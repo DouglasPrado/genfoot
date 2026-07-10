@@ -1,0 +1,96 @@
+# Documentação do Grinta
+
+> **Status:** Rascunho consolidado · **Revisão:** 2026-07-10
+
+**Grinta** é um manager de futebol online no espírito dos clássicos do gênero (Brasfoot, Elifoot), mas com uma camada muito mais profunda de simulação: cada jogador é **único** (origem, personalidade, história de vida, evolução) e cada clube é comandado por uma pessoa real, dentro de um **mundo persistente** e economicamente balanceado que segue evoluindo temporada após temporada.
+
+Esta documentação foi consolidada a partir das conversas de brainstorming em [`../chats/`](../chats/) — que permanecem como arquivo-fonte. Onde os chats deixaram lacunas explícitas, os documentos as marcam com `> **Pendência:**` em vez de inventar conteúdo.
+
+> **Nota sobre o nome:** o diretório do repositório é `genfoot`, um codinome antigo. O nome oficial do produto é **Grinta** (ainda sujeito a verificação de marca — ver [Identidade e Nome](00-produto/02-identidade-e-nome.md)).
+
+## Como navegar
+
+A documentação está organizada em quatro áreas, do "porquê" ao "como":
+
+| Área | O que contém |
+| --- | --- |
+| [`00-produto/`](#00--produto) | Visão, pitch, identidade de marca e a referência histórica que originou o design. |
+| [`01-game-design/`](#01--game-design-gdd) | O GDD — o design de cada sistema do jogo (o "o quê" e o "porquê"). |
+| [`02-tecnico/`](#02--técnico) | Arquitetura, modelo de dados, regras executáveis e roadmap (o "como"). |
+| [`03-guia-do-jogador/`](#03--guia-do-jogador) | O guia oficial voltado a quem joga. |
+| [`99-decisoes/`](#99--decisões) | O registro central de decisões (ADR log), preservando a numeração original. |
+
+**Ponto de entrada recomendado:** comece pela [Visão de Produto](00-produto/01-visao-e-pitch.md) e depois pelo [GDD Overview](01-game-design/00-gdd-overview.md), que resume todos os sistemas e aponta para o detalhe de cada um.
+
+---
+
+### 00 · Produto
+
+- [01 · Visão de Produto e Pitch](00-produto/01-visao-e-pitch.md) — posicionamento, pitches, pilares, público-alvo.
+- [02 · Identidade e Nome](00-produto/02-identidade-e-nome.md) — decisão pelo nome **Grinta**, histórico de naming e pendências de marca.
+- [03 · Referência: Brasfoot](00-produto/03-referencia-brasfoot.md) — como o clássico funcionava e o que Grinta herda/aprofunda (documento de contexto).
+
+### 01 · Game Design (GDD)
+
+- [00 · GDD Overview](01-game-design/00-gdd-overview.md) — documento raiz; mapa de todos os sistemas.
+- [01 · Mundo Persistente e Clubes](01-game-design/01-mundo-persistente-e-clubes.md)
+- [02 · Sistema de Jogadores](01-game-design/02-sistema-de-jogadores.md) — geração, atributos, evolução, memória (+ backlog de gaps).
+- [03 · Economia](01-game-design/03-economia.md) — economia do clube e economia global balanceada.
+- [04 · Estrutura do Clube e Staff](01-game-design/04-estrutura-do-clube-e-staff.md)
+- [05 · Motor de Simulação de Partida](01-game-design/05-motor-de-partida.md)
+- [06 · Temporada e Competições](01-game-design/06-temporada-e-competicoes.md)
+- [07 · Inteligência Artificial](01-game-design/07-inteligencia-artificial.md) — Decision Engine e hierarquia de IAs.
+- [08 · Estádio, Região e Clima](01-game-design/08-estadio-regiao-e-clima.md)
+- [09 · Anti-abuso e Onboarding](01-game-design/09-anti-abuso-e-onboarding.md)
+
+### 02 · Técnico
+
+- [00 · Arquitetura Geral](02-tecnico/00-arquitetura-geral.md) — stack e topologia (monólito modular + workers).
+- [01 · Arquitetura de Dados e Transações (ADRs)](02-tecnico/01-arquitetura-de-dados.md)
+- [02 · Modelo de Dados](02-tecnico/02-modelo-de-dados.md) — **schema Prisma canônico** (fonte da verdade).
+- [03 · Multiplayer e Mundos](02-tecnico/03-multiplayer-e-mundos.md) — mundos, divisões, rodadas assíncronas.
+- [04 · Plataforma, Segurança e Operações](02-tecnico/04-plataforma-seguranca-operacoes.md)
+- [05 · Catálogo de Regras e Fórmulas](02-tecnico/05-catalogo-de-regras-e-formulas.md) — IDs estáveis, máquinas de estado, invariantes.
+- [06 · Roadmap de Implementação](02-tecnico/06-roadmap-de-implementacao.md)
+- [07 · Arquitetura do Core (ECS)](02-tecnico/07-arquitetura-do-core-ecs.md) — modelo Entity–Component–Effect–Event do motor de ecossistema.
+- [08 · Frontend, Cliente e Tempo Real](02-tecnico/08-frontend-cliente-e-tempo-real.md) — stack de frontend, PWA/mobile-first, contratos de API e realtime-gateway.
+
+### 03 · Guia do Jogador
+
+- [Guia Oficial do Jogador](03-guia-do-jogador/README.md) — estrutura de 42 capítulos + spec do site de docs.
+
+### 99 · Decisões
+
+- [Registro de Decisões (ADR Log)](99-decisoes/registro-de-decisoes.md) — série 18xx–19xx e 19.x.
+
+---
+
+## Rastreabilidade — de qual chat cada documento derivou
+
+| Chat de origem (`chats/`) | Documento(s) consolidado(s) |
+| --- | --- |
+| `pitch-elevator.md` | [00-produto/01-visao-e-pitch](00-produto/01-visao-e-pitch.md) |
+| `nome-do-jogo.md`, `descobrindo-nome.md` | [00-produto/02-identidade-e-nome](00-produto/02-identidade-e-nome.md) |
+| `funcionamento-brasfoot.md` | [00-produto/03-referencia-brasfoot](00-produto/03-referencia-brasfoot.md); [02-tecnico/00-arquitetura-geral](02-tecnico/00-arquitetura-geral.md) |
+| `organizacao-de-pensamentos.md` | [01-game-design/00-gdd-overview](01-game-design/00-gdd-overview.md); [01-mundo-persistente-e-clubes](01-game-design/01-mundo-persistente-e-clubes.md) |
+| `lista-envolvidos-jogo.md` | [01-game-design/02-sistema-de-jogadores](01-game-design/02-sistema-de-jogadores.md) (design de jogadores); [02-tecnico/07-arquitetura-do-core-ecs](02-tecnico/07-arquitetura-do-core-ecs.md) (arquitetura de core — 2ª metade) |
+| `economics-initial.md` | [01-game-design/03-economia](01-game-design/03-economia.md) |
+| `planejamento-agrupado-do-jogo.md` | [01-game-design/03-economia](01-game-design/03-economia.md); [04-estrutura-do-clube-e-staff](01-game-design/04-estrutura-do-clube-e-staff.md) |
+| `simulacao-partida.md` | [01-game-design/05-motor-de-partida](01-game-design/05-motor-de-partida.md) |
+| `campeonatos-fim-de-temporadas.md` | [01-game-design/06-temporada-e-competicoes](01-game-design/06-temporada-e-competicoes.md); [02-tecnico/03-multiplayer-e-mundos](02-tecnico/03-multiplayer-e-mundos.md) |
+| `como-podemos-desenvolver-jogo.md` | [01-game-design/07-inteligencia-artificial](01-game-design/07-inteligencia-artificial.md) |
+| `decisao-escopo-do-jogo.md` | [01-game-design/08-estadio-regiao-e-clima](01-game-design/08-estadio-regiao-e-clima.md); [09-anti-abuso-e-onboarding](01-game-design/09-anti-abuso-e-onboarding.md); [99-decisoes](99-decisoes/registro-de-decisoes.md) |
+| `arquitetura-jogo.md` | [02-tecnico/01-arquitetura-de-dados](02-tecnico/01-arquitetura-de-dados.md); [99-decisoes](99-decisoes/registro-de-decisoes.md) |
+| `entidades-do-banco-de-dados-inicial.md` | [02-tecnico/02-modelo-de-dados](02-tecnico/02-modelo-de-dados.md) |
+| `ux-do-jogo.md` | [02-tecnico/04-plataforma-seguranca-operacoes](02-tecnico/04-plataforma-seguranca-operacoes.md) (admin/segurança/ops); [02-tecnico/08-frontend-cliente-e-tempo-real](02-tecnico/08-frontend-cliente-e-tempo-real.md) (frontend/PWA/API/tempo real) |
+| `como-construir-jogo-regras.md` | [02-tecnico/05-catalogo-de-regras-e-formulas](02-tecnico/05-catalogo-de-regras-e-formulas.md); [06-roadmap-de-implementacao](02-tecnico/06-roadmap-de-implementacao.md) |
+| `guia-jogador-initial.md` | [03-guia-do-jogador/README](03-guia-do-jogador/README.md) |
+
+> **Nota:** dois chats têm nomes que não refletem o conteúdo — `ux-do-jogo.md` é, na verdade, arquitetura técnica (backend/plataforma/segurança **e** frontend/cliente/tempo real, dividido entre os docs [04](02-tecnico/04-plataforma-seguranca-operacoes.md) e [08](02-tecnico/08-frontend-cliente-e-tempo-real.md)), e `lista-envolvidos-jogo.md` é o design do sistema de jogadores (não uma lista de pessoas). O `ux-do-jogo.md` define a stack de frontend e a estratégia mobile-first/PWA (com app nativo futuro), mas **não** um desenho tela a tela (fluxos de UI/UX detalhados) — essa spec de telas ainda precisa ser criada.
+
+## Convenções
+
+- **Nome do jogo:** sempre **Grinta** no corpo; "Brasfoot" aparece apenas como referência histórica.
+- **Cabeçalho padrão:** cada documento abre com **Status**, **Fontes** e **Revisão**, seguido de resumo e sumário.
+- **Pendências:** lacunas conhecidas e decisões em aberto são marcadas com `> **Pendência:**`.
+- **Rastreabilidade:** os IDs de decisão originais (ex.: `Decisão 1801`, `19.7`) e de regra (`ECO-001`, `PLY-001`) são preservados.
