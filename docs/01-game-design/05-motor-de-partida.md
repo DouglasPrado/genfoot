@@ -76,6 +76,18 @@ O fluxo lógico completo do funcionamento ideal:
 12. Fecha estatísticas.
 13. Atualiza jogadores, clube, torcida e narrativa.
 
+### Preparação para a partida
+
+A etapa de **pré-jogo** não é só carregar escalação: é toda a preparação que antecede o apito. Ela alimenta o estado inicial físico, emocional e tático e a leitura da comissão técnica.
+
+- **Dossiê da partida.** A comissão reúne um dossiê do confronto: adversário, forma recente, provável escalação, padrões táticos, pontos fortes, fragilidades, situação física do elenco, clima, gramado, viagem, importância e regulamento.
+- **Conhecimento imperfeito do adversário.** O jogo **não revela automaticamente a escalação real** do adversário. O conhecimento depende de observação, análise, partidas públicas, funcionários e tempo de preparação — a comissão **estima**, não entrega a verdade (coerente com o "adversário invisível" da [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)).
+- **Estado do elenco pré-jogo.** Antes da partida, a comissão apresenta a lista de disponíveis, em dúvida, restritos, suspensos, fatigados, sem ritmo e inscritos.
+- **Viagem e logística.** A preparação considera distância, horário, hospedagem, transporte, descanso, clima e adaptação. **Economizar em logística pode aumentar a fadiga e reduzir a preparação** — não é um custo neutro.
+- **Reunião pré-jogo.** O usuário pode definir mensagem, expectativa, abordagem emocional, prioridades e capitão. O efeito depende do contexto, da credibilidade e do perfil do grupo (conecta-se às ações emocionais da [seção 11](#11-acoes-taticas-e-substituicoes-com-custo-e-cooldown)).
+
+Há ainda o **treino específico** da semana (preparar-se para a pressão adversária, defesa de bola parada, ataque a um setor, adaptação a gramado/clima, simulação de cenários), cujo sistema completo é detalhado em outro escopo. A escalação é confirmada dentro do prazo; se o usuário estiver ausente, a política definida e a comissão preparam uma escalação válida.
+
 ## 3. Atributos coletivos dinâmicos
 
 A força do time durante a partida **não é fixa** — ela muda conforme o jogo anda. Cada clube tem atributos coletivos derivados dos jogadores e da estrutura do clube: ataque, defesa, meio-campo, criação, finalização, marcação, compactação, pressão, velocidade, bola parada, controle emocional, resistência física, entrosamento, disciplina e moral.
@@ -292,6 +304,24 @@ Regras de design consolidadas:
 
 A IA offline não pode ser tão agressiva quanto um bom usuário (senão acompanhar não teria valor), nem burra demais (senão o offline seria punido excessivamente). Ela detecta uma vantagem pelo lado direito mas não faz mudança agressiva; faz ajustes leves (reduzir marcação de volante amarelado, recuar a linha diante de atacante veloz, substituir por fadiga acima do limite). O resultado offline tende a ser um pouco pior não porque a IA foi burra, mas porque não explorou as vantagens ofensivas tão bem quanto um usuário atento.
 
+### Retorno do usuário à partida
+
+Quando o usuário volta online no meio de uma partida em andamento, ele não é jogado de volta no jogo às cegas: o motor entrega um **resumo estruturado** do que aconteceu enquanto ele esteve offline, para que retome o controle com contexto. O resumo deve conter:
+
+- **minuto em que saiu** e **minuto atual**;
+- **placar**;
+- **eventos importantes** do período offline;
+- **ações tomadas pela IA** enquanto o usuário esteve ausente;
+- **situação atual** da partida;
+- **alertas ativos**;
+- **riscos**;
+- **oportunidades**;
+- **sugestão atual da comissão**.
+
+Exemplo funcional: "Você voltou aos 64 minutos. Enquanto esteve offline, seu volante recebeu amarelo, o adversário aumentou a pressão e sua comissão reduziu a agressividade dele. O jogo está empatado, seu lateral esquerdo está cansado e o adversário domina o meio."
+
+A qualidade e a antecipação desse resumo dependem da comissão técnica (ver [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)).
+
 ### Plano de jogo pré-configurado
 
 Antes da partida, o usuário define o plano que vira a base da IA offline: mentalidade, foco, gatilhos de substituição (ex.: "substituir acima de 85% de fadiga se houver reserva adequado"), respostas a cenários (perdendo, ganhando, expulsão). Mesmo offline, o time segue o estilo do usuário. A **autonomia** concedida à IA é configurável.
@@ -338,6 +368,7 @@ Escala de justiça: usuário online > offline com bom plano > offline sem plano.
 Como há usuários offline e a partida pode durar, o estado precisa ser persistido (`MatchState` com momentum, placar, eventos, decisões etc.). Diretrizes:
 
 - **Servidor autoritativo:** o cliente nunca calcula resultado — só envia comando; o servidor valida (usuário controla o clube? partida ativa? ação válida? substituição permitida? jogador disponível? janela não expirou?), processa e emite o novo estado.
+- **Fairness em PvP ao vivo:** em partidas entre dois usuários online, os comandos devem ser processados em ordem válida e aplicados no próximo ciclo apropriado da simulação, evitando que a latência de conexão vire vantagem competitiva — nenhum dos dois jogadores ganha por ter enviado o comando alguns milissegundos antes.
 - **Determinismo controlado por seed** (`matchSeed`, `tickSeed`, `eventSeed`): permite reproduzir a partida para debug, balanceamento, investigação de bug e — sobretudo — evitar acusação de "roubo". Comandos do usuário mudam o caminho da simulação.
 - **Snapshot e rollback:** salvar no início, no intervalo, a cada X ticks, antes de decisão crítica e no fim. Se um worker cair, outro continua do último snapshot. Para performance, manter o estado atual em memória rápida (ex.: Redis) e persistir snapshots no banco.
 - **Versão do motor** (`simulationVersion`, `tuningVersion`, `rulesVersion`): partidas antigas continuam auditáveis mesmo após mudanças de regra.
@@ -388,11 +419,32 @@ O usuário **não deve enxergar tudo do adversário com precisão total**. A com
 - **Estimativa, não dado exato:** a comissão diz "o lateral adversário parece cansado", e não "o lateral adversário está com 78% de fadiga" — a menos que o jogo permita análise avançada. Isso evita informação perfeita demais.
 - **Precisão cresce com o nível:** uma comissão alta dá estimativas melhores. A mesma leitura de fadiga escala de "o time está cansando" (baixa) para "seu lado esquerdo está cansando" (média) e para "seu lateral esquerdo perdeu velocidade nos últimos sprints e já não acompanha o ponta adversário" (alta).
 
+### Leitura do perfil do árbitro
+
+Uma comissão alta consegue **detectar o perfil do árbitro durante o jogo** e recomendar ajustes de acordo. O árbitro tem características funcionais — rigor, caseirismo, tolerância a contato, propensão a pênalti e critério disciplinar (ver [seção 10](#10-contexto-torcida-estrutura-clima-gramado-e-arbitragem)) — que afetam marcação forte, faltas, cartões, pênaltis, pressão da torcida e o comportamento de jogadores indisciplinados. Ao ler esse perfil, a comissão pode sugerir, por exemplo, reduzir a agressividade de um pendurado diante de um árbitro rigoroso, ou explorar mais o contato físico diante de um árbitro tolerante.
+
 ### A comissão pode errar
 
 O auxiliar **complementa** o usuário, não o substitui: mesmo com comissão nível 5, um bom usuário deve render mais. E a comissão pode diagnosticar errado (erro de diagnóstico), sugerir tarde ou avaliar mal — o que dá espaço para o usuário discordar. É preciso, ainda, calcular a confiança do usuário na comissão e ter fallback para comissão ruim.
 
 > O detalhamento da inteligência da comissão e da IA fica em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md).
+
+## 14. Reputação tática do usuário (cross-match)
+
+Com o tempo, o usuário desenvolve uma **reputação tática**: um estilo percebido que os adversários passam a reconhecer e para o qual podem se preparar **entre partidas**. Os estilos percebidos previstos são:
+
+- **ofensivo**
+- **defensivo**
+- **reativo**
+- **pragmático**
+- **intenso**
+- **arriscado**
+- **desenvolvedor**
+- **analítico**
+
+Adversários se preparam contra **padrões recorrentes** do usuário ao longo de várias partidas. Se o usuário sempre pressiona alto, um adversário pode preparar bolas longas nas costas da linha; se sempre recua após abrir vantagem, pode antecipar isso e chegar ao jogo disposto a aumentar a pressão e os cruzamentos. Isso impede que uma estratégia seja dominante para sempre.
+
+Este mecanismo é **distinto do contra-ajuste intra-partida** (ver [seção 12](#12-sistema-online-vs-offline) e a pendência de IA adversária na [seção 18](#18-pontos-criticos-a-resolver)): o contra-ajuste reage a padrões repetidos **dentro do mesmo jogo** (o usuário ataca 15 minutos pelo mesmo lado e a comissão adversária dobra a marcação); a reputação tática atua **de uma partida para outra**, fazendo o adversário já entrar em campo preparado contra o estilo histórico do usuário.
 
 ## 15. Arquitetura conceitual do engine
 
@@ -537,6 +589,8 @@ Os acréscimos podem depender de lesões, substituições, VAR, cera, cartões e
 
 > **Pendência:** se as ações de cera existirão como comando explícito do usuário ainda está em aberto na fonte ("Ações de cera podem existir?"). Caso existam, precisam carregar risco real (cartão, irritação do adversário, pressão da arbitragem).
 
+> **Pendência:** **Papel do usuário.** Ainda está em aberto na fonte se o usuário será sempre o **técnico**, se atuará como **gestor/diretor**, ou se poderá **contratar um técnico (e auxiliar) com personalidade e estilo próprios**. A definição afeta quem toma as decisões táticas ao vivo, a postura da IA offline (ver [seção 12](#12-sistema-online-vs-offline)) e a forma como a comissão técnica se relaciona com o usuário.
+
 ## 18. Pontos críticos a resolver
 
 Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de execução que precisam ser fechadas antes de virar implementação real.
@@ -561,7 +615,7 @@ Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de ex
 
 > **Pendência:** **IA adversária que reage (contra-ajuste).** NPC e IA offline precisam reagir a padrões repetidos conforme sua comissão, com nível de leitura, estilo do técnico, coragem e conservadorismo próprios, para evitar estratégia dominante.
 
-> **Pendência:** **Diferentes níveis de simulação para performance.** Partidas simultâneas exigem granularidade variável (online em ticks, offline por blocos, NPC×NPC resumida) mantendo a sensação de mesmo universo. Definir também servidor autoritativo, compatibilidade de jogadores e especialização de bola parada. (Jogadores fora de posição, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo agora estão especificados na [seção 16](#16-fases-finais-e-situacoes-criticas).)
+> **Pendência:** **Diferentes níveis de simulação para performance.** Partidas simultâneas exigem granularidade variável (online em ticks, offline por blocos, NPC×NPC resumida) mantendo a sensação de mesmo universo. Definir também servidor autoritativo, compatibilidade de jogadores e especialização de bola parada. (Jogadores fora de posição, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo agora estão especificados na [seção 17](#17-fases-finais-e-situacoes-criticas).)
 
 > **Pendência:** **Calibração estatística do motor.** Rodar lotes de testes automáticos (ex.: 10.000 partidas equilibradas, favorito×azarão, com chuva, pressão alta, comissão nível 1 vs 5, online e offline) para garantir distribuições realistas de placar, consistência entre ligas e ausência de bola de neve exagerada.
 

@@ -535,20 +535,68 @@ Complementam as decisões acima com as convenções de modelagem aplicadas a tod
 ### Valores monetários e numéricos
 
 - **Dinheiro** em unidade mínima: `amount_minor: bigint` + `currency_code: string` (ex.: R$ 10,50 → `amount_minor = 1050`, `currency_code = BRL`). A moeda interna do mundo pode usar código próprio quando não representar moeda real.
+- **Operações exatas:** soma, subtração e comparação de dinheiro são exatas; **moedas diferentes nunca são somadas silenciosamente**. O saldo oficial deriva do livro financeiro (ledger), não de métricas ou projeções (ver Decisão 19.10, ledger balanceado).
 - **Ponto flutuante é proibido** para dinheiro, percentuais contratuais, parcelas, pontos e saldos.
-- **Percentuais** em pontos-base / inteiro escalado / decimal controlado, com a escala definida no contrato do valor.
+- **Conversão de moeda com taxa versionada:** quando houver conversão entre moedas, ela usa uma **taxa versionada** e **preserva a taxa efetivamente aplicada à operação histórica** — a operação registra a taxa usada (não apenas o valor convertido), permitindo reproduzir e auditar o câmbio no tempo. Recalcular um lançamento histórico com a taxa atual é proibido.
+
+### Escalas inteiras (percentuais, probabilidades e atributos)
+
+Valores oficiais que não são dinheiro também usam representação inteira em escala conhecida, nunca ponto flutuante:
+
+- **Percentuais** financeiros e contratuais usam **escala inteira padronizada** (pontos-base / inteiro escalado / decimal controlado), com a escala definida no contrato do valor.
+- **Probabilidades oficiais** usam **escala inteira fixa**, com zero e máximo representados sem ambiguidade (ex.: base `10000` = 100%).
+- **Atributos oficiais** e **multiplicadores determinísticos** usam valores inteiros em escala conhecida. A **escala interna** pode oferecer precisão superior à exibição pública; a referência inicial é uma escala de **0 a 10000 pontos**.
+- **Exibição não revela a precisão oficial:** a interface pode mostrar uma forma **arredondada** ou uma **faixa percebida** sem expor o valor interno exato (coerente com observação/scouting, em que o valor oficial do jogador não é exposto só porque a tela tem um campo correspondente).
+- **Sem mistura silenciosa de unidades:** mudar de escala exige versionamento explícito.
+
+> **Pendência (escalas internas):** a representação fixa e determinística de atributos, probabilidades e multiplicadores está aprovada, mas o **catálogo definitivo de escalas por tipo de atributo** e os limites específicos de cada valor ainda serão refinados (§26.4 do escopo), sem permitir mistura de unidades ou mudança de escala sem versionamento.
+
+### Arredondamento e conservação numérica
+
+- **Regra de arredondamento declarada:** toda operação que descarte precisão declara explicitamente sua regra de arredondamento.
+- **Arredondar só no ponto de negócio:** o arredondamento ocorre apenas no ponto definido pela regra de negócio, nunca de forma prematura em cálculos intermediários.
+- **Conservação de resíduos:** resíduos de divisão distribuída (ex.: rateio de premiação, parcelamento de valores) são distribuídos de forma **determinística** e **nunca são perdidos ou criados silenciosamente** — a soma das partes reconstitui exatamente o total.
+- **Numerador/denominador preservados:** critérios oficiais de classificação (saldo, aproveitamento, médias) preservam numeradores e denominadores quando possível, evitando arredondamento prematuro que distorça desempates.
+- **Rejeição de valores inválidos:** estados oficiais rejeitam valores inválidos, indefinidos ou infinitos (`NaN`, `±∞`, divisão por zero não tratada). O estado oficial não pode depender de aproximações numéricas não determinísticas.
 
 ### Tempo real vs. tempo do mundo
 
-- **Datas reais** (login, criação, deployment, entrega de notificação, auditoria) em **UTC**.
-- **Tempo do mundo** armazenado separadamente (`world_date`, `world_day`, `world_minute`, `world_tick`, `season_id`). Uma entidade pode carregar ambos: `occurred_at_real` e `occurred_at_world`.
-- A retenção física segue o tempo real, não o tempo lógico (ver Decisão 19.9).
+O sistema distingue **quatro conceitos de tempo** (§5.4 do escopo); nenhum é intercambiável com outro:
+
+- **Tempo real** (login, criação, deployment, entrega de notificação, auditoria) em **UTC**. A apresentação pode converter instantes reais para o fuso do usuário, mas essa conversão **não altera o valor oficial**.
+- **Tempo lógico do mundo** armazenado separadamente (`world_date`, `world_day`, `world_minute`, `world_tick`, `season_id`). Uma entidade pode carregar ambos: `occurred_at_real` e `occurred_at_world`. **Datas do mundo não sofrem conversão de fuso**, e conceitos que representam apenas um dia permanecem sem horário artificial.
+- **Relógio da partida:** tempo decorrido dentro de uma partida, com períodos e acréscimos próprios, separado do calendário do mundo (ver runtime de partida no agendador).
+- **Duração (`Duration`) como Value Object explícito:** um **intervalo** expresso com **unidade explícita** (ex.: dias de contrato, minutos de jogo), distinto de um instante ou data. Evita confundir tempo real com tempo de jogo e acompanha os demais VOs de tempo do shared kernel (`WorldDate`, `DateRange`).
+- A **retenção física** segue o tempo real, não o tempo lógico (ver Decisão 19.9).
 
 ### JSONB e relações
 
 - **JSONB** para payloads de eventos, snapshots, metadados, configurações versionadas, resultados de simulação e dados extensíveis. **Não** substitui indiscriminadamente relações centrais.
 - Contratos, participantes, proprietários, jogadores inscritos, parcelas e títulos são modelados **relacionalmente**.
 - **SQL direto** é permitido (locks, `FOR UPDATE SKIP LOCKED`, particionamento, consultas analíticas, operações em lote, CTEs, extensões PostgreSQL), sempre encapsulado na infraestrutura e nunca concatenando entrada de usuário.
+
+### Semântica de ausência e estados incompletos
+
+Presença obrigatória é o padrão: dados necessários para interpretar uma entidade estão sempre presentes. A ausência só é permitida quando tem significado de domínio claro e documentado (ex.: "não possui avatar", "notificação ainda não lida", "processo ainda não concluído").
+
+**Proibições:**
+
+- **Sem sentinelas:** não usar zero, valor negativo, data artificial, identificador vazio ou texto vazio para representar ausência.
+- **Sem booleanos contraditórios:** não representar uma máquina de estados com múltiplos booleanos que podem se contradizer — o estado é **explícito** (enum/`status`) e coerente com os dados relacionados.
+- **Não inferir estado pela presença de campo:** o estado atual não é deduzido apenas por um campo estar preenchido ou nulo.
+- **Distinguir os tipos de ausência:** desconhecido, privado, não aplicável, removido e pendente de cálculo **não** são a mesma coisa.
+
+**Coerência por estado:**
+
+- Campos de início, conclusão, aceitação, rejeição, entrega ou cancelamento existem **somente** nos estados correspondentes; conjuntos de campos que só aparecem juntos podem ser extraídos para entidades próprias, evitando estruturas cheias de nulos ambíguos.
+- **Campos calculados** carregam estado de cálculo, resultado, momento de conclusão e erro quando aplicável — não um valor "mágico" que confunda "ainda não calculado" com "resultado zero".
+- **Semântica de atualização:** a **omissão** de um campo em um update significa "não alterar"; a **ausência explícita** só remove o valor quando essa operação é permitida (distinção entre patch parcial e remoção intencional).
+
+### Contratos de fronteira e não-exposição do modelo interno
+
+- **Modelos internos de persistência não são devolvidos diretamente aos clientes.** As fronteiras (HTTP, WebSocket, mensageria) expõem **DTOs**/contratos, nunca entidades Prisma, linhas de tabela ou agregados de domínio crus — o pacote `shared` concentra esses DTOs (ver `./00-arquitetura-geral.md`).
+- **Contratos versionados:** comandos, consultas, eventos, tarefas e o protocolo em tempo real têm contratos explícitos e versionados; entradas são validadas estritamente nas fronteiras (Zod).
+- **Mudanças incompatíveis** exigem nova versão e período de compatibilidade — clientes antigos podem permanecer abertos durante uma atualização.
 
 ---
 

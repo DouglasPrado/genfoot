@@ -42,6 +42,7 @@ O objetivo é transformar as decisões de design — hoje dispersas em conversas
   - [3.1 Partida](#31-partida)
   - [3.2 Temporada](#32-temporada)
 - [4. Eventos de Domínio](#4-eventos-de-domínio)
+  - [4.1 Telemetria por evento (log de depuração)](#41-telemetria-por-evento-log-de-depuração)
 - [5. Invariantes](#5-invariantes)
 - [6. Interfaces TypeScript de Referência](#6-interfaces-typescript-de-referência)
 - [7. Notas de Ligação](#7-notas-de-ligação)
@@ -837,6 +838,21 @@ Os eventos de domínio formam o registro imutável do que aconteceu no universo.
 | `SeasonCompleted`          | Uma temporada foi concluída. |
 
 Cada evento é persistido de forma imutável. A estrutura de registro prevista carrega `id`, `worldId`, `aggregateType`, `aggregateId`, `eventType`, `gameDate`, `sequence`, `payload`, `rulesetVersion` e `createdAt`.
+
+### 4.1 Telemetria por evento (log de depuração)
+
+Além do registro imutável de eventos de domínio, o motor mantém um **log interno de telemetria** por evento, voltado a desenvolvimento, balanceamento e auditoria. Esses campos **não aparecem para o usuário comum** — são invisíveis na experiência, mas essenciais para depuração e para explicar por que um resultado aconteceu. Por evento, o log registra:
+
+- **chance real de gol** aplicada no lance;
+- **causa dos gols** (o que originou cada gol);
+- **ação que influenciou** o evento (comando do usuário/IA que alterou o desfecho);
+- **setor de origem** da jogada;
+- **xG** da finalização;
+- **probabilidade aplicada** no sorteio;
+- **principais modificadores** que pesaram no cálculo;
+- **cadeia causal** completa do lance.
+
+Esse log sustenta a explicabilidade do motor (ver a pendência "Registrar causalidade dos eventos" em [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md)) e a calibração estatística em massa (gols por jogo, finalizações, cartões, lesões, empates, viradas, goleadas, vitórias de favoritos, zebras, vantagem de mando, impacto da comissão, impacto do usuário online e quantidade de alertas).
 
 ---
 

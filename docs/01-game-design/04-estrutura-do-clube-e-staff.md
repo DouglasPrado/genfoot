@@ -4,7 +4,7 @@
 
 No **Grinta**, o usuário não gerencia apenas uma escalação: ele constrói uma instituição de futebol ao longo do tempo. O nível real de um clube é resultado da soma entre estrutura física, funcionários, reputação, finanças, desempenho esportivo e capacidade de formar e contratar jogadores. Dois clubes podem ter o mesmo caixa e ainda assim evoluir de formas completamente diferentes, dependendo de onde investem.
 
-Este documento consolida a estrutura organizacional do clube (as ~10 áreas e seus níveis), o papel dos funcionários como multiplicadores de qualidade, as regras de crescimento controlado e manutenção, o modelo de "árvore de evolução" com estilos de clube, e o detalhamento da comissão técnica (cargos e atributos).
+Este documento consolida a estrutura organizacional do clube (as ~10 áreas e seus níveis), o papel dos funcionários como multiplicadores de qualidade, as regras de crescimento controlado e manutenção, o modelo de "árvore de evolução" com estilos de clube, e o detalhamento da comissão técnica (cargos e atributos). As três seções finais reconciliam esse modelo com os documentos definitivos: o **modelo de 6 núcleos** (nível 1–5), a **infraestrutura granular** (que rejeita níveis genéricos) e a separação entre **cargo, responsabilidade e delegação** dos funcionários.
 
 ## Sumário
 
@@ -18,6 +18,9 @@ Este documento consolida a estrutura organizacional do clube (as ~10 áreas e se
 8. [Estilos de crescimento de clube](#8-estilos-de-crescimento-de-clube)
 9. [Comissão técnica: cargos e atributos](#9-comissão-técnica-cargos-e-atributos)
 10. [Perfis de funcionários](#10-perfis-de-funcionários)
+11. [Modelo de 6 núcleos (consolidação)](#11-modelo-de-6-núcleos-consolidação)
+12. [Infraestrutura granular](#12-infraestrutura-granular)
+13. [Cargo, responsabilidade e delegação (funcionários)](#13-cargo-responsabilidade-e-delegação-funcionários)
 
 ---
 
@@ -425,3 +428,138 @@ Além do nível, funcionários podem ter **perfil**, o que adiciona estratégia 
 | Diretoria | Conservadora; Negociadora; Ousada; Formadora; Financeira; Ambiciosa |
 
 > **Pendência:** as fontes trazem perfis apenas para equipe médica, comunicação e diretoria. Definir se as demais áreas (comissão técnica, olheiros, preparação física, análise etc.) também terão perfis e quais seriam.
+
+## 11. Modelo de 6 núcleos (consolidação)
+
+O documento definitivo de escopo consolida a estrutura do **Grinta** em **seis núcleos funcionais**, cada um combinando estrutura, profissionais, orçamento, processos, moral, adaptação e especializações. É um segundo recorte da mesma realidade descrita nas seções 1–3: em vez de ~10 áreas independentes em escala 1–10, o clube é lido por seis núcleos, cada um em **escala 1–5**.
+
+**Escala de nível do núcleo:**
+
+| Nível | Significado |
+| --- | --- |
+| 1 | Básico e limitado |
+| 2 | Funcional |
+| 3 | Competitivo |
+| 4 | Avançado |
+| 5 | Elite |
+
+O nível não representa apenas instalações: inclui capacidade, equipe, ferramentas e processos. A **eficiência real** pode ficar abaixo do nível nominal se houver orçamento insuficiente, sobrecarga, crise, profissionais inadequados ou baixa adaptação. Cada núcleo possui uma **especialização principal** e uma **secundária**; trocar de especialização exige investimento, tempo e adaptação, e pode reduzir a eficiência temporariamente.
+
+**Mapeamento das ~10 áreas (1–10) para os 6 núcleos (1–5):**
+
+| Núcleo | Áreas atuais mapeadas | Especializações (principal/secundária) | Principais efeitos |
+| --- | --- | --- | --- |
+| 1. Técnico | Comissão técnica; Centro de treinamento (qualidade do treino); Análise de desempenho (leitura de jogo) | posse, pressão, transição, jogo direto, bloco baixo, bola parada, jovens, análise de adversário | escalação e substituição automática, plano de jogo, leitura do adversário, repertório tático, sugestões em partida, adaptação, plano para jogos sem o usuário |
+| 2. Físico e médico | Preparação física; Equipe médica | prevenção, recuperação, performance, jovens, veteranos, retorno pós-lesão, diagnóstico | risco de lesão, controle de carga, recuperação, diagnóstico, prevenção, cuidado com jovens/veteranos, recomendação de escalação e substituição |
+| 3. Mental e disciplinar | (sem área direta hoje; diluído em comissão técnica e comunicação) | pressão, liderança, disciplina, integração, crise, confiança, adaptação | moral, pressão, disciplina, reação a erros, liderança, integração, conflitos, estabilidade de jovens, recuperação emocional |
+| 4. Mercado e base | Olheiros; Categoria de base | captação regional, scouting, jovens, livres, contratos, empréstimos, análise de dados | precisão do scouting, avaliação de potencial, descoberta e proteção de jovens, contratos, oportunidades de mercado, empréstimos, reputação formadora |
+| 5. Gestão e diretoria | Diretoria (+ Jurídico/Contratos e Financeiro da árvore) | folha, dívida, orçamento, contratos, infraestrutura, conformidade, crise | orçamento, previsão de caixa, controle de folha, dívida, negociação, infraestrutura, licenciamento, contratação de profissionais, planos de recuperação |
+| 6. Comunicação e torcida | Comunicação; Estádio (dimensão torcida/receita, não a física) | imprensa, torcida, marketing, sócios, patrocínio, proteção de jovens, gestão de ídolos | reação a resultados e decisões, crise de imagem, imprensa, patrocínios, sócios, vazamentos, proteção de jovens, venda de ídolos, narrativa do projeto |
+
+Notas de mapeamento:
+
+- O **núcleo mental e disciplinar** não tem equivalente direto nas 10 áreas atuais; hoje suas funções aparecem diluídas na comissão técnica (controle emocional) e na comunicação (moral e pressão). É a principal novidade estrutural do modelo de 6 núcleos.
+- A **dimensão física** do Estádio, do CT e da Academia pertence à infraestrutura granular (ver [seção 12](#12-infraestrutura-granular)), não ao núcleo. Só a leitura de "torcida/receita" do estádio entra no núcleo de comunicação e torcida.
+- **Análise de desempenho** alimenta tanto o núcleo técnico (leitura de jogo) quanto o núcleo de mercado e base (análise de dados de scouting).
+
+> **Pendência (escala a unificar):** as áreas usam **1–10** (seções 2–3) e os núcleos usam **1–5** (documento definitivo de escopo). A escala canônica única precisa ser fixada — provável mapeamento das faixas 1–10 para os 5 níveis, ou adoção de uma escala única em todo o sistema. Esta é a mesma pendência levantada em 3.2 para as sugestões em partida e deve ser resolvida em conjunto.
+
+> **Pendência (recorte a unificar):** convivem dois recortes da mesma estrutura — ~10 áreas independentes (seção 3) e 6 núcleos agregadores (esta seção). Definir se os núcleos são a camada oficial de modelagem (com as áreas como subdivisões) ou o contrário, e onde encaixar o novo núcleo mental e disciplinar.
+
+## 12. Infraestrutura granular
+
+O documento definitivo do simulador **rejeita explicitamente representar a infraestrutura como uma lista genérica de níveis**. A infraestrutura é composta por instalações, módulos, equipamentos, capacidades e condições reais. Isso convive em tensão com o modelo de níveis 1–10 usado para Estádio, CT e Academia nas seções 2–3 (ver pendência ao fim da seção).
+
+**Áreas físicas:** Estádio; Centro de treinamento; Medicina e reabilitação; Desempenho e análise; Academia e formação; Administração; Tecnologia e dados; Comercial e hospitalidade; Transporte e logística.
+
+### 12.1 Propriedade vs. acesso vs. capacidade operacional
+
+Uma instalação não é só "boa" ou "ruim". **Propriedade, direito de uso e capacidade operacional são tratados separadamente.** Uma instalação pode ser:
+
+- **Própria**
+- **Alugada**
+- **Concedida**
+- **Compartilhada**
+- **Utilizada por acordo temporário**
+
+Ou seja: o clube pode ter acesso a um estádio de alto padrão sem ser dono dele, ou ser dono de uma estrutura que opera abaixo da sua capacidade nominal.
+
+### 12.2 Dimensões distintas de cada estrutura
+
+Cada estrutura carrega dimensões independentes — um único "nível" não as resume:
+
+- **Qualidade funcional**
+- **Condição física** (estado de conservação)
+- **Capacidade nominal**
+- **Capacidade operacional**
+- **Disponibilidade**
+- **Conformidade** (licenças e certificações)
+
+Uma instalação de alta qualidade pode operar mal se estiver deteriorada, sem manutenção ou sem funcionários suficientes. No estádio, a **capacidade licenciada pode ser menor que a capacidade física**.
+
+### 12.3 Manutenção, deterioração e conformidade
+
+Instalações se deterioram com uso, tempo, clima, falta de manutenção, incidentes e sobrecarga. A manutenção preventiva reduz risco, mas tem custo e ocupa recursos. Instalações podem exigir inspeção, certificação, licença, capacidade mínima e plano de adequação; falhas geram restrição de uso, redução de capacidade, necessidade de estádio alternativo, impedimento de acesso a divisão superior ou multa/prazo de correção. Ver licenciamento em [Economia](./03-economia.md) e nas regras de competição.
+
+### 12.4 Projetos de infraestrutura (processo de 9 etapas)
+
+Uma obra não é "clicar e melhorar": é um **projeto que percorre nove etapas**.
+
+```
+1. Estudo de viabilidade
+2. Aprovação
+3. Financiamento
+4. Contratação
+5. Preparação
+6. Execução
+7. Inspeção
+8. Entrega
+9. Entrada em operação
+```
+
+**Riscos de projeto** (podem ocorrer em qualquer etapa): atraso; aumento de custo (sobrecusto); mudança de escopo; falha de fornecedor; entrega parcial; problemas de licença.
+
+### 12.5 Obras que atravessam a temporada
+
+Obras em andamento afetam capacidade do estádio, treinos, rotina médica, amistosos, receita e disponibilidade de instalações. **O fim de uma temporada não conclui automaticamente uma obra:** ela continua conforme seus prazos reais, atravessando a virada de temporada. Isso contrasta com o "tempo de implantação" curto e fixo dos upgrades por nível (seção 6).
+
+### 12.6 Patrimônio e sustentabilidade
+
+A infraestrutura tem valor, custo de manutenção, vida útil e impacto operacional. O clube pode comprar, vender, alugar, ampliar, substituir ou desativar ativos, respeitando contratos e aprovações. Medidas de eficiência, consumo e adaptação climática reduzem custos e riscos, sem gerar vantagens mágicas.
+
+> **Pendência (modelo a reconciliar):** o modelo atual trata Estádio, CT e Academia como áreas em escala 1–10 com "custo/tempo de implantação" fixos (seções 2, 3 e 6), enquanto o documento definitivo modela infraestrutura por dimensões granulares (propriedade/acesso, condição, capacidades, conformidade) e por projetos de 9 etapas com riscos e prazos reais. Definir se o "nível 1–10" passa a ser apenas uma leitura derivada dessas dimensões, ou se a infraestrutura sai do modelo de níveis enquanto os departamentos/núcleos o mantêm.
+
+## 13. Cargo, responsabilidade e delegação (funcionários)
+
+Esta seção refina o papel dos funcionários descrito na seção 4. O documento definitivo do simulador é explícito: **funcionários não serão apenas bônus percentuais.** Cada profissional possui identidade, carreira, função, competências, especialidades, reputação, contrato, relações, disponibilidade, carga de trabalho e responsabilidades. O "multiplicador de qualidade" (seção 4) é o efeito agregado, não a definição completa do funcionário.
+
+### 13.1 Cargo ≠ responsabilidade
+
+**Cargo e responsabilidade são separados.** Um funcionário ocupa um cargo e recebe responsabilidades específicas, com **limites definidos**. Exemplos:
+
+- O diretor esportivo **prepara** negociações; o usuário **aprova** compromissos acima de determinado valor.
+- O analista **produz recomendações**, mas não altera a tática sozinho.
+
+### 13.2 Delegação graduada (mantendo visibilidade)
+
+A delegação é graduada por nível de autoridade:
+
+- **Preparar**
+- **Recomendar**
+- **Monitorar**
+- **Executar dentro de limites**
+- **Aprovar ações de baixo risco**
+
+**Delegar não significa perder visibilidade.** O usuário sempre deve saber: quem recebeu a tarefa, qual autoridade possui, o que foi realizado, qual regra foi usada e qual resultado ocorreu. Alinha-se à delegação por área da governança do clube — recomendações podem ser ignoradas, mas as consequências permanecem com o gestor.
+
+### 13.3 Sobrecarga, ausência e escalonamento
+
+Funcionários podem ficar **sobrecarregados, indisponíveis ou ausentes**. Isso pode causar: atraso; menor qualidade de análise; falta de acompanhamento; necessidade de substituto; **escalonamento ao usuário**. Excesso de lesionados, relatórios, categorias de base, negociações ou crises reduz a eficiência do núcleo responsável; contratar mais profissionais alivia a sobrecarga, mas aumenta a folha.
+
+**Áreas críticas não podem permanecer sem responsável sem que o jogo sinalize a lacuna.** O clube mantém sempre uma operação mínima (execução básica e fraca), e saídas repentinas podem ser cobertas por interinos por período curto.
+
+### 13.4 Desenvolvimento de funcionários
+
+Funcionários evoluem (ganham experiência, melhoram competências, obtêm qualificações, mudam de função, são promovidos) ou regridem (perdem desempenho por idade, contexto ou desatualização) e podem se aposentar. O desenvolvimento depende de trabalho, formação, ambiente e oportunidade, não de progressão automática idêntica. Complementa o efeito da estrutura sobre veteranos e o ciclo de renovação já descrito na seção 4.
+
+> **Pendência (modelo a reconciliar):** a seção 4 modela funcionários como **multiplicadores numéricos de qualidade** (ex.: comissão nível 5 → 70% de aproveitamento), enquanto o documento definitivo afirma que eles **não são apenas bônus percentuais** e separa cargo, responsabilidade, delegação e carga de trabalho. Definir como o multiplicador agregado convive com a modelagem individual (competências, autonomia, sobrecarga) — provavelmente o multiplicador passa a ser um efeito emergente dessas variáveis, e não um parâmetro fixo por nível.

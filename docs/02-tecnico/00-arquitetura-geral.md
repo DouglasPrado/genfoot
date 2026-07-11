@@ -165,6 +165,17 @@ Benefícios:
 
 O domínio como um todo segue essa regra: o `core` não depende de Prisma, Redis, HTTP ou UI; o Prisma apenas persiste e recupera o estado que o domínio produz.
 
+### 4.4 Separação entre decisão e linguagem (IA)
+
+A inteligência artificial do Grinta separa **decisão** (o que acontece) de **linguagem** (como é narrado). Essa fronteira protege o determinismo competitivo estabelecido em 4.1.
+
+- **Lógica que altera estado oficial não depende de LLM.** Decisões competitivas — escalação da IA, mercado, negociações, resultado, evolução — são calculadas por regras determinísticas e reproduzíveis (ver 4.1 e o **AI Decision Engine** na seção 5), nunca delegadas a um modelo de linguagem.
+- **Modelos generativos apenas para a camada de narrativa:** diálogo, explicação, notícias, entrevistas e variação textual.
+- **A narrativa não inventa fatos:** ela descreve o que a simulação determinou e **não pode criar fatos incompatíveis com o estado oficial** (não altera placar, atributos, recursos nem validade de ações).
+- **Decisões competitivas são reproduzíveis, rastreáveis e explicáveis** por seus dados de entrada e regras — auditáveis independentemente de qualquer componente generativo.
+
+O detalhamento das camadas de IA está em [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md).
+
 ---
 
 ## 5. Mapa de engines/módulos do core
