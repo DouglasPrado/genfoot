@@ -23,7 +23,8 @@ Este documento descreve a filosofia, as etapas, a resolução de lances, os sist
 13. [Comissão técnica como gate de qualidade](#13-comissao-tecnica-como-gate-de-qualidade)
 14. [Arquitetura conceitual do engine](#14-arquitetura-conceitual-do-engine)
 15. [Pós-jogo e consequências](#15-pos-jogo-e-consequencias)
-16. [Pontos críticos a resolver](#16-pontos-criticos-a-resolver)
+16. [Fases finais e situações críticas](#16-fases-finais-e-situacoes-criticas)
+17. [Pontos críticos a resolver](#17-pontos-criticos-a-resolver)
 
 ---
 
@@ -36,7 +37,7 @@ Quatro princípios orientam toda a simulação:
 - **Posse perigosa (threat), não só posse de bola.** Ter a bola não é criar perigo. O motor separa posse de posse ofensiva efetiva, permitindo que um time com menos posse vença por jogar melhor em transição.
 - **O placar emerge dos eventos.** Nunca se define "força 80 vs força 70 → provável 2×1". O motor gera volume, chances, qualidade das chances, finalizações, defesas, erros, cartões, lesões, substituições e mudanças emocionais — e o placar surge disso.
 
-A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 16](#16-pontos-criticos-a-resolver)).
+A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 17](#17-pontos-criticos-a-resolver)).
 
 ## 2. As cinco etapas e as entradas/saídas da partida
 
@@ -111,7 +112,7 @@ Consequência: um jogador bom em um time bagunçado rende menos, e um jogador me
 
 Dentro de cada bloco, o motor calcula quem controla mais o jogo, quem cria mais, quem erra mais, quem cansa mais, quem se expõe mais e quem tem maior risco emocional, de lesão ou de cartão.
 
-**Granularidade variável (ver também [seção 16](#16-pontos-criticos-a-resolver)):**
+**Granularidade variável (ver também [seção 17](#17-pontos-criticos-a-resolver)):**
 
 | Tipo de partida | Nível de simulação |
 | --- | --- |
@@ -134,7 +135,7 @@ Um erro comum seria "time mais forte = mais posse = mais gols", o que tornaria o
 - Qualidade da defesa
 - Qualidade do goleiro
 
-Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 16](#16-pontos-criticos-a-resolver)).
+Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 17](#17-pontos-criticos-a-resolver)).
 
 ## 6. Resolução de ataque em 9 passos
 
@@ -185,6 +186,18 @@ Cada evento importante é decidido por microduelos entre atributos individuais, 
 
 Assim, o jogador deixa de ser apenas uma nota geral: ele tem comportamentos diferentes dependendo do contexto. Um lateral já amarelado marca com menos agressividade ou corre risco de expulsão; um ponta com vantagem alta gera mais cruzamento, falta sofrida ou infiltração.
 
+### Função, não só posição
+
+Não basta dizer "meia" ou "zagueiro": a tática depende da **função**, não apenas da posição. O motor distingue funções como meia armador, meia box-to-box, meia atacante, volante marcador, volante construtor, lateral ofensivo, lateral defensivo, ponta aberto, ponta invertido, centroavante pivô e centroavante de profundidade. É a função que muda a simulação: um 4-3-3 com **ponta aberto** joga diferente de um 4-3-3 com **ponta invertido**, e um 4-4-2 com dois atacantes de área é diferente de um 4-4-2 com segundo atacante móvel. Sem função, a simulação fica rasa.
+
+**Jogadores fora de posição.** Mudanças táticas podem colocar um jogador em função inadequada (ex.: o usuário muda para três zagueiros, mas só tem dois — um lateral vira zagueiro). Para isso o motor calcula três medidas:
+
+- **PositionFit** — aptidão do jogador para a posição.
+- **RoleFit** — aptidão do jogador para a função pedida.
+- **FormationFamiliarity** — familiaridade com a formação.
+
+Os efeitos recaem sobre posicionamento, tomada de decisão, cobertura e rendimento técnico, com **aumento do risco de erro**. Um jogador versátil sofre menos com o improviso.
+
 ## 8. Aleatoriedade controlada em 3 camadas
 
 O simulador precisa ter surpresa, mas não caos. Trabalha em três camadas:
@@ -204,7 +217,7 @@ A aleatoriedade respeita o contexto: azar deve ser explicado, nunca gratuito.
 - **Aumentam moral:** gol marcado, defesa difícil do goleiro, torcida apoiando, boa sequência de ataques, adversário expulso, virada no placar.
 - **Reduzem moral:** gol sofrido, erro individual, pênalti perdido, cartão vermelho, pressão da torcida, sequência de derrotas, jogador vaiado.
 
-Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 16](#16-pontos-criticos-a-resolver)).
+Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 17](#17-pontos-criticos-a-resolver)).
 
 **Curvas não-lineares e efeitos de contexto.** Fadiga e moral não escalam de forma linear:
 
@@ -214,6 +227,10 @@ Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, pas
 - **Estado de crise:** um time em má fase (pressão da torcida, notícias negativas, diretoria cobrando, jogador insatisfeito) entra com o emocional mais frágil, e cada gol sofrido pesa mais — isso já é calculado no pré-jogo.
 
 **Jogadores têm personalidade em campo** (decisivo, nervoso, raçudo, frio, irregular, líder, indisciplinado, criativo, egoísta, obediente taticamente, some/cresce em jogo grande). Esses traços entram em momentos específicos, evitando jogadores genéricos.
+
+### Tipos de partida emergentes
+
+Nem todo jogo deve ter a mesma dinâmica. O motor reconhece tipos de partida — jogo aberto, truncado, físico, técnico, nervoso, de domínio estéril, de transição e de bola parada. O tipo **não é escolhido**: ele **emerge** do contexto (táticas, clima, árbitro, qualidade dos times, pressão e importância). Servem para manter a coerência narrativa da partida, ajudando a traduzir para o usuário o que está acontecendo mesmo sem gols ("o jogo está truncado no meio", "o adversário baixou as linhas").
 
 ## 10. Contexto: torcida, estrutura, clima, gramado e arbitragem
 
@@ -278,6 +295,31 @@ A IA offline não pode ser tão agressiva quanto um bom usuário (senão acompan
 
 Antes da partida, o usuário define o plano que vira a base da IA offline: mentalidade, foco, gatilhos de substituição (ex.: "substituir acima de 85% de fadiga se houver reserva adequado"), respostas a cenários (perdendo, ganhando, expulsão). Mesmo offline, o time segue o estilo do usuário. A **autonomia** concedida à IA é configurável.
 
+### Níveis de autonomia da IA
+
+O usuário escolhe **quanto** o auxiliar pode decidir sozinho. Os níveis são nomeados por escopo de atuação:
+
+| Nível | O que o auxiliar faz |
+| --- | --- |
+| **Baixa** | Só emergências. |
+| **Média** | Emergências + plano pré-jogo. |
+| **Alta** | Plano pré-jogo + leitura da comissão. |
+| **Total** | O auxiliar decide quase tudo quando o usuário está offline. |
+
+Além do nível, há a **postura** do auxiliar, que pode depender do perfil do técnico contratado: **conservador** protege o resultado e evita risco; **agressivo** busca a vitória e aceita exposição; **equilibrado** faz ajustes moderados.
+
+Mas a qualidade sempre depende da comissão (ver [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)): comissão nível 1 com autonomia alta pode tomar decisões ruins; comissão nível 5 com autonomia alta age como um auxiliar confiável.
+
+### Priorização de decisões concorrentes
+
+Quando várias coisas acontecem ao mesmo tempo, o sistema precisa priorizar o que sobe para o usuário (ou o que a IA resolve primeiro), evitando excesso de alerta. A ordem é:
+
+1. **Emergência obrigatória** — lesão grave, goleiro fora, expulsão que quebra a formação.
+2. **Risco alto** — jogador prestes a lesionar, pendurado muito agressivo.
+3. **Problema tático grave** — setor colapsando, domínio adversário intenso.
+4. **Oportunidade clara** — adversário vulnerável, jogador rival cansado.
+5. **Narrativa** — torcida, confiança, jogador inspirado.
+
 ### Justiça competitiva e anti-exploit
 
 Estar online dá vantagem estratégica, mas não pode ser uma vantagem absurda. Três camadas equilibram:
@@ -337,6 +379,13 @@ Sugestões melhores não são apenas "mais fortes": trazem trade-offs explícito
 - Invalida se: o jogador-alvo for substituído, o placar mudar, um jogador necessário sair, o adversário mudar de formação ou o clima/contexto mudar.
 
 Exemplo: aos 60' a sugestão é "explorar o lateral adversário cansado"; aos 63' o adversário substitui esse lateral — a sugestão precisa expirar.
+
+### Adversário invisível e economia de informação
+
+O usuário **não deve enxergar tudo do adversário com precisão total**. A comissão **estima**, não entrega o valor exato — e essa é a forma elegante de a comissão importar: em vez de dar bônus direto, ela **melhora a qualidade da informação**. Assim:
+
+- **Estimativa, não dado exato:** a comissão diz "o lateral adversário parece cansado", e não "o lateral adversário está com 78% de fadiga" — a menos que o jogo permita análise avançada. Isso evita informação perfeita demais.
+- **Precisão cresce com o nível:** uma comissão alta dá estimativas melhores. A mesma leitura de fadiga escala de "o time está cansando" (baixa) para "seu lado esquerdo está cansando" (média) e para "seu lateral esquerdo perdeu velocidade nos últimos sprints e já não acompanha o ponta adversário" (alta).
 
 ### A comissão pode errar
 
@@ -424,7 +473,70 @@ O `PostMatchProcessor` gera estatísticas (posse, finalizações, chances claras
 
 Isso encaixa no crescimento dos clubes numa cadeia — boa estrutura → melhor desenvolvimento → melhor elenco → melhores partidas → mais resultados → mais torcida → mais receita → mais estrutura — sempre com risco de crise, lesões, contratações ruins e insatisfação.
 
-## 16. Pontos críticos a resolver
+### Efeitos de longo prazo das decisões
+
+Algumas decisões tomadas dentro da partida têm consequência **depois**, conectando a partida à temporada:
+
+- **Forçar um jogador cansado** pode ganhar o jogo, mas aumenta o risco de lesão/queda física no próximo jogo.
+- **Recuar demais** pode irritar a torcida se o time for favorito.
+- **Substituir uma estrela cedo** preserva o físico, mas pode gerar insatisfação.
+
+## 16. Fases finais e situações críticas
+
+As competições de mata-mata exigem fases além dos 90 minutos, e o fim de jogo, as lesões e as expulsões tardias têm lógica própria — não são exceções, e sim parte da simulação. O motor precisa **receber as regras da competição** (número de substituições, prorrogação, pênaltis, VAR, critério de desempate — ver os parâmetros por competição na [seção 12](#12-sistema-online-vs-offline)).
+
+### Prorrogação
+
+Em mata-matas, quando os 90 minutos não decidem, a sequência é: **90 minutos → prorrogação → pênaltis**. Na prorrogação, a dinâmica muda:
+
+- a fadiga pesa mais;
+- as lesões aumentam;
+- os times ficam mais conservadores **ou** mais desesperados;
+- os jogadores decisivos aparecem mais.
+
+### Disputa de pênaltis
+
+A disputa de pênaltis precisa de **motor próprio**, com atributos e contexto específicos:
+
+- **Batedor:** pênalti, frieza, moral, pressão, fadiga.
+- **Goleiro:** reflexo, leitura, altura, confiança.
+- **Contexto:** se a cobrança é decisiva ou não, torcida e histórico emocional.
+
+### Lesão após esgotar as substituições
+
+Caso comum: o time já usou todas as substituições e um jogador se lesiona. As regras:
+
+- **Se não pode continuar:** o time fica com um a menos.
+- **Se pode continuar limitado:** o rendimento cai muito e o risco de agravar a lesão aumenta.
+
+Isso gera drama real.
+
+### Expulsão em posição crítica
+
+A expulsão de goleiro, zagueiro ou volante **não tem o mesmo impacto** de outras. O motor trata caso a caso:
+
+- **Goleiro expulso:** é obrigatório colocar o goleiro reserva se houver substituição disponível; se não houver, um jogador de linha vai para o gol.
+- **Zagueiro expulso:** reorganização defensiva.
+- **Atacante expulso:** menos pressão ofensiva, mas a estrutura defensiva pode permanecer.
+
+A IA offline precisa saber **priorizar por posição** ao reorganizar o time.
+
+### Comportamento de fim de jogo
+
+Os **últimos 10 minutos** têm lógica própria:
+
+- **Se vencendo:** segurar o resultado, reduzir o risco, ganhar tempo, substituir por cansaço, defender a bola aérea.
+- **Se perdendo:** aumentar a presença ofensiva, bola longa, pressão, aceitar a transição adversária.
+
+Mas o comportamento depende de: perfil do técnico, importância do jogo, saldo de gols, critério da competição, moral e qualidade da comissão.
+
+### Tempo de acréscimo e ações de cera
+
+Os acréscimos podem depender de lesões, substituições, VAR, cera, cartões e confusão — o que cria tensão. As **ações de cera**, se existirem, precisam ter risco embutido: ganhar tempo, mas irritar o adversário, com risco de cartão e pressão da arbitragem.
+
+> **Pendência:** se as ações de cera existirão como comando explícito do usuário ainda está em aberto na fonte ("Ações de cera podem existir?"). Caso existam, precisam carregar risco real (cartão, irritação do adversário, pressão da arbitragem).
+
+## 17. Pontos críticos a resolver
 
 Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de execução que precisam ser fechadas antes de virar implementação real.
 
@@ -448,7 +560,7 @@ Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de ex
 
 > **Pendência:** **IA adversária que reage (contra-ajuste).** NPC e IA offline precisam reagir a padrões repetidos conforme sua comissão, com nível de leitura, estilo do técnico, coragem e conservadorismo próprios, para evitar estratégia dominante.
 
-> **Pendência:** **Diferentes níveis de simulação para performance.** Partidas simultâneas exigem granularidade variável (online em ticks, offline por blocos, NPC×NPC resumida) mantendo a sensação de mesmo universo. Definir também servidor autoritativo, jogadores fora de posição, compatibilidade de jogadores, especialização de bola parada, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo.
+> **Pendência:** **Diferentes níveis de simulação para performance.** Partidas simultâneas exigem granularidade variável (online em ticks, offline por blocos, NPC×NPC resumida) mantendo a sensação de mesmo universo. Definir também servidor autoritativo, compatibilidade de jogadores e especialização de bola parada. (Jogadores fora de posição, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo agora estão especificados na [seção 16](#16-fases-finais-e-situacoes-criticas).)
 
 > **Pendência:** **Calibração estatística do motor.** Rodar lotes de testes automáticos (ex.: 10.000 partidas equilibradas, favorito×azarão, com chuva, pressão alta, comissão nível 1 vs 5, online e offline) para garantir distribuições realistas de placar, consistência entre ligas e ausência de bola de neve exagerada.
 
@@ -456,4 +568,4 @@ Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de ex
 
 > **Pendência:** **Sugestões que expiram quando o contexto muda.** Toda `SuggestedAction` precisa de `validUntilMinute`, `conditions` e `invalidatedBy`, sendo recalculada ou descartada quando o alvo é substituído, o placar muda, a formação adversária muda ou o contexto se altera.
 
-Itens adicionais levantados na discussão e a incorporar na especificação técnica: comportamento por função (não só posição), balanceamento coletivo, arbitragem detalhada, importância do jogo e estado do campeonato, risco de lesão agravada, modelo de confiança da informação, ritmo narrativo, scouting pré-jogo, integração com o treino semanal, reputação tática do usuário e ocultação de complexidade para jogadores iniciantes.
+Itens adicionais levantados na discussão e a incorporar na especificação técnica: balanceamento coletivo, arbitragem detalhada, importância do jogo e estado do campeonato, risco de lesão agravada, modelo de confiança da informação, ritmo narrativo, scouting pré-jogo, integração com o treino semanal, reputação tática do usuário e ocultação de complexidade para jogadores iniciantes.

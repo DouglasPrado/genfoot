@@ -1,6 +1,6 @@
 # Arquitetura de Dados e Transações (ADRs)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/arquitetura-jogo.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/arquitetura-jogo.md, chats/ux-do-jogo.md (Bloco 25) · **Revisão:** 2026-07-10
 
 Este documento consolida as decisões arquiteturais (ADRs) que governam a camada de dados e transações do **Grinta**, um manager de futebol online multi-mundo. Ele descreve como o banco PostgreSQL é organizado por domínio, como a integridade referencial é garantida com isolamento por mundo, e como concorrência e transações são tratadas para preservar invariantes de negócio sob carga.
 
@@ -26,6 +26,13 @@ As decisões estão registradas no formato ADR e mantêm seus identificadores or
 - [Decisão 19.9 — Índices, paginação e particionamento](#decisão-199--índices-paginação-e-particionamento)
 - [Decisão 19.10 — Transações, concorrência, locks e consistência](#decisão-1910--transações-concorrência-locks-e-consistência)
   - [Fluxos transacionais passo a passo](#fluxos-transacionais-passo-a-passo)
+- [Convenções de dados e tipos](#convenções-de-dados-e-tipos)
+- [Mensageria durável (RabbitMQ)](#mensageria-durável-rabbitmq)
+- [Cache e dados efêmeros (Redis)](#cache-e-dados-efêmeros-redis)
+- [Agendador persistente e relógio do mundo](#agendador-persistente-e-relógio-do-mundo)
+- [CQRS pragmático, read models e projeções](#cqrs-pragmático-read-models-e-projeções)
+- [Sagas e process managers](#sagas-e-process-managers)
+- [Busca, analytics e arquivos](#busca-analytics-e-arquivos)
 - [Registro de decisões](#registro-de-decisões)
 
 ---
@@ -510,6 +517,124 @@ Um retry com o mesmo resultado é idempotente. Um resultado diferente para a mes
 #### Processos longos (ex.: fechamento de temporada)
 
 Não são representados por uma única transação. Máquina de estados: `REQUESTED → PREPARING → VALIDATING → FREEZING_INPUTS → CALCULATING → APPLYING_RESULTS → VERIFYING → COMPLETED`. Cada etapa tem transação curta, checkpoint, idempotência, versão, lease, eventos e possibilidade de retomada. O mundo pode permanecer pausado logicamente sem manter locks SQL durante todo o processo.
+
+---
+
+## Convenções de dados e tipos
+
+Complementam as decisões acima com as convenções de modelagem aplicadas a todas as entidades persistentes.
+
+### Identificadores e campos padrão
+
+- **Identidade:** UUIDv7 (unicidade distribuída, ordenação temporal aproximada, geração fora do banco, migração entre clusters). Ver Decisão 19.8 para a chave de escopo `(world_id, id)`.
+- **Identificadores públicos:** quando necessário, uma entidade combina UUID interno + código público curto + nome legível + slug **não autoritativo**.
+- **Campos padrão** (quando aplicável): `id`, `world_id` (`gameWorldId`), `created_at`, `updated_at`, `version`, `deleted_at`.
+- **Concorrência otimista** via `version` — ver Decisão 19.10.
+- **Exclusão lógica** (`deleted_at`) apenas quando houver necessidade de recuperação, auditoria, retenção ou histórico. Nem toda tabela usa soft delete automaticamente.
+
+### Valores monetários e numéricos
+
+- **Dinheiro** em unidade mínima: `amount_minor: bigint` + `currency_code: string` (ex.: R$ 10,50 → `amount_minor = 1050`, `currency_code = BRL`). A moeda interna do mundo pode usar código próprio quando não representar moeda real.
+- **Ponto flutuante é proibido** para dinheiro, percentuais contratuais, parcelas, pontos e saldos.
+- **Percentuais** em pontos-base / inteiro escalado / decimal controlado, com a escala definida no contrato do valor.
+
+### Tempo real vs. tempo do mundo
+
+- **Datas reais** (login, criação, deployment, entrega de notificação, auditoria) em **UTC**.
+- **Tempo do mundo** armazenado separadamente (`world_date`, `world_day`, `world_minute`, `world_tick`, `season_id`). Uma entidade pode carregar ambos: `occurred_at_real` e `occurred_at_world`.
+- A retenção física segue o tempo real, não o tempo lógico (ver Decisão 19.9).
+
+### JSONB e relações
+
+- **JSONB** para payloads de eventos, snapshots, metadados, configurações versionadas, resultados de simulação e dados extensíveis. **Não** substitui indiscriminadamente relações centrais.
+- Contratos, participantes, proprietários, jogadores inscritos, parcelas e títulos são modelados **relacionalmente**.
+- **SQL direto** é permitido (locks, `FOR UPDATE SKIP LOCKED`, particionamento, consultas analíticas, operações em lote, CTEs, extensões PostgreSQL), sempre encapsulado na infraestrutura e nunca concatenando entrada de usuário.
+
+---
+
+## Mensageria durável (RabbitMQ)
+
+A mensageria transporta eventos de domínio, commands assíncronos, jobs distribuídos, notificações, simulação, rebuilds e integrações internas. A garantia é **`AT_LEAST_ONCE_DELIVERY`** — o sistema **não** depende de *exactly once*; a idempotência de consumo (Inbox, ver Decisão 19.10) é a proteção final contra efeitos duplicados.
+
+> **Pendência (broker):** o chat de UX (Bloco 25) especifica **RabbitMQ**; a fonte `arquitetura-jogo.md` (Decisão 19.10) descreve a publicação pós-commit sobre **NATS**. A modelagem de Outbox/Inbox é independente do broker; ratificar o broker oficial junto à pendência de mensageria em `./00-arquitetura-geral.md`.
+
+- **Exchanges recomendadas:** `domain.events`, `application.commands`, `simulation.commands`, `notifications.events`, `operations.jobs`, `dead.letters`.
+- **Routing keys** por evento, ex.: `match.started`, `match.command.submitted`, `transfer.completed`, `contract.expired`, `world.day.advanced`, `notification.requested`.
+- **Filas críticas** duráveis, com mensagens persistentes, dead letter, limites e monitoramento.
+- **Evolução:** nó único com volume persistente na primeira infraestrutura; cluster com **filas quorum** depois.
+- **Ordenação:** eventos de um agregado usam `aggregate_version`; eventos de um mundo usam `world_sequence`. Evento fora de ordem faz o consumidor aguardar a versão anterior, reenfileirar, solicitar snapshot, marcar inconsistência ou reconstruir a projeção.
+
+---
+
+## Cache e dados efêmeros (Redis)
+
+O Redis serve cache, sessões temporárias, rate limiting, presença, adapter de Socket.IO, locks não críticos e chaves de curta duração. **Nunca é fonte definitiva** para saldo, contrato, resultado, propriedade de jogador, inscrição, título, pagamento ou prazo oficial.
+
+- **Persistência AOF** na implantação inicial; ainda assim, a perda total do Redis deve ser recuperável a partir do PostgreSQL (perde-se cache/presença, não dados de mundo).
+- **Anatomia de cada cache:** chave, escopo de mundo, TTL, versão, estratégia de invalidação e fonte oficial. Alvos típicos: perfil público, tabela, calendário, resumo de clube, configurações, permissões estáveis.
+- **Invalidação** por evento, versão, TTL, operação administrativa ou rebuild. Quando cache e projeção discordam, prevalece a projeção oficial/banco e o cache é invalidado.
+- **Cache stampede** controlado por locks curtos, TTL aleatório, revalidação antecipada, *stale-while-revalidate* e limite de concorrência.
+- **Locks críticos** preferem row lock / advisory lock do PostgreSQL, lease persistido e restrição única — o Redis **não** é a única garantia para contratos, finanças ou transferências (ver Decisão 19.10).
+
+---
+
+## Agendador persistente e relógio do mundo
+
+Prazos oficiais **sempre** são persistidos no PostgreSQL — timers em memória seriam perdidos em restart, deployment, falha, migração ou escalonamento.
+
+- **Tarefas agendadas** (`scheduled_task_id`, `world_id`, `task_type`, `due_at_world`, `due_at_real`, `status`, `payload`, `priority`, `attempt_count`, `lease_owner`, `lease_expires_at`, `last_failure`). Workers reivindicam lotes vencidos com `FOR UPDATE SKIP LOCKED` (ver Decisão 19.9).
+- **Relógio do mundo** (`world_clock_id`, `current_world_time`, `status`, `processing_lease`, `last_processed_at`, `next_scheduled_at`, `version`). O avanço segue: adquire lease → verifica estado → executa etapa → registra checkpoint → publica eventos → atualiza relógio → libera lease. Apenas o detentor do lease avança o mundo; um mundo atrasado processa as etapas pendentes em ordem, com carga limitada, sem pular etapas obrigatórias.
+- **Runtime de partida:** o estado em andamento (`match_runtime_id`, `status`, `current_simulation_time`, `last_event_sequence`, `active_worker_lease`, `checkpoint_reference`, `heartbeat_at`) é separado do resultado oficial final. Cada partida tem um único actor lógico; checkpoints periódicos (após gol, cartão relevante, substituição, intervalo, fim, desligamento) permitem que outro worker assuma um lease expirado, carregue o último checkpoint e continue sem duplicar efeitos. A conclusão persiste atomicamente resultado, eventos, estatísticas, estados de jogador, suspensões, consequências e Outbox, passando de `FINISHED_PENDING_VALIDATION` a `OFFICIAL`. A finalização com resultado oficial único está detalhada na Decisão 19.10.
+
+### Catálogo de jobs recorrentes (`task_type`)
+
+Os tipos de tarefa agendada naturais do jogo — cada um é um `task_type` do agendador acima:
+
+| Job | Responsabilidade |
+| --- | --- |
+| `world:daily-tick` | Avanço diário do relógio do mundo |
+| `season:check-start-end` | Início/fim de temporada |
+| `competition:generate-fixtures` | Geração de tabelas/calendário |
+| `match:start-scheduled` · `match:simulate-live` · `match:simulate-offline` · `match:finish` | Ciclo de vida das partidas (agendada → ao vivo/offline → finalização) |
+| `training:process-results` · `medical:process-recovery` | Treino e recuperação médica |
+| `finance:pay-wages` · `economy:rebalance` · `contracts:check-expiration` | Ciclos financeiro, econômico e contratual |
+| `players:process-aging` · `players:process-retirement` · `scouting:process-missions` | Envelhecimento, aposentadoria e olheiros |
+| `notifications:cleanup` · `narratives:update` | Manutenção de notificações e narrativa |
+
+---
+
+## CQRS pragmático, read models e projeções
+
+O sistema separa **logicamente** commands e queries, mas **não** exige bancos diferentes inicialmente (leitura e escrita no mesmo cluster, com limites distintos; réplica de leitura só no futuro, e nunca para commands que precisam do estado mais recente).
+
+- **Commands** passam por aplicação → autorização → domínio → repositório → transação → Outbox.
+- **Queries** leem tabelas de domínio, projeções, views, materialized views ou cache.
+- **Projeções** são atualizadas por eventos e rastreiam `projection_name`, `projection_version`, `last_processed_event`, `rebuild_status`. Podem ser **descartadas e reconstruídas** sem alterar o fato-base (ver Decisão 19.8: projeções não têm FKs fortes).
+- **Rebuild com troca atômica:** nova versão é construída → validada → o alias/ponteiro ativo é trocado → a versão anterior é removida depois. Uma projeção incorreta é reconstruída a partir dos eventos e fatos oficiais.
+- **Event sourcing híbrido:** estado relacional atual + log imutável de eventos relevantes + Outbox + snapshots históricos — **não** event sourcing completo para todos os agregados. Eventos técnicos (ex.: `CACHE_INVALIDATED`) diferenciam-se de eventos de domínio (`PLAYER_TRANSFER_COMPLETED`) e históricos (`CLUB_WON_FIRST_NATIONAL_TITLE`). Eventos competitivos e financeiros essenciais são preservados enquanto o mundo existir; eventos técnicos de baixa relevância têm retenção menor e podem ser particionados, compactados ou exportados para R2 (ver Decisão 19.9).
+
+---
+
+## Sagas e process managers
+
+Processos longos são coordenados por **saga / process manager**, nunca por transação distribuída de duas fases (**sem 2PC**, ver Decisão 19.10). Exemplos: transferência, contratação, construção, transição de temporada, entrada de usuário, restauração, licenciamento.
+
+- **Estados da saga:** `CREATED`, `RUNNING`, `WAITING`, `COMPENSATING`, `COMPLETED`, `FAILED`, `MANUAL_REVIEW`.
+- **Compensação:** quando uma etapa posterior falha, as etapas já confirmadas permanecem registradas, a saga aplica compensação (libera reservas, corrige estados) e o usuário recebe explicação.
+- **Exemplo (transferência):** reservar orçamento → aceitar proposta → negociar contrato → realizar exame → registrar jogador → liquidar valores → concluir. Uma falha no registro pode manter o acordo pendente e impedir a liquidação final, conforme as regras.
+
+O estado da saga é persistido (`process_manager_id`, `process_type`, `subject_type`, `subject_id`, `status`, `current_step`, `state_payload`, `completed_steps`, `compensation_steps`, `waiting_for_event_types`, `version`). O detalhamento em `./02-modelo-de-dados.md`.
+
+---
+
+## Busca, analytics e arquivos
+
+- **Busca:** a primeira versão usa **PostgreSQL Full Text Search + índices trigram**. Um motor externo (Meilisearch, OpenSearch) só entra quando volume, latência, relevância e operação justificarem. A busca **não é autoritativa** — apenas localiza a entidade; a abertura carrega sempre o estado oficial.
+- **Analytics:** na primeira fase, PostgreSQL, views, materialized views, projeções e exportações. Banco analítico (ex.: ClickHouse) só quando o volume de telemetria/histórico justificar.
+- **Arquivos (Cloudflare R2):** o binário fica no R2; o PostgreSQL guarda apenas metadados (`file_id`, `owner_type`, `owner_id`, `bucket`, `object_key`, `content_type`, `size`, `checksum`, `visibility`, `status`, `created_at`, …). O upload é direto ao R2 via URL pré-assinada, confirmado pelo cliente e validado por worker (tipo, tamanho, checksum, inspeção, quarentena); uploads não confirmados são limpos por job. Arquivos privados usam URL temporária com verificação de permissão e expiração; chaves de objeto evitam nomes previsíveis com informação privada. A exclusão lógica precede a física, respeitando retenção de histórico/auditoria.
+- **Backups:** PostgreSQL com **WAL-G** para destino S3-compatível no R2 (WAL contínuo + base diário + longa retenção semanal + teste de restauração + checksum + criptografia). Backups não ficam apenas no mesmo host do banco. A recuperação de um mundo **não** depende de backup de Redis ou RabbitMQ — reconstrói-se a partir do PostgreSQL, Outbox e jobs persistidos.
+
+> **Pendência (busca):** a Decisão 19.9 assume que "a busca pública fica no Meilisearch", enquanto o Bloco 25 de UX adota PostgreSQL FTS + trigram como padrão inicial, com motor externo apenas sob necessidade. Ratificar a estratégia oficial de busca.
 
 ---
 

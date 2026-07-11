@@ -42,6 +42,7 @@ A documentação está organizada em quatro áreas, do "porquê" ao "como":
 - [07 · Inteligência Artificial](01-game-design/07-inteligencia-artificial.md) — Decision Engine e hierarquia de IAs.
 - [08 · Estádio, Região e Clima](01-game-design/08-estadio-regiao-e-clima.md)
 - [09 · Anti-abuso e Onboarding](01-game-design/09-anti-abuso-e-onboarding.md)
+- [10 · Experiência do Usuário e Telas](01-game-design/10-experiencia-e-telas.md) — ciclo do dia a dia, tela inicial, ações, notificações, telas de indicadores.
 
 ### 02 · Técnico
 
@@ -74,10 +75,10 @@ A documentação está organizada em quatro áreas, do "porquê" ao "como":
 | `funcionamento-brasfoot.md` | [00-produto/03-referencia-brasfoot](00-produto/03-referencia-brasfoot.md); [02-tecnico/00-arquitetura-geral](02-tecnico/00-arquitetura-geral.md) |
 | `organizacao-de-pensamentos.md` | [01-game-design/00-gdd-overview](01-game-design/00-gdd-overview.md); [01-mundo-persistente-e-clubes](01-game-design/01-mundo-persistente-e-clubes.md) |
 | `lista-envolvidos-jogo.md` | [01-game-design/02-sistema-de-jogadores](01-game-design/02-sistema-de-jogadores.md) (design de jogadores); [02-tecnico/07-arquitetura-do-core-ecs](02-tecnico/07-arquitetura-do-core-ecs.md) (arquitetura de core — 2ª metade) |
-| `economics-initial.md` | [01-game-design/03-economia](01-game-design/03-economia.md) |
-| `planejamento-agrupado-do-jogo.md` | [01-game-design/03-economia](01-game-design/03-economia.md); [04-estrutura-do-clube-e-staff](01-game-design/04-estrutura-do-clube-e-staff.md) |
-| `simulacao-partida.md` | [01-game-design/05-motor-de-partida](01-game-design/05-motor-de-partida.md) |
-| `campeonatos-fim-de-temporadas.md` | [01-game-design/06-temporada-e-competicoes](01-game-design/06-temporada-e-competicoes.md); [02-tecnico/03-multiplayer-e-mundos](02-tecnico/03-multiplayer-e-mundos.md) |
+| `economics-initial.md` | [01-game-design/03-economia](01-game-design/03-economia.md); [10-experiencia-e-telas](01-game-design/10-experiencia-e-telas.md) (telas de indicadores) |
+| `planejamento-agrupado-do-jogo.md` | [03-economia](01-game-design/03-economia.md); [04-estrutura-do-clube-e-staff](01-game-design/04-estrutura-do-clube-e-staff.md); [01-mundo-persistente](01-game-design/01-mundo-persistente-e-clubes.md); [06-temporada](01-game-design/06-temporada-e-competicoes.md); [09-anti-abuso](01-game-design/09-anti-abuso-e-onboarding.md); [03-multiplayer](02-tecnico/03-multiplayer-e-mundos.md) (entrada de novos clubes) |
+| `simulacao-partida.md` | [01-game-design/05-motor-de-partida](01-game-design/05-motor-de-partida.md); [02-tecnico/05-catalogo-de-regras-e-formulas](02-tecnico/05-catalogo-de-regras-e-formulas.md) (fórmulas F1–F21); [08-frontend-cliente-e-tempo-real](02-tecnico/08-frontend-cliente-e-tempo-real.md) (UX de partida) |
+| `campeonatos-fim-de-temporadas.md` | [01-game-design/06-temporada-e-competicoes](01-game-design/06-temporada-e-competicoes.md); [02-tecnico/03-multiplayer-e-mundos](02-tecnico/03-multiplayer-e-mundos.md); [10-experiencia-e-telas](01-game-design/10-experiencia-e-telas.md) (dia a dia/telas) |
 | `como-podemos-desenvolver-jogo.md` | [01-game-design/07-inteligencia-artificial](01-game-design/07-inteligencia-artificial.md) |
 | `decisao-escopo-do-jogo.md` | [01-game-design/08-estadio-regiao-e-clima](01-game-design/08-estadio-regiao-e-clima.md); [09-anti-abuso-e-onboarding](01-game-design/09-anti-abuso-e-onboarding.md); [99-decisoes](99-decisoes/registro-de-decisoes.md) |
 | `arquitetura-jogo.md` | [02-tecnico/01-arquitetura-de-dados](02-tecnico/01-arquitetura-de-dados.md); [99-decisoes](99-decisoes/registro-de-decisoes.md) |

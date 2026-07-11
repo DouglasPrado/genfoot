@@ -20,11 +20,12 @@ Para a implementação técnica de auditoria, segurança e operações (server a
   - [1.7 W.O. e abandono](#17-wo-e-abandono)
   - [1.8 Troca de clube](#18-troca-de-clube)
   - [1.9 Explorações de sistema](#19-exploracoes-de-sistema)
-  - [1.10 Garantias técnicas de integridade](#110-garantias-tecnicas-de-integridade)
-  - [1.11 Punições e sanções](#111-punicoes-e-sancoes)
-  - [1.12 Admin, revisão e recurso](#112-admin-revisao-e-recurso)
-  - [1.13 Auditoria, transparência e privacidade](#113-auditoria-transparencia-e-privacidade)
-  - [1.14 Escopo fechado](#114-escopo-fechado)
+  - [1.10 Interações sociais futuras e parcerias oficiais](#110-interacoes-sociais-futuras-e-parcerias-oficiais)
+  - [1.11 Garantias técnicas de integridade](#111-garantias-tecnicas-de-integridade)
+  - [1.12 Punições e sanções](#112-punicoes-e-sancoes)
+  - [1.13 Admin, revisão e recurso](#113-admin-revisao-e-recurso)
+  - [1.14 Auditoria, transparência e privacidade](#114-auditoria-transparencia-e-privacidade)
+  - [1.15 Escopo fechado](#115-escopo-fechado)
 - [2. Onboarding e entrada tardia](#2-onboarding-e-entrada-tardia)
 
 ---
@@ -205,9 +206,30 @@ Detectar derrota intencional ou escalação sabotada (Decisão 1895). Sinais: es
 
 **Abuso de comunicação pública** (Decisão 1946): se houver sistema de fala pública, limitar frequência, moderar conteúdo, impedir ataque pessoal, impedir spam contra jogador/clube e registrar histórico.
 
-> **Pendência:** As decisões referentes a interações sociais futuras (alianças, empréstimos recorrentes, torneios privados, amistosos pagos, parcerias de base, clubes satélites oficiais — Decisões 1943 e 1944) definem que qualquer interação social competitiva futura deve passar pelo anti-abuso, com valor justo, auditoria, duração, transparência e proibição entre contas relacionadas abusivas. Os detalhes operacionais dessas mecânicas ainda não foram fechados.
+### 1.10 Interações sociais futuras e parcerias oficiais
 
-### 1.10 Garantias técnicas de integridade
+Grinta poderá, no futuro, oferecer **interações sociais competitivas** entre clubes que hoje ainda não existem. A regra-mestra já está fixada: **qualquer interação social competitiva futura passa obrigatoriamente pelo anti-abuso** (Decisão 1943) — não é um espaço fora das regras de integridade.
+
+**Interações sociais previstas** (Decisão 1943) — todas tratadas como mecânicas futuras:
+
+- alianças entre clubes;
+- empréstimos recorrentes;
+- torneios privados;
+- amistosos pagos;
+- parcerias de base;
+- clubes satélites oficiais.
+
+**Parcerias oficiais entre clubes** (Decisão 1944): se existirem futuramente, precisam de **regras rígidas**. Uma parceria pode envolver empréstimos, cessão de jovens, prioridade de compra e amistosos — mas sempre dentro de limites de segurança:
+
+- **valor justo** — nenhuma vantagem econômica embutida fora da faixa de mercado;
+- **auditoria** — toda a movimentação da parceria é registrada e revisável;
+- **duração** — a parceria tem prazo definido, não é vínculo perpétuo;
+- **transparência** — as condições ficam visíveis e rastreáveis;
+- **proibição entre contas relacionadas abusivas** — a parceria não pode virar disfarce de multi-conta ou de clube satélite.
+
+A diferença entre uma parceria legítima e um clube satélite (ver [§1.4](#14-clube-satelite)) é justamente esse conjunto de limites: a parceria oficial existe à luz do anti-abuso, enquanto o satélite opera para burlá-lo. Enquanto essas mecânicas não forem implementadas, valem como **direção de design** — os detalhes operacionais (parâmetros, fluxos e telas) ainda serão fechados em revisão futura.
+
+### 1.11 Garantias técnicas de integridade
 
 Estas garantias sustentam todo o anti-abuso. A implementação está detalhada em [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
@@ -218,7 +240,7 @@ Estas garantias sustentam todo o anti-abuso. A implementação está detalhada e
 - **Reprocessamento seguro** (Decisão 1924): reprocessar só com versão, log e autorização (por bug, partida interrompida, job falho, revisão administrativa, erro de calendário), sempre preservando histórico, registrando o motivo, evitando duplicidade e notificando quando afetar o usuário.
 - **Reversão administrativa** (Decisão 1925): existe, mas deve ser **rara** — usada em abuso confirmado, bug grave, transferência indevida, duplicidade, manipulação comprovada ou erro de admin, sempre com audit log.
 
-### 1.11 Punições e sanções
+### 1.12 Punições e sanções
 
 **Punições progressivas** escalam por gravidade e reincidência (Decisão 1926):
 
@@ -248,7 +270,7 @@ Tipos de punição:
 
 **Sanções públicas** (Decisão 1959): punições esportivas podem virar notícia — perda de pontos, multa pública, W.O., punição de mando, eliminação administrativa. Isso **afeta reputação e torcida**.
 
-### 1.12 Admin, revisão e recurso
+### 1.13 Admin, revisão e recurso
 
 - **Admin não altera sem rastro** (Decisão 1933): toda ação admin gera audit log **imutável** registrando admin, ação, motivo, entidade, antes/depois, timestamp, ticket/referência e impacto.
 - **Admin tools com permissões** (Decisão 1934): o painel admin tem níveis de permissão (suporte visualiza, moderador revisa, operador corrige job, admin financeiro ajusta ledger, superadmin reverte), sempre com **menor privilégio possível**.
@@ -258,7 +280,7 @@ Tipos de punição:
 - **Quarentena de ação** (Decisão 1938): ações suspeitas (transferência alta, troca complexa, empréstimo de jovem valioso, venda de clube relacionado) podem ficar **pendentes** — jogador não muda, dinheiro não move, usuário é avisado e existe prazo de revisão.
 - **Delay anti-fraude** (Decisão 1939): algumas ações de risco têm atraso de efetivação para reduzir abuso de último minuto (transferência usuário-usuário no fim da janela, troca com cláusula complexa, venda antes de clássico, troca de clube).
 
-### 1.13 Auditoria, transparência e privacidade
+### 1.14 Auditoria, transparência e privacidade
 
 - **Auditoria de temporada** (Decisão 1949): o fim de temporada roda uma auditoria global sobre transferências extremas, clubes satélite, W.O., manipulação de tabela, evolução econômica anormal, premiações, usuários trocando de clube, jovens transferidos e rankings.
 - **Health check anti-abuso** (Decisão 1950): o mundo tem um painel de saúde com métricas — negociações bloqueadas, negociações em revisão, contas relacionadas, W.O. por clube, transferências fora da faixa, clubes em risco satélite, reversões, punições e recursos.
@@ -269,7 +291,7 @@ Tipos de punição:
 - **Logs imutáveis** (Decisão 1957): logs críticos são **append-only**. Não se edita log antigo; para corrigir, cria-se um novo log de correção que referencia o anterior e registra admin/sistema.
 - **Separar auditoria de narrativa** (Decisão 1958): o audit log é técnico/administrativo e **não é notícia** do jogo. A narrativa pública só aparece se o evento for esportivo/financeiro conhecido. Exemplo: anti-abuso bloqueando uma transferência suspeita não vira notícia automaticamente; um clube punido publicamente vira narrativa.
 
-### 1.14 Escopo fechado
+### 1.15 Escopo fechado
 
 **Anti-abuso global considerado fechado em nível de regra principal** (Decisão 1960). Cobertos: risk score global, multi-conta, contas relacionadas, clube satélite, mercado suspeito, empréstimos, jovens, manipulação esportiva, W.O., abandono, troca de clube, exploração de calendário, exploração financeira, bot/script, server authoritative, idempotência, locks, snapshots, reversão, punições, admin, revisão, SimulationLab, privacidade e logs imutáveis.
 
@@ -296,7 +318,7 @@ As diretrizes abaixo detalham cada item da filosofia. Como a fonte consolida o o
 
 O usuário pode **criar um clube novo** ou **assumir um clube existente**, entendendo os riscos de cada caminho (Decisão 1961). Assumir clube forte não é abuso, mas passa por auditoria de contexto (Decisão 1905, ver seção 1.8), e assumir clube recém-abandonado por conta relacionada é bloqueado (Decisão 1904).
 
-> **Pendência:** Definir onde clubes novos são inseridos na estrutura de ligas/divisões, os critérios que tornam um clube existente "disponível" para ser assumido, e como a escolha entre criar e assumir é apresentada ao usuário.
+> **Pendência:** Os critérios que tornam um clube existente "disponível" para ser assumido e como a escolha entre criar e assumir é apresentada ao usuário ainda não foram detalhados na fonte. (Onde clubes novos são inseridos já está resolvido: entram na **Liga Inicial** das divisões por nível estrutural — ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) — com o apoio do **Programa de Clube Novo**, seção [2.8](#28-programa-de-clube-novo-catch-up-estrutural).)
 
 ### 2.2 Caixa inicial fixo
 
@@ -326,10 +348,24 @@ O usuário **tem pré-temporada ativa** (Decisão 1961), permitindo preparar o e
 
 O onboarding deve **evitar a exploração de clubes fortes** (Decisão 1961) — impedir que a entrada seja usada para obter vantagem indevida assumindo os melhores clubes. Isso conversa diretamente com o anti-abuso: auditoria de contexto ao assumir clube forte (Decisão 1905) e bloqueio de assumir clube preparado por conta relacionada (Decisão 1904).
 
-> **Pendência:** Definir as regras concretas (cooldowns, filas, auditoria de disponibilidade) que evitam a captura oportunista de clubes fortes no momento da entrada, e o mecanismo de **divisão de expansão** e de **proteção contra escolhas quebradas** mencionados no escopo, ainda não detalhados na fonte.
+> **Pendência:** Definir as regras concretas (cooldowns, filas, auditoria de disponibilidade) que evitam a captura oportunista de clubes fortes no momento da entrada, e a **proteção contra escolhas quebradas** mencionada no escopo, ainda não detalhada na fonte. O mecanismo de **divisão de expansão** já está resolvido: o clube novo entra na **Liga Inicial** (divisões por nível estrutural, ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)), com o apoio do **Programa de Clube Novo** (seção [2.8](#28-programa-de-clube-novo-catch-up-estrutural)).
 
 ### 2.7 Preservar a história do mundo
 
 A entrada de novos usuários deve **preservar a história do mundo** (Decisão 1961), mantendo o histórico, os vínculos e a continuidade das competições já disputadas — coerente com a natureza de mundo persistente de Grinta e com os princípios de auditoria e logs imutáveis (Decisões 1957 e 1958).
 
-> **Pendência:** O bloco de Onboarding e entrada tardia foi consolidado na fonte apenas em nível de filosofia (Decisão 1961). Os itens "divisão de expansão" e "proteção contra escolhas quebradas" citados no escopo não têm decisão dedicada e devem ser fechados em revisão futura.
+> **Pendência:** O bloco de Onboarding e entrada tardia foi consolidado na fonte (Decisão 1961) sobretudo em nível de filosofia. O item "proteção contra escolhas quebradas" citado no escopo ainda não tem decisão dedicada e deve ser fechado em revisão futura; o item "divisão de expansão" está materializado pela Liga Inicial (seção [2.8](#28-programa-de-clube-novo-catch-up-estrutural) e [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)).
+
+### 2.8 Programa de Clube Novo (catch-up estrutural)
+
+Para dar a um clube recém-criado a capacidade de recuperar o atraso frente a clubes de temporadas anteriores — sem conceder vantagem injusta nem "jogador apelão" — o Grinta aplica um **Programa de Clube Novo**: um plano de desenvolvimento inicial, limitado no tempo. Durante as **3 primeiras temporadas** do clube:
+
+- **custo de upgrade estrutural reduzido**;
+- **tempo de construção menor**;
+- **bônus pequeno na base**;
+- **contratos iniciais um pouco mais protegidos**;
+- **premiações de liga inicial maiores proporcionalmente**.
+
+Isso **não dá jogador apelão** nem quebra a justiça inicial (caixa fixo idêntico, elenco equilibrado): dá **capacidade de recuperar o atraso** — um "catch-up" estrutural. O programa opera junto com as divisões por nível estrutural (a Liga Inicial em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)) e com o mercado segmentado e as receitas proporcionais ao estágio da liga (ver [`./03-economia.md`](./03-economia.md), seções 7.3 e 9.5), que protegem a entrada do clube novo.
+
+> **Pendência:** os parâmetros do programa (percentual de redução do custo de upgrade, redução do tempo de construção, tamanho do bônus de base, grau de proteção dos contratos iniciais e multiplicador das premiações de liga inicial) não foram definidos na fonte — são citados como plano, não como números. Calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).

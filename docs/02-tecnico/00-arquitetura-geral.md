@@ -1,6 +1,6 @@
 # Arquitetura Geral (Stack e Topologia)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md, chats/ux-do-jogo.md (Bloco 25) · **Revisão:** 2026-07-10
 
 Este documento define a arquitetura de referência do **Grinta**, um manager de futebol online com jogadores únicos e mundo persistente (herdeiro conceitual do Brasfoot, mas com identidade própria por atleta). Ele consolida as decisões de topologia, estrutura de repositório, stack tecnológica e princípios transversais que orientam toda a construção técnica do jogo.
 
@@ -11,7 +11,12 @@ Este documento define a arquitetura de referência do **Grinta**, um manager de 
 3. [Stack tecnológica recomendada](#3-stack-tecnológica-recomendada)
 4. [Princípios transversais](#4-princípios-transversais)
 5. [Mapa de engines/módulos do core](#5-mapa-de-enginesmódulos-do-core)
-6. [Documentos relacionados](#6-documentos-relacionados)
+6. [Camadas conceituais e fronteiras de módulos](#6-camadas-conceituais-e-fronteiras-de-módulos)
+7. [Topologia de processos executáveis](#7-topologia-de-processos-executáveis)
+8. [Infraestrutura, implantação e operação](#8-infraestrutura-implantação-e-operação)
+9. [Observabilidade](#9-observabilidade)
+10. [Fases de evolução da arquitetura](#10-fases-de-evolução-da-arquitetura)
+11. [Documentos relacionados](#11-documentos-relacionados)
 
 ---
 
@@ -75,21 +80,28 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 
 | Camada | Tecnologia | Observação |
 | --- | --- | --- |
-| Linguagem | TypeScript / Node.js | Base única para domínio, API, workers e web. |
+| Linguagem | TypeScript / Node.js LTS | Base única para domínio, API, workers e web. Modo `strict` obrigatório (ver seção 4 do estilo de código). |
 | Frontend | **Next.js 15** | Painel do jogador. |
-| Banco de dados | **PostgreSQL** | Estado persistente do mundo. |
+| Banco de dados | **PostgreSQL** | Estado persistente do mundo e fonte única de verdade. |
 | ORM / Persistência | **Prisma** | Camada `packages/database`. |
-| Fila / Assíncrono | **Redis + BullMQ** | Simulações longas e processamento de partidas nos workers. |
-| Tempo real | WebSocket | Partidas ao vivo e comandos em tempo real. |
+| Mensageria | **RabbitMQ** | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna (ver `./01-arquitetura-de-dados.md`). |
+| Cache / dados efêmeros | **Redis** | Cache, presença, rate limiting, adapter de Socket.IO e locks não críticos. Nunca fonte definitiva de dados competitivos. |
+| Fila / Assíncrono | **Redis + BullMQ** (fontes anteriores) / **RabbitMQ** (ux-do-jogo) | Ver pendência de mensageria abaixo. |
+| Tempo real | WebSocket com **Socket.IO** | Partidas ao vivo, presença e comandos em tempo real. |
+| Armazenamento de arquivos | **Cloudflare R2** | Escudos, avatares, relatórios, snapshots grandes, backups e arquivos históricos. |
 | Monorepo | PNPM Workspaces + Turborepo | Gerência de pacotes e build. |
+| Validação de contratos | **Zod** | Validação em runtime de payloads externos (API, mensageria, WebSocket, env, imports). |
 | Testes | Vitest | Unitários, de propriedade e de invariantes. |
-| Observabilidade | OpenTelemetry | Instrumentação transversal. |
+| Observabilidade | **OpenTelemetry + Prometheus + Grafana + Loki + Tempo** | Instrumentação, métricas, dashboards, logs e traces (ver seção 9). |
+| Implantação | Docker, GitHub Actions, GHCR e **EasyPanel** | Imagens imutáveis publicadas no GHCR e implantadas no EasyPanel (ver seção 8). |
 
 ### Framework da API
 
-> **Pendência:** As fontes não convergem para um único framework de API. São citados **NestJS**, **Fastify** e **AdonisJS** como candidatos. Decidir o framework oficial da camada `apps/api` (critérios sugeridos: suporte a WebSocket, integração com BullMQ, ergonomia de módulos e curva de adoção).
+> **Pendência:** As fontes não convergem para um único framework de API. Os chats anteriores citam **NestJS**, **Fastify** e **AdonisJS** como candidatos; o chat de UX (Bloco 25) decide explicitamente **NestJS + TypeScript**. Manter como pendência formal até ratificação, adotando NestJS como candidato preferencial. Critérios: suporte a WebSocket, integração com a mensageria, ergonomia de módulos e curva de adoção.
 
-O restante da stack (Next.js, PostgreSQL, Prisma, Redis/BullMQ) é consenso entre as fontes e é adotado como padrão.
+> **Pendência (mensageria):** As fontes divergem sobre a camada de trabalho assíncrono. Chats anteriores adotam **Redis + BullMQ**; o Bloco 25 de UX adota **RabbitMQ** para mensageria durável (com exchanges, dead letters e evolução para filas quorum) e reserva o Redis apenas para cache/efêmero. Decidir a mensageria oficial. A modelagem de eventos (Outbox/Inbox) em `./01-arquitetura-de-dados.md` é independente do broker escolhido.
+
+O restante da stack (Next.js, PostgreSQL, Prisma, Redis, Cloudflare R2, observabilidade e deploy) é consenso e é adotado como padrão.
 
 ---
 
@@ -177,7 +189,127 @@ O `core` se organiza em um conjunto de motores (engines) cooperantes, cada um re
 
 ---
 
-## 6. Documentos relacionados
+## 6. Camadas conceituais e fronteiras de módulos
+
+Internamente, o monólito modular organiza-se em três camadas conceituais, com dependência sempre no sentido de fora para dentro:
+
+```text
+Domínio  →  Aplicação  →  Infraestrutura
+```
+
+- **Domínio.** Entidades, agregados, objetos de valor, políticas, regras, invariantes, eventos e erros de domínio. **Não** depende de NestJS, Prisma, Redis, RabbitMQ, HTTP, WebSocket, R2 nem EasyPanel.
+- **Aplicação.** Casos de uso, commands, queries, handlers, orquestrações, sagas, autorizações de negócio, portas de entrada e interfaces de repositório.
+- **Infraestrutura.** Implementações concretas: Prisma/PostgreSQL, RabbitMQ, Redis, R2, HTTP, WebSocket, e-mail, logs, métricas e repositórios.
+
+### Organização por domínio (bounded contexts)
+
+O backend é dividido por contexto de negócio. Cada contexto é um módulo com estrutura interna própria (`/domain`, `/application`, `/infrastructure`, `/api`, `/contracts`, `/tests`):
+
+`identity`, `world`, `club`, `person`, `player`, `squad`, `training`, `tactics`, `match`, `competition`, `calendar`, `market`, `scouting`, `transfer`, `contract`, `staff`, `finance`, `infrastructure` (do clube), `commercial`, `supporter`, `communication`, `history`, `notification`, `automation`, `administration`.
+
+O monorepo reflete essa divisão com pacotes de plataforma (`domain`, `application`, `contracts`, `database`, `infrastructure`, `observability`, `configuration`, `testing`, `ui`) — a versão granular referida na pendência da seção 2.
+
+### Regras de dependência e acoplamentos proibidos
+
+- Módulos **não** acessam tabelas privadas, classes internas, repositórios ou serviços concretos de outro módulo. A comunicação ocorre por **interface de aplicação, contrato público, command, query ou evento**.
+- **Shared kernel pequeno:** contém apenas primitivas (`EntityId`, `GameWorldId`, `ClubId`, `Money`, `Percentage`, `DateRange`, `WorldDate`, `Version`, `Result`, erros básicos, metadados de evento). Regras de negócio específicas **não** entram em pacote genérico.
+- Proibidos, entre outros: Finance importar implementação de Transfer; Match escrever direto no banco de Contract; Notification alterar estado de Player; History decidir resultado; Frontend acessar banco; Worker ignorar a camada de aplicação; SQL de um módulo sobre tabelas de outro sem operação administrativa formal.
+- **Testes de arquitetura** automatizados bloqueiam o merge quando: o domínio importa infraestrutura, um módulo acessa internos indevidos, a API acessa Prisma diretamente, um worker ignora casos de uso, o frontend importa domínio de servidor, ou há dependência circular.
+
+---
+
+## 7. Topologia de processos executáveis
+
+Todos os processos compartilham o mesmo código-base e pacotes, mas rodam como contêineres separados. A implantação inicial possui sete processos de aplicação:
+
+| Processo | Responsabilidade |
+| --- | --- |
+| `web` | Interface/PWA, navegação, cache local, sincronização e comunicação com API/WebSocket. Não executa regras oficiais. |
+| `api` | Autenticação, commands síncronos, queries, validação, autorização, transações e criação de eventos. |
+| `realtime-gateway` | Conexões WebSocket, salas (usuário/clube/mundo/partida), presença, entrega em tempo real e recuperação de sequência. **Não é fonte de verdade.** |
+| `world-scheduler` | Relógios dos mundos, processamentos diários, disparo de partidas, prazos, expirações e tarefas agendadas. |
+| `simulation-worker` | Simulação de partidas, IA em partida, runtime, comandos ao vivo, checkpoints e conclusão. |
+| `async-worker` | Processamento de eventos, projeções, conciliações, rebuilds, mercado, histórico e jobs administrativos. |
+| `notification-worker` | Notificações derivadas, agrupamentos, digests, push, e-mail e retentativas. |
+
+Componentes de infraestrutura: `postgres`, `redis`, `rabbitmq`, `otel-collector`, `prometheus`, `grafana`, `loki`, `tempo`; armazenamento externo em Cloudflare R2.
+
+**Replicação futura:** `api`, `realtime-gateway`, `simulation-worker`, `async-worker` e `notification-worker` podem ter N réplicas. O `world-scheduler` é coordenado por **leases**, de modo que apenas um processo avance um dado mundo por vez.
+
+---
+
+## 8. Infraestrutura, implantação e operação
+
+A infraestrutura inicial é projetada para caber em uma única instância operacional (EasyPanel) e evoluir sem reescrever regras (ver seção 10).
+
+### EasyPanel, rede e serviços
+
+- Cada processo é um serviço Docker no EasyPanel (`football-web`, `football-api`, `football-realtime`, `football-world-scheduler`, `football-simulation-worker`, `football-async-worker`, `football-notification-worker`, além de `football-postgres`, `football-redis`, `football-rabbitmq` e os serviços de observabilidade).
+- **Rede privada:** PostgreSQL, Redis e RabbitMQ **não** são expostos à internet. Publicáveis apenas `web`, `api` e `realtime-gateway`.
+- **TLS/HTTPS** obrigatório no acesso público, com terminação no proxy do EasyPanel. Cloudflare pode fornecer DNS, proxy, CDN, proteção básica e cache de arquivos públicos.
+- **Volumes persistentes** para PostgreSQL, RabbitMQ, Redis, Grafana e (conforme retenção) Loki/Prometheus.
+
+### Saúde e degradação controlada
+
+- Cada serviço expõe `/health/live` e `/health/ready`. A `api` só fica *ready* com configuração válida, PostgreSQL acessível e migrações compatíveis.
+- **Falha do RabbitMQ:** a API continua aceitando commands cuja transação e Outbox sejam gravadas — o evento é publicado depois.
+- **Falha do Redis:** apenas degradação (perda de cache, reconstrução de presença); dados oficiais preservados.
+- **Falha do R2:** uploads/downloads indisponíveis, mas partidas, contratos e finanças continuam.
+
+### Configuração e segredos
+
+- Variáveis de ambiente (`DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `JWT_PRIVATE_KEY`, …) são **validadas na inicialização**; configuração inválida impede o boot em vez de operar parcialmente.
+- Segredos ficam como secrets/variáveis protegidas do EasyPanel — nunca no repositório, na imagem, em logs ou em arquivos públicos.
+
+### Ambientes e CI/CD
+
+- Ambientes: `development` (Docker Compose com versões equivalentes de Postgres/Redis/RabbitMQ e R2 simulado), `test`, `staging` (reproduz topologia/variáveis/migrações/filas/observabilidade, sem segredos ou dados reais) e `production` (apenas artefatos aprovados e imutáveis).
+- **Imagens Docker** imutáveis, com tag de versão, commit, data de build e checksum, publicadas no **GitHub Container Registry (GHCR)**. Pode-se usar uma imagem backend comum com diferentes comandos de inicialização.
+- **Pipeline (GitHub Actions):** deps → format → lint → typecheck → testes → gerar cliente Prisma → validar migrações → build → imagens → GHCR → deploy no EasyPanel → verificações pós-deploy. Fluxo de branches `main` + `feature/*` + `fix/*`; produção derivada de `main`/tags. Releases têm versão, changelog, migrações, compatibilidade, feature flags e plano de rollback.
+
+### Migrações e feature flags
+
+- Migrações Prisma são versionadas, revisadas e testadas em cópia de staging. Mudanças arriscadas usam **expand-contract** (EXPAND → MIGRATE → SWITCH → CONTRACT). Migrações destrutivas **não** rodam automaticamente no boot (job/etapa dedicada); o rollback da aplicação não depende de reverter toda a migração.
+- Feature flags ficam no PostgreSQL e são cacheadas no Redis; podem ter escopo por mundo quando não afetarem a justiça competitiva. Regras competitivas mudam por versão de regulamento + data efetiva + comunicação, nunca por flag invisível.
+
+### Banco: conexões e ausência de serverless
+
+- Pool de conexões controlado; réplica não abre conexões ilimitadas. **PgBouncer** pode ser introduzido se necessário.
+- A arquitetura **não** é serverless na primeira fase — isso simplifica conexões, workers, WebSocket, partidas, jobs persistentes e scheduler.
+
+Detalhes de mensageria, cache, backups (WAL-G → R2) e modelagem transacional estão em [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md).
+
+---
+
+## 9. Observabilidade
+
+Toda aplicação usa **OpenTelemetry** desde o início, com traces propagados entre HTTP, WebSocket, RabbitMQ, workers, banco e jobs.
+
+- **Metadados de trace:** `traceId`, `correlationId`, `commandId`, `eventId`, `gameWorldId`, `clubId`, `matchId`, `jobId`.
+- **Métricas (Prometheus):** latência, erros, requests, conexões, filas, jobs, partidas, commands, eventos, cache, banco e runtime.
+- **Logs (Loki):** estruturados em JSON. **Traces (Tempo).** **Dashboards (Grafana):** plataforma, API, banco, Redis, RabbitMQ, partidas, scheduler, jobs, mundo e deployments.
+- **Alertas iniciais:** API indisponível, banco sem conexão, fila crescendo, scheduler atrasado, worker de partida sem heartbeat, disco alto, backup atrasado, erro crítico, invariante falhando, mundo em risco.
+- **SLOs por fluxo** (não só pela plataforma inteira): commands comuns, partidas ao vivo, processamento diário, notificações críticas, consultas e recuperação. As metas de performance diferenciam consulta simples, consulta agregada, command e relatório pesado; consultas pesadas são assíncronas/cacheadas/baseadas em projeção e separadas dos commands críticos.
+
+---
+
+## 10. Fases de evolução da arquitetura
+
+A arquitetura evolui por fases; nenhuma delas exige reescrever as regras do jogo.
+
+| Fase | Foco | Conteúdo |
+| --- | --- | --- |
+| **1 — Fundação** | Single-host | Um EasyPanel, um PostgreSQL, um Redis, um RabbitMQ, apps/workers separados, R2 externo. |
+| **2 — Escala horizontal** | Réplicas | Mais réplicas de API/gateway/workers, Redis Adapter, pool de conexões, particionamento de filas, banco ampliado. |
+| **3 — Especialização** | Extração seletiva | Extrair (só com necessidade comprovada) motor de partidas, notificações, histórico, busca, analytics. |
+| **4 — Distribuição por mundo** | Sharding lógico | Mundos atribuídos a clusters, roteamento por `gameWorldId`, migração de mundo, filas por partição, workers por região. |
+| **5 — Alta disponibilidade** | Resiliência | PostgreSQL com réplica/failover, RabbitMQ em cluster, Redis com réplica/Sentinel, múltiplos hosts, balanceamento, recuperação regional. |
+
+**Extração de serviço** só ocorre quando o módulo tem fronteira estável, carga própria, necessidade de escalar de forma independente e benefício superior ao custo de rede. A preparação (contratos públicos, eventos, repositórios próprios, dados identificáveis, sem importações internas indevidas) é mantida desde o início; a separação de aplicação e de dados pode ocorrer em fases distintas, e uma **anti-corruption layer** protege o domínio ao integrar módulos antigos, novos serviços ou fornecedores. Não se adota **2PC** entre serviços — consistência entre limites usa Outbox/Inbox, idempotência, sagas e compensações (ver `./01-arquitetura-de-dados.md`).
+
+---
+
+## 11. Documentos relacionados
 
 - **Modelagem de dados e transações:** `./01-arquitetura-de-dados.md`
 - **Schema (modelo de dados):** `./02-modelo-de-dados.md`

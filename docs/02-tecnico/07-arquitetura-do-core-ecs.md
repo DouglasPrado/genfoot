@@ -504,7 +504,11 @@ jogador disponível para o clube
 risco físico reduzido
 ```
 
-Depois vêm **eventos em cascata**, todos reaproveitando a mesma estrutura: *jogador foi bem pela seleção*, *foi mal*, *voltou lesionado*, *voltou valorizado*, *voltou frustrado*.
+Depois vêm **eventos em cascata**, todos reaproveitando a mesma estrutura. O jogador retorna da seleção em um de **8 estados**, cada um gerando seus próprios efeitos:
+
+> voltou confiante · voltou cansado · voltou lesionado · voltou frustrado · voltou valorizado · voltou pressionado · voltou querendo sair · voltou mais maduro
+
+O estado de retorno alimenta ainda a relação clube-seleção (confiança médica, histórico de liberação/lesão, prestígio do jogador, força da federação, importância do torneio).
 
 ---
 
@@ -628,6 +632,22 @@ StaffMember {
 
 > **Princípio:** reaproveitar estrutura, individualizar valores. Mesma estrutura, controles individuais.
 
+### Expectativa por peça
+
+Investir numa peça **não é só positivo**: cada peça investida gera um tipo próprio de expectativa — e, portanto, de pressão. O princípio é **investimento cria pressão proporcional**.
+
+| Peça investida | Tipo de expectativa gerada |
+|---|---|
+| Elenco caro | expectativa esportiva alta |
+| Estádio novo | expectativa de público alto |
+| Técnico famoso | expectativa tática alta |
+| Base cara | expectativa de revelar jogadores |
+| Patrocínio grande | expectativa comercial e de resultado |
+
+Fluxo: investimento → melhora a peça → aumenta a expectativa → se o resultado vem, a reputação cresce; se não vem, a pressão cresce.
+
+> Exemplo: um clube investe muito em jogadores. Se ganha, vira potência; se perde, mídia e torcida cobram mais do que cobrariam antes. Por isso a expectativa por peça conecta o [Club Growth System](#ciclos-temporada-e-crescimento-do-clube) ao `InstitutionalState` (expectativa, pressão).
+
 Ver também: [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md).
 
 ---
@@ -658,7 +678,9 @@ Forma lógica:
 
 ```
 developmentGain =
-    remainingPotential
+    baseLearningRate        // capacidade de aprendizado do jogador (fator próprio)
+  * remainingPotential
+  * trainingFocus           // foco do treino no atributo (fator próprio, distinto de trainingQuality)
   * trainingQuality
   * playerCompatibility
   * minutesFactor
@@ -670,6 +692,8 @@ developmentGain =
   - pressurePenalty
   - fatiguePenalty
 ```
+
+`baseLearningRate` (o quão rápido o jogador aprende) e `trainingFocus` (o quanto o treino aponta para aquele atributo) são fatores **distintos**: aprender rápido sem foco, ou focar muito num jogador que não aprende, resultam em ganho baixo. O cálculo roda **por atributo** — ex.: o ganho em passe usa o `trainingFocus` de passe e o `remainingPotential` técnico.
 
 > **Pendência:** os intervalos numéricos, a normalização de cada fator e os pesos relativos devem ser definidos e centralizados no catálogo de fórmulas ([`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md)).
 
@@ -914,6 +938,14 @@ Core do Jogo
 | 13 | Narrative System | Transforma eventos e memórias em história |
 
 > **Nota:** o material de origem lista 13 sistemas nomeados sob "Estrutura final do core". A referência a "~14 sistemas" inclui, de forma implícita, o **Reputação/Tradição** (citado entre os motores na abertura do desenho e absorvido pelo Club Growth System). O agrupamento pode ser refinado na consolidação técnica.
+
+### Narrative System: exemplo de narrativa gerada
+
+Como o Grinta quer jogadores únicos, cada evento e memória deveria alimentar uma **narrativa gerada** em texto — o `Narrative System` consome o `MemoryComponent` e a linha de eventos do jogador e produz prosa por atleta, aumentando a imersão.
+
+> "Caio Andrade, criado pela mãe e revelado no futsal, chegou ao profissional como meia criativo, mas sentiu a pressão inicial. Após apoio do capitão e trabalho psicológico, virou titular e decidiu o clássico."
+
+Cada frase da narrativa acima mapeia diretamente para memórias e eventos do core: origem/`LifeStory`, estado inicial de pressão, evento de apoio do capitão (`Relationship`) + suporte psicológico, e a memória de "decidiu o clássico".
 
 ---
 

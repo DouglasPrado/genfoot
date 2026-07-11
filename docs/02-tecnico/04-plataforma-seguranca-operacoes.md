@@ -20,7 +20,7 @@ A plataforma protege o mundo — disponibilidade, consistência, segurança e re
 8. [Filas, jobs e projeções](#8-filas-jobs-e-projeções)
 9. [Observabilidade, alertas e incidentes](#9-observabilidade-alertas-e-incidentes)
 10. [Backups, snapshots e recuperação](#10-backups-snapshots-e-recuperação)
-11. [Migrações expand-contract](#11-migrações-expand-contract)
+11. [Deployment, manutenção e migrações](#11-deployment-manutenção-e-migrações)
 12. [Arquitetura técnica](#12-arquitetura-técnica)
 13. [Modelo de dados e integridade](#13-modelo-de-dados-e-integridade)
 14. [Pendências](#14-pendências)
@@ -136,11 +136,32 @@ Correções no log **nunca sobrescrevem** o evento original: geram evento comple
 
 São auditados: login administrativo e falhas de autenticação, permissões, elevação temporária, acesso emergencial, dados sensíveis visualizados, exportações, impersonação, correções, scripts, jobs, backups, restaurações, migrações, deployments, feature flags, incidentes, alterações de mundo, anonimizações, exclusões, ações de organizadores e **tentativas bloqueadas**.
 
+### Logs técnicos e correlação
+
+- Tipos de log: `APPLICATION_LOG` · `SECURITY_LOG` · `AUDIT_LOG` · `ACCESS_LOG` · `DATABASE_LOG` · `JOB_LOG` · `INTEGRATION_LOG` · `INCIDENT_LOG`.
+- Estrutura mínima: `timestamp`, `environment`, `service`, `severity`, `traceId`, `requestId`, `gameWorldId`, `userId`, `operatorId`, `entityType`, `entityId`, `eventCode`, `message`, `metadata`.
+- Severidade: `TRACE` · `DEBUG` · `INFO` · `WARN` · `ERROR` · `CRITICAL`. Regra fechada: **eventos competitivos normais não são registrados como erros técnicos**.
+- **Proibido em logs comuns**: senhas, tokens completos, chaves, diagnósticos completos, mensagens privadas completas, dados de cartão e documentos pessoais completos.
+- Uma operação é rastreável por `traceId`, `requestId`, `commandId`, `eventId`, `jobId` e `incidentId`.
+
+### Classificação de dados e mascaramento
+
+- Níveis: `PUBLIC` (resultados, tabelas, perfis públicos, títulos) · `INTERNAL` (métricas de serviço, config não sensível, estado de filas, versões) · `CONFIDENTIAL` (finanças privadas do clube, estratégias, relatórios de observação, contratos não publicados, diagnósticos médicos) · `RESTRICTED` (mensagens privadas, evidências de moderação, informações de segurança, dados pessoais, sessões) · `HIGHLY_RESTRICTED` (segredos, chaves, tokens, material de recuperação, credenciais, dados financeiros externos completos).
+- Interfaces internas **mascaram** e-mails, telefones, tokens, documentos, endereços, dados de pagamento e segredos.
+- **Revelação temporária** exige permissão, reautenticação, motivo, duração curta e auditoria.
+- Buscas por dado sensível (e-mail, telefone, endereço técnico, identificador de pagamento) exigem permissão específica e geram auditoria.
+
 ### Auditoria vs. narrativa
 
 A auditoria (registro técnico de quem fez o quê no sistema) é **distinta da narrativa do jogo** (a história pública/esportiva que os usuários leem). Segredos competitivos não aparecem em métricas nem logs; a auditoria interna não vira conteúdo narrativo.
 
 > A regra reforçada em todo o bloco: a administração pode corrigir o mundo, mas **não pode administrar secretamente a competição**. Organizadores de mundos privados têm poderes limitados e **não podem alterar resultados ou saldos**; organizadores que também competem sofrem restrições adicionais.
+
+### Organizadores de mundos privados
+
+- **Podem**: convidar, gerir canais, publicar anúncios, configurar regras permitidas, solicitar correções e moderar casos leves.
+- **Não podem**: consultar dados pessoais internos, ver atributos secretos, criar dinheiro, editar jogadores, alterar resultados, apagar dívidas, executar restore, acessar banco, ver logs de segurança ou assumir conta.
+- **Organizador que também compete** tem restrições extras: não moderar caso próprio, não acessar informação privada de rival, não alterar regras durante disputa sem processo, não remover concorrente sem revisão e não controlar o calendário arbitrariamente.
 
 ---
 
@@ -152,16 +173,41 @@ A auditoria (registro técnico de quem fez o quê no sistema) é **distinta da n
 - Correções financeiras usam **estornos e lançamentos** (nunca sobrescrita); correções de transferência tratam todas as dependências.
 - Estatísticas e classificações podem ser **reconstruídas**, mas **tabelas alteradas exigem nova validação oficial**; a **população de jogadores não é regenerada arbitrariamente**; **replays em produção exigem operação formal**.
 
+### Tipos, estados e escopo da correção
+
+- Tipos: `DATA_CORRECTION` · `STATE_REPAIR` · `EVENT_REPLAY` · `EVENT_COMPENSATION` · `PROJECTION_REBUILD` · `TRANSACTION_REVERSAL` · `HISTORICAL_CORRECTION` · `ACCESS_CORRECTION` · `CONFIGURATION_CORRECTION`.
+- Estados: `DRAFT` → `VALIDATING` → `DRY_RUN_COMPLETED` → `AWAITING_APPROVAL` → `APPROVED` → `SCHEDULED` → `EXECUTING` → `PARTIALLY_COMPLETED`/`COMPLETED`/`FAILED` → `ROLLING_BACK` → `ROLLED_BACK`/`CANCELLED`.
+- **Correção de projeção** (fato oficial correto, tela/estatística errada): reconstrói projeção, invalida cache, reindexa busca e mantém os fatos intactos. **Correção de fato-base**: processo reforçado, com avaliação de dependências, nova versão, compensações, comunicação e auditoria.
+- **Compensação**: quando a ação original não pode ser apagada, cria-se evento compensatório que reverte o efeito, preserva histórico e atualiza projeções.
+- **Limite de escopo**: todo job de correção exige mundo, temporada, tipo, filtro, quantidade máxima e confirmação do total; um script que afeta mais entidades que o esperado é bloqueado.
+- **Jogador duplicado** é consolidado (registro principal, migração de relações, contratos e estatísticas, redirecionamentos, auditoria preservada), não apagado.
+
+### Correção em partida ao vivo e pós-partida
+
+- Operação manual em partida ao vivo é **apenas técnica**: pausar, reiniciar transmissão, reconectar serviço, recuperar snapshot, marcar incidente. **Nunca** inserir gol, remover cartão, ordenar substituição, alterar aleatoriedade ou mudar tática.
+- **Correção de resultado é do processo competitivo**, mesmo quando causada por bug técnico: a equipe técnica fornece evidências, corrige cálculo e reprocessa dependências, mas não decide campeão, pontuação administrativa nem sanção esportiva.
+- Se o motor produz estado inválido, o resultado fica **pendente**, um incidente é aberto e a competição decide os efeitos oficiais.
+
 ### Privacidade, anonimização e retenção
 
 - Dados pessoais podem ser **anonimizados sem apagar fatos competitivos** (resultados e histórico permanecem).
 - **Exportações respeitam a privacidade de terceiros**; dados de outras pessoas são omitidos ou mascarados.
 - **Legal hold** é suportado: dados sob retenção legal não são apagados nem anonimizados enquanto ela vigorar.
 - **Dados de produção não são usados em testes sem proteção**; dados **sintéticos** são preferidos.
+- Solicitações de privacidade cobrem: acesso, correção, exportação, exclusão, restrição e anonimização.
+- **Separação dado pessoal × fato competitivo**: nome pessoal e identidade de conta podem ser removidos/anonimizados; resultados, clube, transferências e controle histórico (anonimizado) **permanecem**, com auditoria essencial conforme política.
+- **Exportação** inclui só dados permitidos do próprio usuário — nunca segredos de outros clubes, mensagens de terceiros sem base, evidências internas protegidas, atributos ocultos ou dados de segurança.
+- Exclusão em processamento: `REQUESTED` → `IDENTITY_VERIFICATION` → `UNDER_REVIEW` → `WAITING_RETENTION_PERIOD` → `ANONYMIZING` → `COMPLETED` (`REJECTED`/`CANCELLED`).
 
 ### Suporte
 
 Impersonação é **somente leitura por padrão**; suporte não joga pelo usuário. Sessões de suporte (`supportAccessSessionId`) são **visíveis, temporárias, aprovadas** e notificam o usuário (`userNotificationId`).
+
+- **Verificação de identidade** é exigida antes de operar sobre conta; informação fornecida em conversa **não basta** para operações de alto risco.
+- Estados do ticket: `OPEN` · `TRIAGED` · `WAITING_USER` · `WAITING_INTERNAL` · `IN_PROGRESS` · `ESCALATED` · `RESOLVED` · `CLOSED` · `REOPENED` · `DUPLICATE` · `INVALID`.
+- Modos de impersonação: `READ_ONLY_IMPERSONATION` (padrão, só visualiza) e `ASSISTED_IMPERSONATION` (navegação guiada; ações críticas ainda exigem confirmação do usuário).
+- **Proibido durante impersonação**: transferir jogador, alterar senha, aceitar contrato, gastar recursos, excluir conta, enviar mensagem como usuário, controlar partida e desativar segurança.
+- Disputas de propriedade de clube **não são decididas pelo suporte sozinho**: seguem processo específico de conta e governança.
 
 ---
 
@@ -185,6 +231,26 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
 - **Projeções (read models) podem ser reconstruídas** por jobs de rebuild; não há event sourcing completo obrigatório, mas eventos relevantes são imutáveis. Consultas pesadas usam projeções ou jobs.
 - Conciliações validam os principais domínios continuamente.
 
+### Tipos, estados e contrato do job
+
+- Tipos: `SCHEDULED_JOB` · `EVENT_CONSUMER` · `BATCH_JOB` · `MIGRATION_JOB` · `REBUILD_JOB` · `CLEANUP_JOB` · `RECONCILIATION_JOB` · `BACKUP_JOB` · `RESTORE_JOB`.
+- Estados: `CREATED` → `QUEUED` → `STARTING` → `RUNNING` → `PAUSED`/`WAITING_DEPENDENCY`/`RETRYING` → `PARTIALLY_COMPLETED`/`COMPLETED`/`FAILED`/`CANCELLED`/`DEAD_LETTERED`. Job sem heartbeat vira `STALLED` (investigado, retomado, cancelado ou reatribuído).
+- Contrato mínimo: `jobId`, `jobType`, `environment`, `gameWorldId`, `status`, `parameters`, `checkpoint`, `progress`, `attemptCount`, `startedAt`, `lastHeartbeatAt`, `completedAt`, `failureReason`, `idempotencyKey`, `version`.
+- Cancelamento: `GRACEFUL`, `IMMEDIATE`, `AFTER_CURRENT_ITEM`. Jobs parciais expõem itens concluídos/falhos/pendentes, possibilidade de retomada e efeitos já persistidos.
+
+### Conciliação (reconciliation)
+
+- Verifica: contratos×registros, lançamentos×saldos, partidas×tabelas, jogadores×clubes, eventos×projeções, locks, filas, notificações e ativos comerciais.
+- Frequência: contínua, diária, semanal, na transição, sob demanda ou após incidente.
+- Resultado: `CONSISTENT` · `MINOR_DIFFERENCES` · `REPAIRABLE` · `CRITICAL_INCONSISTENCY` · `MANUAL_REVIEW_REQUIRED`.
+
+### DLQ, poison message, ordenação e backpressure
+
+- Dead letter guarda motivo, payload protegido, tentativas, serviço e data; o reprocessamento revalida schema e estado, preserva `eventId` e impede duplicidade.
+- **Poison message** (evento que sempre falha) é isolada para não bloquear a fila inteira.
+- Filas críticas podem exigir **ordenação** por mundo, entidade, agregado, partida ou contrato.
+- **Backpressure**: sob sobrecarga, reduz produção não crítica, aumenta workers, prioriza eventos críticos, agrupa atualizações e alerta operações.
+
 ---
 
 ## 9. Observabilidade, alertas e incidentes
@@ -195,6 +261,39 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
 - Incidentes têm `severity`, `incidentCommanderId` e `responderIds`; usuários afetados recebem comunicação contextual; incidentes relevantes têm revisão posterior com ações corretivas responsabilizadas e com prazo.
 - Verificação **contínua de invariantes**; auto-repair só em situações comprovadamente seguras.
 - **Capacidade e armazenamento são monitorados**; logs têm **correlação distribuída** (trace/correlation IDs) ligando ação, evento e efeito.
+
+### Composição, métricas e health checks
+
+- Pilares: `METRICS` · `LOGS` · `TRACES` · `EVENTS` · `AUDIT` · `SYNTHETIC_CHECKS` · `BUSINESS_INVARIANTS`.
+- Métricas **técnicas** (latência, taxa de erro, CPU, memória, disco, conexões, fila, tempo de job, disponibilidade, cache) e **de negócio operacionais** (partidas iniciadas/travadas, transferências concluídas, pagamentos duplicados bloqueados, mundos atrasados, jobs diários, erros de inscrição, conflitos de versão).
+- **Métricas competitivas protegidas**: não revelam potencial real dos jogadores, seeds futuros, aleatoriedade de partidas, estratégias privadas nem alvos de mercado.
+- Tracing distribuído liga API, serviço, banco, fila, worker, notificação e integração. Dashboards por plataforma, mundo, serviço, competição, partida, transição, mercado, segurança e backups.
+- Health checks: `LIVENESS` (processo vivo) · `READINESS` (pode receber tráfego) · `DEPENDENCY` · `DEEP_HEALTH` (testa banco/fila/cache/storage/integrações/consistência mínima, sem execução excessiva). **Synthetic checks** simulam fluxos controlados (login técnico, consulta de mundo, criação em teste, leitura de calendário, evento sintético).
+
+### Incidentes: severidade, estados e timeline
+
+- Severidade: `SEV_5_INFORMATIONAL` (sem impacto visível) · `SEV_4_MINOR` (interface parcialmente degradada) · `SEV_3_MAJOR` (função relevante indisponível para grupo) · `SEV_2_CRITICAL` (mundo/serviço crítico comprometido) · `SEV_1_CATASTROPHIC` (risco de perda ampla de dados, segurança ou indisponibilidade geral).
+- Estados: `DETECTED` → `ACKNOWLEDGED` → `INVESTIGATING` → `MITIGATING` → `MONITORING` → `RESOLVED` → `POST_INCIDENT_REVIEW` → `CLOSED` (`REOPENED` possível). Estado público: `INVESTIGATING`/`IDENTIFIED`/`MITIGATING`/`MONITORING`/`RESOLVED`.
+- A **timeline** registra detecção, primeira resposta, escalonamento, mitigação, recuperação, resolução e comunicação.
+- **Comunicação segmentada**: só usuários afetados recebem alertas específicos, salvo incidente global. Mitigação pode desativar função, entrar em somente leitura, pausar fila, reduzir carga, trocar dependência, restaurar réplica, reverter deployment ou aplicar feature flag. Resolução exige serviço estável, integridade validada, processamentos pendentes tratados e usuários informados.
+
+### Post-incident review e ações corretivas
+
+- A revisão identifica impacto, linha do tempo, causa, fatores contribuintes, detecção, resposta, o que funcionou/falhou e ações preventivas.
+- **Cultura sem culpabilização simplista**: foco em sistema, processo, barreiras, decisões e contexto — sem impedir responsabilização por abuso deliberado.
+- Ações corretivas têm responsável, prioridade, prazo, evidência de conclusão e estado: `OPEN` · `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED` · `OVERDUE`.
+
+### Invariantes e auto-repair
+
+- Exemplos de invariante técnica: um mundo tem uma data oficial ativa; um clube tem um controlador principal; um pagamento não é liquidado duas vezes; um contrato não está ativo e expirado ao mesmo tempo; uma partida oficial tem resultado consistente; um job concluído não reexecuta sem nova tentativa registrada.
+- Verificação após comando, evento, job periódico, transição, deployment e restauração. Violação crítica **bloqueia operações relacionadas**, cria incidente, preserva estado e evita correção automática arriscada.
+- **Auto-repair** só em situações bem definidas, reversíveis e testadas (reconstruir cache, recriar projeção, liberar lock expirado, reenfileirar evento seguro). **Nunca** decide campeão, destino de dinheiro controverso, razão em disputa, anulação de transferência nem autor de gol.
+
+### Estado operacional do mundo
+
+- Estados: `HEALTHY` · `DEGRADED` · `AT_RISK` · `MAINTENANCE` · `READ_ONLY` · `RECOVERING` · `SUSPENDED` · `ARCHIVED`.
+- `AT_RISK`: mundo ainda funciona, mas com fila crescente, backup atrasado, falha de conciliação, capacidade no limite, dependência instável ou job crítico em retry.
+- **Somente leitura automático** entra quando integridade financeira falha, há duplicidade de jogadores, sequência de eventos quebra, banco fica inconsistente ou segurança exige contenção. A saída exige causa resolvida, invariantes válidas, jobs conciliados, aprovação, comunicação e monitoramento reforçado.
 
 ---
 
@@ -207,11 +306,42 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
 - Mundos podem ser restaurados **isoladamente** — falha de um mundo não corrompe os demais, e falha de um serviço não derruba a plataforma (degradação graciosa).
 - Recuperação de desastre tem **runbook** e exercícios praticados; **integridade tem prioridade sobre reabertura rápida**.
 
+### Tipos, RPO/RTO e estados
+
+- Tipos de backup: `FULL` · `INCREMENTAL` · `TRANSACTION_LOG` · `SNAPSHOT` · `CONFIGURATION` · `OBJECT_STORAGE` · `AUDIT_ARCHIVE`.
+- **RPO** (*Recovery Point Objective*): máximo de dados que se aceita perder. **RTO** (*Recovery Time Objective*): tempo-alvo para restaurar o serviço. Ambos definidos por política, junto de frequência, retenção, local, criptografia, redundância, teste e responsável.
+- Backups isolados protegem contra exclusão acidental, credencial comprometida, ransomware, corrupção e falha regional; criptografia **em trânsito e em repouso**, com gestão separada de chaves.
+- Estados do backup: `SCHEDULED` → `RUNNING` → `COMPLETED` → `VALIDATING` → `VALID`/`INVALID`/`FAILED` → `EXPIRED`/`DELETED`. Backup não testado é marcado `UNVERIFIED_BACKUP`.
+
+### Restauração, replay e disaster recovery
+
+- Tipos de restauração: `FULL_PLATFORM_RESTORE` · `WORLD_RESTORE` · `SERVICE_RESTORE` · `DATABASE_RESTORE` · `ENTITY_REPAIR` · `POINT_IN_TIME_RECOVERY`.
+- Pré-condições: incidente aberto, backup validado, escopo, plano, comunicação, aprovação, ambiente de validação e estratégia para eventos posteriores.
+- Estados: `REQUESTED` → `PLANNING` → `AWAITING_APPROVAL` → `RESTORING_TO_ISOLATED_ENVIRONMENT` → `VALIDATING` → `READY_TO_APPLY` → `APPLYING` → `REPLAYING_EVENTS` → `VERIFYING` → `COMPLETED`/`FAILED`/`ROLLED_BACK`.
+- **Replay** reaplica eventos posteriores ao backup apenas se íntegros, idempotentes e com schema compatível; evento suspeito **interrompe** o replay. Integrações externas usam **modo seguro** para não cobrar, enviar e-mail, criar pagamento ou publicar mensagem novamente.
+- Disaster recovery cobre perda de região, banco, storage, credencial comprometida, corrupção ampla, falha de provedor e exclusão acidental; ativações e exercícios são registrados. **Continuidade degradada** prioriza segurança, estado dos mundos, partidas em andamento e processamentos críticos.
+
 ---
 
-## 11. Migrações expand-contract
+## 11. Deployment, manutenção e migrações
 
-Migrações são versionadas, testadas e retomáveis. Princípios: compatibilidade, idempotência, checkpoints, monitoramento, backup, dry run quando possível, validação e rollback/compensação.
+### Deployment
+
+- Estados: `PLANNED` → `APPROVED` → `DEPLOYING` → `VERIFYING` → `COMPLETED`/`FAILED` → `ROLLING_BACK` → `ROLLED_BACK`/`CANCELLED`.
+- Estratégias: `ROLLING`, `BLUE_GREEN`, `CANARY`, `RECREATE`, conforme capacidade.
+- Verificação pós-deployment: health checks, taxa de erro, latência, jobs, filas, invariantes, fluxos críticos e logs. **Rollback** dispara quando erros críticos sobem, invariantes falham, processamento quebra, migração é incompatível ou segurança é afetada.
+- **Código antigo × schema novo**: a compatibilidade é planejada para permitir rollback seguro; um deployment incompatível é bloqueado ou exige migração compatível.
+
+### Manutenção
+
+- Tipos: `PLANNED`, `EMERGENCY`, `WORLD_SPECIFIC`, `SERVICE_SPECIFIC`, `DATABASE`, `MIGRATION`, `SECURITY`.
+- A janela define início, duração, serviços, mundos, prazos, partidas, modo de acesso e comunicação.
+- **Congelamento de prazo**: durante manutenção, prazos podem continuar, ser estendidos, congelados ou reabertos — a política é definida antes quando possível.
+- Manutenção emergencial começa sem aviso longo, mas informa assim que possível, registra motivo, protege partidas/prazos e produz revisão posterior.
+
+### Migrações
+
+Migrações são versionadas, testadas e retomáveis, com estados `DRAFT` → `REVIEWED` → `TESTED` → `APPROVED` → `SCHEDULED` → `RUNNING` → `VALIDATING` → `COMPLETED`/`FAILED`/`ROLLED_BACK`/`MANUAL_INTERVENTION_REQUIRED`. Princípios: compatibilidade, idempotência, checkpoints, monitoramento, backup, dry run quando possível, validação e rollback/compensação.
 
 Migrações **destrutivas** ocorrem em etapas (**expand-contract**):
 
@@ -240,9 +370,30 @@ Parar escrita  →  Migrar leitura  →  Validar  →  Arquivar dado  →  Remov
 
 ### Endurecimento e segurança de aplicação
 
-- **Rate limiting** protege contra abuso; comandos repetidos são idempotentes.
-- **Vulnerabilidades têm processo próprio** e **dependências são monitoradas**; artefatos de deployment são **verificáveis** (imagens rastreáveis no GHCR).
-- **Segredos são rotacionáveis**, ficam fora do código e **nunca aparecem em logs**; interfaces internas **mascaram** dados sensíveis.
+- **Rate limiting** protege contra abuso, aplicável por conta, sessão, endereço, mundo, comando, serviço e risco — sem prejudicar ações legítimas próximas de prazo; comandos repetidos são idempotentes.
+- **Proteção contra replay de comando**: comandos críticos usam `commandId`, `idempotencyKey`, timestamp, sessão, assinatura/token e janela de validade. Conhecer um identificador **não** concede autoridade.
+- **Vulnerabilidades têm processo próprio** com estados `REPORTED` → `TRIAGED` → `CONFIRMED` → `MITIGATING` → `PATCHED` → `VERIFYING` → `RESOLVED` (`DUPLICATE`/`NOT_APPLICABLE`); severidade considera impacto, explorabilidade, dados, privilégio, escopo e disponibilidade de exploração. Há **divulgação responsável** com canal próprio e proteção a pesquisadores legítimos.
+- **Dependências são monitoradas** (vulnerabilidades conhecidas, versões obsoletas, licenças, integridade de pacotes); atualização passa por testes, staging, verificação e rollback.
+- **Cadeia de build** protege código, pipelines, artefatos, credenciais, assinaturas, dependências e deployments. O artefato tem versão, commit, build, checksum, ambiente, aprovação e data; um artefato alterado ou não reconhecido **não é implantado** (imagens rastreáveis no GHCR).
+- **Segredos são rotacionáveis** (nova versão, atualização de consumidores, sobreposição quando necessário, revogação da versão antiga), ficam fora do código e **nunca aparecem em logs**; interfaces internas **mascaram** dados sensíveis.
+
+### Segurança da API web
+
+- **CORS controlado**, **headers de segurança**, **sanitização** de entrada e **logs seguros** são requisitos de base da API.
+- **CSRF:** quando a autenticação usar cookies, há proteção CSRF apropriada.
+- **XSS:** conteúdo gerado por usuários é escapado, sanitizado, limitado e renderizado de forma segura.
+- **SQL injection:** o acesso usa Prisma e parâmetros; **SQL direto nunca concatena entrada do usuário**.
+- **Upload malicioso:** todo upload é validado antes da publicação (ver também URLs assinadas em [Busca, analytics e arquivos](#busca-analytics-e-arquivos)).
+- **Rate limiting diferenciado** por tipo de operação — login, commands, busca, mensagens, upload, WebSocket e partida — com **limite competitivo** que considera sessão, tipo, histórico, risco e janela para não bloquear commands legítimos perto do prazo.
+- **Auditoria de command:** commands críticos registram `actor`, `session`, `device`, `commandId`, `expectedVersion`, `result` e `correlationId`.
+
+### Capacidade, escalonamento e resiliência
+
+- Capacidade é monitorada (crescimento do banco, eventos, arquivos, partidas, mundos, usuários, filas, cache, conexões); o planejamento considera tendência, sazonalidade, picos de partidas, fechamento de janela e transição de temporada.
+- Escalonamento: `VERTICAL`, `HORIZONTAL`, `SCHEDULED`, `EVENT_DRIVEN`, `MANUAL`.
+- **Prioridade sob carga**: segurança > comandos competitivos > partidas > processamentos obrigatórios > consultas essenciais > mercado > notificações > estatísticas > social > rebuilds históricos.
+- **Degradação graciosa**: desativar gráficos avançados, atrasar rankings, agrupar notificações, pausar rebuilds e limitar busca histórica — mantendo partida e mercado ativos.
+- **Proteção contra cascata**: timeouts, circuit breakers, filas, limites, isolamento, fallbacks e bulkheads. Dependência externa indisponível usa retry controlado, abre circuito, preserva comandos e evita avalanche.
 
 ### Busca, analytics e arquivos
 
@@ -252,13 +403,27 @@ Parar escrita  →  Migrar leitura  →  Validar  →  Arquivar dado  →  Remov
 
 ### Integrações externas
 
-- Integrações usam **adapters**, com **credenciais isoladas** por integração.
-- **Webhooks são autenticados e idempotentes**; **e-mail e push são assíncronos**.
+- Integrações usam **adapters**, com **credenciais isoladas** por integração; terceiros/fornecedores têm contrato, escopo, dados mínimos, chaves próprias, auditoria, revogação e limite de retenção.
+- **Integração comprometida**: revogar credencial, bloquear tráfego, avaliar dados, abrir incidente, rotacionar segredos e informar afetados quando necessário.
+- **Webhooks são autenticados, validados e idempotentes**; webhooks fora de ordem usam versão, estado, timestamp e identificador externo para impedir regressão de processo. **E-mail e push são assíncronos**.
+- Pagamentos externos usam identificador idempotente, estado, reconciliação e webhook verificado — **dinheiro real da plataforma e economia fictícia do mundo são domínios separados**.
 
 ### Testes como parte da arquitetura
 
-- Testes de **domínio, integração, concorrência e simulação** são obrigatórios.
-- O motor tem **golden tests** e **testes estatísticos**; há **testes de recuperação** e testes que protegem as **fronteiras dos módulos**.
+A estratégia de testes combina dez tipos, cada um cobrindo uma classe de risco:
+
+| Tipo | Cobre |
+| --- | --- |
+| **Unitários** | Regras, políticas, objetos de valor, invariantes, cálculos e decisões — **sem depender de banco**. |
+| **Integração** | Instâncias reais de PostgreSQL, Redis e RabbitMQ (preferencialmente via **Testcontainers**). |
+| **Contrato** | API, eventos, WebSocket, schemas e compatibilidade entre versões. |
+| **End-to-end** | Fluxos completos: criar mundo, entrar em clube, montar escalação, disputar partida, transferência, processar temporada. |
+| **Concorrência** | Cenários obrigatórios: duas propostas pelo mesmo jogador, dois commands no mesmo contrato, dois schedulers no mesmo mundo, dois workers na mesma partida, pagamento repetido, aceite duplicado, retry de evento. |
+| **Propriedade** | Invariantes: saldo não diverge do razão, jogador não pertence a dois clubes incompatíveis, soma de percentuais dentro do limite, calendário sem partida duplicada, simulação sempre termina em estado válido. |
+| **Motor / golden** | Seeds fixas + **golden files**: uma seed e um snapshot produzem a sequência esperada de eventos para dada **versão do motor**. Mudança intencional de resultados **incrementa a versão do motor** e atualiza os golden files conscientemente; partidas antigas permanecem na versão anterior. |
+| **Estatístico** | Milhares de simulações verificam distribuição de gols, cartões, lesões, posse, vantagem de mando e impacto tático, sem resultados impossíveis frequentes. |
+| **Carga** | Muitos usuários conectados, rodada simultânea, fechamento de janela, transição de temporada, muitos eventos, notificações e busca histórica. |
+| **Migração e recuperação** | Migrações de schema e recuperação após falha; testes de **arquitetura** protegem as fronteiras dos módulos.
 
 ---
 

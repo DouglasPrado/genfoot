@@ -48,7 +48,49 @@ GameWorld {
 }
 ```
 
-O mundo controla a **data corrente** e o ritmo (`speed`). O tempo é **acelerado**, não em tempo real: a recomendação é que uma temporada inteira dure 45 dias reais. Um mundo em que uma temporada durasse um ano real seria lento demais.
+O mundo controla a **data corrente** e o ritmo (`speed`). O tempo é **acelerado**, não em tempo real: um mundo em que uma temporada durasse um ano real seria lento demais.
+
+O ritmo pode ser expresso de duas formas equivalentes:
+
+- **Por razão de tempo** — `1 dia real = 1 semana no jogo`, deixando o calendário avançar de forma constante.
+- **Por duração de temporada** — `45 dias reais = 1 temporada inteira`, a recomendação padrão.
+
+O campo `speed` do mundo materializa essa escolha. Exemplos:
+
+```
+speed: { seasonDays: 45 }        // 1 temporada = 45 dias reais (padrão)
+speed: { realDay: "1 week" }     // 1 dia real = 1 semana no jogo
+speed: { seasonDays: 30 }        // temporada mais curta e intensa
+speed: { seasonDays: 60 }        // temporada mais longa e pausada
+```
+
+As duas notações descrevem o mesmo mundo acelerado; a temporada de 45 dias continua sendo a referência inicial recomendada.
+
+### Mundos por geração (eras temporais)
+
+Como cada mundo é independente e persistente, o Grinta pode operar **eras** ou **servidores temporais**: mundos que começaram em temporadas globais diferentes e, por isso, estão em estágios de maturidade distintos no momento em que um usuário chega. Em vez de forçar todo novato a entrar num universo já muito avançado, o jogo permite que ele **escolha em qual mundo entrar**.
+
+Exemplo:
+
+| Mundo | Começou na | Estado na entrada de um novato |
+| --- | --- | --- |
+| Mundo 1 | Temporada 1 | Economia madura, clubes históricos, mais desafio |
+| Mundo 2 | Temporada 10 | Universo intermediário |
+| Mundo 3 | Temporada 20 | Universo recente |
+
+O usuário novo pode optar por:
+
+- **Entrar num mundo antigo** — economia madura, clubes históricos consolidados, competição mais difícil.
+- **Entrar num mundo novo** — todo mundo começa junto, competição mais equilibrada desde o início.
+
+Esse modelo é especialmente bom para um jogo online e pode coexistir em camadas:
+
+- um **mundo persistente principal**;
+- **novos mundos sazonais** abertos periodicamente;
+- **ligas de novatos**;
+- **campeonatos especiais de início** para quem acabou de entrar.
+
+As eras não substituem os mecanismos de entrada dentro de um mundo já maduro (divisões por nível estrutural, programa de desenvolvimento inicial): são uma alternativa de escolha de servidor, complementar a eles.
 
 > Ciclo de temporada, competições e transição de fim de temporada: ver [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md).
 
@@ -312,6 +354,28 @@ O modelo usa divisões hierárquicas (Divisão 1, 2, 3, 4...), cada uma com club
 
 Isso cria objetivo para todos — não só para quem briga por título, mas também para quem foge do rebaixamento ou busca o acesso.
 
+### Divisões por nível estrutural do clube (ligas de desenvolvimento)
+
+O modelo hierárquico acima (Divisão 1, 2, 3…) organiza os clubes por **resultado esportivo** — sobe quem vence, cai quem perde. Isso não basta para um mundo persistente em que clubes antigos cresceram muito: se um clube recém-criado (estrutura nível 1, base nível 1, estádio nível 1, elenco inicial velho, reputação baixa) cair direto contra um gigante de temporadas anteriores (estrutura nível 7, base nível 8, torcida grande, caixa maior), o novato não tem chance real. Por isso o Grinta usa também um segundo eixo: **divisões/ligas por nível estrutural do clube**. Um clube novo entra numa camada compatível com seu nível de estrutura, e não contra o topo do mundo.
+
+As faixas seguem o nível estrutural (1 a 10) do clube:
+
+| Nível estrutural | Liga |
+| --- | --- |
+| 1–2 | Liga Inicial |
+| 3–4 | Liga de Acesso |
+| 5–6 | Liga Intermediária |
+| 7–8 | Liga Principal |
+| 9–10 | Elite |
+
+Assim, um clube novo joga contra clubes parecidos: continua no **mesmo universo persistente**, mas compete numa **camada compatível**. Numa temporada global avançada (ex.: temporada 20), os clubes grandes disputam a Elite, os médios a Liga Principal / Intermediária e os novos a Liga Inicial — o que preserva o mérito dos antigos sem massacrar os que chegam.
+
+O clube novo cresce **subindo de camada** (Liga Inicial → Liga de Acesso → Liga Intermediária → Liga Principal → Elite), sentindo progressão sem precisar vencer um gigante logo na primeira temporada: ele renova o elenco, estrutura o clube, forma jovens, ganha reputação e aumenta receita até chegar gradualmente à elite.
+
+**Coexistência dos dois eixos.** As divisões por resultado (as Séries / Divisões 1, 2, 3…, com promoção e rebaixamento por desempenho) e as ligas por nível estrutural são **complementares, não substitutas**: a primeira organiza a disputa esportiva dentro de uma faixa; a segunda garante que o adversário de um clube tenha porte estrutural compatível. Ambas descrevem o mesmo mundo, por ângulos diferentes.
+
+> **Pendência:** a fonte apresenta os dois eixos (divisões por resultado e ligas por nível estrutural) sem especificar como se encaixam operacionalmente — se as ligas por nível são a moldura dentro da qual existem as Séries por resultado, se um clube pode subir de nível estrutural e de Série ao mesmo tempo, e quais os limiares exatos que movem um clube de uma liga de nível para outra. Definir a interação entre os dois sistemas.
+
 ### Modelo recomendado para começar
 
 - 1 mundo, 40 clubes, 2 divisões de 20 clubes.
@@ -321,6 +385,36 @@ Isso cria objetivo para todos — não só para quem briga por título, mas tamb
 - Temporada de 45 dias, com rodadas 4 vezes por semana.
 
 Expansões posteriores: Divisão C, competição continental, mundial, categorias de base, seleções e torneios privados.
+
+### Exemplos de mundo dimensionado
+
+Para ilustrar como a composição escala, dois exemplos concretos de mundo:
+
+**Exemplo A — Brasil Online 1 (temporada 2027), mundo grande em 4 divisões:**
+
+| Item | Valor |
+| --- | --- |
+| Clubes totais | 80 |
+| Humanos | 34 |
+| Bots | 46 |
+| Divisões | 4 (Séries A, B, C e D, com 20 clubes cada) |
+| Competições | Liga Nacional, Copa Nacional, Supercopa, Copa Continental, torneios de base, amistosos |
+| Calendário | Segunda/Quarta/Sexta liga, Quinta copa, Domingo continental ou liga |
+
+No fim da temporada: campeões definidos, rebaixados caem, promovidos sobem, usuários recebem avaliação, jogadores evoluem, contratos vencem, mercado abre, clubes bots podem ser assumidos e a nova temporada começa.
+
+**Exemplo B — Brasil Online 1 (temporada 2028), mundo médio com ruleset explícito:**
+
+| Item | Valor |
+| --- | --- |
+| Duração | 45 dias reais |
+| Clubes totais | 60 |
+| Humanos | 28 |
+| Bots | 32 |
+| Competições | Série A, Série B, Série C, Copa Nacional, Supercopa, Copa Sub-20 |
+| Calendário | Segunda/Quarta/Sexta liga, Quinta copa, Domingo liga ou final |
+
+Ruleset resumido do Exemplo B: usuário confirma a escalação antes das 19h; jogos simulam às 20h; ausente usa a última escalação; 5 ausências seguidas liberam o clube; transferências entre usuários passam por validação; jogadores podem recusar propostas; e bots completam os clubes vazios. Esse já é um modelo muito bom para começar.
 
 > **Pendência:** a fonte não especifica as **faixas exatas de número de usuários** que disparam a criação de uma nova divisão nem o momento em que um clube bot é convertido em vaga humana (regra de conversão automática vs. manual). Definir os limiares de dimensionamento.
 

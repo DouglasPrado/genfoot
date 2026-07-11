@@ -22,6 +22,7 @@ Este documento define a temporada e suas fases, os campeonatos como entidades in
 10. [Aposentadorias e reaproveitamento de personagens](#10-aposentadorias-e-reaproveitamento-de-personagens)
 11. [Nova temporada: objetivos e narrativa](#11-nova-temporada-objetivos-e-narrativa)
 12. [Exemplos práticos](#12-exemplos-praticos)
+13. [Equilíbrio competitivo para clubes novos](#13-equilibrio-competitivo-para-clubes-novos)
 
 ---
 
@@ -623,6 +624,49 @@ O **mesmo sistema** gera histórias totalmente diferentes conforme o desfecho da
 
 - **Clube:** Nacional FC · **Resultado:** rebaixado · Financeiro: negativo · Torcida: revoltada · Diretoria: pressionada.
 - **Consequências:** corte de salários; jogadores pedem saída; patrocínio reduz; técnico pode ser demitido; jovens ganham espaço por necessidade; torcida protesta; alguns jogadores ficam mais fortes mentalmente, outros desmoronam emocionalmente.
+
+---
+
+## 13. Equilíbrio competitivo para clubes novos
+
+Num mundo persistente, clubes de temporadas diferentes convivem na mesma competição. Para que um clube forte não esmague uma divisão pequena e para que o clube novo sinta progresso mesmo longe do topo global, a temporada aplica três ajustes: **teto por divisão**, **objetivos calibrados por estágio do clube** e **copas com chance de zebra**. A moldura de divisões por nível estrutural do clube está em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md).
+
+### 13.1 Teto por divisão
+
+Cada divisão tem um **limite natural de força**, para impedir que um clube muito forte fique esmagando divisões pequenas. Exemplo:
+
+| Divisão | Limites |
+| --- | --- |
+| Liga Inicial | limite de folha salarial, limite de overall médio, limite de estrangeiros, limite de reputação, estrutura máxima recomendada, premiação menor |
+| Liga Intermediária | limites maiores |
+| Elite | sem grandes limites |
+
+Se um clube passa do teto da sua divisão, ele é **obrigado a subir** (ou a competir numa liga superior) — não pode continuar dominando uma camada que já superou.
+
+> **Pendência:** os valores exatos de cada teto (folha, overall médio, nº de estrangeiros, faixa de reputação, nível máximo de estrutura) e a premiação por divisão não foram definidos na fonte. Calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+
+### 13.2 Objetivos diferentes por estágio do clube
+
+Um clube novo não deve ter o mesmo objetivo de um clube grande — assim o usuário novo sente sucesso mesmo sem estar no topo global. A diretoria calibra as metas conforme o estágio do clube:
+
+| Estágio | Objetivos da temporada |
+| --- | --- |
+| Clube novo | reduzir a idade média do elenco; subir de divisão; revelar 2 jovens; melhorar a base para o nível 2; equilibrar as finanças |
+| Clube médio | brigar por acesso; manter os bons jogadores; melhorar o estádio; chegar à semifinal da copa |
+| Clube grande | ganhar título; manter as estrelas; disputar competições maiores; sustentar a alta folha salarial |
+
+Essa matriz complementa a **avaliação da diretoria** (seção 6.2) e o **briefing de nova temporada** (seção 11): as expectativas registradas em `BoardEvaluation` e `SeasonOpeningContext` passam a depender do estágio do clube, não de uma meta única para todos.
+
+### 13.3 Copas com chance de zebra
+
+Além das ligas por nível, existe **copa aberta a todos os clubes** — mas com formato que permite a zebra, dando ao clube pequeno um momento especial contra um grande. O formato favorece a surpresa:
+
+- **jogo único** nas primeiras fases;
+- **mando de campo ao clube de menor porte** (o menor joga em casa);
+- **premiação boa por fase** (`prizeRules: "per_round"`);
+- **chance de exposição** para o clube pequeno.
+
+O clube menor provavelmente não vence sempre, mas pode surpreender — e ganhar reputação, torcida e receita ao avançar. Isso especializa o formato de copa nacional eliminatória já descrito na [seção 2](#2-campeonatos-como-entidades-independentes) para o cenário de portes desiguais.
 
 ---
 

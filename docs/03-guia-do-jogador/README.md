@@ -281,7 +281,19 @@ O guia não deve parecer documentação técnica. A aparência pode remeter a **
 
 ### 5.10 Distribuição
 
-Uma única base gera: site público (ex.: `guia.grinta...`), guia contextual dentro do jogo (links diretos para regras específicas, em modal/painel/aba/WebView), pacote offline em `.zip`, PWA instalável e PDF via CSS de impressão.
+Uma única base gera seis formatos de distribuição: site público (ex.: `guia.grinta...`), guia contextual dentro do jogo (links diretos para regras específicas, em modal/painel/aba/WebView), pacote offline em `.zip`, PWA instalável, PDF via CSS de impressão e **arquivo dentro da instalação do jogo**.
+
+Neste sexto formato, o build do guia **acompanha o executável do jogo** e viaja junto na instalação:
+
+```
+game/
+├── executable
+├── assets/
+└── guide/
+    └── index.html
+```
+
+Isso garante que o jogador tenha o guia **disponível offline, sem depender de internet nem de instalar o PWA**, abrindo direto o `guide/index.html` embarcado. Ele é distinto do pacote `.zip` (que precisa ser baixado e descompactado à parte) e do guia contextual (que exibe regras específicas dentro da interface do jogo): aqui, o manual completo já vem embutido na própria instalação.
 
 > **Pendência:** Definir domínio público oficial, esquema de rotas contextuais dentro do jogo e política de geração/nomeação do PDF por versão.
 

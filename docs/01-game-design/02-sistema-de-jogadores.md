@@ -145,6 +145,27 @@ Os atributos reais podem ser ocultos. O que o clube enxerga é uma estimativa co
 
 A incerteza vale para potencial, personalidade, risco de lesão, pressão familiar, disciplina, adaptação, valor real e mentalidade. A verdade aparece com o tempo.
 
+### Exemplo completo end-to-end: Rafael Nascimento
+
+Jogador gerado — Rafael Nascimento, 16 anos, origem no futebol de rua, família pobre com muita responsabilidade, posição inicial ponta, potencial natural 88.
+
+| Atributo | Valor inicial |
+|---|---|
+| drible | 72 |
+| velocidade | 68 |
+| finalização | 48 |
+| marcação | 32 |
+| físico | 45 |
+| tática | 38 |
+| garra | 80 |
+| pressão | 55 |
+
+**Clube 1 — formador técnico (3 anos).** Treinos: técnica, passe curto, tomada de decisão, futsal/base integrada. Evolução: +drible, +passe, +visão, +controle, +criatividade. Novo perfil: **ponta criativo / meia aberto**.
+
+**Clube 2 — físico/tático.** Treinos: pressão alta, resistência, recomposição, marcação. Evolução: +resistência, +marcação, +disciplina tática, +intensidade. Novo perfil: **ponta moderno, intenso, que ajuda defensivamente**.
+
+> Resultado final: não virou só um driblador — virou um jogador completo por causa dos clubes e treinos. O mesmo atleta gerado, em clubes diferentes, teria terminado como perfis distintos.
+
 > **Pendência:** a estrutura completa de safra (`YouthClass`) e o motor de geração por clube (`YouthGenerationEngine`) pertencem ao Sistema de Base/Clube; aqui documentamos apenas a geração individual do atleta. Verificar limite de escopo com o documento de base quando existir.
 
 ---
@@ -250,6 +271,27 @@ Treino errado prejudica. O desenvolvimento tem custo de oportunidade:
 - Jogador criativo em clube muito rígido: ganha disciplina tática, mas perde liberdade criativa, ousadia e drible espontâneo.
 - Jogador leve com treino físico exagerado: ganha força, mas perde agilidade e aumenta risco de lesão.
 - Jogador jovem em pressão extrema: ganha maturidade se resistir, mas perde confiança se sentir demais.
+
+### Fórmula de evolução direcionada
+
+O ganho em **cada atributo** é um produto de fatores multiplicativos menos penalidades. `baseLearningRate` (a capacidade de aprendizado do próprio jogador) e `focoDoTreino` (o quanto o treino aponta para aquele atributo específico) são **fatores distintos e próprios** — um jogador que aprende rápido num treino sem foco no atributo evolui pouco, e vice-versa.
+
+```
+Ganho em atributo =
+    baseLearningRate        (capacidade de aprendizado do jogador)
+  × potencialRestante
+  × focoDoTreino            (foco do treino naquele atributo)
+  × qualidadeDoTreino
+  × compatibilidade
+  × minutosCompetitivos
+  × idadeFactor
+  × moral
+  − fadiga
+  − lesão
+  − pressãoNegativa
+```
+
+> Exemplo por atributo — **ganho em passe** = capacidade de aprendizado × potencial técnico restante × foco em passe × qualidade dos treinadores × compatibilidade com o estilo × minutos em função adequada.
 
 ### Compatibilidade jogador-clube
 
@@ -359,7 +401,19 @@ Cada evento deve ter, além do fato em si: **intensidade, duração, alvo, orige
 
 > Exemplo: derrota em clássico com intensidade 80, duração emocional de 2 semanas, efeito imediato +pressão/-confiança, efeito futuro de aumentar a cobrança no próximo clássico. Se repetir, cria um tabu.
 
-Todo evento negativo deveria ter caminhos de reversão (ex.: jogador vaiado recuperado por gol decisivo; jovem queimado recuperado por bom empréstimo).
+### Eventos de reversão
+
+Todo evento negativo deveria ter **caminhos de recuperação**. O fluxo é: evento negativo → dano → decisão do clube → evento de recuperação ou de agravamento.
+
+| Crise | Pode ser revertida por |
+|---|---|
+| Jogador vaiado | gol decisivo, apoio do técnico, torcida abraça |
+| Técnico pressionado | vitória convincente, mudança tática |
+| Jovem queimado | empréstimo bom, psicologia, gol importante |
+| Mídia negativa | comunicação forte, sequência positiva |
+| Lesão grave | bom médico, retorno planejado |
+| Má fase | liderança, treino, adversário favorável |
+| Torcida irritada | raça em campo, título, transparência |
 
 ---
 
@@ -473,6 +527,21 @@ O clube também lembra, e isso gera identidade:
 > Exemplo: um clube que revelou muitos goleiros ganha reputação de formar goleiros, o que atrai jovens goleiros e valoriza o preparador de goleiros. Um clube que perdeu 3 finais seguidas acumula pressão em decisões, torcida ansiosa e narrativa de "time que pipoca".
 
 Cada memória tem tipo, descrição, intensidade, temporada, duração (curta / média / longa / histórica) e efeitos sobre o futuro. Memórias históricas se convertem em tradição.
+
+### As quatro variáveis institucionais
+
+A memória do clube alimenta quatro variáveis que precisam ser **separadas**, porque mudam em velocidades diferentes:
+
+| Variável | O que é | Muda rápido? | Exemplo |
+|---|---|---|---|
+| Momento | fase atual | Sim | 5 vitórias seguidas |
+| Reputação | percepção atual do clube | Médio | clube respeitado nesta década |
+| Tradição | peso histórico acumulado | Lento | muitos títulos antigos |
+| Expectativa | o que esperam do clube agora | Médio/rápido | elenco caro precisa ganhar |
+
+Fluxo ideal: resultado recente altera o **momento**; o momento altera **expectativa** e mídia; títulos recentes alteram a **reputação**; títulos acumulados alteram a **tradição**; investimento alto aumenta a **expectativa**, e expectativa alta aumenta a pressão.
+
+> Exemplo: clube com tradição alta e momento ruim → torcida cobra muito, mídia compara com o passado. Clube sem tradição e momento ótimo → vira surpresa, ganha torcida e reputação. Clube rico sem tradição → tem pressão por investimento, mas pouca história.
 
 ---
 

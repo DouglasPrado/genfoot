@@ -14,6 +14,7 @@ O princípio que atravessa todas as seções é único: **o servidor é autorita
 - [API e contratos](#api-e-contratos)
 - [Tempo real (realtime-gateway)](#tempo-real-realtime-gateway)
 - [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)
+- [Tela de partida ao vivo](#tela-de-partida-ao-vivo)
 - [Critérios de aceite](#criterios-de-aceite)
 - [Pendências consolidadas](#pendencias-consolidadas)
 - [Documentos relacionados](#documentos-relacionados)
@@ -273,6 +274,99 @@ Quando o cliente **reenvia** um command (por reconexão, timeout ou repetição)
 | A partida termina enquanto o usuário está desconectado | O motor continua e o usuário recebe o estado oficial ao retornar |
 | O usuário altera o relógio do celular | Nenhum prazo oficial é alterado (o relógio do mundo é do servidor) |
 | O aplicativo antigo usa contrato incompatível | Commands críticos são bloqueados, com exigência de atualização |
+
+---
+
+## Tela de partida ao vivo
+
+A partida ao vivo é a tela mais densa do jogo. Ela consome o *feed* de eventos do [realtime-gateway](#tempo-real-realtime-gateway) e apresenta o estado da partida sem que o cliente execute qualquer regra (o motor roda no servidor).
+
+### Layout
+
+| Região | Conteúdo |
+| --- | --- |
+| **Topo** | Placar, minuto, competição |
+| **Centro** | Linha do tempo ou **campo tático simplificado** (sem 3D) |
+| **Lateral** | Momentum, posse, pressão, alertas ativos |
+| **Inferior** | **Ações rápidas** |
+| **Modal** | Pontos de decisão importantes (aparecem no momento certo) |
+
+Informações principais exibidas: placar, minuto, eventos recentes, momentum, **fadiga por setor**, alertas ativos, **sugestões da comissão técnica**, ações rápidas e substituições disponíveis.
+
+Cada evento e decisão importante é **explicável** — a interface mostra o *porquê*, não só o *quê* (ex.: "sofreu gol após sequência de ataques pela esquerda, onde o lateral estava cansado e sem cobertura"), reaproveitável no pós-jogo. A hierarquia de peso dos eventos (0 interno → 5 decisivo) governa o que aparece na linha do tempo e nos alertas.
+
+### Ações rápidas com submenus
+
+A região inferior traz **botões rápidos**, pensados para mobile: `Recuar`, `Pressionar`, `Atacar`, `Controlar`, `Substituir`, `Marcar forte`, `Contra-atacar`, `Poupar`. Cada botão **abre um submenu** em vez de aplicar um efeito único:
+
+- **Pressionar →** pressão leve · pressão alta · pressão máxima · pressionar a saída do adversário.
+- **Substituir →** sugestões **contextuais** montadas a partir do estado da partida, por exemplo: "Substituir camisa 8, cansado", "Substituir lateral esquerdo, nota baixa", "Colocar atacante para buscar gol".
+
+Cada opção vira um *command* enviado à API oficial (o cliente não aplica o efeito localmente — ver [Tela de partida ao vivo](#tela-de-partida-ao-vivo) e o motor em [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md)).
+
+### Código de cores e anatomia das notificações
+
+As notificações seguem uma **categoria de cor** consistente, espelhando o `type` do ponto de decisão no motor:
+
+| Cor | Categoria |
+| --- | --- |
+| **Vermelho** | Emergência |
+| **Amarelo** | Risco |
+| **Azul** | Oportunidade |
+| **Cinza** | Narrativa / informação |
+
+Mesmo que as cores não sejam adotadas desde o primeiro momento, a categoria orienta conceitualmente a hierarquia visual. Além disso, **toda notificação precisa responder a cinco perguntas**:
+
+1. O que está acontecendo?
+2. Por que importa?
+3. Quais opções tenho?
+4. Qual o risco de cada uma?
+5. Até quando posso agir?
+
+### Live Match Feed (tipos de mensagem)
+
+O front **não precisa receber o estado inteiro a cada atualização**: ele consome um *feed* de eventos do stream `matchSequence` (ver [Tempo real](#tempo-real-realtime-gateway)). Os tipos de mensagem são:
+
+| Tipo | Significado |
+| --- | --- |
+| `MATCH_TICK` | Avanço do relógio/estado incremental da partida |
+| `MATCH_EVENT` | Evento visível (gol, cartão, chance, lesão…) |
+| `DECISION_POINT_CREATED` | Surgiu um ponto de decisão |
+| `DECISION_POINT_RESOLVED` | Ponto de decisão resolvido (pelo usuário ou pela IA) |
+| `TACTIC_CHANGED` | Mudança tática aplicada |
+| `SUBSTITUTION_MADE` | Substituição realizada |
+| `MOMENTUM_CHANGED` | Alteração de momentum |
+| `MATCH_FINISHED` | Partida encerrada |
+
+Exemplo de payload:
+
+```json
+{
+  "type": "DECISION_POINT_CREATED",
+  "matchId": "match_123",
+  "minute": 67,
+  "title": "Seu lado esquerdo está vulnerável",
+  "severity": 82
+}
+```
+
+### Feedback pós-ação em tempo real
+
+Depois de uma ação, a tela **mede e mostra o efeito**, ensinando o usuário e tornando a partida estratégica. Exemplos:
+
+- "Você recuou a linha defensiva aos 68'. Desde então: o adversário teve menos bolas nas costas, mas aumentou os cruzamentos; sua posse caiu de 51% para 43%."
+- "Você concentrou os ataques pelo lado direito. Resultado: 3 jogadas criadas, 1 chance clara, o lateral adversário recebeu amarelo."
+
+### Modo compacto e modo detalhado
+
+Para evitar que a profundidade vire barreira, a tela oferece dois modos:
+
+- **Compacto** — para quem só quer acompanhar: placar, eventos e decisões importantes.
+- **Detalhado** — para o usuário avançado: zonas, momentum, xG, fadiga, padrões e *trade-offs*.
+
+> A lógica de simulação, os pontos de decisão e o papel da comissão como filtro de qualidade estão em [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md). Esta seção cobre apenas a **apresentação** no cliente.
+
+> **Pendência:** esta é a única tela com especificação de layout nas fontes. O desenho tela a tela do restante do jogo (elenco, mercado, finanças, competições, etc.) ainda precisa ser especificado.
 
 ---
 

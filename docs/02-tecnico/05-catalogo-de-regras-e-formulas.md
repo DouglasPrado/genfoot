@@ -16,6 +16,28 @@ O objetivo é transformar as decisões de design — hoje dispersas em conversas
   - [2.1 Interface `GameFormula`](#21-interface-gameformula)
   - [2.2 Versionamento de fórmulas](#22-versionamento-de-fórmulas)
   - [2.3 Fórmulas conceituais previstas](#23-fórmulas-conceituais-previstas)
+- [Fórmulas do motor de partida (transcrição)](#fórmulas-do-motor-de-partida-transcrição)
+  - [F1. Atributo efetivo por lance](#f1-atributo-efetivo-por-lance)
+  - [F2. Fadiga por tick](#f2-fadiga-por-tick)
+  - [F3. Moral atual](#f3-moral-atual)
+  - [F4. Tática efetiva (TeamTacticalState)](#f4-tática-efetiva-teamtacticalstate)
+  - [F5. Controle de zona e vantagem ofensiva vs defensiva](#f5-controle-de-zona-e-vantagem-ofensiva-vs-defensiva)
+  - [F6. Posse e posse perigosa](#f6-posse-e-posse-perigosa)
+  - [F7. Ataques esperados por tick](#f7-ataques-esperados-por-tick)
+  - [F8. Duelo](#f8-duelo)
+  - [F9. Criação de chance e tiers](#f9-criação-de-chance-e-tiers)
+  - [F10. Qualidade da finalização](#f10-qualidade-da-finalização)
+  - [F11. Defesa efetiva e chance de gol](#f11-defesa-efetiva-e-chance-de-gol)
+  - [F12. Chance de falta e de cartão](#f12-chance-de-falta-e-de-cartão)
+  - [F13. Risco de lesão](#f13-risco-de-lesão)
+  - [F14. Momentum](#f14-momentum)
+  - [F15. xG](#f15-xg)
+  - [F16. Nota do jogador](#f16-nota-do-jogador)
+  - [F17. decisionScore e limiares](#f17-decisionscore-e-limiares)
+  - [F18. offlineDecisionQuality](#f18-offlinedecisionquality)
+  - [F19. Qualidade da leitura e impacto da sugestão](#f19-qualidade-da-leitura-e-impacto-da-sugestão)
+  - [F20. Deltas internos de uma ação](#f20-deltas-internos-de-uma-ação)
+  - [F21. staffLevel (média ponderada)](#f21-stafflevel-média-ponderada)
 - [3. Máquinas de Estado](#3-máquinas-de-estado)
   - [3.1 Partida](#31-partida)
   - [3.2 Temporada](#32-temporada)
@@ -158,7 +180,591 @@ As fórmulas a seguir foram identificadas nas fontes como necessárias. Suas exp
 | Probabilidade de eventos    | Partidas |
 | Desempenho em partidas      | Partidas |
 
-> **Pendência:** Atribuir IDs estáveis a cada fórmula e transcrever suas expressões, parâmetros e versões a partir dos documentos de `../01-game-design/`.
+> **Pendência:** Atribuir IDs estáveis a cada fórmula e definir seus parâmetros e versões. As **expressões** conceituais do motor de partida do **Grinta** já foram transcritas da fonte em [Fórmulas do motor de partida (transcrição)](#fórmulas-do-motor-de-partida-transcrição); resta ligar cada uma ao seu ID estável e calibrar os coeficientes.
+
+---
+
+## Fórmulas do motor de partida (transcrição)
+
+Esta seção transcreve **fielmente** as fórmulas do motor de partida do **Grinta** a partir da fonte de brainstorming (`chats/simulacao-partida.md`, a rodada de detalhamento do cálculo interno). As expressões são **conceituais**: descrevem a estrutura do cálculo (quais termos somam, quais subtraem) e, quando a fonte fornece, o exemplo numérico correspondente.
+
+> **Importante:** A maioria das fórmulas abaixo é somatória de fatores sem coeficientes explícitos na fonte. Onde os pesos, escalas e curvas exatos ainda não existem, marca-se `> **Pendência:**` de calibração — mas a **estrutura** da fórmula é normativa e deve ser preservada na implementação.
+
+Cada fórmula resolve-se por **tick** (bloco curto de simulação, ~1 minuto). O fluxo por tick é: atualizar fadiga → moral → momentum → controle de zonas → posse perigosa → gerar ataques → resolver duelos → criar chances → resolver finalizações → eventos secundários → detectar pontos de decisão → aplicar comandos → salvar estado.
+
+### F1. Atributo efetivo por lance
+
+Nenhum jogador atua com o atributo base fixo: em cada lance o motor calcula um **atributo efetivo**, somando o contexto do lance ao valor base.
+
+```
+atributoEfetivo =
+    atributoBase
+  + moral
+  + entrosamento
+  + compatibilidadeTática
+  + vantagemContextual
+  − fadiga
+  − pressãoEmocional
+  − lesãoLeve
+  − climaGramado
+```
+
+**Variáveis:** `atributoBase` (nota do jogador para o atributo em jogo, ex.: finalização), `moral`, `entrosamento`, `compatibilidadeTática`, `vantagemContextual` (ex.: chance clara, estar livre de marcação), `fadiga`, `pressãoEmocional`, `lesãoLeve`, `climaGramado`.
+
+**Exemplo (atacante finalizando, base 72 → efetiva 73):**
+
+```
+Finalização base:              72
+Moral alta:                    +5
+Frieza boa:                    +4
+Fadiga alta:                   −7
+Marcação forte:                −8
+Chance clara:                 +10
+Pressão de jogo decisivo:      −3
+────────────────────────────────
+Finalização efetiva:           73
+```
+
+O mesmo jogador com finalização 72 poderia finalizar como 80 (confiante e livre) ou 59 (cansado, pressionado e sob chuva). Um jogador de finalização 68, descansado e livre, poderia finalizar como 82 naquela chance. O contexto do lance importa tanto quanto a nota.
+
+> **Pendência:** Calibrar a escala de cada modificador (o exemplo usa incrementos inteiros de −8 a +10, mas a fonte não fixa a faixa nem o teto/piso do atributo efetivo).
+
+### F2. Fadiga por tick
+
+A fadiga acumula a cada tick e degrada progressivamente velocidade, força em duelos, precisão de passe, concentração, finalização e recomposição, além de **aumentar** risco de lesão, de erro e de cartão por atraso.
+
+```
+fadigaPorTick =
+    baseDaPosição
+  + intensidadeDoTime
+  + pressãoAplicada
+  + clima
+  + gramado
+  + açõesIndividuais
+  − resistênciaDoJogador
+  − preparaçãoFísicaDoClube
+```
+
+**Variáveis:** `baseDaPosição` (custo físico da posição), `intensidadeDoTime` (mentalidade/ritmo), `pressãoAplicada` (pressing), `clima`, `gramado`, `açõesIndividuais` (sprints e duelos no tick), `resistênciaDoJogador`, `preparaçãoFísicaDoClube`.
+
+**Exemplo (lateral sob pressão alta, +3.6 no tick):**
+
+```
+Base posição:              2.0
+Intensidade alta:         +1.5
+Clima quente:             +0.8
+Muitos duelos:            +0.7
+Resistência alta:         −1.0
+Preparação física boa:    −0.4
+─────────────────────────────
+Fadiga no tick:           +3.6
+```
+
+Faixas de efeito citadas: ~20% de fadiga → atua quase normal; ~65% → perde intensidade e precisão; ~85% → alto risco de erro, lesão e queda brusca de rendimento.
+
+> **Pendência:** Calibrar as constantes por posição e a curva que converte fadiga acumulada em penalidade sobre os atributos (a fonte só dá o exemplo somado e as três faixas qualitativas).
+
+### F3. Moral atual
+
+A moral oscila durante a partida em função de eventos (gol marcado/sofrido, defesas, chances, cartões, torcida, sequências de domínio ou de pressão) e influencia decisão, frieza, erro técnico, agressividade, disciplina e confiança para driblar/finalizar.
+
+```
+moralAtual =
+    moralInicial
+  + eventosPositivos
+  − eventosNegativos
+  + liderançaEmCampo
+  + gestãoEmocionalDaComissão
+  − pressãoDaTorcida
+  − importânciaDoJogo
+```
+
+**Variáveis:** `moralInicial`, `eventosPositivos` (gol, boa defesa, chance criada, torcida apoiando, domínio, expulsão adversária), `eventosNegativos` (gol sofrido, erro individual, cartão, pênalti perdido, vaias, pressão), `liderançaEmCampo`, `gestãoEmocionalDaComissão`, `pressãoDaTorcida`, `importânciaDoJogo`.
+
+Elenco experiente segura melhor a moral; elenco jovem oscila mais.
+
+> **Pendência:** Calibrar o peso de cada evento e o fator de experiência do elenco (a fonte não fornece exemplo numérico).
+
+### F4. Tática efetiva (TeamTacticalState)
+
+A tática do time gera modificadores coletivos, materializados no estado `TeamTacticalState`. Cada escolha tática soma e subtrai propriedades (ex.: mentalidade ofensiva `+ presença ofensiva + volume de ataque − proteção defensiva − estabilidade em transição`; pressão alta `+ recuperação no campo adversário + chance de erro adversário − fadiga − espaço nas costas`; defesa baixa `+ proteção da área + bloqueio central − posse ofensiva − volume sofrido`).
+
+```
+TeamTacticalState {
+  attackIntent
+  defensiveSecurity
+  pressingPower
+  transitionRisk
+  tempo
+  compactness
+  width
+  centralPresence
+  wingPresence
+}
+```
+
+**Exemplo (4-3-3 ofensivo com pressão alta):**
+
+```
+attackIntent:        78
+pressingPower:       82
+defensiveSecurity:   52
+transitionRisk:      71
+fatigueCost:      alto
+```
+
+> **Pendência:** Formalizar o mapeamento formação × mentalidade × pressão → valores de cada campo do `TeamTacticalState` (a fonte só dá o exemplo do 4-3-3 ofensivo).
+
+### F5. Controle de zona e vantagem ofensiva vs defensiva
+
+O campo é dividido em 9 zonas (defesa/meio/ataque × esquerda/centro/direita). Para cada zona o motor calcula a força ofensiva do time e a compara com a força defensiva adversária.
+
+```
+zoneControl =
+    playersInZoneQuality
+  + tacticalSupport
+  + numericalAdvantage
+  + morale
+  + chemistry
+  − fatigue
+  − opponentPressure
+  − instability
+
+vantagemDaZona =
+    forçaOfensivaDoTime
+  − forçaDefensivaAdversária
+```
+
+Forma expandida da força de um setor (ex.: lado direito): `ponta + lateral + meia de apoio + foco ofensivo pelo lado + moral + entrosamento − fadiga − marcação adversária`.
+
+**Exemplo (Time A ataca a direita vs defesa esquerda do Time B, vantagem +42):**
+
+```
+Ofensiva (Time A, direita)          Defensiva (Time B, esquerda)
+  Ponta direito efetivo:   78          Lateral esquerdo efetivo:  61
+  Lateral direito apoio:   66          Zagueiro cobertura:        70
+  Meia cobertura:          60          Volante cobertura:         55
+  Foco tático no lado:     +8          Fadiga lateral:            −8
+  Moral:                   +4          Cartão amarelo:            −4
+  ───────────────────────────          ────────────────────────────
+  Força ofensiva:         216          Força defensiva:          174
+
+  Vantagem: 216 − 174 = +42  → boa chance de criar por aquele lado
+```
+
+A probabilidade de ataque por zona deriva dessa vantagem:
+
+```
+probabilidadeDeAtaqueNaZona =
+    vantagemDaZona
+  + focoTático
+  + jogadoresDisponíveis
+  + fraquezaAdversária
+  + padrãoRecente
+  − bloqueioAdversário
+```
+
+**Exemplo (lado direito):** vantagem +42, foco tático +10, ponta em boa fase +6, lateral adversário cansado +8 → alta probabilidade de ataques por ali.
+
+> **Pendência:** Definir a função que converte `vantagemDaZona` (e a `probabilidadeDeAtaqueNaZona`) em taxa efetiva de geração de ataques por tick.
+
+### F6. Posse e posse perigosa
+
+O motor separa **posse total** de **posse perigosa** — um time pode ter 60% de posse e criar pouco. São duas fórmulas distintas.
+
+```
+posse =
+    qualidadeDoMeio
+  + passe
+  + táticaDeControle
+  + entrosamento
+  + moral
+  − pressãoAdversária
+  − erroTécnico
+  − gramadoRuim
+
+possePerigosa =
+    posseEmZonasOfensivas
+  + vantagemDeZona
+  + criatividade
+  + movimentação
+  + falhasAdversárias
+  − compactaçãoDefensivaAdversária
+```
+
+**Estatística derivada:** posse (%) = soma dos ticks controlados por cada time.
+
+> **Pendência:** Calibrar a normalização de `posse` para percentual e o limiar de `possePerigosa` (a fonte não dá exemplo numérico).
+
+### F7. Ataques esperados por tick
+
+Em cada tick o motor define quantos ataques relevantes podem ocorrer. Nem todo ataque vira chance — muitos morrem em passe errado, desarme ou cruzamento bloqueado.
+
+```
+ataquesEsperados =
+    ritmoDoJogo
+  + mentalidadeOfensiva
+  + possePerigosa
+  + desorganizaçãoAdversária
+  + momentum
+  − defesaAdversária
+  − baixaIntensidade
+```
+
+**Exemplo (qualitativo):** Time A com ritmo alto, posse perigosa alta, adversário cansado e momentum positivo → maior chance de gerar 2 ou 3 ataques relevantes no bloco.
+
+> **Pendência:** Definir a função que mapeia o somatório para um número esperado de ataques por tick (a fonte fornece só o exemplo qualitativo de "2 ou 3").
+
+### F8. Duelo
+
+Cada ataque resolve-se por duelos (ex.: ponta × lateral). A chance de vencer é uma razão entre os atributos efetivos dos dois lados.
+
+```
+chanceDeVencerDuelo =
+    ataqueEfetivo / (ataqueEfetivo + defesaEfetiva)
+```
+
+**Variáveis:** `ataqueEfetivo` (drible, velocidade, técnica, imprevisibilidade, moral do atacante), `defesaEfetiva` (marcação, posicionamento, força, concentração, disciplina do defensor).
+
+**Exemplo (ponta 82 vs lateral 64 = 56%):**
+
+```
+chance do ponta = 82 / (82 + 64) = 0,5616 ≈ 56%
+```
+
+Modificadores aplicados sobre o resultado: `+ vantagem de velocidade + lateral cansado + cartão amarelo no defensor + ajuda de cobertura − clima ruim − gramado ruim`. Com eles o resultado do exemplo poderia subir para ~63%. O duelo não é binário: pode gerar drible completo, cruzamento bloqueado, falta sofrida, perda de bola, escanteio, passe para trás, erro técnico, cartão ou lesão em disputa.
+
+> **Pendência:** Calibrar a magnitude dos modificadores pós-razão (a fonte dá a fórmula-base exata e um exemplo ilustrativo de ajuste para 63%).
+
+### F9. Criação de chance e tiers
+
+Depois que o ataque progride, o motor calcula se ele vira chance e de qual qualidade.
+
+```
+chanceDeCriar =
+    qualidadeDaProgressão
+  + criatividade
+  + movimentaçãoOfensiva
+  + erroDefensivo
+  + vantagemNumérica
+  + zonaPerigosa
+  − compactaçãoAdversária
+  − pressãoNoPortador
+  − fadigaOfensiva
+```
+
+**Tiers de chance:** `chance fraca` · `chance média` · `chance clara` · `chance muito clara`.
+
+**Exemplos de mapeamento (qualitativo):** cruzamento sob pressão → fraca/média; passe infiltrado livre → clara; contra-ataque 3 contra 2 → clara/muito clara; chute de fora → chance baixa, mas pode virar golaço.
+
+> **Pendência:** Definir os limiares numéricos que separam os quatro tiers de chance (a fonte só os nomeia e dá exemplos qualitativos).
+
+### F10. Qualidade da finalização
+
+Quando uma chance nasce, o motor calcula a qualidade da finalização.
+
+```
+qualidadeDaFinalização =
+    finalizaçãoEfetivaDoJogador
+  + frieza
+  + tipoDaChance
+  + péDominante
+  + ângulo
+  + distância
+  + pressãoDoMarcador
+  + fadiga
+  + moral
+```
+
+> **Observação de sinal:** a fonte lista todos os termos com `+`, mas `distância`, `pressãoDoMarcador` e `fadiga` atuam como penalidades (ver exemplo — valores negativos).
+
+**Exemplo (atacante livre na área):**
+
+```
+Tipo da chance:      +25
+Distância curta:     +15
+Pressão baixa:       +10
+Finalização:         +72
+Frieza:               +8
+Fadiga:               −6
+→ finalização efetiva alta
+```
+
+**Contraexemplo (chute de longe):** distância −20, pressão −5, chance base menor.
+
+> **Pendência:** Fixar os sinais e a escala de cada termo, e a base por tipo de chance (a fonte mistura sinais no texto e só os resolve nos exemplos).
+
+### F11. Defesa efetiva e chance de gol
+
+O gol não depende só do atacante: o motor calcula a resposta defensiva (goleiro + cobertura) e combina com a finalização.
+
+```
+defesaEfetiva =
+    goleiroPosicionamento
+  + reflexo
+  + confiança
+  + visãoDaBola
+  + coberturaDefensiva
+  + dificuldadeDoChute
+  − desvio
+  − bolaMolhada
+  − marcaçãoAtrapalhandoVisão
+
+chanceDeGol =
+    qualidadeDaFinalização
+  − defesaEfetiva
+  + qualidadeDaChance
+  + aleatoriedadeControlada
+```
+
+A `aleatoriedadeControlada` opera em três níveis: (1) variação normal (passes/duelos/finalizações), (2) erro humano (fadiga/pressão/concentração), (3) evento raro (frango, gol contra, golaço improvável, lesão precoce, expulsão boba, pênalti polêmico) — o evento raro tem de ser raro mesmo.
+
+**Exemplo (chance de gol 33%):**
+
+```
+Qualidade da chance:    35
+Finalização efetiva:    74
+Defesa/goleiro:         68
+Pressão defensiva:      −8
+→ chance de gol: 33%   (sorteio dentro dos 33% = gol)
+```
+
+Se não for gol: defesa do goleiro, chute para fora, bloqueio, escanteio ou rebote.
+
+> **Pendência:** Explicitar como os termos (qualidade 35, finalização 74, defesa 68, pressão −8) se combinam nos 33% (a fonte dá as entradas e o resultado, mas não a operação de normalização).
+
+### F12. Chance de falta e de cartão
+
+Faltas nascem de duelos, pressão e agressividade; cartões derivam da gravidade e do contexto.
+
+```
+chanceDeFalta =
+    agressividadeDoJogador
+  + marcaçãoForte
+  + atrasoNoDuelo
+  + fadiga
+  + rivalMaisRápido
+  + árbitroRigoroso
+  − disciplina
+  − concentração
+
+chanceDeCartão =
+    gravidadeDaFalta
+  + árbitroRigoroso
+  + repetiçãoDeFaltas
+  + jogadorNervoso
+  + contextoDoLance
+  − disciplina
+```
+
+**Exemplo (qualitativo):** volante cansado, com amarelo, marcando forte → alto risco de segunda falta perigosa → gera ponto de decisão ("Seu volante está pendurado e chegando atrasado. Reduzir agressividade ou substituir?").
+
+> **Pendência:** Calibrar pesos e o limiar que converte cada score em probabilidade por duelo (a fonte não dá exemplo numérico).
+
+### F13. Risco de lesão
+
+A lesão não é puramente aleatória: depende de **risco acumulado**.
+
+```
+riscoDeLesão =
+    históricoFísico
+  + fadiga
+  + intensidade
+  + clima
+  + gramado
+  + númeroDeSprints
+  + númeroDeDuelos
+  + idade
+  − preparaçãoFísica
+  − equipeMédica
+```
+
+**Tipos de lesão:** `leve` · `moderada` · `grave` · `por pancada` · `muscular` · `recorrente`.
+
+**Exemplo (qualitativo):** jovem, descansado, gramado bom → baixo risco; jogador velho, 85% de fadiga, chuva, pressão alta → risco alto. A equipe médica influencia detecção precoce, risco real, tempo de recuperação e chance de agravar se o jogador seguir em campo.
+
+> **Pendência:** Calibrar os pesos e a matriz que sorteia o tipo de lesão a partir do risco (a fonte só o descreve qualitativamente).
+
+### F14. Momentum
+
+O momentum representa o momento psicológico/tático. Sobe com gol marcado, sequência de ataques, torcida apoiando, adversário errando, duelos vencidos e mudança tática bem-sucedida; cai com gol sofrido, chance clara perdida, erro individual, vermelho, pressão adversária e fadiga coletiva.
+
+```
+momentum =
+    eventosRecentes
+  + controleTerritorial
+  + moralColetiva
+  + apoioDaTorcida
+  + domínioDeZonas
+  − fadiga
+  − pressãoAdversária
+```
+
+O momentum não faz gol sozinho: aumenta a chance de gerar ataques (F7) e de vencer duelos próximos (F8).
+
+> **Pendência:** Definir a janela de "eventos recentes" e o decaimento temporal do momentum (a fonte não dá exemplo numérico).
+
+### F15. xG
+
+O **xG** (expected goals) é a **soma das probabilidades de gol de cada finalização** do time na partida.
+
+```
+xG_time = Σ chanceDeGol(finalização_i)
+```
+
+**Exemplo:**
+
+```
+Chute com 0.32 de chance de gol:   xG += 0.32
+Chute de fora com 0.04:            xG += 0.04
+Cabeçada difícil com 0.10:         xG += 0.10
+...
+Final →  Time A xG: 1.84   |   Time B xG: 0.92
+```
+
+O xG ajuda a explicar se o resultado foi justo. Estatísticas irmãs saem dos mesmos eventos: finalização (chance vira chute), finalização no alvo (chute exige defesa ou vira gol), chance clara (`qualidadeDaChance` passa de um limite), escanteio, falta (duelo físico).
+
+### F16. Nota do jogador
+
+A nota nasce das ações, com critérios **por posição**, e é ajustada por **expectativa**.
+
+```
+Atacante:  + gol  + assistência  + chance criada  + finalização no alvo
+           + duelos ofensivos vencidos
+           − chance clara perdida  − impedimentos  − perdas de bola
+
+Zagueiro:  + cortes  + duelos vencidos  + bloqueios  + interceptações
+           − erro que gera chance  − falha em gol  − cartão
+
+Goleiro:   + defesas difíceis  + pênalti defendido  + saída segura
+           − falha  − gol evitável sofrido
+
+Meia:      + passes-chave  + controle de posse  + assistências
+           + recuperação de bola
+           − passes perigosos errados  − sumir do jogo
+```
+
+**Ajuste por expectativa:** um zagueiro sob ataque muito forte pode tirar nota alta mesmo sofrendo pressão; um atacante pode marcar gol e ainda ter nota média se perdeu muitas chances.
+
+> **Pendência:** Fixar a nota-base, os pesos de cada ação por posição e a função de ajuste por expectativa (a fonte lista os critérios, sem valores).
+
+### F17. decisionScore e limiares
+
+O motor gera sinais brutos por tick (ex.: `leftSideThreat = 82`, `midfieldLoss = 67`, `injuryRiskPlayer8 = 76`, `yellowCardRiskPlayer5 = 84`, `opportunityRightWing = 79`) e decide se cada um vira **ponto de decisão**.
+
+```
+decisionScore =
+    severidade
+  + urgência
+  + tendênciaRecente
+  + impactoPotencial
+  + capacidadeDeAção
+  − ruído
+```
+
+**Limiares (motor bruto):**
+
+```
+decisionScore > 70     → gera ponto de decisão
+decisionScore 40–70    → observação interna
+decisionScore < 40     → ignora
+```
+
+**A comissão altera o limiar:**
+
+```
+Comissão nível 1 → só alerta acima de 85, e tarde
+Comissão nível 5 → alerta acima de 60 se o padrão for consistente e houver ação útil
+```
+
+Complemento (§26 da fonte — chance de detectar por nível): nível 1 ≈ 35% (mensagem genérica, tarde), nível 3 ≈ 65% (quando o padrão fica claro), nível 5 ≈ 90% (antes de virar chance clara, com sugestões detalhadas).
+
+> **Pendência:** Calibrar os pesos de `decisionScore` e a curva nível-da-comissão → limiar (a fonte fixa os dois pontos extremos: 85 no nível 1, 60 no nível 5).
+
+### F18. offlineDecisionQuality
+
+Quando o usuário está ausente, a qualidade da IA que decide por ele é calculada assim:
+
+```
+offlineDecisionQuality =
+    nívelDaComissão
+  + autonomiaPermitida
+  + clarezaDoPlanoPréJogo
+  + leituraTática
+  + comunicação
+  − pressãoDoJogo
+  − complexidadeDaSituação
+```
+
+Qualidade baixa → só ações seguras (substituir lesionado, reorganizar após expulsão). Qualidade alta → ações inteligentes (ajustar bloco, explorar setor, proteger jogador pendurado, alterar ritmo). O motor offline consulta, em ordem: existe emergência? existe regra no plano pré-jogo? a comissão tem qualidade para agir? a ação é segura? o risco de não agir supera o de agir?
+
+> **Pendência:** Calibrar pesos e o limiar entre "ações seguras" e "ações inteligentes" (a fonte não dá exemplo numérico).
+
+### F19. Qualidade da leitura e impacto da sugestão
+
+Duas fórmulas conceituais da comissão técnica (§26–27 da fonte).
+
+```
+qualidadeDaLeitura =
+    leituraTáticaDaComissão
+  + familiaridadeComElenco
+  + entrosamentoDaComissão
+  + dadosDisponíveis
+  + nívelDeAnáliseDoClube
+  − pressãoDoJogo
+  − caosDaPartida
+  − mudançasRecentes
+
+impactoDaSugestão =
+    adequaçãoAoProblema
+  + capacidadeDosJogadoresExecutarem
+  + comunicaçãoDaComissão
+  + tempoDisponívelParaEncaixar
+  + compatibilidadeComTáticaBase
+  − fadiga
+  − pressãoEmocional
+  − resistênciaDoAdversário
+  − instabilidadePorMudançasExcessivas
+```
+
+**Exemplo (qualitativo):** final de campeonato, estádio cheio, jogador expulso e chuva forte → mesmo uma comissão boa tem leitura menos precisa porque o jogo está caótico (mantém imprevisibilidade). Uma sugestão boa ainda depende do elenco executá-la.
+
+> **Pendência:** Calibrar pesos das duas fórmulas (a fonte não dá exemplo numérico).
+
+### F20. Deltas internos de uma ação
+
+Uma decisão do usuário/IA aplica deltas diretos sobre o estado interno da simulação, que valem nos próximos ticks. Cada ação carrega benefício, custo, tempo de encaixe, risco e duração.
+
+**Exemplo (usuário manda "dar cobertura com volante no lado esquerdo"):**
+
+```
+leftSideDefensiveStrength     += 12
+centralMidfieldControl        −= 6
+defensiveMidfielderFatigueRate += 0.4
+leftBackDuelPenalty           −= 8
+```
+
+Efeitos qualitativos correspondentes: `+ defesa no lado esquerdo`, `+ proteção ao lateral`, `− presença no meio central`, `− saída de bola central`, `+ fadiga do volante`. Como resposta, o adversário pode insistir com menos sucesso, mudar para o centro, inverter o jogo ou perder momentum.
+
+> **Pendência:** Catalogar os deltas de todas as ações táticas disponíveis e sua janela de tempo de encaixe (a fonte dá só o exemplo da cobertura pelo volante; menciona encaixe de 2–5 min e duração ideal de 10–15 min para "pressão alta").
+
+### F21. staffLevel (média ponderada)
+
+O nível geral da comissão técnica é uma média ponderada de seus atributos (§3 da fonte, rodada C).
+
+```
+staffLevel =
+    tacticalReading      * 0.25
+  + communication        * 0.15
+  + emotionalManagement  * 0.15
+  + physicalPreparation  * 0.15
+  + substitutions        * 0.15
+  + adaptability         * 0.15
+```
+
+**Observação:** os pesos citados somam **1.00** (0.25 + 0.15×5). A fonte ressalva que o ideal **não** é usar apenas o nível geral: cada atributo (incluindo os não ponderados no exemplo, como `offensiveTraining`, `defensiveTraining`, `setPieces`, `offlineAutonomy`) deve impactar sistemas diferentes.
+
+> **Pendência:** Confirmar se `offlineAutonomy` e os treinos entram no `staffLevel` ou operam apenas em subsistemas dedicados (o exemplo da fonte pondera só seis atributos).
 
 ---
 

@@ -250,6 +250,75 @@ Transforma eventos brutos em histórias — dá alma ao jogo. O evento já foi d
 | Jovem fez 2 gols contra o rival | "A torcida começa a ver João Mendes como uma das maiores promessas do clube. A diretoria já teme assédio de clubes maiores." |
 | Atacante 7 jogos sem marcar | "A fase ruim do centroavante incomoda a torcida. Internamente, a comissão avalia se ele precisa de descanso ou apoio psicológico." |
 
+### 3.9. Espaço de decisão por área (enums)
+
+Cada área define explicitamente o **conjunto de decisões possíveis** — o vocabulário fechado que o Decision Engine pode comparar. Isso mantém a IA previsível e auditável: nenhum módulo inventa ações fora do seu domínio.
+
+**Partida** — Utility AI + regras táticas + eventos probabilísticos:
+
+```ts
+type TacticalDecisionType =
+  | 'CHANGE_FORMATION'
+  | 'SUBSTITUTE_PLAYER'
+  | 'PRESS_HIGH'
+  | 'DROP_BACK'
+  | 'MARK_KEY_PLAYER'
+  | 'EXPLOIT_FLANK'
+  | 'KEEP_STRATEGY';
+```
+
+**Mercado** — Scoring AI + regras econômicas + perfil do clube:
+
+```ts
+type TransferDecisionType =
+  | 'BUY_PLAYER'
+  | 'SELL_PLAYER'
+  | 'LOAN_PLAYER'
+  | 'RENEW_CONTRACT'
+  | 'REJECT_OFFER'
+  | 'MAKE_COUNTER_OFFER';
+```
+
+**Torcida e mídia** — Event-based AI + narrativa (pressão, cobrança, crise, idolatria, reputação, moral do elenco):
+
+```ts
+type FanReactionEvent =
+  | 'BIG_WIN'
+  | 'DERBY_LOSS'
+  | 'BAD_SEQUENCE'
+  | 'YOUNG_PLAYER_BREAKOUT'
+  | 'STAR_PLAYER_SOLD'
+  | 'MANAGER_FIRED';
+```
+
+**Desenvolvimento de jogador** — Progression Engine + potencial + personalidade + treino + contexto. Aqui o "espaço de decisão" é, na verdade, o **contexto de entrada** que alimenta a evolução (técnica, física, queda por idade, impacto de treino, lesões, moral, minutos, qualidade da comissão):
+
+```ts
+type PlayerDevelopmentContext = {
+  player: Player;
+  trainingFocus: TrainingFocus;
+  staffQuality: StaffQuality;
+  clubStructure: ClubStructure;
+  minutesPlayed: number;
+  morale: number;
+  injuryHistory: Injury[];
+};
+```
+
+**Narrativa** — único módulo que pode usar LLM/IA generativa, e só para texto. O evento já foi decidido pelo motor; a narrativa apenas o veste, com um `tone` que controla a voz do texto gerado:
+
+```ts
+type NarrativeInput = {
+  eventType: string;
+  clubName: string;
+  playerName?: string;
+  context: Record<string, unknown>;
+  tone: 'neutral' | 'press' | 'fan' | 'dramatic';
+};
+```
+
+Saída de exemplo (`tone: 'press'`): *"A torcida começa a pressionar a diretoria após a terceira derrota seguida, principalmente pela falta de reação tática no segundo tempo."* — mas o evento em si (a derrota, a pressão) já veio do motor; a IA generativa só escreve bonito.
+
 ---
 
 ## 4. Padrão núcleo de decisão (Decision Engine)
@@ -417,6 +486,78 @@ Duas garantias acompanham essa estrutura:
 - **Determinismo:** decisões podem usar **aleatoriedade controlada por seed** quando necessário, e a seed é **registrada em decisões críticas simuladas** para reprodutibilidade e auditoria.
 
 > A implementação técnica dessa separação (contratos, workers, event bus) vive em [`../02-tecnico/00-arquitetura-geral.md`](../02-tecnico/00-arquitetura-geral.md).
+
+### 4.8. Exemplo aplicado — `SubstitutionAI`
+
+Este é o único exemplo de um **módulo de IA concreto** montando opções e delegando ao `DecisionEngine`. Ele mostra o padrão completo em ação: `baseScore` fixo por ação, modificadores condicionais ao contexto (com `label`, `value` e `reason`) e consequências com trade-off explícito. O módulo não decide nada sozinho — apenas descreve as opções e chama `decisionEngine.choose(...)`.
+
+```ts
+type SubstitutionAction =
+  | 'SUBSTITUTE_TIRED_PLAYER'
+  | 'SUBSTITUTE_BOOKED_PLAYER'
+  | 'ADD_ATTACKER'
+  | 'ADD_DEFENDER'
+  | 'KEEP_TEAM';
+
+export class SubstitutionAI {
+  constructor(private decisionEngine: DecisionEngine) {}
+
+  decide(context: MatchContext): DecisionResult<SubstitutionAction> {
+    const options: DecisionOption<SubstitutionAction>[] = [
+      {
+        action: 'SUBSTITUTE_TIRED_PLAYER',
+        baseScore: 40,
+        modifiers: [
+          {
+            label: 'fatigue',
+            value: context.mostTiredPlayer.energy < 40 ? 30 : 0,
+            reason: 'Jogador com energia baixa.',
+          },
+          {
+            label: 'injury_risk',
+            value: context.mostTiredPlayer.injuryRisk > 70 ? 20 : 0,
+            reason: 'Risco elevado de lesão.',
+          },
+        ],
+        consequences: [
+          { target: 'team', attribute: 'physical_stability', value: 10 },
+        ],
+      },
+      {
+        action: 'ADD_ATTACKER',
+        baseScore: 30,
+        modifiers: [
+          {
+            label: 'losing_game',
+            value: context.scoreDiff < 0 && context.minute > 65 ? 35 : 0,
+            reason: 'Time está perdendo no fim do jogo.',
+          },
+        ],
+        consequences: [
+          { target: 'team', attribute: 'attack_pressure', value: 15 },
+          { target: 'team', attribute: 'defensive_risk', value: 12 },
+        ],
+      },
+      {
+        action: 'KEEP_TEAM',
+        baseScore: 20,
+        modifiers: [
+          {
+            label: 'stable_match',
+            value: context.teamMomentum > 60 ? 20 : 0,
+            reason: 'O time está em bom momento na partida.',
+          },
+        ],
+        consequences: [],
+      },
+    ];
+
+    return this.decisionEngine.choose(context.manager, options);
+  }
+}
+```
+
+Repare que `ADD_ATTACKER` carrega duas consequências opostas (`attack_pressure +15` e `defensive_risk +12`): é o trade-off do §4.6 codificado. É previsível, controlável e balanceável — mexer no `baseScore` ou no `value` de um modificador ajusta o comportamento sem reescrever a lógica de decisão.
 
 ---
 

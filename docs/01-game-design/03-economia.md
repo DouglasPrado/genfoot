@@ -378,6 +378,44 @@ Conforme o jogo avança, o mercado muda. Jogadores melhores pedem mais; clubes r
 
 A liga (camada 2 do [modelo em 4 camadas](#1-modelo-em-4-camadas)) também evolui economicamente e retroalimenta o mercado. Uma liga forte gera mais receita de TV, melhores patrocínios e maior retenção de talentos: os jogadores querem jogar nela, os clubes arrecadam mais e os salários sobem. Uma liga fraca perde talentos cedo, vende barato e retém pouco. Essa reputação não é estática: se os clubes de uma liga performam bem internacionalmente, a reputação da liga sobe, os valores de mercado sobem e os jogadores permanecem mais tempo — criando histórias de longo prazo (por exemplo, clubes brasileiros com boas campanhas continentais valorizam toda a liga).
 
+### 7.3 Mercado segmentado para clubes novos (regional/iniciante)
+
+Num universo maduro (ex.: temporada 20) o mercado geral pode estar caro demais para um clube recém-criado. Para que o novato não precise competir financeiramente com clubes ricos por todos os jogadores, o mercado é **segmentado em camadas paralelas**, cada uma com nível de jogador compatível:
+
+| Camada | O que oferece |
+| --- | --- |
+| **Mercado Geral** | Jogadores caros, disputados, de nível alto |
+| **Mercado Regional/Iniciante** | Jogadores acessíveis, úteis, de nível compatível com clubes pequenos |
+| **Base Local** | Jovens baratos para clubes novos |
+| **Empréstimos** | Jogadores de clubes maiores que precisam de minutos (ver [7.4](#74-empréstimos-como-ponte-entre-clubes-grandes-e-pequenos)) |
+
+Assim o clube novo tem acesso a jogadores dentro do seu orçamento sem disputar preço com os gigantes. A segmentação atua junto com as divisões por nível estrutural (ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)) e com o controle anti-abuso do mercado (transações fora da faixa continuam auditadas).
+
+### 7.4 Empréstimos como ponte entre clubes grandes e pequenos
+
+O empréstimo é um dos melhores instrumentos de equilíbrio entre clubes de portes diferentes. Clubes grandes acumulam **muitos jovens bons que não conseguem jogar**; clubes novos precisam de jogadores úteis. A ponte beneficia os dois lados:
+
+```
+Clube grande empresta jovem
+   ↓
+Clube pequeno usa o jogador
+   ↓
+Jogador ganha minutos
+   ↓
+Clube grande desenvolve o ativo
+   ↓
+Clube pequeno ganha competitividade temporária
+```
+
+Para evitar abuso (favorecimento, clube satélite, transferência disfarçada), o empréstimo respeita limites:
+
+- **limite de empréstimos por clube**;
+- **salário parcialmente pago pelo clube dono**;
+- **jogador precisa cumprir minutos mínimos**;
+- **o clube pequeno não pode comprar barato automaticamente** ao fim do empréstimo (sem opção de compra vantajosa embutida).
+
+Isso conversa diretamente com as regras de empréstimo do anti-abuso (Decisão 1889, ver [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md)).
+
 ## 8. Contratos, empresários e mente financeira
 
 Contrato, empresário e mente financeira do jogador (entidades 3.2, 3.4 e 3.3) formam o núcleo emocional das negociações. Grinta trata a economia como **parcialmente irracional**: clubes e jogadores decidem sob influência de emoção.
@@ -420,6 +458,18 @@ A base é uma fábrica de ativos únicos: como os jogadores são gerados com his
 
 Cada jovem carrega um perfil econômico próprio: custo de formação, potencial financeiro, risco social, apoio familiar, necessidade econômica, apego ao clube e probabilidade de sair cedo. Isso gera dilemas de proteção do ativo. Um menino pobre, muito talentoso e com família pressionando quer contrato profissional cedo e atrai empresários — o clube precisa protegê-lo (blindar com contrato e luvas) ou o perde barato. Um menino de família estável e disciplinado tem desenvolvimento mais previsível, menor pressão financeira e aceita projeto de longo prazo. Ver o ciclo de clube formador na [seção 10.3](#103-loops-de-consequência) e a economia global da base na [seção 14.4](#144-dimensionamento-de-jogadores).
 
+### 9.5 Receitas e patrocínios proporcionais ao estágio da liga
+
+Um clube novo precisa ganhar dinheiro suficiente para evoluir — não o mesmo dinheiro da elite, mas o bastante para crescer sem ficar travado. Por isso as receitas, os custos e os upgrades são **proporcionais ao estágio da liga** em que o clube compete (as ligas por nível estrutural em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)):
+
+| Estágio da liga | Receita | Custos | Upgrades |
+| --- | --- | --- | --- |
+| Liga Inicial | Baixa | Baixos | Baratos |
+| Liga Intermediária | Média | Médios | Médios |
+| Elite | Alta | Altos | Caros |
+
+Cada clube tem, assim, uma **economia própria proporcional ao seu estágio**: o novato não recebe a receita da elite, mas também não enfrenta os custos dela, e consegue financiar sua evolução dentro da própria camada. Os patrocínios seguem a mesma lógica da fórmula de [5.4](#54-valor-de-patrocínio), em que a divisão e a reputação do clube pesam no valor — um título de Liga Inicial melhora o patrocínio **local**, mesmo que o clube ainda seja irrelevante globalmente.
+
 ## 10. Dívidas, punições e loops de consequência
 
 ### 10.1 Dívida como risco estratégico
@@ -442,6 +492,7 @@ A economia gera ciclos que se retroalimentam. São o coração narrativo do sist
 - **Ciclo negativo:** má gestão → dívida → venda de jogadores → queda técnica → resultados ruins → torcida some → receita cai → mais dívida.
 - **Ciclo de clube formador:** investe em base → revela jogador → vende → melhora estrutura → revela ainda melhor.
 - **Ciclo de estrela:** jogador performa → fama sobe → salário pedido sobe → clubes interessados → pressão para renovar ou vender.
+- **Ciclo de decadência de clube grande:** o clube cresceu muito → a folha salarial explodiu → a base parou de revelar → os veteranos aposentaram → as contratações foram ruins → a torcida pressiona → a receita cai → o clube perde nível. Esse ciclo é o contrapeso do topo: um gigante mal administrado pode cair, o que **abre espaço para clubes novos subirem** e mantém o universo em movimento, sem congelar no topo. É a face econômica do desgaste natural dos clubes grandes (custos fixos maiores, salários maiores, pressão maior, renovação de elenco mais cara), que torna o topo difícil de manter.
 
 Esses ciclos produzem os dilemas centrais do jogo: renovar caro com a promessa ou vender agora? Contratar estrela cara ou investir na base? Encher o estádio ou cobrar mais caro? Aceitar dívida para subir de divisão? Vender para o rival ou segurar e perder dinheiro?
 
@@ -516,6 +567,7 @@ Os eventos (modelo `EconomicEvent`, entidade 3.10) conectam acontecimentos espor
 | `CLUB_MISSES_PROMOTION` | Queda de receita e de expectativa, possível crise no ano seguinte |
 | `SALARY_DELAY` | Moral cai, empresário aciona, risco de rescisão |
 | `SPONSOR_WITHDRAWS` | Perda de receita comercial, torcida reage |
+| `PLAYER_SCANDAL` | Escândalo extra-campo: patrocinador ameaça sair, torcida reage, moral cai, valor de mercado do jogador cai |
 | `ECONOMIC_CRISIS` | Patrocínios caem, clubes reduzem gastos, jogadores aceitam menos, vendas internacionais aumentam |
 | `TRANSFER_RUMOR` | Pressão sobre o clube, oscilação de moral e de valor |
 

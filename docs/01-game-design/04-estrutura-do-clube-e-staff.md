@@ -117,6 +117,8 @@ Afeta a evolução técnica e tática dos jogadores. Impacta: treino técnico, t
 
 A comissão técnica também determina a qualidade das decisões e sugestões durante a partida — ver [seção 9](#9-comissão-técnica-cargos-e-atributos) e [Motor de partida](./05-motor-de-partida.md).
 
+> **Pendência (escala a reconciliar):** este documento usa a escala **1–10** para o nível das áreas (incluindo a comissão), enquanto o [Motor de partida](./05-motor-de-partida.md) descreve a qualidade das sugestões em uma escala **1–5** (herdada do chat de simulação). São duas granularidades da mesma coisa; a escala canônica única precisa ser fixada na modelagem final (provável mapeamento 1–10 → faixas de 1–5, ou adoção de 1–10 em todo o sistema).
+
 ### 3.3 Preparação física
 
 Afeta condição física, desgaste e queda de rendimento. Impacta: resistência, recuperação pós-jogo, cansaço acumulado, queda física de veteranos, chance de lesão muscular, intensidade de treino e desempenho em calendário apertado.

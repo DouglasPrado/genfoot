@@ -36,7 +36,7 @@ As **decisões estratégicas profundas**, porém, devem depender do usuário —
 
 ### 1.2 Usuários entrando ao longo do tempo
 
-O universo é contínuo: um usuário pode entrar na temporada 1 ou na temporada 20. Como clubes antigos crescem muito, o mundo precisa oferecer **caminho real de evolução** a quem chega tarde, sem apagar o mérito dos clubes veteranos. Os mecanismos que garantem isso (divisões por nível, ligas de acesso, reputação por faixa — local, regional, nacional, continental, mundial — e programa de desenvolvimento inicial) são tratados em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md).
+O universo é contínuo: um usuário pode entrar na temporada 1 ou na temporada 20. Como clubes antigos crescem muito, o mundo precisa oferecer **caminho real de evolução** a quem chega tarde, sem apagar o mérito dos clubes veteranos. Os mecanismos que garantem isso estão distribuídos entre os documentos: as **divisões por nível estrutural / ligas de acesso** e os **mundos por geração** ficam em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md); a **reputação por faixa** (local → regional → nacional → continental → mundial), os **eventos de oportunidade** e o exemplo do Clube Aurora estão na [seção 4](#4-crescimento-por-mérito) deste documento; e o **Programa de Clube Novo** (desenvolvimento inicial) está em [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md).
 
 Em linha geral:
 
@@ -169,7 +169,53 @@ O tempo favorece os clubes antigos, mas o sistema cria ligas, incentivos e janel
 
 > **Regra de ouro:** o usuário novo não recebe igualdade imediata com clubes antigos, mas recebe um **caminho justo, protegido e divertido** para crescer.
 
-O detalhamento das divisões, mundos e proteções de entrada está em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md).
+O detalhamento das divisões por nível e dos mundos por geração está em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md); as proteções de entrada (Programa de Clube Novo) em [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md). As subseções seguintes detalham os mecanismos de oportunidade que vivem neste documento.
+
+### 4.3 Sistema de reputação por faixa
+
+O clube novo não precisa disputar reputação global imediatamente. A reputação cresce em **camadas**, da mais local para a mais ampla:
+
+**Local → Regional → Nacional → Continental → Mundial**
+
+Um clube novo pode crescer **rápido localmente**, mesmo que ainda seja irrelevante no plano global — o que dá sensação de avanço sem precisar se comparar com os gigantes. Exemplo: na temporada 20, o clube novo ganha a Liga Inicial e, como consequência, a reputação local sobe bastante, a torcida cresce, o patrocínio local melhora e jogadores regionais passam a aceitar propostas dele. Essa progressão por faixas é o mesmo eixo de reputação citado na tabela de atributos do clube (seção 2) e na lista de crescimento por mérito (início da seção 4).
+
+### 4.4 Eventos de oportunidade para clubes menores
+
+O mundo gera **oportunidades naturais** que ajudam os clubes novos a crescer sem parecer artificial — em vez de conceder vantagem direta, o sistema cria janelas que o clube pequeno pode aproveitar:
+
+- um jovem **rejeitado por um clube grande**;
+- **crise financeira** em um clube maior;
+- clube grande que **precisa vender atletas**;
+- promessa que **quer jogar mais** (busca minutos);
+- veterano que **aceita reduzir salário**;
+- **patrocinador regional** que apoia um clube emergente;
+- boa campanha que **aumenta a torcida** rapidamente.
+
+Esses eventos surgem do próprio funcionamento do universo (decadência de clubes grandes, envelhecimento de elenco, pressão de empresários) e conversam com os eventos econômicos descritos em [`./03-economia.md`](./03-economia.md).
+
+### 4.5 Exemplo: a trajetória do Clube Aurora
+
+O **Clube Aurora** ilustra o ritmo saudável de crescimento de um clube que entra num universo já maduro. Temporada global de entrada: **20**.
+
+Ao nascer, o Aurora tem nível geral 1, caixa inicial padrão, elenco veterano equilibrado, estrutura básica e reputação local baixa. Ele entra na **Liga Inicial 20-B** e recebe os benefícios iniciais do Programa de Clube Novo:
+
+- upgrades de nível 1 → 3 mais baratos;
+- acesso facilitado a empréstimos;
+- mercado regional compatível;
+- objetivos simples;
+- premiação proporcional para evoluir.
+
+A trajetória projetada:
+
+| Temporada | Marco |
+| --- | --- |
+| 20 | Entra na Liga Inicial 20-B com o Programa de Clube Novo |
+| 21 | Sobe para a Liga de Acesso; a base melhora; a torcida local cresce |
+| 23 | Já é nível 3 ou 4; começa a disputar jogadores melhores; tem jovens próprios no elenco |
+| 26 | Se bem gerido, vira clube médio |
+| 30 | Pode alcançar a elite |
+
+Esse ritmo é o **alvo de design**: o usuário novo *não* alcança os antigos em uma temporada, mas sente progresso constante — cerca de dez temporadas da Liga Inicial à elite. Preserva ao mesmo tempo o mérito dos clubes antigos e a oportunidade real dos novos.
 
 ---
 
@@ -196,4 +242,5 @@ Assim, o caixa inicial fixo e o crescimento por mérito são a "porta de entrada
 
 - [`./03-economia.md`](./03-economia.md) — Economia global balanceada (detalhe).
 - [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md) — Estrutura física, departamentos e staff.
-- [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) — Multiplayer, mundos/servidores, divisões e entrada de novos usuários.
+- [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) — Multiplayer, mundos/servidores, divisões (por resultado e por nível estrutural), mundos por geração e entrada de novos usuários.
+- [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) — Onboarding e Programa de Clube Novo (desenvolvimento inicial).

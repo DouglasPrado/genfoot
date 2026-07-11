@@ -1,6 +1,6 @@
 # Modelo de Dados (Schema Prisma Canônico e Domínio)
 
-> **Status:** Rascunho consolidado (fonte da verdade do modelo de dados) · **Fontes:** chats/entidades-do-banco-de-dados-inicial.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado (fonte da verdade do modelo de dados) · **Fontes:** chats/entidades-do-banco-de-dados-inicial.md (schema canônico, seções 1–5), chats/ux-do-jogo.md (Bloco 26, seção 6) · **Revisão:** 2026-07-10
 
 Este documento consolida o **modelo de dados canônico** do **Grinta** — um manager de futebol online (estilo Brasfoot), com mundo persistente, clubes que crescem ao longo das temporadas e jogadores únicos gerados com biografia e personalidade. É a **fonte da verdade** para o schema: em caso de divergência com outros documentos, este prevalece.
 
@@ -13,6 +13,7 @@ O schema foi desenhado como estrutura robusta e reaproveitável — **não** com
 3. [Models por domínio](#3-models-por-domínio)
 4. [Os 30 módulos de domínio](#4-os-30-módulos-de-domínio)
 5. [Algoritmo de geração de jogador em 11 passos](#5-algoritmo-de-geração-de-jogador-em-11-passos)
+6. [Modelo detalhado do Bloco 26 (ux-do-jogo)](#6-modelo-detalhado-do-bloco-26-ux-do-jogo)
 
 Notas de ligação: regras de integridade referencial (FK), transações e particionamento operacional → `./01-arquitetura-de-dados.md`. Design dos sistemas de jogo (regras, fórmulas, balanceamento) → `../01-game-design/`.
 
@@ -795,3 +796,302 @@ Fluxo de `PlayerGeneratorService.generatePlayer()`, fiel ao chat-fonte. Preenche
 11. **Calcula expectativa salarial** (`Player.wageExpectation`).
 
 > **Nota:** `generationSource` (`INITIAL_WORLD`, `SCOUT_FOUND`, `YOUTH_ACADEMY`, `REGEN_AFTER_RETIREMENT`, `MARKET_BALANCE`) e `generatedAtSeasonNumber` registram a origem de cada jogador gerado — usados pela Economia Global e pelo Fim de Temporada no rebalanceamento de oferta.
+
+---
+
+## 6. Modelo detalhado do Bloco 26 (ux-do-jogo)
+
+> **Status desta seção:** Iteração **mais granular** do modelo de dados, capturada do chat `ux-do-jogo.md` (Bloco 26). **NÃO substitui** o schema canônico das seções 1–5 acima — é a segunda versão a ser **reconciliada** com ele (ver a `> **Pendência (reconciliação de schema)**` no topo do documento). Diverge em nomenclatura e granularidade: `gameWorldId` (não `worldId`), UUIDv7 (não `cuid`), dinheiro em `BigInt amountMinor` (não `Decimal`), `Person` separado de `Player`, controle de clube via `ClubControl` (não `ClubUser`), e centenas de entidades por período/versão. Esta seção documenta o conteúdo substantivo do bloco; **não** é uma decisão de modelagem final.
+
+O princípio-guia do bloco: **o schema representa as regras do mundo**. A aplicação não deve compensar permanentemente um banco incapaz de proteger suas próprias invariantes estruturais. O modelo tem três camadas complementares: **Prisma Schema** (models, relações, FKs, enums estáveis, índices/constraints comuns, tipagem do cliente) + **Migrações SQL nativas** (CHECK, EXCLUDE, índices parciais/por expressão/INCLUDE, views, materialized views, triggers, particionamento, funções, extensões) + **Domínio** (transições válidas, autoridade, cálculos, políticas, regras multi-agregado, mensagens de erro).
+
+### 6.1 Convenções (que ainda não estão nas seções 1–5)
+
+As convenções de modelagem deste bloco (schemas PostgreSQL por domínio, PascalCase/camelCase/snake_case, chaves compostas por mundo, `BigInt` para dinheiro, uso/uso-proibido de JSONB, exclusão lógica, concorrência otimista via `version`) já estão consolidadas em [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md) — consulte lá em vez de reproduzir. Resumo do que o Bloco 26 fixa e que ainda não aparece nas seções 1–5:
+
+- **Organização física do Prisma** — schema dividido em ~28 arquivos por domínio (`platform.prisma`, `world.prisma`, `club.prisma`, `person.prisma`, `player.prisma`, `staff.prisma`, `squad.prisma`, `training.prisma`, `tactics.prisma`, `medical.prisma`, `match.prisma`, `competition.prisma`, `market.prisma`, `transfer.prisma`, `contract.prisma`, `finance.prisma`, `infrastructure.prisma`, `commercial.prisma`, `supporter.prisma`, `communication.prisma`, `history.prisma`, `notification.prisma`, `automation.prisma`, `entry.prisma`, `eventing.prisma`, `operations.prisma`, `enums.prisma`) + `schema.prisma` principal (generator, datasource, extensões, versão).
+- **Schemas lógicos PostgreSQL:** `platform`, `game`, `finance`, `eventing`, `operations`, `read_model`.
+- **Identidade:** `id String @id @default(uuid(7)) @db.Uuid` (UUIDv7). Sem IDs sequenciais globais como identidade das entidades do mundo.
+- **Identificadores públicos:** `publicCode` / `slug` / `shortCode` (ex.: `CLB-7F29DK`, `MAT-93F4AX`) — não substituem o UUID, podem ser regeneráveis, não concedem autorização, não ordenam cronologicamente.
+- **Campos comuns de entidades do mundo:** `id`, `gameWorldId @db.Uuid`, `createdAt`/`updatedAt @db.Timestamptz(6)`, `version Int @default(1)`; opcionais por ciclo de vida: `effectiveAt`, `endedAt`, `cancelledAt`, `archivedAt`, `deletedAt`, `createdBy`, `updatedBy`.
+- **Proteção contra relações entre mundos:** todo pai central tem `@@unique([gameWorldId, id])`; filhos críticos usam **FK composta** `references: [gameWorldId, id]` com `onDelete: Restrict`. A unicidade global do UUID **não** é considerada proteção suficiente contra erro de escopo.
+- **Chaves compostas naturais:** `(gameWorldId, seasonNumber)`, `(competitionEditionId, clubId)`, `(matchId, eventSequence)`, `(matchId, clubId)`, `(journalEntryId, lineNumber)`, `(consumerName, eventId)`, etc.
+- **Datas reais** em `@db.Timestamptz(6)`; **tempo do mundo** em `worldTick: BigInt` (derivados persistidos para leitura: `seasonId`, `worldDay`, `worldMinute`, `worldDateLabel`). Prazos competitivos comparados pelo relógio persistido do mundo, não pelo dispositivo. Períodos: `startsAt/endsAtWorldTick` + `startsAt/endsAtReal`; `endsAt = null` = período ativo (nunca "data desconhecida" — esta tem estado explícito).
+- **Valores monetários:** `amountMinor BigInt` + `currencyId` (ex.: R$ 125,90 → `12590`). Proibido Float/Double/decimal sem escala para caixa, transferências, salários, bônus, parcelas, dívidas, orçamentos, recebíveis, pagamentos.
+- **Percentuais/probabilidades:** inteiros escalados — `basisPoints` (12,50% = 1250) ou escala 0–1.000.000; escala declarada pelo objeto de valor. **Atributos/avaliações:** inteiros escalados 0–10.000 (7825 = 78,25%). **`Decimal`** restrito a casos onde inteiro não representa a escala e há justificativa documentada; **dinheiro continua BigInt**.
+- **JSONB permitido** para estruturas versionadas, lidas como unidade, de alta variação, validadas em runtime (perfil técnico do jogador, snapshot de partida, payload de evento, condições de automação, regulamento, resultado de simulação, resumo histórico). **JSONB proibido** para proprietário do jogador, clube contratante, parcelas, participantes, inscrições, saldos, contas, títulos, suspensões, responsáveis, autoridades, membros do elenco, relações entre pessoas.
+- **Arrays PostgreSQL** só para tags técnicas, escopos simples, códigos auxiliares (dados sem identidade própria) — nunca relações principais.
+- **Política de enums em 3 categorias:** (1) **Enum estável** — ciclo fechado, muda raramente, comportamento técnico, mudança exige migration; (2) **Catálogo expansível** — tabelas (`CatalogDefinition`/`CatalogEntry`/`CatalogEntryTranslation`/`CatalogEntryVersion`) para posições, funções táticas, competências, tipos de objetivo/prêmio/lesão, especialidades médicas, papéis de departamento, etc.; (3) **Regra versionada** — `RuleSet`/`RuleDefinition`/`RuleValue`/`RuleSetVersion` para desempate, limites de inscrição/estrangeiros, formato de competição, premiação, suspensões. Enum **não** é tradução: banco guarda `ACTIVE`/`SUSPENDED`/`CANCELLED`; interface traduz.
+- **Política de deleção:** `Restrict`/`NoAction`/`SetNull` controlado; `Cascade` só para filhos descartáveis (rascunhos, linhas de simulação não persistida, preferências, tokens de sessão). Entidades históricas (clubes, pessoas, jogadores, partidas, contratos, transferências concluídas, lançamentos, títulos, competições, auditoria) **não** são excluídas fisicamente — usam status/encerramento/anonimização/arquivamento/nova versão. `deletedAt` só com processo real de retenção.
+- **Estado atual × histórico:** históricos importantes usam **períodos** (`ClubIdentityPeriod`, `PersonNamePeriod`, `PlayerContractSalaryPeriod`, `ClubAutonomyPeriod`). Ponteiros de performance (`currentControlId`, `currentIdentityPeriodId`, `currentEmploymentClubId`) coexistem com as tabelas de período e são reconciliados por jobs. **Snapshots imutáveis** (`snapshotId`, `stateHash`, `payload`, `capturedAtWorldTick`) para verificação/deduplicação/determinismo.
+
+> **Pendência:** toda a §6.1 é iteração a reconciliar. Onde o Bloco 26 e as seções 1–5 divergem (nomes de campo, tipos, granularidade), a reconciliação é decisão de modelagem em aberto.
+
+### 6.2 Taxonomia de enums por domínio (§27–40 do bloco)
+
+Enums **estáveis** propostos, agrupados por domínio. (Muitas taxonomias abertas — posições, funções, competências, tipos de lesão — viram catálogo, não enum; ver §6.1.)
+
+| Domínio | Enums |
+| --- | --- |
+| **Plataforma (§27)** | `UserAccountStatus`, `UserSessionStatus`, `UserDeviceTrustStatus`, `SecurityFactorType`, `SecurityFactorStatus`, `WorldMembershipStatus`, `InvitationStatus`, `AccountRestrictionType` |
+| **Mundo (§28)** | `GameWorldStatus`, `WorldClockStatus`, `WorldOperationalState`, `SeasonStatus`, `SeasonTransitionStatus`, `WorldEntryWindowStatus`, `WorldProcessingState` |
+| **Clube e governança (§29)** | `ClubStatus`, `ClubOriginType`, `ClubIdentityStatus`, `ClubControlStatus`, `GovernanceModel`, `BoardStatus`, `BoardMandateStatus`, `AutonomyLevel`, `ClubObjectiveStatus`, `ClubPolicyStatus`, `DepartmentStatus`, `ResponsibilityAssignmentStatus` |
+| **Pessoa e carreira (§30)** | `PersonStatus`, `PlayerCareerStatus`, `PlayerAvailabilityStatus`, `StaffCareerStatus`, `CareerPeriodStatus`, `PersonRelationshipStatus`, `RetirementProcessStatus`, `RecognitionStatus` |
+| **Elenco e registro (§31)** | `SquadType`, `SquadMembershipStatus`, `SquadMembershipRole`, `PlayerRegistrationStatus`, `RegistrationMovementType`, `ShirtNumberStatus`, `LeadershipAssignmentType`, `LeadershipAssignmentStatus` |
+| **Contratual (§32)** | `AgreementStatus`, `PlayerContractStatus`, `StaffContractStatus`, `ContractNegotiationStatus`, `ContractOptionType`, `ContractOptionStatus`, `ContractTriggerStatus`, `LoanAgreementStatus`, `TransferAgreementStatus`, `CommercialContractStatus`, `FacilityAgreementStatus` |
+| **Transferência (§33)** | `TransferCaseStatus`, `TransferOfferStatus`, `TransferDirection`, `TransferType`, `PaymentScheduleStatus`, `TransferMedicalStatus`, `TransferRegistrationStatus`, `SellOnClauseType`, `LoanPurchaseClauseType` |
+| **Financeiro (§34)** | `FinancialAccountType`, `AccountNormalSide`, `JournalEntryStatus`, `JournalLineDirection`, `BudgetStatus`, `BudgetLineStatus`, `FinancialReservationStatus`, `PayableStatus`, `ReceivableStatus`, `PaymentStatus`, `InstallmentStatus`, `DebtStatus`, `FinancialRiskLevel` |
+| **Competitivo (§35)** | `CompetitionDefinitionStatus`, `CompetitionEditionStatus`, `CompetitionType`, `CompetitionFormatType`, `CompetitionStageType`, `CompetitionParticipantStatus`, `FixtureStatus`, `HomologationStatus`, `CompetitiveMovementType`, `CompetitiveMovementStatus`, `AppealStatus`, `LicenseStatus`, `DrawStatus` |
+| **Partida (§36)** | `MatchStatus`, `MatchSide`, `MatchRuntimeStatus`, `MatchCommandStatus`, `MatchCommandOrigin`, `MatchEventKind`, `MatchResultStatus`, `MatchCheckpointType`, `LineupStatus`, `SubstitutionStatus`, `TacticalInstructionStatus` |
+| **Treino e medicina (§37)** | `TrainingPlanStatus`, `TrainingSessionStatus`, `TrainingAttendanceStatus`, `TrainingLoadLevel`, `MedicalCaseStatus`, `InjurySeverity`, `MedicalAssessmentStatus`, `TreatmentPlanStatus`, `RehabilitationStatus`, `MedicalRestrictionStatus`, `ReturnToPlayStatus` |
+| **Estrutura (§38)** | `FacilityStatus`, `FacilityOwnershipType`, `FacilityAccessType`, `InfrastructureProjectStatus`, `ProjectPhaseStatus`, `MaintenancePlanStatus`, `WorkOrderStatus`, `InspectionStatus`, `ComplianceCertificateStatus`, `FacilityIncidentStatus`, `BookingStatus` |
+| **Notificação e automação (§39)** | `NotificationStatus`, `NotificationPriority`, `NotificationUrgency`, `ActionableTaskStatus`, `ReminderStatus`, `NotificationDeliveryStatus`, `AutomationRuleStatus`, `AutomationLevel`, `AutomationExecutionStatus`, `AutomationFailurePolicy`, `DelegationStatus` |
+| **Operacional (§40)** | `AdminOperatorStatus`, `AdminSessionStatus`, `AdministrativeOperationStatus`, `AdministrativeCorrectionStatus`, `SupportTicketStatus`, `SupportAccessMode`, `OperationalIncidentStatus`, `OperationalIncidentSeverity`, `AdministrativeJobStatus`, `BackupStatus`, `RestoreStatus`, `DeploymentStatus`, `MigrationStatus`, `FeatureFlagStatus` |
+
+> **Nota:** `MatchEventKind` conterá apenas categorias estruturais estáveis; detalhes (tipo de finalização, região do campo, motivo de interrupção, tipo de passe) usam códigos versionados no payload.
+
+### 6.3 Entidades refinadas (§41+ do bloco)
+
+Conjunto de entidades por domínio, com campos-chave e constraints quando o bloco detalha. Nomes de model em PascalCase; muitas entidades existem em variantes por período/versão/snapshot.
+
+#### 6.3.1 Plataforma (globais, sem `gameWorldId`) — §41–43
+
+- **Conta e identidade:** `UserAccount`, `UserProfile`, `UserCredential`, `UserSession`, `UserRefreshToken`, `UserDevice`, `UserSecurityFactor`, `UserRecoveryCode`, `UserSecurityEvent`, `UserAccountRestriction`.
+- **Preferências:** `UserGlobalPreference`, `UserLocalePreference`, `UserAccessibilityPreference`, `UserPrivacyPreference`.
+- **Relações com mundos:** `WorldParticipant`, `WorldInvitation`, `WorldMembershipRestriction`, `WorldObserverAccess`.
+
+```prisma
+model UserAccount {
+  id                    // status, primaryEmailNormalized, emailVerifiedAt,
+  // authenticationVersion, lastLoginAt, anonymizedAt, createdAt, updatedAt, version
+}
+// Regra fechada: a conta global NÃO controla clube diretamente — o controle ocorre por ClubControl.
+
+model WorldParticipant {
+  id, gameWorldId, userId, status, joinedAt, leftAt,
+  observerState, restrictionState, version
+  // Constraint: unique(gameWorldId, userId)
+}
+```
+
+#### 6.3.2 Mundo, tempo e temporada — §44–48
+
+- **Mundo:** `GameWorld`, `GameWorldConfiguration`, `GameWorldRuleSet`, `GameWorldRuleSetVersion`, `WorldClock`, `WorldClockCheckpoint`, `WorldPause`, `WorldProcessingLease`, `WorldScheduledTask`, `WorldSequenceCounter`, `WorldEconomicSnapshot`, `WorldPopulationSnapshot`.
+- **Temporada:** `Season`, `SeasonPhase`, `SeasonTransition`, `SeasonTransitionCheckpoint`, `SeasonSnapshot`, `ClubSeasonParticipation`, `ClubSeasonReview`, `ClubSeasonObjectiveResult` — constraint `unique(gameWorldId, seasonNumber)`.
+- **Geografia (própria do mundo, não localidades reais externas):** `WorldRegion`, `WorldSubregion`, `WorldCity`, `WorldVenueLocation`, `RegionalEconomicProfile`, `RegionalPlayerPopulation`, `RegionalSupporterMarket`.
+
+```prisma
+model GameWorld {
+  id, publicCode, name, status, operationalState, currentSeasonId,
+  currentRuleSetVersionId, currentWorldTick, rhythmProfile, regionProfile,
+  createdAt, startedAt, archivedAt, version
+}
+
+model WorldClock {
+  gameWorldId, status, currentWorldTick, lastProcessedWorldTick,
+  nextProcessingWorldTick, leaseOwner, leaseExpiresAt, heartbeatAt, version
+  // Constraint parcial: um único WorldClock ACTIVE por gameWorldId
+}
+```
+
+#### 6.3.3 Clube e governança — §49–54
+
+- **Clube e períodos:** `Club`, `ClubIdentityPeriod`, `ClubStatusPeriod`, `ClubOriginProfile`, `ClubControl`, `ClubControlPeriod`, `ClubReputationSnapshot`, `ClubOperationalSnapshot`.
+- **Governança:** `ClubGovernance`, `ClubOwnership`, `ClubOwner`, `ClubBoard`, `ClubBoardMember`, `ClubBoardMandate`, `ClubAuthorityProfile`, `ClubAuthorityGrant`, `ClubAuthorityRestriction`, `ClubAutonomyPeriod`, `BoardDecision`, `BoardApprovalRequest`, `ClubObjective`, `ClubObjectiveEvaluation`, `ClubPolicy`, `ClubStrategy`.
+- **Departamentos e responsabilidades (separados):** `ClubDepartment`, `DepartmentCapability`, `DepartmentOperationalSnapshot`, `ClubPosition`, `ClubPositionAssignment`, `ClubResponsibility`, `ClubResponsibilityAssignment`, `ClubDelegationPolicy`, `ClubWorkQueue`, `ClubWorkItem`.
+
+```prisma
+model Club {
+  id, gameWorldId, publicCode, status, originType, foundedAtWorldTick,
+  currentIdentityPeriodId, currentControlId, currentGovernanceId, homeCityId,
+  createdAt, version
+  // NÃO armazena diretamente: nome/escudo/estádio/controlador histórico (ficam em períodos)
+}
+
+model ClubIdentityPeriod {
+  clubId, officialName, shortName, nickname, slug, primaryColor, secondaryColor,
+  badgeFileId, startsAtWorldTick, endsAtWorldTick, changeReason, decisionId, status, version
+  // Constraint: sem sobreposição de períodos oficiais do mesmo clube
+}
+
+model ClubControl { // controle atual ou histórico
+  clubId, worldParticipantId, status, controlType, startsAtWorldTick, endsAtWorldTick,
+  competitiveControlStartsAtWorldTick, authorityProfileId, activationProcessId, version
+  // Constraints: um único controle ativo por clube; um único clube ativo por participante no mesmo mundo
+}
+```
+
+#### 6.3.4 Pessoa e jogador (separados) — §55–66
+
+`Person` representa toda pessoa única do mundo; pode ter perfil de jogador, funcionário, proprietário, dirigente, histórico. **Um jogador aposentado que vira funcionário continua usando o mesmo `Person`.**
+
+- **Pessoa:** `Person`, `PersonNamePeriod`, `PersonNationalityPeriod`, `PersonLanguage`, `PersonPublicProfile`, `PersonPrivateProfile`, `PersonPersonalityProfile`, `PersonRelationship`, `PersonRelationshipEvent`, `PersonReputationSnapshot`, `PersonAvailabilityPeriod`, `PersonLifeEvent`.
+- **Jogador:** `Player`, `PlayerAbilityProfile`, `PlayerHiddenProfile`, `PlayerPositionProficiency`, `PlayerRoleFamiliarity`, `PlayerFootPreference`, `PlayerCareerPeriod`, `PlayerDevelopmentSnapshot`, `PlayerPhysicalState`, `PlayerMentalState`, `PlayerAvailability`, `PlayerLeadershipProfile`, `PlayerPromise`, `PlayerCareerMilestone`.
+- **Estado físico/mental:** `PlayerPhysicalState`, `PlayerMentalState`, `PlayerFatigueSnapshot`, `PlayerMoraleSnapshot`, `PlayerConditionEvent` (estado atual atualizável; snapshots preservam histórico).
+- **Conhecimento do clube sobre o jogador (não fica no `Player`):** `ClubPlayerKnowledge`, `ClubPlayerKnowledgeSource`, `ScoutingReport`, `MedicalKnowledge`, `ContractKnowledge`, `RelationshipKnowledge` — cada clube tem conhecimento parcial; relatórios antigos não são atualizados retroativamente.
+
+```prisma
+model Person {
+  id, gameWorldId, status, birthWorldDate, deathWorldDate,
+  currentNamePeriodId, primaryNationalityId, publicProfileId, privateProfileId, createdAt, version
+}
+model PersonNamePeriod { // nome atual nunca é sobrescrito
+  personId, fullName, commonName, shirtName, startsAtWorldTick, endsAtWorldTick, reason
+}
+model Player {
+  id, gameWorldId, personId, careerStatus, primaryPositionCode,
+  currentEmploymentClubId, currentSportingClubId, currentSquadId,
+  professionalDebutAtWorldTick, retiredAtWorldTick, version
+  // Constraint: unique(gameWorldId, personId)
+  // currentEmploymentClubId (contrato/origem) ≠ currentSportingClubId (autorizado a atuar); em empréstimo divergem
+}
+model PlayerAbilityProfile { // snapshot versionado usado pelo motor
+  playerId, schemaVersion, technicalProfile Json, mentalProfile Json, physicalProfile Json,
+  goalkeepingProfile Json, profileHash, effectiveFromWorldTick, effectiveUntilWorldTick, version
+}
+// PlayerHiddenProfile: potencial, consistência, ambição, tendência a lesão, traços privados —
+// acesso restrito ao motor/processos autorizados, nunca diretamente ao usuário.
+model PlayerCareerPeriod { // passagem por clube
+  playerId, clubId, movementType, employmentContractId, loanAgreementId,
+  startsAtWorldTick, endsAtWorldTick, status, exitReason, version
+}
+```
+
+#### 6.3.5 Elenco, contrato e registro (entidades diferentes) — §67–74
+
+- **Elenco:** `Squad`, `SquadSeason`, `SquadMembership`, `SquadRoleAssignment`, `SquadLeadershipAssignment`, `SquadGroup`, `SquadGroupMembership`, `SquadAvailabilitySnapshot`. `SquadMembership` (`squadId`, `playerId`, `status`, `role`, `startsAt/endsAtWorldTick`, `shirtNumber`, `version`) representa presença operacional — **não** substitui contrato, registro, empréstimo ou propriedade.
+- **Contrato:** `PlayerContract`, `PlayerContractTerm`, `PlayerContractSalaryPeriod`, `PlayerContractBonus`, `PlayerContractClause`, `PlayerContractOption`, `PlayerContractTrigger`, `PlayerContractPromise`, `PlayerContractAmendment`, `PlayerContractTermination`.
+- **Negociação:** `ContractNegotiation`, `ContractNegotiationParty`, `ContractProposal`, `ContractProposalTerm`, `ContractNegotiationMessage`, `ContractNegotiationDeadline` — proposta aceita permanece registrada e ligada ao contrato resultante.
+- **Registro competitivo (independente do contrato):** `CompetitionRegistration`, `CompetitionRegistrationPlayer`, `CompetitionRegistrationChange`, `PlayerEligibilityDecision`, `PlayerRegistrationRestriction`, `ShirtNumberAssignment`.
+
+```prisma
+model PlayerContract {
+  id, gameWorldId, playerId, clubId, status, contractType, signedAtWorldTick,
+  startsAtWorldTick, endsAtWorldTick, baseCurrencyId, currentSalaryPeriodId, negotiationId, version
+  // Constraint central: nenhum jogador com dois contratos principais de emprego incompatíveis e sobrepostos
+}
+model PlayerContractSalaryPeriod { contractId, amountMinor, paymentFrequency, startsAtWorldTick, endsAtWorldTick, reason }
+model PlayerContractBonus { contractId, bonusTypeCode, amountMinor, triggerDefinition Json, maximumOccurrences, status }
+```
+
+#### 6.3.6 Funcionários, treino, táticas e medicina — §75–87
+
+- **Funcionários:** `StaffMember`, `StaffCareerProfile`, `StaffCompetency`, `StaffSpecialty`, `StaffQualification`, `StaffLicense`, `StaffLanguage`, `StaffCareerPeriod`, `StaffContract`, `StaffContractTerm`, `StaffPositionAssignment`, `StaffResponsibilityAssignment`, `StaffWorkloadSnapshot`, `StaffPerformanceReview`, `StaffAbsence`, `StaffDevelopmentPlan`, `StaffSuccessionPlan`. `StaffMember` (`personId`, `careerStatus`, `primaryFunctionCode`, `currentClubId`, `currentPositionAssignmentId`, `reputationProfile`, `availableFromWorldTick`, `version`) — `unique(gameWorldId, personId)`; Player+StaffMember na mesma pessoa só em períodos regulamentarmente permitidos. `StaffCompetency` em linhas com `competencyCode` de catálogo (cresce sem migration de colunas). **Posição (cargo institucional) ≠ Responsabilidade (ação/domínio executável).**
+- **Treino:** `TrainingPlan`, `TrainingCycle`, `TrainingSession`, `TrainingSessionGroup`, `TrainingSessionParticipant`, `TrainingSessionExercise`, `TrainingAttendance`, `TrainingLoad`, `PlayerTrainingAssignment`, `PlayerDevelopmentPlan`, `PlayerDevelopmentObservation`, `TrainingFacilityBooking`, `TrainingIncident`. Desenvolvimento real (`PlayerDevelopmentEvent`, `PlayerDevelopmentSnapshot`) é registro **diferente** da recomendação (`PlayerDevelopmentObservation`).
+- **Táticas (versionadas):** `TacticalSystem`, `TacticalSystemVersion`, `TacticalFormation`, `TacticalRoleAssignment`, `TacticalInstruction`, `TacticalInstructionSet`, `TacticalPhasePlan`, `SetPiecePlan`, `SetPieceAssignment`, `OpponentPlan`, `MatchTacticalPlan`, `TacticalFamiliarity`. Alterar tática cria nova `TacticalSystemVersion`.
+- **Medicina:** `MedicalCase`, `MedicalAssessment`, `MedicalDiagnosis`, `MedicalExam`, `InjuryCase`, `InjuryEvent`, `TreatmentPlan`, `TreatmentSession`, `RehabilitationPlan`, `RehabilitationMilestone`, `MedicalRestriction`, `TrainingRestriction`, `MatchRestriction`, `ReturnToPlayProcess`, `MedicalClearance`, `MedicalCost`, `MedicalResponsibility`. `InjuryCase` (`playerId`, `status`, `injuryTypeCode`, `severity`, `occurredAtWorldTick`, `estimatedRecoveryMin/MaxTick`, `confirmedRecoveryTick`, `sourceMatchId`, `sourceTrainingSessionId`, `confidentialityLevel`, `version`) — diagnóstico real separado de estimativa, comunicação pública, relatório à comissão e conhecimento de outro clube.
+
+#### 6.3.7 Competições, calendário e partida — §88–102
+
+- **Competição (definição permanente × edição da temporada):** `CompetitionDefinition`, `CompetitionDefinitionVersion`, `CompetitionEdition`, `CompetitionStage`, `CompetitionGroup`, `CompetitionRound`, `CompetitionParticipant`, `CompetitionRuleSet`, `CompetitionRuleSetVersion`, `CompetitionRuleValue`, `CompetitionPrizeRule`, `CompetitionQualificationRule`, `CompetitionRelegationRule`, `CompetitionRegistrationRule`, `CompetitionDisciplinaryRule`. Estrutura de fases é **relacional** (`StageParticipant`, `GroupParticipant`), não JSON monolítico. `CompetitionParticipant`: `unique(competitionEditionId, clubId)`.
+- **Calendário e jogos (Fixture = compromisso programado; Match = execução concreta):** `Fixture`, `FixtureConstraint`, `FixtureVenueAssignment`, `FixtureScheduleChange`, `Match`, `MatchTeam`, `MatchOfficialResult`, `MatchHomologation`, `MatchReplayLink`, `MatchAdministrativeDecision`.
+- **Partida:** `Match`, `MatchTeam`, `MatchLineup`, `MatchLineupSlot`, `MatchBenchEntry`, `MatchTacticalPlan`, `MatchRuntime`, `MatchCommand`, `MatchEvent`, `MatchCheckpoint`, `MatchTeamStatistic`, `MatchPlayerStatistic`, `MatchOfficialResult`, `MatchConsequence`, `MatchReview`. Runtime (`MatchRuntime`, `MatchRuntimeLease`, `MatchRuntimeSnapshot`) separado do registro oficial/estatísticas/homologação.
+- **Classificação:** `CompetitionStanding`, `CompetitionStandingEntry`, `CompetitionStandingSnapshot`, `CompetitionStandingAdjustment`, `CompetitionTiebreakResult` — punições não entram silenciosamente nos pontos; existe `CompetitionStandingAdjustment`.
+- **Homologação:** `CompetitionHomologation`, `CompetitionFinalStanding`, `CompetitiveMovement`, `CompetitiveAppeal`, `CompetitionAdministrativeDecision`.
+
+```prisma
+model MatchTeam {
+  matchId, clubId, side, scoreOfficial, scoreOnField, lineupId, tacticalPlanId, version
+  // Constraints: unique(matchId, clubId); unique(matchId, side)
+}
+model MatchEvent {
+  matchId, sequence, simulationTime, kind, clubId, playerId, secondaryPlayerId,
+  payload, engineVersion, status, createdAt
+  // Constraint: unique(matchId, sequence)
+}
+model MatchCommand { // idempotente
+  commandId, matchId, clubId, origin, type, status, expectedMatchVersion,
+  submittedAtReal, receivedAtReal, effectiveSimulationTime, payload, resultPayload, version
+  // Constraint: unique(commandId)
+}
+// Estatísticas separadas e versionadas: MatchPlayerStatistic, MatchTeamStatistic, MatchStatisticCorrection
+```
+
+#### 6.3.8 Mercado, transferências e empréstimos — §103–109
+
+- **Observação/mercado:** `ScoutingMission`, `ScoutingAssignment`, `ScoutingObservation`, `ScoutingReport`, `ScoutingReportEstimate`, `ScoutingReportEvidence`, `ScoutingRecommendation`, `ClubPlayerKnowledge`, `ClubPlayerKnowledgeSnapshot`, `Watchlist`, `WatchlistEntry`, `RecruitmentNeed`, `RecruitmentCandidate`, `RecruitmentShortlist`, `MarketAvailability`, `PlayerMarketInterest`, `AgentRelationship`. `ClubPlayerKnowledge` é **projeção consolidada** (de relatórios, partidas, relações, público, negociações, histórico) — não sobrescreve relatórios.
+- **Transferência (processo, não troca de `clubId`):** `TransferCase`, `TransferCaseParty`, `TransferInquiry`, `TransferOffer`, `TransferOfferVersion`, `TransferOfferTerm`, `TransferCounterOffer`, `TransferAgreement`, `TransferAgreementTerm`, `TransferPaymentSchedule`, `TransferInstallment`, `TransferBonus`, `TransferSellOnClause`, `TransferBuyBackClause`, `TransferMatchingRight`, `TransferMedicalProcess`, `TransferRegistrationProcess`, `TransferCompletion`, `TransferCancellation`.
+- **Empréstimos (preservam contrato/clube de origem):** `PlayerLoanAgreement`, `PlayerLoanSalaryShare`, `PlayerLoanUsagePromise`, `PlayerLoanPurchaseClause`, `PlayerLoanRecallClause`, `PlayerLoanRestriction`, `PlayerLoanReturn`.
+
+```prisma
+model TransferCase { // processo inteiro
+  playerId, buyingClubId, sellingClubId, status, transferType, openedAtWorldTick,
+  currentOfferId, agreementId, deadlineAtWorldTick, version
+}
+model TransferOfferVersion { // contraproposta não sobrescreve a anterior
+  transferOfferId, versionNumber, proposedByClubId, fixedAmountMinor, termsPayload,
+  submittedAtWorldTick, expiresAtWorldTick, status
+}
+model ScoutingReport {
+  clubId, playerId, scoutId, missionId, status, confidence, observedFrom/UntilWorldTick,
+  overallEstimate, potentialEstimate, attributeEstimates Json, recommendation, expiresAtWorldTick, version
+}
+```
+
+#### 6.3.9 Finanças (partidas dobradas) — §110–118
+
+Razão de partidas dobradas: `FinancialAccount`, `FinancialAccountGroup`, `FinancialJournalEntry`, `FinancialJournalLine`, `FinancialTransactionReference`, `FinancialAccountBalanceSnapshot`, `FinancialPeriod`, `FinancialPeriodClose`, `Budget`, `BudgetScenario`, `BudgetLine`, `BudgetAllocation`, `BudgetRevision`, `FinancialReservation`, `Receivable`, `ReceivableInstallment`, `Payable`, `PayableInstallment`, `Payment`, `PaymentAllocation`, `ClubDebt`, `DebtInstallment`, `CreditFacility`, `FinancialForecast`, `FinancialRiskAssessment`.
+
+- **Saldo derivado do razão**; `FinancialAccountBalanceSnapshot` é cache recalculável/versionado/conciliado — sem campo de saldo editável isolado. Lançamento passa por `DRAFT → POSTING → POSTED → REVERSED`; só `POSTED` afeta saldo. Lançamento publicado não é editado — reversão cria novo `FinancialJournalEntry` com `reversalOfJournalEntryId`.
+- **Orçamento ≠ caixa** (autorização/planejamento). `FinancialReservation` (`clubId`, `budgetLineId`, `purposeType/Id`, `amountMinor`, `status`, `expiresAtWorldTick`, `consumedAmountMinor`, `releasedAmountMinor`, `version`) — constraint `consumido + liberado <= reservado`.
+
+```prisma
+model FinancialAccount { clubId, accountCode, accountType, normalSide, currencyId, status, parentAccountId, version }
+// FinancialJournalEntry = transação lógica; FinancialJournalLine = débitos/créditos
+// Constraint: soma dos débitos = soma dos créditos por journalEntry e moeda
+model FinancialJournalLine {
+  journalEntryId, lineNumber, financialAccountId, direction, amountMinor, currencyId,
+  clubId, costCenterCode, referenceType, referenceId
+  // Constraints: amountMinor > 0; unique(journalEntryId, lineNumber)
+}
+```
+
+#### 6.3.10 Infraestrutura, comercial, torcida e comunicação — §119–127
+
+- **Infraestrutura (Facility = ativo físico; FacilityModule = parte funcional):** `FacilitySite`, `Facility`, `FacilityModule`, `FacilityCapability`, `FacilityCapabilitySnapshot`, `FacilityEquipment`, `Pitch`, `Stadium`, `StadiumSector`, `FacilityAccessAgreement`, `FacilityBooking`, `InfrastructureProject`(+`Phase`/`Milestone`/`Dependency`/`Estimate`), `Contractor`, `ConstructionAgreement`, `ConstructionChangeOrder`, `MaintenancePlan`, `MaintenanceWorkOrder`, `FacilityInspection`, `ComplianceCertificate`, `FacilityIncident`, `TemporaryFacilityPlan`. Capacidade em `FacilityCapability`/`Snapshot`, não em "nível do centro".
+- **Comercial:** `CommercialAsset`, `CommercialAssetInventory`, `Sponsor`, `SponsorContact`, `SponsorshipOpportunity`, `SponsorshipProposal`, `SponsorshipAgreement`, `SponsorshipRight`, `SponsorshipObligation`, `SponsorshipActivation`, `SponsorshipDelivery`, `CommercialCampaign`, `MerchandiseProduct`/`Inventory`/`Sale`, `TicketProduct`, `TicketPricePolicy`, `MatchTicketAllocation`, `HospitalityProduct`, `NamingRightsAgreement`, `SupplierAgreement`. Ativos explícitos (frente/manga do uniforme, placa, naming rights, camarote, conteúdo, treino, base, digital); constraint: mesmo ativo não pode ter dois direitos exclusivos sobrepostos.
+- **Torcida:** `SupporterPopulation`, `SupporterSegment`(+`Snapshot`), `SupporterSentimentSnapshot`, `SupporterExpectation`, `SupporterMemory`, `SupporterGroup`(+`Relationship`), `SupporterCampaign`, `SupporterProtest`, `SupporterMembershipProgram`, `SupporterMembership`, `AttendanceDemandSnapshot`.
+- **Comunicação e mídia:** `MediaOutlet`, `MediaPerson`, `MediaPublication`(+`Correction`), `MediaNarrative`(+`Entity`), `PressConference`, `PressQuestion`, `PressResponse`, `ClubCommunication`(+`Approval`), `PublicPromise`, `PublicStatement`, `Rumor`(+`Source`/`Resolution`), `SocialConversation`, `SocialMessage`, `SocialChannel`. Promessas por domínio (`PlayerPromise`, `StaffPromise`, `BoardPromise`, `PublicPromise`) com relações tipadas — sem tabela genérica que elimine relações.
+
+#### 6.3.11 História, notificação, automação, entrada, admin e eventing — §128–140
+
+- **História:** `HistoricalEvent`(+`Subject`), `HistoricalTimeline`, `SeasonHistoryBook`, `HistoricalHonor`, `HistoricalStatistic`(+`Correction`), `RecordDefinition`, `RecordOccurrence`, `RecordHolder`, `HistoricalEra`, `HistoricalRivalry`, `HistoricalCorrection`, `ClubHistoricalIdentityPeriod`, `PlayerCareerMilestone`, `StaffCareerMilestone`, `HistoricMatchClassification`. `HistoricalEvent` pode usar referência polimórfica controlada (`subjectType`/`subjectId`) por ser projeção transversal. Recorde: definição separada da ocorrência.
+- **Notificações (Task 1 → N Notification):** `Notification`, `NotificationThread`(+`Entry`), `ActionableTask`, `TaskDependency`, `TaskAssignment`, `Reminder`, `NotificationPreferenceProfile`, `NotificationCategoryPreference`, `NotificationChannelPreference`, `NotificationDelivery`, `NotificationDigest`, `ReturnExperience`.
+- **Automações (versionadas):** `AutomationRule`(+`Version`), `AutomationTrigger`, `AutomationCondition`, `AutomationAction`, `AutomationLimit`, `AutomationExecution`(+`Action`), `AutomationApproval`, `AutomationConflict`, `AutomationSimulation`, `TaskDelegation`, `DelegationAuthority`. Execução referencia sempre `automationRuleVersionId`.
+- **Entrada de usuários (processo):** `WorldEntryProcess`, `WorldEntryEligibilityCheck`, `WorldEntryQueue`(+`Item`), `WorldEntryClubOffer`, `ClubEntryReservation`, `ClubTakeoverReview`, `ClubExpansionProject`(+`Study`), `ExpansionClubConfiguration`, `InitialSquadGeneration`, `InitialSquadPlayerAllocation`, `ClubEntryBenefit`, `ClubOnboardingProgress`(+`Step`), `ClubInitialReview`.
+- **Administração/operações:** `AdminOperator`, `AdminRole`, `AdminPermission`, `AdminRolePermission`, `AdminOperatorRole`, `AdminTemporaryAccess`, `AdminSession`, `AdminConflictDeclaration`, `BreakGlassAccess`, `AdministrativeOperation`, `AdministrativeApproval`, `AdministrativeCorrection`, `OperationalIncident`(+`TimelineEvent`/`CorrectiveAction`), `AdministrativeJob`, `Backup`, `RestoreOperation`, `MaintenanceWindow`, `Deployment`, `DatabaseMigration`, `FeatureFlag`, `SupportTicket`(+`Message`), `SupportAccessSession`, `AuditEvent` (sem cascade delete; cadeia de hash de integridade).
+- **Eventing:** `DomainEvent`, `OutboxEvent`, `InboxEvent`, `ScheduledTask`(+`Attempt`), `ProcessManager`(+`Step`), `Lease`, `ProjectionState`, `ProjectionRebuild`, `DeadLetterMessage`, `IdempotencyRecord`, `CommandExecution`.
+
+```prisma
+model CommandExecution {
+  commandId, idempotencyKey, actorId, gameWorldId, commandType, status,
+  aggregateId, resultPayload, errorCode, createdAt, completedAt
+  // Constraints: unique(commandId); unique(actorId, idempotencyKey)
+}
+model DomainEvent {
+  eventId, gameWorldId, aggregateType, aggregateId, aggregateVersion, worldSequence,
+  eventType, schemaVersion, correlationId, causationId, actorType, actorId,
+  payload, occurredAtReal, occurredAtWorldTick
+  // Constraints: unique(gameWorldId, eventId);
+  //   unique(gameWorldId, aggregateType, aggregateId, aggregateVersion);
+  //   unique(gameWorldId, worldSequence)
+}
+// Outbox: unique(eventId) · Inbox: unique(consumerName, eventId)
+```
+
+### 6.4 Constraints, integridade e infraestrutura de dados — §141–250
+
+Pontos estruturais do bloco (detalhamento em [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md)):
+
+- **Relações explícitas obrigatórias** (jogador↔contrato/clube, partida↔clubes, inscrição↔competição, lançamento↔conta, transferência↔jogador, tarefa↔responsável). **Referências genéricas** só para auditoria, notificação, histórico, arquivo, telemetria, event log, comentários administrativos — nunca para propriedade, dinheiro, elegibilidade ou resultado.
+- **Constraints estruturais obrigatórias no banco** (~30 invariantes): 1 usuário por e-mail normalizado; 1 participação por usuário/mundo; 1 controle ativo por clube; 1 clube ativo por participante/mundo; 1 identidade oficial ativa por clube; 1 temporada por número/mundo; 1 relógio ativo por mundo; 1 Person por perfil de jogador/funcionário; 1 contrato principal incompatível ativo por jogador; 1 inscrição por jogador/clube/edição; 1 lado por clube/partida e 2 lados distintos; sequência única por evento de partida/mundo; versão por agregado; 1 processamento por `commandId`; 1 consumo por consumidor/evento; débitos = créditos; quantias positivas; percentuais na escala; datas finais ≥ iniciais; 1 direito comercial exclusivo por período/ativo; 1 runtime ativo por partida.
+- **Constraints condicionais** via índice único parcial (ex.: `CREATE UNIQUE INDEX ... ON game.club_control (game_world_id, club_id) WHERE status = 'ACTIVE'`), CHECK, EXCLUDE (`EXCLUDE USING gist` para períodos sobrepostos de controle/contrato/identidade/direito comercial/reserva/cargo), triggers restritos, tabelas de estado atual.
+- **Índices seguem consultas reais** (nunca por intuição): padrões `(gameWorldId, id/status/clubId/playerId/seasonId/deadlineWorldTick)`, mais índices de partida/financeiros/mercado/notificação; B-tree + GIN (texto/JSON) + trigram (nomes) + BRIN (séries temporais). Índices redundantes são revisados.
+- **Particionamento não prematuro** — chave principal `gameWorldId`; candidatas: `DomainEvent`, `MatchEvent`, `AuditEvent`, `NotificationDelivery`, `HistoricalStatistic`. Estratégias: HASH(gameWorldId), RANGE(seasonId/occurredAtReal). Particionar exige chave de partição nas PK/unique.
+- **Read models:** views (saldos, classificações, contratos/elenco/controle atuais, prazos), materialized views (rankings, resumos sazonais — não fonte de verdade), e projeções persistidas (`ClubDashboardProjection`, `CompetitionStandingProjection`, etc.) com `projectionVersion`/`lastProcessedEventId`/`rebuildStatus`, reconstruíveis.
+- **Transações/locks:** cada command define agregado principal; ordem de locks documentada (`GameWorld → Club → Person/Player → Contract → TransferCase → FinancialReservation → FinancialAccount → Competition → Match`). Idempotência protegida por constraints (`commandId`, `idempotencyKey`, `sourceEventId`); gerações têm seed persistida (`GenerationProcess`/`GenerationItem`, `unique(gameWorldId, generationType, subjectId, generationVersion)`).
+- **Migrações:** Prisma + SQL nativo complementares; `db push` fora de produção; migrações destrutivas em **expand-contract** (EXPAND → BACKFILL → DUAL WRITE → VALIDATE → SWITCH READ → STOP OLD WRITE → CONTRACT); backfills retomáveis; enums alterados conscientemente (valores não removidos casualmente). Seeds em 3 categorias (estrutural idempotente por código, desenvolvimento, testes).
+- **Domínio isolado do Prisma:** `PrismaClient`/`Prisma.Decimal`/tipos gerados só na infraestrutura; conversão para objetos de valor de domínio (`BigInt → Money`, `String enum → DomainState`, `Json → ValidatedProfile`, `DateTime → RealInstant`, `BigInt worldTick → WorldInstant`).
+- **Catálogo de invariantes** (`IntegrityInvariant`: `code`, `domain`, `enforcementLayer`, `severity`, `repairPolicy`, `monitoringQuery`) com níveis de proteção `APPLICATION_ONLY` / `DOMAIN_AND_APPLICATION` / `DATABASE_CONSTRAINT` / `DATABASE_AND_DOMAIN` / `CONTINUOUS_RECONCILIATION`. Exemplos: `PLAYER_ONE_ACTIVE_PRIMARY_CONTRACT`, `CLUB_ONE_ACTIVE_CONTROL`, `MATCH_TWO_DISTINCT_SIDES`, `FINANCIAL_ENTRY_BALANCED`, `WORLD_ONE_ACTIVE_CLOCK`, `PLAYER_REGISTRATION_UNIQUE`, `TRANSFER_PAYMENT_NOT_DUPLICATED`, `AUTOMATION_EXECUTION_IDEMPOTENT`.
+
+> **Pendência (reconciliação):** todas as entidades, enums e constraints da seção 6 são a iteração granular do Bloco 26. Formalizar FKs/índices Prisma explícitos, definir os catálogos vs. enums finais e decidir a nomenclatura convergente com o schema canônico (seções 1–5) é decisão de modelagem pendente. Os catálogos base (`CatalogDefinition`/`CatalogEntry`/`CatalogEntryTranslation`/`CatalogEntryVersion`) e `RuleSet`/`RuleValue` ainda não têm relações Prisma explícitas neste bloco.
