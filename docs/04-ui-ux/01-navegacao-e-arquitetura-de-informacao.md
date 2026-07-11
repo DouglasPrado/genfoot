@@ -246,6 +246,9 @@ Todas as telas do app, com ID e documento de detalhe. IDs `M-*`.
 | `M-MEMBERSHIP` | Sócio-torcedor |
 | `M-PRODUCTS` | Produtos / merchandising |
 | `M-CLAUSES` | Cláusulas e obrigações condicionais |
+| `M-ROUND` | Rodada e relógio do mundo *(2ª passada)* |
+| `M-FRIENDLIES` | Amistosos / gestão de pré-temporada *(2ª passada)* |
+| `M-TUTORIAL` | Tutorial / tour guiado *(2ª passada)* |
 
 ## 5. Sitemap completo — admin
 

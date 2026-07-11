@@ -174,3 +174,60 @@ Campos/ações que faltavam nas telas dos docs 03–12 (adicionar ao respectivo 
 - **`M-CONVO`/`M-FANS`:** **despedida de ídolo** como fluxo conduzido (reduz desgaste da torcida) [`11 §7`].
 
 > **Nota de manutenção:** estes adendos podem ser dobrados nos specs originais (docs 05–11) numa próxima revisão; aqui ficam consolidados para rastreabilidade da auditoria. As **telas novas** da seção A já entram no sitemap ([doc 01](01-navegacao-e-arquitetura-de-informacao.md)).
+
+---
+
+## C. Telas novas — 2ª passada da auditoria
+
+A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lacuna estrutural: **o modelo de rodada assíncrona não tinha superfície persistente** (relógio do mundo, prazo de bloqueio da escalação, simulação em lote), além da pré-temporada como palco de gestão. Estas 3 telas fecham isso.
+
+### `M-ROUND` — Rodada e relógio do mundo
+- **Objetivo:** situar o usuário no tempo do mundo assíncrono — que dia/hora é no mundo, em que estado está a rodada e quando é a próxima simulação. Núcleo do modelo "gerenciar entre rodadas".
+- **Como se chega:** faixa de status na `M-HOME`; componente `WorldClock` no `Header` (toque); `M-CALENDAR`.
+- **Layout:** relógio/data do mundo no topo → estado da rodada → cronômetros → progresso da temporada.
+- **Componentes e dados:** **relógio do mundo** (`currentDate`, fuso do mundo, `speed`); **estado da rodada** (`RoundStatus`: aberta / **bloqueada** (após o *lock* da escalação) / simulando (lote) / publicada); **contagem regressiva até o lock** da escalação (ex.: 19h59) — distinta do início do jogo (20h); **próxima simulação**; **progresso da temporada** (ex.: "dia 12 de 45", tempo real restante). Reaproveita `worldSequence`.
+- **Ações:** abrir escalação/tática antes do lock (`M-LINEUP`/`M-TACTICS`); ver calendário (`M-CALENDAR`).
+- **Estados:** **rodada bloqueada** (comandos de escalação recusados — `MATCH_COMMAND_WINDOW_CLOSED`) sinalizada proativamente **antes** do bloqueio; mundo em manutenção/`WORLD_READ_ONLY`; relógio local do aparelho não altera prazos (servidor é a verdade).
+- **Tempo real/notificações:** aviso proativo "escalação fecha em X"; "rodada simulada".
+- **Referências:** [`03-multiplayer-e-mundos §1, §4, §5`](../02-tecnico/03-multiplayer-e-mundos.md); [doc 08](../02-tecnico/08-frontend-cliente-e-tempo-real.md); [design system §5, §7, §9](00-visao-geral-e-design-system.md). > **A incorporar em doc 00 §9:** componentes `WorldClock` e `RoundStatus` como *chrome* persistente do `Header`.
+
+### `M-FRIENDLIES` — Amistosos / gestão de pré-temporada
+- **Objetivo:** montar a pré-temporada — agendar amistosos e turnês para testar tática/jovens sem punição.
+- **Como se chega:** `M-CALENDAR` (fase pré-temporada); `M-NEXTMATCH`; briefing de temporada.
+- **Componentes e dados:** agenda de amistosos; escolha de adversários; datas/turnê; mando/receita/viagem; objetivo do amistoso (testar tática/jovens/condição). Caráter de **baixo risco** (sem punição de moral/torcida). Alimenta `M-PREMATCH` (flag "importância: amistoso").
+- **Ações:** agendar amistoso; escolher adversário; definir objetivo; cancelar.
+- **Estados:** só na fase pré-temporada/janela; > **Pendência:** a mecânica de *arranjo* do amistoso (aceite do adversário, oferta) é pendência da fonte — a superfície existe, os parâmetros a definir.
+- **Referências:** [`06-temporada §1, §2`](../01-game-design/06-temporada-e-competicoes.md); [`05-motor §10`](../01-game-design/05-motor-de-partida.md).
+
+### `M-TUTORIAL` — Tutorial / tour guiado de primeira vez
+- **Objetivo:** ensinar o loop incomum "gerenciar, não jogar", o ciclo de rodadas assíncronas e a delegação à IA — reduzindo barreira de retenção.
+- **Como se chega:** após `M-ONBOARD-REVIEW` (primeira sessão); reabrível em `M-SETTINGS`.
+- **Componentes e dados:** *coach-marks* sobre Home/Central/rodada/automações; tour opcional e pulável; checklist de primeiros passos (integra `M-ONBOARD-REVIEW`).
+- **Ações:** avançar/pular; refazer o tour; concluir.
+- **Estados:** progresso salvo; não bloqueia o uso.
+- **Referências:** [design system §1](00-visao-geral-e-design-system.md); [`09-anti-abuso §2`](../01-game-design/09-anti-abuso-e-onboarding.md) (onboarding).
+
+## D. Adendos — 2ª passada
+
+### Mundo, sessão e rodada
+- **`Header` / design system §9:** componente `WorldClock` (data/fuso do mundo) sempre visível e `RoundStatus` (estado da rodada) [`03-mp §1, §4`].
+- **`M-HOME`:** faixa de status com **cronômetro da próxima simulação** e progresso da temporada; **banner de manutenção agendada** ("mundo entra em manutenção às 20h") e **recepção de comunicados do operador** (categoria de notificação "comunicado do mundo") [`03-mp §1`; `04-plataforma §11`; design system §5].
+- **`M-NOTIFS` / design system §5:** categoria **"comunicado do mundo"** (broadcast do admin) e aviso proativo de manutenção com contagem regressiva.
+- **`M-CONTROL-ACTIVATE` / `M-CLUB-PREVIEW`:** ao entrar em **temporada avançada**, situar na rodada assíncrona ("assume na rodada 15 de 38; próxima simulação em 2 dias; janela de escalação fecha em X; a IA já tem escalação-fallback") [`03-mp §2`].
+- **`M-SETTINGS` / `M-ACCOUNT`:** *toggle* de **privacidade de presença** (mostrar/ocultar online e visto-por-último); tratamento de **sessão concorrente** em múltiplos dispositivos ("sessão iniciada em outro aparelho") [`03-mp §3`; design system §5].
+- **`M-WORLD-STRUCTURE` / `M-FEED`:** evento de **transição de liga por nível estrutural** (Liga Inicial→Acesso→Intermediária→Principal→Elite) e **criação/renumeração dinâmica de divisões** quando entram mais usuários [`03-mp §7`]. > **Pendência:** limiares de expansão e interação dos dois eixos (fonte em aberto).
+
+### Temporada, competição e seleções
+- **`M-WORLD-STRUCTURE` / `M-BOARD`:** **teto da divisão** (folha, overall médio, estrangeiros, reputação, estrutura) vs. o clube, e estado **"acima do teto → obrigado a subir"** [`06 §13.1`].
+- **`M-LICENSING`:** aba/seção **"Licença competitiva"** separada do estádio — checklist por padrão mínimo (segurança, financeiro, elenco, médica, base, atrasos, conformidade), **plano de adequação com prazo/marcos**, escada de sanção (plano→restrições→multas→impedimento/rebaixamento administrativo), e estado **"venceu no campo mas acesso/rebaixamento pendente de licença"** ecoado em `M-COMPETITION`/`M-SEASON-CLOSE` [`06 §15.1, §14.1`].
+- **`M-CALENDAR` / `M-CLAUSES` / `M-SQUAD`:** **marcos contratuais** na timeline (expiração, gatilho por desempenho, janela de opção — cada vínculo vira no seu marco) e roll-up "situação contratual do elenco" [`06 §14.5`].
+- **`M-HOME` (fase pré-temporada) / `MF-04`:** superfície do **briefing de nova temporada** (`SeasonOpeningContext`: expectativas do clube/torcida, situação financeira, jogadores-chave, necessidades de mercado, promoções da base, riscos) na entrada da temporada, não só no fim do wizard [`06 §11, §13.2`].
+- **`M-BOARD`:** sinalizar **objetivos calibrados por estágio** do clube (novo revela jovens/reduz idade; médio briga por acesso; grande ganha título) [`06 §13.2`].
+- **`M-NATIONAL`:** **fluxo de dispensa por recomendação médica** com estados (solicitada → em avaliação → reconhecida/negada → arbitragem clube×seleção), origem em `M-MEDICAL-CASE`; **grade prospectiva de rotação por datas FIFA** (quem está fora em cada janela + **projeção de prontidão no retorno** — viagem/clima/minutos), espelhada em `M-CALENDAR` [`12 §3, §5`].
+- **`M-AWARDS` / `M-PLAYER`:** roll-up **"prêmios do meu elenco"** e **efeito psicológico** do prêmio no jogador (confiança↑ + pressão↑) no bloco de estados [`06 §7, §14.3`].
+- **`M-PLAYER`:** **elegibilidade de seleção** (por qual seleção pode ser convocado; dupla nacionalidade/naturalização) [`12 §1`]. > **Pendência:** estrutura de dados de nacionalidade (fonte em aberto).
+
+### Mercado (residual)
+- **`M-PLAYER` / `M-NEGOTIATION`:** micro-bloco **"valor percebido vs. valor de tabela"** com os drivers nomeados (jovem, artilheiro, convocado, contrato longo, clube não precisa vender) [`07 §3.3`].
+
+> **Hall da fama / cerimônias** ([`13-relatorios §6.4`](../01-game-design/13-relatorios-notificacoes-e-memoria.md)) permanece **pendência da fonte** — o acervo de dados já está em `M-HISTORY`; a cerimônia como evento aguarda decisão do GDD, não é lacuna de UI.
