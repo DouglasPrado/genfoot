@@ -1,16 +1,16 @@
 # Frontend, Cliente e Tempo Real
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/ux-do-jogo.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/ux-do-jogo.md, decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
 
-Este documento consolida as decisões de **frontend**, **cliente**, **PWA/mobile**, **API** e **tempo real** do **Grinta** (manager de futebol online, jogadores únicos, mundo persistente) que até então estavam registradas apenas no chat de UX e não haviam sido documentadas oficialmente.
+Este documento consolida as decisões de **frontend**, **clientes**, **estratégia mobile**, **API** e **tempo real** do **Grinta** (manager de futebol online, jogadores únicos, mundo persistente) que até então estavam registradas apenas no chat de UX e não haviam sido documentadas oficialmente.
 
-O princípio que atravessa todas as seções é único: **o servidor é autoritativo e o cliente é não-autoritativo**. O cliente renderiza, navega, sincroniza e oferece experiência offline limitada, mas nunca executa regras oficiais do jogo. A camada de tempo real acelera a percepção do estado, porém a API oficial permanece a única fonte de verdade.
+A partir de **2026-07-11** o Grinta tem **dois clientes**: o **app do jogador** (mobile, Android+iOS, em **Expo / React Native**) e o **admin do mundo** (web, em **Next.js**). O princípio que atravessa todas as seções vale para **ambos** e é único: **o servidor é autoritativo e o cliente é não-autoritativo**. Cada cliente renderiza, navega, sincroniza e oferece experiência offline limitada, mas nunca executa regras oficiais do jogo. A camada de tempo real acelera a percepção do estado, porém a API oficial permanece a única fonte de verdade. Justamente por isso a arquitetura de backend nunca dependeu de recursos exclusivos da web — a decisão de mobile nativo abaixo apenas exerce essa garantia já prevista. O **desenho de telas e fluxos** de ambos os clientes vive na área [`../04-ui-ux/`](../04-ui-ux/); aqui ficam os **contratos** que essas telas consomem.
 
 ## Sumário
 
 - [Stack de frontend](#stack-de-frontend)
 - [Gestão de estado no cliente](#gestao-de-estado-no-cliente)
-- [PWA e estratégia mobile](#pwa-e-estrategia-mobile)
+- [Estratégia mobile e clientes](#estrategia-mobile-e-clientes)
 - [API e contratos](#api-e-contratos)
 - [Tempo real (realtime-gateway)](#tempo-real-realtime-gateway)
 - [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)
@@ -23,21 +23,25 @@ O princípio que atravessa todas as seções é único: **o servidor é autorita
 
 ## Stack de frontend
 
-O frontend do Grinta é uma aplicação web (processo `web`) responsável por interface, PWA, navegação, renderização, cache local, sincronização, experiência offline limitada, comunicação com a API e comunicação WebSocket. Ele **não** simula partidas, não valida negociações, não calcula finanças oficiais, não resolve prazos, não gera resultados e não aplica regras competitivas — tudo isso é responsabilidade do backend.
+O Grinta tem **dois clientes**, cada um responsável por interface, navegação, renderização, cache local, sincronização, experiência offline limitada, comunicação com a API e comunicação WebSocket. Nenhum deles simula partidas, valida negociações, calcula finanças oficiais, resolve prazos, gera resultados ou aplica regras competitivas — tudo isso é responsabilidade do backend.
 
-A stack inicial é:
+| Cliente | Stack | Papel |
+| --- | --- | --- |
+| **App do jogador** (mobile, Android+iOS) | **Expo / React Native** (TypeScript) | Cliente principal do jogador: elenco, escalação, partida, mercado, competições |
+| **Admin do mundo** (web) | **Next.js** (App Router) + **React** | Painel de operação do mundo (RBAC, correções, moderação, equilíbrio) |
+
+As demais camadas são **compartilhadas** entre os dois clientes:
 
 | Camada | Tecnologia | Papel |
 | --- | --- | --- |
-| Framework/app | **Next.js** + **React** | Interface, roteamento, renderização |
 | Estado do servidor | **TanStack Query** | Cache e sincronização de dados vindos da API |
 | Estado de interface | **Zustand** | Apenas estado local de UI |
 | Tempo real | **Socket.IO Client** | Conexão WebSocket com o `realtime-gateway` |
-| Cache offline | **IndexedDB** | Persistência para leitura offline limitada |
+| Cache offline | **IndexedDB** (admin web) / **Expo SQLite · MMKV · AsyncStorage** (app mobile) | Persistência para leitura offline limitada |
 
-O repositório é um monorepo (**pnpm** + **Turborepo** + **TypeScript**), com o app web em `/apps/web` e pacotes compartilhados em `/packages` (incluindo `/packages/ui` e `/packages/contracts`).
+O repositório é um monorepo (**pnpm** + **Turborepo** + **TypeScript**), com o app mobile em `/apps/mobile` (Expo), o admin em `/apps/admin` (Next.js) e pacotes compartilhados em `/packages` (incluindo `/packages/contracts` e o design system). O detalhe do desenho de telas de cada cliente está na área [`../04-ui-ux/`](../04-ui-ux/).
 
-> **Regra fechada:** o frontend não importa domínio de servidor e não acessa o banco diretamente. Ele consome exclusivamente a API oficial e o WebSocket.
+> **Regra fechada:** **nenhum** dos clientes importa domínio de servidor ou acessa o banco diretamente. Ambos consomem exclusivamente a **API oficial `/api/v1`** e o **WebSocket** — os contratos deste documento (command/query/evento, versionamento, idempotência) valem igualmente para o app mobile e para o admin.
 
 ---
 
@@ -47,7 +51,7 @@ O estado no cliente é separado em três categorias, cada uma com um responsáve
 
 - **Estado do servidor** — gerenciado pelo **TanStack Query**. São os dados oficiais consultados na API (clube, elenco, mercado, tabela, etc.). O cliente os trata como *cache* do estado oficial, sujeito a revalidação.
 - **Estado de interface** — gerenciado localmente ou por **Zustand**. É estado efêmero de UI: navegação, modais, seleções, preferências transitórias de tela.
-- **Estado offline** — persistido em **IndexedDB**. Suporta a leitura offline limitada da PWA.
+- **Estado offline** — persistido em **IndexedDB** (admin web) ou **Expo SQLite/MMKV/AsyncStorage** (app mobile). Suporta a leitura offline limitada de cada cliente.
 
 > **Regra fechada:** dados oficiais do clube **não** serão mantidos como fonte definitiva em stores globais do cliente. O cliente é **não-autoritativo**: o servidor é autoritativo e o cliente não executa regras oficiais.
 
@@ -55,27 +59,30 @@ Consequência prática dessa regra: mesmo que a interface mostre um valor desatu
 
 ---
 
-## PWA e estratégia mobile
+## Estratégia mobile e clientes
 
-O **mobile é tratado como prioridade de interface** (mobile-first). O frontend nasce como aplicação web responsiva e a **primeira versão é uma PWA (aplicação web progressiva)**.
+O **mobile é tratado como prioridade de interface** (mobile-first) e o **cliente principal do jogador é um app nativo em Expo / React Native** (Android+iOS). O **admin do mundo** é uma aplicação web em Next.js. O desenho das telas de cada um está em [`../04-ui-ux/`](../04-ui-ux/).
 
-A PWA deverá suportar:
+### Decisão de mobile nativo (2026-07-11)
 
-- **Instalação** (adicionar à tela inicial).
-- **Ícone** próprio.
-- **Tela inicial** (splash).
-- **Cache do shell** da aplicação.
-- **Leitura offline limitada** (apoiada no IndexedDB).
-- **Push** quando suportado pela plataforma.
-- **Atualização controlada** do app instalado.
+> **Decisão (2026-07-11):** o app do jogador é um **aplicativo nativo em Expo / React Native**, distribuído na **App Store (iOS)** e **Google Play (Android)** via **EAS Build/Submit**, com atualização OTA via **EAS Update**. Esta decisão **resolve** a antiga pendência da "tecnologia do app nativo futuro".
 
-### Aplicativo nativo futuro
+**Evolução registrada.** A primeira formulação deste documento previa que a versão inicial do mobile seria uma **PWA (aplicação web progressiva)** sobre o app web responsivo, deixando o app nativo como pendência sem stack definida. Com a decisão de 2026-07-11, **o mobile deixa de ser PWA e passa a ser um app nativo Expo**; a PWA **não** é mais o caminho do cliente do jogador. Essa mudança não altera nenhum contrato de backend: a decisão apenas exerce a garantia (registrada logo abaixo) de que a arquitetura não depende de recursos exclusivos da web. A web permanece na stack apenas para o **admin** (Next.js).
 
-Um aplicativo nativo poderá ser criado posteriormente **utilizando a mesma API e os mesmos contratos** do Grinta.
+O app nativo cobre, por meios nativos, as mesmas capacidades que se esperava da PWA:
 
-> **Regra fechada:** a arquitetura de backend **não dependerá de recursos exclusivos da web**. Isso garante que um cliente nativo futuro reaproveite integralmente commands, respostas, eventos e contratos já definidos.
+- **Instalação** e presença na tela inicial (loja + ícone próprio).
+- **Tela inicial** (splash) nativa.
+- **Cache do shell** e da navegação.
+- **Leitura offline limitada** (apoiada em Expo SQLite/MMKV/AsyncStorage).
+- **Push nativo** (APNs/FCM via Expo Notifications), espelhando as notificações estratégicas.
+- **Atualização controlada** (releases nas lojas + OTA via EAS Update).
 
-> **Pendência:** a tecnologia do aplicativo nativo futuro não está definida. O chat de origem não menciona nenhuma stack nativa específica; a escolha (framework, distribuição, ferramentas) fica em aberto para decisão futura.
+### Reuso integral da API e dos contratos
+
+Tanto o app mobile quanto o admin **utilizam a mesma API e os mesmos contratos** do Grinta.
+
+> **Regra fechada:** a arquitetura de backend **não depende de recursos exclusivos da web**. Foi essa garantia que já previa o cliente nativo — por isso o app Expo reaproveita **integralmente** commands, respostas, eventos e contratos definidos aqui, sem qualquer mudança de backend.
 
 ---
 
@@ -366,7 +373,7 @@ Para evitar que a profundidade vire barreira, a tela oferece dois modos:
 
 > A lógica de simulação, os pontos de decisão e o papel da comissão como filtro de qualidade estão em [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md). Esta seção cobre apenas a **apresentação** no cliente.
 
-> **Pendência:** esta é a única tela com especificação de layout nas fontes. O desenho tela a tela do restante do jogo (elenco, mercado, finanças, competições, etc.) ainda precisa ser especificado.
+> **Nota:** nas fontes deste documento esta era a única tela com especificação de layout. O **desenho tela a tela** do restante do jogo (elenco, mercado, finanças, competições, etc.), tanto no app do jogador quanto no admin, é agora responsabilidade da área [`../04-ui-ux/`](../04-ui-ux/) — este documento mantém apenas os contratos que essas telas consomem.
 
 ---
 
@@ -374,11 +381,10 @@ Para evitar que a profundidade vire barreira, a tela oferece dois modos:
 
 Relativos a frontend, cliente e tempo real, o bloco é considerado correto quando:
 
-- O frontend utilizar **Next.js**.
-- O frontend **separar estado local e estado do servidor**.
-- A aplicação for **mobile-first**.
-- A primeira versão for **PWA**.
-- Um **aplicativo nativo futuro** puder reutilizar a API.
+- O **app do jogador** for um app nativo em **Expo / React Native** (Android+iOS) e o **admin** for **Next.js** (decisão 2026-07-11).
+- Cada cliente **separar estado local e estado do servidor**.
+- O app do jogador for **mobile-first**.
+- O **app nativo** (e qualquer outro cliente) reutilizar **integralmente** a API e os contratos.
 - **Commands** utilizarem a **API oficial**.
 - **WebSocket** for utilizado para eventos em tempo real.
 - **WebSocket não** ser fonte de verdade.
@@ -396,12 +402,13 @@ Relativos a frontend, cliente e tempo real, o bloco é considerado correto quand
 
 ## Pendências consolidadas
 
-> **Pendência:** tecnologia do aplicativo nativo futuro não definida (o chat não cita nenhuma stack nativa específica).
+> **Resolvido (2026-07-11):** a tecnologia do app nativo do jogador — antes em aberto — foi decidida como **Expo / React Native** (Android+iOS), com o **admin** em Next.js. Ver [Estratégia mobile e clientes](#estrategia-mobile-e-clientes) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/). Não há pendências abertas de stack de cliente.
 
 ---
 
 ## Documentos relacionados
 
+- **UI/UX — desenho de telas e fluxos dos dois clientes** (app mobile e admin): [`../04-ui-ux/`](../04-ui-ux/) e a decisão de stack em [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md)
 - Arquitetura geral (processos, topologia, monorepo): [`./00-arquitetura-geral.md`](./00-arquitetura-geral.md)
 - Arquitetura de dados, transações e outbox: [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md)
 - Plataforma, segurança e operações: [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md)

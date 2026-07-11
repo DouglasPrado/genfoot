@@ -1,6 +1,6 @@
 # Arquitetura Geral (Stack e Topologia)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md, chats/ux-do-jogo.md (Bloco 25) · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md, chats/ux-do-jogo.md (Bloco 25), decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
 
 Este documento define a arquitetura de referência do **Grinta**, um manager de futebol online com jogadores únicos e mundo persistente (herdeiro conceitual do Brasfoot, mas com identidade própria por atleta). Ele consolida as decisões de topologia, estrutura de repositório, stack tecnológica e princípios transversais que orientam toda a construção técnica do jogo.
 
@@ -43,7 +43,8 @@ O repositório é um **monorepo** organizado em aplicações (`apps/`) e pacotes
 grinta/
 ├── apps/
 │   ├── api/        # Camada HTTP/WebSocket, autenticação, orquestração de casos de uso
-│   ├── web/        # Painel do jogador (Next.js): elenco, escalação, partida, mercado, competições
+│   ├── mobile/     # App do jogador (Expo/React Native): elenco, escalação, partida, mercado, competições — Android+iOS
+│   ├── web/        # Admin do mundo (Next.js): operação, RBAC, correções, moderação, equilíbrio
 │   ├── worker/     # Processamento assíncrono (simulações, partidas, jobs pesados)
 │   └── scheduler/  # Disparo de tarefas agendadas (avanço de dias/temporadas, eventos futuros)
 │
@@ -58,9 +59,14 @@ grinta/
 | App | Responsabilidade |
 | --- | --- |
 | `api` | Expõe a interface HTTP e WebSocket, cuida de autenticação e orquestra os casos de uso sobre o domínio. |
-| `web` | Frontend em Next.js com as telas do jogador (elenco, escalação, central da partida, mercado, classificação, finanças). |
+| `mobile` | **App do jogador** em Expo/React Native (Android+iOS) com as telas do jogo (elenco, escalação, central da partida, mercado, classificação, finanças). Cliente não-autoritativo: consome só a API oficial e o WebSocket. Distribuído nas lojas via EAS, não roda como contêiner de servidor. |
+| `web` | **Admin do mundo** em Next.js: painel de operação (RBAC, saúde econômica/demográfica, correções, moderação/anti-abuso, testes de equilíbrio). Cliente não-autoritativo, também consumindo só a API oficial e o WebSocket. |
 | `worker` | Executa trabalho pesado e assíncrono via filas: simulação de partidas, temporadas longas e processamento de eventos. |
 | `scheduler` | Agenda e dispara tarefas temporais do mundo (avanço do relógio do jogo, rodadas, eventos programados). |
+
+> **Decisão (2026-07-11):** a stack de interface foi fixada em **app do jogador = Expo/React Native (mobile)** e **admin do mundo = Next.js (web)**. Antes, o `web` (Next.js) era o painel do jogador (PWA); ver a evolução e os contratos em [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/).
+
+> **Pendência:** as fontes de arquitetura descreviam o monorepo apenas com o app `web`; o encaixe exato do app Expo no monorepo (nome/caminho — aqui assumido `apps/mobile` conforme [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md) —, pacotes de UI por plataforma como `ui`/`ui-native`, e configuração de EAS/OTA) precisa ser ratificado na modelagem final junto com a granularidade de pacotes da pendência da seção 2.
 
 ### Pacotes (`packages/`)
 
@@ -80,8 +86,9 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 
 | Camada | Tecnologia | Observação |
 | --- | --- | --- |
-| Linguagem | TypeScript / Node.js LTS | Base única para domínio, API, workers e web. Modo `strict` obrigatório (ver seção 4 do estilo de código). |
-| Frontend | **Next.js 15** | Painel do jogador. |
+| Linguagem | TypeScript / Node.js LTS | Base única para domínio, API, workers, app mobile e admin. Modo `strict` obrigatório (ver seção 4 do estilo de código). |
+| App do jogador (mobile) | **Expo / React Native** | Cliente principal do jogador, Android+iOS (decisão 2026-07-11). Distribuído via EAS. |
+| Admin do mundo (web) | **Next.js 15** | Painel de operação do mundo. |
 | Banco de dados | **PostgreSQL** | Estado persistente do mundo e fonte única de verdade. |
 | ORM / Persistência | **Prisma** | Camada `packages/database`. |
 | Mensageria | **RabbitMQ** | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna (ver `./01-arquitetura-de-dados.md`). |
@@ -231,11 +238,11 @@ O monorepo reflete essa divisão com pacotes de plataforma (`domain`, `applicati
 
 ## 7. Topologia de processos executáveis
 
-Todos os processos compartilham o mesmo código-base e pacotes, mas rodam como contêineres separados. A implantação inicial possui sete processos de aplicação:
+Todos os **processos de servidor** compartilham o mesmo código-base e pacotes, mas rodam como contêineres separados. A implantação inicial possui sete processos de aplicação. O **app do jogador (Expo/React Native)** **não** é um desses processos: é um cliente nativo distribuído pelas lojas (App Store/Google Play via EAS), fora da topologia de contêineres — comunica-se apenas com `api` e `realtime-gateway`.
 
 | Processo | Responsabilidade |
 | --- | --- |
-| `web` | Interface/PWA, navegação, cache local, sincronização e comunicação com API/WebSocket. Não executa regras oficiais. |
+| `web` | **Admin do mundo** (Next.js): navegação, cache local, sincronização e comunicação com API/WebSocket para a operação do mundo. Não executa regras oficiais. |
 | `api` | Autenticação, commands síncronos, queries, validação, autorização, transações e criação de eventos. |
 | `realtime-gateway` | Conexões WebSocket, salas (usuário/clube/mundo/partida), presença, entrega em tempo real e recuperação de sequência. **Não é fonte de verdade.** |
 | `world-scheduler` | Relógios dos mundos, processamentos diários, disparo de partidas, prazos, expirações e tarefas agendadas. |

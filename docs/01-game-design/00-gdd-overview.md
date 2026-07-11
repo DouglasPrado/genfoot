@@ -31,6 +31,7 @@ Este documento é o mapa raiz do Game Design de **Grinta**, um manager de futebo
 - [22. Fim de Temporada](#22-fim-de-temporada)
 - [23. Notificações](#23-notificações)
 - [24. Arquitetura Lógica do Core](#24-arquitetura-lógica-do-core)
+- [25. Regras Transversais de Consistência](#25-regras-transversais-de-consistência)
 - [Estrutura Final em Blocos](#estrutura-final-em-blocos)
 - [Mapa de Documentos Irmãos](#mapa-de-documentos-irmãos)
 
@@ -254,6 +255,37 @@ Temporada inicia → Campeonatos montados → Clubes treinam e contratam
 O core é desenhado como um **simulador de ecossistema** baseado em Entidades → Componentes → Efeitos → Eventos, com memória — detalhado em [`../02-tecnico/07-arquitetura-do-core-ecs.md`](../02-tecnico/07-arquitetura-do-core-ecs.md). O modelo de dados canônico e as regras/fórmulas executáveis vivem em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md) e [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 > **Pendência:** fórmulas iniciais e regras de balanceamento numérico ainda dependem de calibração (ver pendências nos docs técnicos).
+
+## 25. Regras Transversais de Consistência
+
+Alguns princípios não pertencem a um único sistema: eles **atravessam todos os módulos** do Grinta e garantem que mercado, partida, finanças, estrutura, torcida e desenvolvimento formem um organismo coerente — e não minijogos isolados sem consequência nos demais módulos. Valem igualmente para usuários e para a IA; a diferença está na **qualidade das decisões**, não na permissão de ignorar orçamento, contrato ou regulamento.
+
+**Fonte única por assunto.** Cada informação tem um sistema responsável (um dono), e os demais apenas o consultam ou o representam — nunca o redefinem. O **contrato** é a fonte do vínculo contratual; a **inscrição** é a fonte da elegibilidade competitiva; o **sistema médico** é a fonte das restrições de saúde; o **razão financeiro** é a fonte dos valores contábeis; a **competição** é a fonte da classificação oficial; a **notificação** apenas representa o assunto, jamais o define.
+
+**Separação de conceitos.** Doze distinções são obrigatórias e nunca podem ser confundidas:
+
+- Clube ≠ controlador (o clube persiste mesmo quando muda quem o gere).
+- Pessoa ≠ carreira.
+- Contrato ≠ inscrição (ter vínculo não é o mesmo que estar elegível para uma competição).
+- Elenco ≠ propriedade esportiva.
+- Caixa ≠ orçamento (dinheiro disponível não é o mesmo que dinheiro planejado).
+- Resultado em campo ≠ resultado oficial (a celebração é imediata, mas o registro depende de homologação).
+- Fato ≠ narrativa.
+- Notificação ≠ tarefa.
+- Recomendação ≠ decisão.
+- Estrutura ≠ funcionário.
+- Potencial ≠ desenvolvimento realizado.
+- Informação real ≠ conhecimento do clube (o que existe no mundo não é o mesmo que o clube sabe sobre isso).
+
+**Não duplicação.** O jogo impede a repetição indevida de pagamentos, transferências, premiações, títulos, aposentadorias, geração de jogadores, partidas, contratos e ações automáticas — cada evento acontece uma única vez.
+
+**Informação incompleta nunca vira zero.** Quando um dado é desconhecido, o jogo indica **incerteza**; jamais substitui o desconhecido por zero, por certeza falsa ou por valor inventado. Dado desconhecido é sinalizado como estimativa/faixa, não como número exato.
+
+**Consequências proporcionais.** Decisões não geram bônus ou punições desconectadas: toda consequência deriva de **contexto, intensidade, duração, repetição, reputação, capacidade do clube e regras oficiais**.
+
+Completam esses princípios outras regras transversais do escopo, na mesma direção: **continuidade histórica** — nenhuma troca de temporada, controlador, nome ou divisão apaga dívida, lesão, contrato, suspensão, promessa, obra, relação, reputação ou histórico; **correções transparentes** — toda correção relevante preserva estado anterior, motivo, data, autoridade e efeitos recalculados; **sem vantagem oculta** — nenhum bônus secreto por ser usuário novo, estar offline ou ser clube controlado pela IA, pois a entrada tardia recebe viabilidade, não equiparação artificial; e **escopo integral** — os sistemas são interdependentes.
+
+→ ver detalhe em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md) e [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md)
 
 ## Estrutura Final em Blocos
 
