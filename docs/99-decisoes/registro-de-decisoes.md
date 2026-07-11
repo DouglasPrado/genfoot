@@ -221,3 +221,122 @@ Consolidando a Seção 24 de [`chats/documento-definitivo-escopo.md`](../../chat
 - **Seleções de base, competições continentais e gestão de seleções por usuários** — expansões.
 - **Mudança de cidade, camisa aposentada, naming rights e exploração comercial detalhada do estádio** — expansões.
 - **IA generativa** — limitada à redação de narrativas baseadas em fatos já definidos; **nunca participa do resultado competitivo**.
+
+---
+
+## 6. Série R — Resolução de pendências (2026-07-11)
+
+Esta série registra as decisões e recomendações produzidas na **passada de resolução das 243 pendências** da documentação (rastreada em [`../BACKLOG-PENDENCIAS.md`](../BACKLOG-PENDENCIAS.md)). Diferente das séries `18xx–19xx`/`19.x` — que apenas **preservam** decisões já tomadas nas fontes —, a Série R **introduz** decisões novas, tomadas na consolidação. Por isso, cada entrada carrega um **estado explícito**:
+
+- **RATIFICADA** — decidida pelo dono do produto (Douglas) nesta consolidação.
+- **RECOMENDADA (a ratificar)** — proposta minha, com racional e valor sugerido, aguardando martelo do dono. Enquanto não ratificada, é a direção de trabalho, não a verdade final.
+
+Protocolo desta passada (autonomia escolhida: *"só reconciliação; resto vira recomendação"*):
+- **Reconciliação, consistência, extração e conteúdo** → resolvidos direto na fonte (removem o marcador `> **Pendência:**`).
+- **Decisão de produto/design** e **valor de balanceamento** → o marcador `> **Pendência:**` é reescrito como `> **Recomendação (a ratificar — [R-##](#6-série-r--resolução-de-pendências-2026-07-11)):**` com valor proposto; a decisão entra aqui como RECOMENDADA.
+
+### R-01 — Papel do usuário: **Gestor + Técnico** · RATIFICADA
+
+O usuário é **gestor do clube e também comanda a parte técnica** (tática, escalação, decisões ao vivo), no espírito Brasfoot/FM. A comissão técnica **assessora** (qualidade da comissão = qualidade das sugestões); a **IA cobre o período offline** com limites de autoridade. Não há técnico-NPC contratável que retire do usuário o comando tático.
+- **Racional:** reconcilia com o corpus dominante — [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md) §"Usuário online vira técnico ativo" e todos os fluxos de UI ([`../04-ui-ux/02-mobile-fluxos.md`](../04-ui-ux/02-mobile-fluxos.md) MF-07) que já assumem o usuário definindo `M-LINEUP`/`M-TACTICS`/`M-GAMEPLAN`.
+- **Fecha:** a pendência "Papel do usuário" de [`05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md) §17.
+- **Consequência:** `CoachTrust` (confiança do elenco no técnico) refere-se ao usuário-como-técnico.
+
+### Sistema de jogadores (R-02..R-09) · RECOMENDADAS (a ratificar)
+
+Fonte: reconciliação de [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md). Escala canônica de atributos fixada em **0–100** (reconciliação: única faixa usada no corpus).
+
+- **R-02 — Compatibilidade jogador-clube** (`playerCompatibility`, multiplicador 0–1: estilo .25 / função .20 / personalidade .15 / metodologia .15 / pressão .10 / relação c/ técnico .10 / cultura .05) entrando em `developmentGain`.
+- **R-03 — Clima de vestiário** (`LockerRoomClimate` 0–100 = .30 moral + .20 CoachTrust + .15 liderança + .15 satisfação contratual + .10 minutos + .10 estabilidade − penalidades até −40).
+- **R-04 — Bandas de incerteza do `ScoutReport`** (olheiro ruim ±10/conf≤40; bom ±3/conf≥80; estreitamento ~30%/ciclo).
+- **R-05 — Retorno de empréstimo** (`LoanSpell`: score = minutos% × qualidadeFormação; melhor≥.60 / igual .30–.60 / pior <.30).
+- **R-06 — `CareerEvent` + decaimento** (meias-vidas: curto ~3d, médio ~3sem, longo ~1 temporada, histórico não decai).
+- **R-07 — Química/entrosamento** (`PlayerChemistry`: aresta até ±8 setorial, cresce ~2/temporada juntos).
+- **R-08 — Empresário** (`Agent`: gatilho quando `aggressiveness + commissionDrive − boardRelationship > 120`; `influenceOverPlayer` 0–100).
+- **R-09 — Pesos de `overall` por posição** (média ponderada do grid canônico por posição).
+
+### Estrutura do clube e staff (R-10..R-14) · RECOMENDADAS (a ratificar)
+
+Fonte: reconciliação de [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md). Modelo unificado numa só decisão (R-10).
+
+- **R-10 — Modelo canônico único de estrutura:** escala única **1–5**; **6 núcleos** = camada oficial de modelagem, áreas = subdivisões; infra física (estádio/CT/academia) **fora da escala de nível** (granular + projetos de 9 etapas); funcionários modelados individualmente, "multiplicador" = eficiência emergente. Novo núcleo *Mental e disciplinar*.
+- **R-11 — Fórmula única de nível geral:** externa **60/20/10/10** (estrutura interna / desempenho / finanças / reputação-torcida); pesos internos entre núcleos **22/18/12/18/18/12**.
+- **R-12 — Curva de aproveitamento por nível de núcleo:** 1→40%, 2→55%, 3→70%, 4→85%, 5→95%.
+- **R-13 — Capacidade operacional do CT por nível 1–5** (campos/sessões/categorias; conflito de agenda por prioridade do usuário, sem bloquear).
+- **R-14 — Teto de contratação por nível geral:** 1→E/D, 2→D/C, 3→C/B, 4→B/A, 5→A/S.
+
+### Motor de partida — fórmulas F1–F21 (R-15..R-24) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md) §2.4. Coeficientes de **1ª passada**; calibração final via lote de ~10.000 partidas.
+
+- **R-15** escala/clamp do atributo efetivo (F1) · **R-16** fadiga→penalidade `pMax·(f/100)^2.5` + riskMult (F2) · **R-17** pesos de moral + momentum `ρ=0.9` (F3,F14) · **R-18** tático→`TeamTacticalState` + deltas de ação (F4,F20) · **R-19** normalizações somatório→prob/taxa: duelo, softmax, Poisson, tiers (F5–F9) · **R-20** qualidade de finalização + **chance de gol F11** `p=pMin+(pMax−pMin)·σ(k·(raw−50))`, `k=0.042, pMin=0.005, pMax=0.98` (reproduz o exemplo 33→≈33%) · **R-21** faltas/cartões + matriz de lesão (F12,F13) · **R-22** nota/decisionScore/offline/leitura da comissão (F16–F19) · **R-23** pesos do `staffLevel` (F21) · **R-24** versionamento `GameFormula.version`↔`rulesetVersion`.
+
+### Contratos de command (R-25..R-29) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../02-tecnico/10-catalogo-de-commands.md`](../02-tecnico/10-catalogo-de-commands.md). Limites de antiabuso/balanceamento.
+
+- **R-25** TTL da reserva de vaga (`ReserveClubSlot`, ~30 min + 1 renovação).
+- **R-26** faixa plausível de oferta ([40%,250%] do valor de mercado) + cooldown de `LeaveClub`.
+- **R-27** limites de preço de ingresso ([25%,400%] do preço de referência).
+- **R-28** janela de renovação antecipada + teto de missões de scouting simultâneas.
+- **R-29** janela ao vivo: máx. substituições (5), duração da janela de `DECISION_POINT`, rate-limit de `IssueMatchCommand`.
+
+### Schema de dados (R-30..R-31) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md).
+
+- **R-30 — Versão de ruleset:** `GameWorldRuleSetVersion.publishedFormulaVersion Int` espelhando `GameFormula.version` (rastreabilidade fórmula↔ruleset sem join).
+- **R-31 — Quiet hours:** model `NotificationQuietHoursWindow` (janelas 0–N por perfil, relógio real do dispositivo, `CRITICAL` fura o silêncio).
+
+### Motor de partida — design (R-32..R-34) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md).
+
+- **R-32 — Ações de "cera":** sem comando dedicado; gestão de tempo emerge da postura de fim de jogo + timing de substituições (um botão dedicado viraria tática dominante).
+- **R-33 — Curva de adaptação a mudanças táticas:** 0–2 min desorganização / 3–6 encaixe / 7+ efeito completo; encurta com inteligência tática, entrosamento e comunicação da comissão.
+- **R-34 — Suíte de calibração:** ~10.000 partidas/cenário com critérios de aceite (distribuição de placar realista, consistência entre ligas, ausência de bola de neve). Fonte de calibração de F1–F21.
+
+### Economia — coeficientes e alvos (R-41..R-49) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../01-game-design/03-economia.md`](../01-game-design/03-economia.md). Calibração final via lote de simulações econômicas.
+
+- **R-41** fórmulas conceituais §5 (valor de mercado `C·(overall/100)^3.5·fatorIdade`, público, receita, patrocínio) · **R-42** `financialHealth` (pesos 0.22/0.20/0.18/0.12/0.10/0.08/0.05/0.05, histerese ±3) · **R-43** **caixa inicial `500000000` (R$ 5.000.000, amountMinor)** + elenco 1.500 pts / 23 jog / média ≈65 + identidade 100 pts · **R-44** pirâmide de geração 25/25/30/15/5, posição, qualidade 60/25/10/4/1 · **R-45** estágios de crise ↔ faixas de `financialHealth` · **R-46** índices de inflação por categoria (bandas) · **R-47** custo de scouting × precisão · **R-48** limiares do exame médico · **R-49** "fórmula do universo" = vetor de indicadores com alvo+banda.
+
+### Onboarding, mundo e anti-abuso (R-50..R-57) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md), [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md).
+
+- **R-50** critérios de "clube disponível" p/ assumir (IA ≥1 temporada, não preparado por conta relacionada, estado consistente) · **R-51** caixa inicial **fixo e idêntico** — *valor unificado em **R-43** (R$ 5.000.000); a antiga referência de R$ 1.000.000 fica superada* · **R-52** entrada em temporada em andamento nunca reescreve a tabela · **R-53** anti-captura de clubes fortes (cooldown ~1 temporada, reserva TTL, auditoria) · **R-54** Programa de Clube Novo (3 temporadas, decaimento linear) · **R-55 — Decisão 3 = C** (liga nova / em andamento / temática) + regras mínimas das temáticas · **R-56** arquivamento de mundo (≥2 temporadas ociosas, aviso 30 dias, read-only reversível) · **R-57** elenco inicial 23 jogadores / 25–32 anos / 1.500 pts.
+
+### Temporada, competições e seleções (R-58..R-67) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md), [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md).
+
+- **R-58** duração das fases da temporada · **R-59** `reputationWeight`/`financialWeight` por campeonato · **R-60** fórmula pós-temporada `Δ=[−4,+4]` · **R-61** prêmios objetivos vs `AwardScore` · **R-62** tetos por divisão · **R-63** limites de inscrição (squad 26, estrangeiros 5, cota 2 formados) · **R-64** curva de fadiga de convocação · **R-65** limiar de reputação p/ cargos de seleção (≥85) · **R-66** compensação por lesão em convocação · **R-67** dispensa por recomendação médica como estado.
+
+### Torcida, imprensa e relatórios (R-68..R-76) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../01-game-design/11-torcida-imprensa-e-narrativa.md`](../01-game-design/11-torcida-imprensa-e-narrativa.md), [`../01-game-design/13-relatorios-notificacoes-e-memoria.md`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).
+
+- **R-68** composição de segmentos de torcida (share × vocalidade) · **R-69** satisfação: faixas + velocidade assimétrica · **R-70** rivalidade: escala 0–100 + decay exponencial · **R-71** 8 posturas de comunicação (deltas + decaimento por repetição) · **R-72** rótulos de reputação (12 clube + 10 gestor, histerese) · **R-73** crescimento/esfriamento da torcida (±20%/temporada) · **R-74** rebranding (cooldown + custo + penalidade tradicionalista) · **R-75 — relatórios NÃO-PAGOS** (qualidade da comissão é o único diferenciador; fecha o conflito com monetização) · **R-76** detalhe/frequência/retenção de relatórios por comissão 1–5.
+
+### Plataforma, arquitetura e operação (R-77..R-88) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../02-tecnico/`](../02-tecnico/). Resolve **P0.2** (paradigma do core) e **P0.4** (stack).
+
+- **R-77 — Framework de API = NestJS + TypeScript** (Fastify como adapter HTTP; AdonisJS descartado).
+- **R-78 — Broker = Redis + BullMQ na fundação** → RabbitMQ/NATS na evolução; Outbox/Inbox independente do broker.
+- **R-79 — Busca = PostgreSQL FTS + trigram** no início → Meilisearch/OpenSearch na evolução.
+- **R-80 — Paradigma do core = ECS (Entity–Component–Effect–Event) como runtime + Prisma/Postgres como persistência** (event sourcing híbrido; core headless não depende de Prisma).
+- **R-81** gramática de `TargetSelector`/`Condition`/`Multiplier` + ordem determinística de efeitos (`set→add/subtract→multiply`, desempate por `effectId`).
+- **R-82** escalas internas base 10000 (percentuais em pontos-base; mudança só com versionamento).
+- **R-83** interação divisões×ligas (liga por nível estrutural = moldura; Séries por resultado dentro dela; histerese na troca).
+- **R-84** dimensionamento de mundo (nova Série a ~60% de vagas humanas + fila ≥20; conversão bot→humano; penalidade leve por não escalar, nunca no placar).
+- **R-85** identidade externa OIDC (Google/Apple; conta é fonte de verdade) + parâmetros de drenagem (drain 30s, partida 10min, tarefa 60s).
+- **R-86** painel de saúde do mundo (11 cards, drill-down) + governança de verificações (ajuste só sobre geração/regras futuras, via versão de ruleset).
+- **R-87** comunicação pós-correção (in-app antes→depois quando afeta estado percebido) + 6 níveis de papéis cumulativos com segregação de funções.
+- **R-88** metodologia dos testes de equilíbrio (≥1.000 mundos × ≥10 temporadas, seeds fixas, bandas de aceitação + gate de promoção).
+
+> **Reconciliação de caixa inicial:** R-43 é a fonte única do valor (**R$ 5.000.000 = `500000000` amountMinor**). R-51 e as referências textuais a "R$ 1.000.000" em `01-mundo` e `09-anti-abuso` ficam superadas — alinhamento textual pendente (ver BACKLOG P1).
+
+> Entradas R-89+ são acrescentadas conforme o loop alcança novas `[DECISÃO]`/`[TUNING]` remanescentes.

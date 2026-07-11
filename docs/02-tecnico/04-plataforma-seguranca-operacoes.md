@@ -23,7 +23,7 @@ A plataforma protege o mundo — disponibilidade, consistência, segurança e re
 11. [Deployment, manutenção e migrações](#11-deployment-manutenção-e-migrações)
 12. [Arquitetura técnica](#12-arquitetura-técnica)
 13. [Modelo de dados e integridade](#13-modelo-de-dados-e-integridade)
-14. [Pendências](#14-pendências)
+14. [Pendências resolvidas](#14-pendências-resolvidas)
 
 ---
 
@@ -104,7 +104,7 @@ A autenticação inicial é **própria da plataforma**, com possibilidade de pro
 
 A **autorização é sempre calculada no servidor** (nunca no cliente), combinando usuário, sessão, mundo, clube, função e autonomia. Isso decorre do princípio de que o servidor é autoritativo — ver [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) para o modelo de cliente não-autoritativo.
 
-> **Pendência:** provedores de identidade externos (login social/corporativo) são citados como possibilidade futura, sem decisão de qual(is) adotar.
+> **Recomendação (a ratificar — R-85):** provedores de identidade externos. Proposta: manter o **login próprio (Argon2id)** como base e adicionar, quando houver demanda, **OAuth/OIDC com Google e Apple** primeiro (cobrem a maioria do público mobile e o *Sign in with Apple* é exigência de loja quando há outro login social no app), com a plataforma como **fonte de verdade da conta** (o provedor externo apenas autentica; papéis, permissões e vínculo com clube/mundo continuam calculados no servidor). Provedores corporativos/SAML ficam fora de escopo até haver necessidade B2B. Racional: cobre o essencial de conveniência sem multiplicar integrações nem enfraquecer o modelo de autorização server-side. Compartilha **R-85** com os parâmetros de drenagem (§11).
 
 ---
 
@@ -338,7 +338,7 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
     - **Executores de partida antigos deixam de receber partidas novas e concluem as já iniciadas**; uma nova versão do executor recebe **apenas partidas novas** enquanto a versão anterior finaliza as em andamento.
     - Novas versões podem ser liberadas **progressivamente por mundos ou escopos controlados**; a reversão reutiliza artefatos anteriores, **sem recompilação**.
 
-> **Pendência:** a fonte não fixa parâmetros de drenagem — janela/timeout de drain das conexões de tempo real e prazo-limite para conclusão das partidas em andamento antes de forçar checkpoint/handoff. Definir na modelagem operacional.
+> **Recomendação (a ratificar — R-85):** parâmetros de drenagem na troca de versão (1ª passada). **Drain de conexões de tempo real** com janela de **30 s** (orienta reconexão e ressincronização; após o prazo, força reconexão do cliente, que solicita retrato de estado); **partidas em andamento** concluídas pelo executor antigo com **teto de 10 min** antes de forçar **checkpoint + handoff** ao novo executor (a partida não reinicia); **processos de execução** param de puxar novas tarefas imediatamente e têm **até 60 s** para concluir/devolver a tarefa ativa antes do checkpoint. Racional: janelas curtas para não travar o deploy, com teto de partida alto o suficiente para a maioria terminar naturalmente. Compartilha **R-85** com os provedores de identidade (§3). Calibrar por telemetria de duração real de partida/handoff.
 
 ### Manutenção
 
@@ -443,8 +443,8 @@ As convenções canônicas de modelagem — chaves (UUIDv7, escopo `(world_id, i
 
 ---
 
-## 14. Pendências
+## 14. Pendências resolvidas
 
-> **Pendência:** O roteiro do chat previa blocos posteriores que **não foram redigidos** nesta fonte — notadamente o **Plano de Implementação, MVP, Fases e Critérios de Entrega** (transformar a arquitetura em ordem prática de construção), além de um último bloco de fechamento. Esses conteúdos precisam ser produzidos e documentados separadamente.
+> **Resolvido (reconciliação):** o **Plano de Implementação / MVP / Fases / Critérios de Entrega** — ausente na fonte original — foi produzido e vive em [`./06-roadmap-de-implementacao.md`](./06-roadmap-de-implementacao.md); as fases de evolução da arquitetura estão em [`./00-arquitetura-geral.md`](./00-arquitetura-geral.md) (seção 10). Este documento cobre plataforma, segurança e operações e não reespecifica o roadmap.
 
-> **Pendência:** Apesar do nome do arquivo de origem (`ux-do-jogo.md`), **não existe em nenhum chat uma verdadeira especificação de UX/UI de telas** (fluxos, wireframes, componentes, estados de interface, navegação). Essa spec de UX/UI ainda **precisa ser criada** e não deve ser confundida com este documento, que trata de arquitetura de backend, segurança e operações.
+> **Resolvido (reconciliação):** a especificação de **UX/UI de telas** (fluxos, navegação, telas por área, estados de interface) — inexistente nas fontes originais — foi produzida e vive em [`../04-ui-ux/`](../04-ui-ux/) (visão geral, arquitetura de informação e telas mobile por área). Este documento trata de arquitetura de backend, segurança e operações e **não** é a spec de UX; os dois se complementam.

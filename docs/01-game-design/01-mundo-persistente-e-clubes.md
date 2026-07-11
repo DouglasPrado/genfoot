@@ -81,7 +81,7 @@ Um **mundo inteiro sem atividade** pode ser **arquivado administrativamente**. O
 
 O arquivamento **não é uma mecânica normal de jogo nem um reset competitivo** — é uma operação administrativa de manutenção do universo, distinta da continuidade automática descrita em [1.1](#11-o-mundo-continua).
 
-> **Pendência:** os critérios exatos de arquivamento de mundo inativo (gatilho de inatividade, prazo do aviso prévio e política de manutenção de mundo) ainda não estão fechados — def-escopo §25.4. Ver registro de decisões, [§4.1.4](../99-decisoes/registro-de-decisoes.md).
+> **Recomendação (a ratificar — [R-56](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** critérios de 1ª passada para o arquivamento de mundo inativo. **Gatilho:** mundo sem **nenhum** usuário ativo por **≥ 2 temporadas** consecutivas (ou abaixo de um piso mínimo de usuários ativos que inviabilize a competição), avaliado **entre temporadas**. **Aviso prévio:** **30 dias** aos usuários com vínculo remanescente antes do congelamento. **Política de manutenção:** o mundo entra em estado **read-only** — histórico, títulos e recordes preservados; nenhuma partida nova roda —, reversível por decisão administrativa. Racional: o arquivamento é operação de manutenção rara (não é reset competitivo, [1.1](#11-o-mundo-continua)); números conservadores evitam arquivar mundo ainda vivo e dão janela real de aviso. def-escopo §25.4; ver [registro de decisões](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11).
 
 ### 1.6 Histórico do mundo
 
@@ -143,7 +143,7 @@ Todo clube novo entra no mundo com o **mesmo caixa inicial**, garantindo que nin
 - Valor de referência citado nas fontes: **R$ 1.000.000**.
 - O importante é a **regra**, não o número exato: o caixa inicial é igual para todos.
 
-> **Pendência:** As fontes oscilam entre "caixa inicial fixo idêntico para todos" e "pequenas variações de caixa para gerar identidade" (ex.: um clube com caixa um pouco maior porém estrutura menor). Definir se o caixa é estritamente idêntico ou admite micro-variações compensadas por outros atributos. O valor de R$ 1.000.000 é referência, não fechado.
+> **Recomendação (a ratificar — [R-51](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** o caixa inicial é **estritamente idêntico para todos**, **sem micro-variações** de dinheiro — resolvendo a oscilação das fontes em favor da justiça de largada (regra `ECO-001`). A **identidade** entre clubes vem da distribuição de atributos (base, torcida, estrutura, elenco, finanças, disciplina), **nunca** do caixa (ver [3.2](#32-diferenças-de-identidade-não-de-poder)). Valor de referência **R$ 1.000.000**, a ratificar no [`Catálogo de Regras e Fórmulas`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Mesma decisão registrada em [`09-anti-abuso-e-onboarding.md §2.2`](./09-anti-abuso-e-onboarding.md#22-caixa-inicial-fixo). Racional: um caixa maior "compensado" por estrutura menor ainda é vantagem líquida de largada e abre brecha de mercado — micro-variações contradiriam `ECO-001` e o princípio "todos nascem pequenos".
 
 ### 3.2 Diferenças de identidade, não de poder
 
@@ -168,7 +168,7 @@ Essas variações podem se organizar em **perfis iniciais nomeados**, todos bala
 
 Os caminhos de crescimento associados a cada perfil (formador, comprador, competitivo, popular) são detalhados em [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md).
 
-> **Pendência:** Números do elenco inicial (quantidade exata de jogadores, faixa etária, teto de força total) aparecem como exemplos nas fontes e precisam ser fechados em documento próprio de elenco/jogadores.
+> **Recomendação (a ratificar — [R-57](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** fixar o elenco inicial em **23 jogadores**, faixa etária mais alta e equilibrada (predomínio **25–32 anos**, potencial limitado, contratos curtos), com **teto comum de força total = 1.500 pontos** distribuídos de formas diferentes entre goleiros, defesa, meio e ataque (identidade sem quebra de justiça, [3.2](#32-diferenças-de-identidade-não-de-poder)), e **100 pontos** de identidade institucional repartidos entre base, torcida, estrutura, elenco, finanças e disciplina. Racional: promove a números os exemplos já citados na fonte, mantendo "todos partem da mesma soma de força total"; a composição por posição/qualidade e a pirâmide etária do universo são calibradas em [`./03-economia.md §14.5`](./03-economia.md) e no `Catálogo de Regras` (`PLY-001`/`PLY-002`). O fechamento final fica no documento próprio de elenco/jogadores.
 
 ---
 

@@ -4,7 +4,15 @@
 
 No **Grinta**, o usuário não gerencia apenas uma escalação: ele constrói uma instituição de futebol ao longo do tempo. O nível real de um clube é resultado da soma entre estrutura física, funcionários, reputação, finanças, desempenho esportivo e capacidade de formar e contratar jogadores. Dois clubes podem ter o mesmo caixa e ainda assim evoluir de formas completamente diferentes, dependendo de onde investem.
 
-Este documento consolida a estrutura organizacional do clube (as ~10 áreas e seus níveis), o papel dos funcionários como multiplicadores de qualidade, as regras de crescimento controlado e manutenção, o modelo de "árvore de evolução" com estilos de clube, e o detalhamento da comissão técnica (cargos e atributos). As três seções finais reconciliam esse modelo com os documentos definitivos: o **modelo de 6 núcleos** (nível 1–5), a **infraestrutura granular** (que rejeita níveis genéricos) e a separação entre **cargo, responsabilidade e delegação** dos funcionários.
+Este documento consolida a estrutura organizacional do clube em um **modelo único**: seis **núcleos funcionais** são a camada oficial de modelagem, medidos numa **escala única 1–5**; as ~10 **áreas** são subdivisões qualitativas dentro desses núcleos; a **infraestrutura física** (estádio, CT, academia) sai da escala de nível e é modelada de forma **granular** (dimensões e projetos); e os **funcionários** são modelados individualmente, com o antigo "multiplicador de qualidade" reinterpretado como **eficiência emergente** do núcleo. As seções 11–13 aprofundam, respectivamente, os núcleos, a infraestrutura granular e a separação entre cargo, responsabilidade e delegação. A escolha desse modelo canônico está registrada como **Recomendação R-10 (a ratificar)**, porque afeta o schema Club.
+
+> **Recomendação (a ratificar — R-10):** adotar como **modelo canônico único de estrutura do clube**:
+> - **Escala única 1–5** em todo o sistema (núcleos, áreas, comissão em partida e [Motor de partida](./05-motor-de-partida.md)), aposentando a escala 1–10 das fontes antigas. A tabela de faixas é a do núcleo: 1 Básico · 2 Funcional · 3 Competitivo · 4 Avançado · 5 Elite.
+> - **Seis núcleos funcionais como camada oficial de modelagem** (nível, eficiência, moral, orçamento, especialização, adaptação). As **~10 áreas** passam a ser **subdivisões** com nível próprio 1–5; o nível do núcleo é a **agregação** dos níveis das suas áreas, e a **eficiência real** modula esse nível nominal por orçamento, sobrecarga, crise e adequação dos profissionais.
+> - **Infraestrutura física fora da escala de nível:** estádio, CT e academia são modelados por **dimensões granulares** (propriedade/acesso, condição, capacidades, conformidade) e por **projetos de 9 etapas** (seção 12). Onde o texto ainda fala em "nível" de infraestrutura, trata-se de **leitura derivada** da dimensão de serviço/operacional que alimenta os núcleos.
+> - **Funcionários modelados individualmente** (competências, autonomia, sobrecarga, contrato); o "multiplicador de qualidade" (seção 4) é o **efeito agregado emergente** dessas variáveis, não um parâmetro fixo por nível.
+>
+> **Racional:** é o recorte dos documentos definitivos (escopo → 6 núcleos 1–5; simulador → infraestrutura granular e funcionários que "não são apenas bônus percentuais") e o único que alinha com a escala 1–5 do Motor de partida. Elimina de uma só vez as três contradições estruturais do documento (escala, recorte, infraestrutura/multiplicador). **Impacto no schema Club:** define Núcleo (6) como raiz, Área como subdivisão, Infraestrutura como entidade separada e Funcionário como entidade individual — por isso aguarda ratificação no ADR.
 
 ## Sumário
 
@@ -26,65 +34,51 @@ Este documento consolida a estrutura organizacional do clube (as ~10 áreas e se
 
 ## 1. Nível geral do clube
 
-O clube não tem apenas um número único: ele tem **vários níveis internos**, um por área, além de um **nível geral** derivado do conjunto. Um clube pode, por exemplo, ter equipe médica nível 1, comunicação nível 5, diretoria nível 2 e base nível 3 ao mesmo tempo.
+O clube não tem apenas um número único: ele tem **vários níveis internos** — um por área, agregados em seis núcleos — além de um **nível geral** derivado do conjunto. Um clube pode, por exemplo, ter o núcleo físico e médico nível 1, o de comunicação e torcida nível 4, o de gestão nível 2 e o de mercado e base nível 3 ao mesmo tempo — e, dentro de cada núcleo, áreas em níveis distintos.
 
-O nível geral é calculado como uma composição de estrutura física, funcionários, reputação, finanças, desempenho esportivo, torcida e qualidade do elenco, com a estrutura tendo peso alto.
+O nível geral é calculado como uma composição da **estrutura interna** (a média ponderada dos seis núcleos) com **desempenho esportivo, finanças e reputação/torcida**, com a estrutura tendo peso alto.
 
-**Sugestão de pesos (fatores externos):**
-
-| Fator | Peso |
-| --- | --- |
-| Estrutura e funcionários | 40% |
-| Desempenho esportivo | 25% |
-| Finanças | 15% |
-| Reputação / torcida | 10% |
-| Qualidade do elenco | 10% |
-
-Uma segunda formulação, mais detalhada, propõe separar a média ponderada das **áreas estruturais** dos demais fatores externos:
-
-**Peso interno entre as áreas:**
-
-| Área | Peso |
-| --- | --- |
-| Diretoria | 15% |
-| Comissão técnica | 12% |
-| Base | 12% |
-| Centro de treinamento (CT) | 12% |
-| Equipe médica | 10% |
-| Preparação física | 10% |
-| Comunicação | 8% |
-| Olheiros | 8% |
-| Estádio | 8% |
-| Análise de desempenho | 5% |
-
-**Composição final:**
-
-| Componente | Peso |
-| --- | --- |
-| Estrutura interna | 60% |
-| Reputação esportiva | 20% |
-| Finanças | 10% |
-| Torcida | 10% |
+> **Recomendação (a ratificar — R-11):** adotar **uma única fórmula** de nível geral, substituindo as duas formulações das fontes (40/25/15/10/10 e 60/20/10/10). Proposta: **composição externa 60/20/10/10** com a estrutura interna calculada pela **média ponderada dos seis núcleos**.
+>
+> **Composição externa (final):**
+>
+> | Componente | Peso |
+> | --- | --- |
+> | Estrutura interna (núcleos) | 60% |
+> | Desempenho esportivo | 20% |
+> | Finanças | 10% |
+> | Reputação / torcida | 10% |
+>
+> **Peso interno entre os seis núcleos:**
+>
+> | Núcleo | Peso |
+> | --- | --- |
+> | 1. Técnico | 22% |
+> | 2. Físico e médico | 18% |
+> | 3. Mental e disciplinar | 12% |
+> | 4. Mercado e base | 18% |
+> | 5. Gestão e diretoria | 18% |
+> | 6. Comunicação e torcida | 12% |
+>
+> **Racional:** a formulação 60/20/10/10 separa explicitamente a estrutura interna dos fatores externos, o que casa com o modelo de núcleos como camada oficial (R-10); os pesos por núcleo herdam a ênfase das antigas áreas (diretoria, técnico e base pesavam mais) e reservam espaço para o novo núcleo mental e disciplinar. Os pesos somam 100% e são valores de balanceamento sujeitos a ajuste.
 
 Consequência de design: um clube campeão, porém desorganizado, **não vira gigante automaticamente**. Ele pode estar em boa fase e ainda ser estruturalmente pequeno. O crescimento é orgânico.
 
 > **Regra de ouro:** o clube só cresce de verdade quando sua estrutura interna acompanha seu desempenho esportivo. Isso impede crescimento artificial.
 
-> **Pendência:** as duas formulações de pesos (a de 40/25/15/10/10 e a de 60/20/10/10 com pesos internos por área) coexistem nas fontes. Definir qual é a oficial ou como conciliá-las.
-
 ## 2. Níveis por área
 
-Cada área evolui em uma escala de **1 a 10**:
+Cada área evolui na **escala única 1–5** (a mesma dos núcleos e do [Motor de partida](./05-motor-de-partida.md) — ver R-10):
 
-| Faixa | Descrição |
+| Nível | Descrição |
 | --- | --- |
-| 1–2 | Amador / muito básico |
-| 3–4 | Pequeno organizado |
-| 5–6 | Médio competitivo |
-| 7–8 | Grande estruturado |
-| 9–10 | Elite |
+| 1 | Básico e limitado (amador) |
+| 2 | Funcional (pequeno organizado) |
+| 3 | Competitivo (médio) |
+| 4 | Avançado (grande estruturado) |
+| 5 | Elite |
 
-Cada upgrade custa **dinheiro, tempo e manutenção**. Não deve ser apenas "clicar e melhorar".
+O nível de cada área compõe o **nível nominal do seu núcleo** (seção 11). Cada upgrade custa **dinheiro, tempo e manutenção**. Não deve ser apenas "clicar e melhorar".
 
 **Exemplo — melhorar equipe médica do nível 1 para 2:**
 
@@ -96,7 +90,7 @@ Ver [Economia](./03-economia.md) para custos, manutenção e o impacto no fluxo 
 
 ## 3. As áreas da estrutura e seus efeitos
 
-As áreas centrais da estrutura organizacional. Todas seguem a escala 1–10; abaixo, os efeitos por área com referências de comportamento nos níveis 1, 5 e 10.
+As áreas centrais da estrutura organizacional — **subdivisões dos seis núcleos** (seção 11). Todas seguem a **escala única 1–5**; abaixo, os efeitos por área com referências de comportamento nos níveis **1, 3 e 5**.
 
 ### 3.1 Diretoria
 
@@ -105,8 +99,8 @@ Afeta a capacidade administrativa do clube. Impacta: qualidade de contratos, dur
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Contratos curtos, negociação ruim, jogadores melhores rejeitam mais propostas, salários mais altos, cláusulas piores, menor controle financeiro |
-| 5 | Contratos equilibrados, negociação média, contrata jogadores úteis, salários mais controlados, cláusulas melhores |
-| 10 | Contratos longos e bem estruturados, negociação forte, atrai jogadores de nível alto, reduz custos salariais, protege ativos do clube |
+| 3 | Contratos equilibrados, negociação média, contrata jogadores úteis, salários mais controlados, cláusulas melhores |
+| 5 | Contratos longos e bem estruturados, negociação forte, atrai jogadores de nível alto, reduz custos salariais, protege ativos do clube |
 
 ### 3.2 Comissão técnica
 
@@ -115,12 +109,10 @@ Afeta a evolução técnica e tática dos jogadores. Impacta: treino técnico, t
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Jovens evoluem pouco e de forma instável |
-| 5 | Jovens evoluem com regularidade |
-| 10 | Jovens bem escolhidos podem atingir alto potencial |
+| 3 | Jovens evoluem com regularidade |
+| 5 | Jovens bem escolhidos podem atingir alto potencial |
 
-A comissão técnica também determina a qualidade das decisões e sugestões durante a partida — ver [seção 9](#9-comissão-técnica-cargos-e-atributos) e [Motor de partida](./05-motor-de-partida.md).
-
-> **Pendência (escala a reconciliar):** este documento usa a escala **1–10** para o nível das áreas (incluindo a comissão), enquanto o [Motor de partida](./05-motor-de-partida.md) descreve a qualidade das sugestões em uma escala **1–5** (herdada do chat de simulação). São duas granularidades da mesma coisa; a escala canônica única precisa ser fixada na modelagem final (provável mapeamento 1–10 → faixas de 1–5, ou adoção de 1–10 em todo o sistema).
+A comissão técnica também determina a qualidade das decisões e sugestões durante a partida — ver [seção 9](#9-comissão-técnica-cargos-e-atributos) e [Motor de partida](./05-motor-de-partida.md). Ambos usam agora a **mesma escala 1–5** (R-10), eliminando a antiga divergência de granularidade (1–10 aqui × 1–5 no Motor de partida).
 
 ### 3.3 Preparação física
 
@@ -129,8 +121,8 @@ Afeta condição física, desgaste e queda de rendimento. Impacta: resistência,
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Jogadores cansam mais, veteranos caem mais rápido, risco muscular maior |
-| 5 | Recuperação normal, queda física controlada |
-| 10 | Melhor recuperação, permite treinos fortes, prolonga a vida útil de alguns atletas |
+| 3 | Recuperação normal, queda física controlada |
+| 5 | Melhor recuperação, permite treinos fortes, prolonga a vida útil de alguns atletas |
 
 ### 3.4 Equipe médica
 
@@ -139,8 +131,8 @@ Afeta lesões, recuperação e diagnóstico. Impacta: chance de lesão, tempo de
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Jogadores mais propensos a se machucar, lesões duram mais, maior chance de recaída, veteranos sofrem mais |
-| 5 | Lesões dentro do padrão, recuperação razoável, risco médio de recaída |
-| 10 | Menos lesões evitáveis, recuperação mais rápida, menor chance de recaída, ajuda a prolongar a carreira |
+| 3 | Lesões dentro do padrão, recuperação razoável, risco médio de recaída |
+| 5 | Menos lesões evitáveis, recuperação mais rápida, menor chance de recaída, ajuda a prolongar a carreira |
 
 ### 3.5 Olheiros
 
@@ -149,8 +141,8 @@ Afetam descoberta e avaliação de jogadores. Impactam: qualidade dos relatório
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Relatórios imprecisos, potencial pode estar errado, encontra poucos jogadores |
-| 5 | Relatórios razoáveis, boa chance de achar jogadores úteis |
-| 10 | Relatórios precisos, encontra joias raras com mais frequência, identifica riscos ocultos |
+| 3 | Relatórios razoáveis, boa chance de achar jogadores úteis |
+| 5 | Relatórios precisos, encontra joias raras com mais frequência, identifica riscos ocultos |
 
 ### 3.6 Comunicação
 
@@ -159,16 +151,16 @@ Não é cosmética: ela **controla narrativa**. Impacta: insatisfação da torci
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Torcida perde paciência rápido, crises crescem mais, rumores afetam elenco, derrotas pesam mais, jovens sofrem mais pressão |
-| 5 | Controla crises médias, reduz impacto de notícias negativas, mantém a torcida mais estável |
-| 10 | Narrativa forte, protege o projeto esportivo, reduz pressão em transição, transforma jovens em símbolos do clube |
+| 3 | Controla crises médias, reduz impacto de notícias negativas, mantém a torcida mais estável |
+| 5 | Narrativa forte, protege o projeto esportivo, reduz pressão em transição, transforma jovens em símbolos do clube |
 
 **Exemplo — controle de crise após venda do melhor jogador:**
 
 | Comunicação | Torcida | Moral do elenco | Pressão da diretoria | Narrativa |
 | --- | --- | --- | --- | --- |
 | Nível 1 | -25 | -10 | +15 | — |
-| Nível 5 | -12 | -5 | +5 | — |
-| Nível 10 | -5 | 0 | 0 | "Venda estratégica para fortalecer o futuro" |
+| Nível 3 | -12 | -5 | +5 | — |
+| Nível 5 | -5 | 0 | 0 | "Venda estratégica para fortalecer o futuro" |
 
 ### 3.7 Categoria de base
 
@@ -177,8 +169,8 @@ Afeta geração e desenvolvimento dos jovens. Impacta: quantidade de jovens, qua
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Poucos jovens úteis, evolução lenta, maior chance de jogadores crus |
-| 5 | Gera jovens razoáveis, alguns podem virar titulares |
-| 10 | Fluxo constante de bons jovens, maior chance de jogadores especiais, jovens chegam mais preparados |
+| 3 | Gera jovens razoáveis, alguns podem virar titulares |
+| 5 | Fluxo constante de bons jovens, maior chance de jogadores especiais, jovens chegam mais preparados |
 
 ### 3.8 Centro de treinamento (CT)
 
@@ -187,12 +179,22 @@ Afeta o desenvolvimento geral do elenco. Impacta: qualidade do treino, evoluçã
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Treinos simples e pouco eficientes |
-| 5 | Treinos consistentes |
-| 10 | Desenvolvimento de elite |
+| 3 | Treinos consistentes |
+| 5 | Desenvolvimento de elite |
 
-Além do nível, o CT tem **capacidade operacional** própria (def-simulador §7.5): **disponibilidade de campos**, **capacidade de treinar categorias diferentes simultaneamente** (profissional + base) e **integração de grupos**. **Conflitos de agenda e indisponibilidade de áreas** do CT devem ser possíveis — treinar todas as categorias ao mesmo tempo pode competir por campos/horários, exigindo priorização.
+O CT físico é **infraestrutura granular** (seção 12): o "nível 1–5" acima é a **leitura derivada** do serviço de treino que alimenta o núcleo técnico. Além do nível, o CT tem **capacidade operacional** própria (def-simulador §7.5): **disponibilidade de campos**, **capacidade de treinar categorias diferentes simultaneamente** (profissional + base) e **integração de grupos**. **Conflitos de agenda e indisponibilidade de áreas** do CT devem ser possíveis — treinar todas as categorias ao mesmo tempo pode competir por campos/horários, exigindo priorização.
 
-> **Pendência:** número de campos por nível de CT, limites de sessões simultâneas e como o conflito de agenda se resolve (fila, prioridade, perda de qualidade) não foram fixados na fonte.
+> **Recomendação (a ratificar — R-13):** fixar a **capacidade operacional do CT por nível de serviço (1–5)**:
+>
+> | Nível do CT | Campos | Sessões simultâneas | Categorias em paralelo |
+> | --- | --- | --- | --- |
+> | 1 | 1 | 1 | só profissional OU base |
+> | 2 | 2 | 1 | profissional + base alternados |
+> | 3 | 2 | 2 | profissional + base |
+> | 4 | 3 | 2 | profissional + base + sub-20 |
+> | 5 | 4 | 3 | todas as categorias |
+>
+> **Resolução do conflito de agenda:** por **prioridade explícita definida pelo usuário** (fila por prioridade). Sessões que excedem a capacidade entram na fila; se forçadas, sofrem **perda de qualidade** (eficiência reduzida) em vez de bloqueio total. **Racional:** dá leitura clara de progressão e cria o trade-off de priorização citado na fonte sem travar o jogo; campos e sessões são a dimensão de capacidade da infraestrutura granular (seção 12). Valores de balanceamento a ajustar.
 
 ### 3.9 Estádio
 
@@ -201,8 +203,10 @@ Afeta receita, torcida e pressão. Impacta: bilheteria, crescimento de torcida, 
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Baixa receita, pouca torcida, pouca pressão sobre o adversário |
-| 5 | Receita boa, torcida participativa |
-| 10 | Grande fonte de receita, forte mando de campo, clube mais atrativo |
+| 3 | Receita boa, torcida participativa |
+| 5 | Grande fonte de receita, forte mando de campo, clube mais atrativo |
+
+A dimensão física do estádio (capacidade, condição, conformidade) é **infraestrutura granular** (seção 12); o "nível 1–5" acima é a **leitura derivada** de serviço/receita que alimenta o núcleo de comunicação e torcida.
 
 ### 3.10 Análise de desempenho
 
@@ -211,24 +215,43 @@ Afeta leitura estatística e decisões estratégicas. Impacta: relatórios pós-
 | Nível | Comportamento |
 | --- | --- |
 | 1 | Poucos dados, relatórios genéricos, decisões mais no escuro |
-| 5 | Bons relatórios, identifica tendências |
-| 10 | Relatórios precisos, ajuda a maximizar desempenho, revela problemas antes que virem crise |
+| 3 | Bons relatórios, identifica tendências |
+| 5 | Relatórios precisos, ajuda a maximizar desempenho, revela problemas antes que virem crise |
 
-> **Pendência:** as fontes citam áreas complementares na árvore de evolução (Jurídico/Contratos, Financeiro, Fisioterapia, Recuperação, Marketing, Relacionamento com torcida, Academia, Nutrição, Fisiologia, Estrutura psicológica). Definir quais são departamentos independentes com nível próprio e quais são subdivisões das dez áreas centrais.
+**Resolução (áreas complementares).** As áreas que as fontes citam na árvore de evolução (seção 7) **não** são departamentos independentes com nível próprio: cada uma é **subdivisão de um dos seis núcleos** — ou **infraestrutura física**. Mapeamento:
+
+| Área complementar | Classificação |
+| --- | --- |
+| Jurídico/Contratos | Subdivisão do núcleo 5 (Gestão e diretoria) |
+| Financeiro | Subdivisão do núcleo 5 (Gestão e diretoria) |
+| Fisioterapia | Subdivisão do núcleo 2 (Físico e médico) |
+| Recuperação | Subdivisão do núcleo 2 (Físico e médico) |
+| Nutrição | Subdivisão do núcleo 2 (Físico e médico) |
+| Fisiologia | Subdivisão do núcleo 2 (Físico e médico) |
+| Estrutura psicológica | Subdivisão do núcleo 3 (Mental e disciplinar) |
+| Marketing | Subdivisão do núcleo 6 (Comunicação e torcida) |
+| Relacionamento com torcida | Subdivisão do núcleo 6 (Comunicação e torcida) |
+| Academia | Infraestrutura física (seção 12), não é núcleo nem área |
+
+Isso mantém seis núcleos como camada oficial (R-10) e evita multiplicar departamentos com nível próprio.
 
 ## 4. Funcionários como multiplicadores
 
-Funcionários **não** devem dar vantagem direta absurda. Eles atuam como **multiplicadores de qualidade**: a estrutura não cria talento do nada, ela ajuda o clube a extrair melhor o talento existente.
+Funcionários **não** dão vantagem direta absurda. Seu efeito agregado é o de **multiplicadores de qualidade**: a estrutura não cria talento do nada, ela ajuda o clube a extrair melhor o talento existente. No modelo canônico (R-10), esse multiplicador **não é um parâmetro fixo por nível**: é a **eficiência emergente** do núcleo, resultado das competências, autonomia e carga de trabalho dos profissionais (seção 13). As curvas abaixo são a **leitura agregada** desse efeito.
 
-**Exemplo — aproveitamento do potencial de evolução técnica de um jogador:**
+> **Recomendação (a ratificar — R-12):** fixar a **curva de aproveitamento (eficiência) por nível de núcleo (1–5)**, substituindo os pontos 40/70/95% da escala 1–10:
+>
+> | Nível do núcleo | Aproveitamento do potencial |
+> | --- | --- |
+> | 1 | 40% |
+> | 2 | 55% |
+> | 3 | 70% |
+> | 4 | 85% |
+> | 5 | 95% |
+>
+> **Racional:** preserva as âncoras das fontes (base 40%, elite 95%) e interpola para os níveis intermediários da escala 1–5. Representa a eficiência **nominal**, ainda modulada para baixo por orçamento/sobrecarga (seções 11 e 13). Valores de balanceamento a ajustar.
 
-| Comissão técnica | Aproveitamento do potencial |
-| --- | --- |
-| Nível 1 | 40% |
-| Nível 5 | 70% |
-| Nível 10 | 95% |
-
-Isso significa que um jogador com potencial para evoluir 10 pontos em técnica aproveita apenas 4 pontos com comissão nível 1, contra 9,5 pontos com comissão nível 10.
+Isso significa que um jogador com potencial para evoluir 10 pontos em técnica aproveita apenas 4 pontos com comissão nível 1, contra 9,5 pontos com comissão nível 5.
 
 O mesmo princípio de multiplicador aparece no desenvolvimento de jovens: o potencial bruto só se realiza plenamente com estrutura à altura.
 
@@ -237,8 +260,8 @@ O mesmo princípio de multiplicador aparece no desenvolvimento de jovens: o pote
 | Estrutura (base / CT / comissão) | Chance real de alcançar |
 | --- | --- |
 | Nível 1 / 1 / 1 | 55–65 |
-| Nível 5 / 5 / 5 | 70–80 |
-| Nível 10 / 10 / 10 | 80–88 |
+| Nível 3 / 3 / 3 | 70–80 |
+| Nível 5 / 5 / 5 | 80–88 |
 
 > Potencial não é promessa garantida. **Estrutura transforma potencial em realidade.**
 
@@ -253,20 +276,24 @@ O nível de contratação **não depende só do caixa**. Um clube pode ter dinhe
 | Diretoria + reputação | Alcance de contratação |
 | --- | --- |
 | Nível 1 + reputação baixa | Jogadores simples, veteranos ou jovens sem mercado |
-| Nível 5 + reputação média | Jogadores úteis e promessas medianas |
-| Nível 10 + reputação alta | Disputa jogadores melhores e faz contratos mais inteligentes |
+| Nível 3 + reputação média | Jogadores úteis e promessas medianas |
+| Nível 5 + reputação alta | Disputa jogadores melhores e faz contratos mais inteligentes |
 
 A capacidade de contratação combina, portanto: nível da diretoria + reputação do clube + salário disponível + projeto esportivo + comunicação + divisão atual.
 
 **Teto de contratação por nível geral.** Além da diretoria e da reputação, o **nível geral** do clube define a faixa de jogadores que ele consegue disputar:
 
-| Nível geral do clube | Faixa de jogadores acessível |
-| --- | --- |
-| 1 | E / D |
-| 3 | D / C |
-| 5 | C / B |
-| 7 | B / A |
-| 10 | A / S |
+> **Recomendação (a ratificar — R-14):** fixar o **teto de contratação por nível geral (1–5)**, remapeando a tabela antiga (que usava 1/3/5/7/10):
+>
+> | Nível geral do clube | Faixa de jogadores acessível |
+> | --- | --- |
+> | 1 | E / D |
+> | 2 | D / C |
+> | 3 | C / B |
+> | 4 | B / A |
+> | 5 | A / S |
+>
+> **Racional:** mantém o alcance elite→amador em cinco degraus alinhados à escala única (R-10); é apenas o teto por nível — quem o clube realmente convence depende dos demais fatores. Faixas de balanceamento a ajustar.
 
 Esse é apenas o teto por nível; dentro da faixa, quem o clube realmente convence depende dos demais fatores acima. Detalhes de mercado e preços em [Economia](./03-economia.md).
 
@@ -276,7 +303,7 @@ Esse é apenas o teto por nível; dentro da faixa, quem o clube realmente conven
 
 ### Não pode subir de nível rápido demais
 
-Para manter o equilíbrio, o jogo precisa de travas. Um clube com nível geral 1 **não pode** contratar funcionário nível 10 imediatamente. Cada contratação/upgrade exige um conjunto de requisitos:
+Para manter o equilíbrio, o jogo precisa de travas. Um clube com nível geral 1 **não pode** contratar funcionário nível 5 imediatamente. Cada contratação/upgrade exige um conjunto de requisitos:
 
 - dinheiro;
 - reputação;
@@ -285,21 +312,21 @@ Para manter o equilíbrio, o jogo precisa de travas. Um clube com nível geral 1
 - tempo de implantação;
 - custo mensal sustentável.
 
-**Exemplo — para contratar equipe médica nível 7:** clube nível geral 5+, CT nível 4+, orçamento mensal suficiente e reputação mínima. Isso impede que o clube pule etapas.
+**Exemplo — para contratar equipe médica nível 4:** clube nível geral 3+, CT nível 3+, orçamento mensal suficiente e reputação mínima. Isso impede que o clube pule etapas.
 
-Cada nível de funcionário possui: custo de contratação, salário mensal, tempo de implantação, benefício principal, benefício secundário e risco.
+Cada nível de funcionário possui: custo de contratação, salário mensal, tempo de implantação, benefício principal, benefício secundário e risco. O "tempo de implantação" curto e fixo vale para **departamentos/núcleos**; a **infraestrutura física** (estádio, CT, academia) segue o fluxo de **projetos de 9 etapas** com prazos reais (seção 12), não este tempo fixo.
 
 A cada faixa de nível corresponde um "tipo" de departamento, o que dá leitura imediata do estágio. Para a equipe médica, por exemplo:
 
 | Nível | Departamento |
 | --- | --- |
 | 1 | Médico local barato |
-| 3 | Departamento médico básico |
-| 5 | Equipe profissional |
-| 7 | Centro multidisciplinar |
-| 10 | Departamento de elite |
+| 2 | Departamento médico básico |
+| 3 | Equipe profissional |
+| 4 | Centro multidisciplinar |
+| 5 | Departamento de elite |
 
-**Exemplo — equipe médica nível 5:**
+**Exemplo — equipe médica nível 3 (equipe profissional):**
 
 - Custo inicial: R$ 600.000
 - Custo mensal: R$ 80.000
@@ -310,10 +337,10 @@ A cada faixa de nível corresponde um "tipo" de departamento, o que dá leitura 
 
 Estrutura boa custa caro — e esse é um mecanismo central de controle da economia. Quanto maior a estrutura: maior o custo mensal, maior a folha administrativa, maior a exigência de receita e maior a pressão por resultado. **Crescer tem risco:** um clube pode falir se tentar virar grande rápido demais.
 
-**Espiral de risco — investir em CT nível 7 cedo demais:**
+**Espiral de risco — investir em CT nível 4 cedo demais:**
 
 ```
-CT nível 7 cedo demais
+CT nível 4 cedo demais
   ↓ custos mensais sobem
   ↓ receita não acompanha
   ↓ precisa vender jogadores
@@ -359,6 +386,8 @@ Infraestrutura
 └── Academia
 ```
 
+Os ramos (Administração, Futebol, Saúde, Base, Marca, Infraestrutura) são o **agrupamento visual da tela**, não uma camada de modelagem: cada folha corresponde a uma **subdivisão de um dos seis núcleos** (mapeamento em 3.10) ou à **infraestrutura física** (Centro de treinamento, Estádio, Academia), que segue o modelo granular da seção 12.
+
 Cada item da árvore, na tela de estrutura, exibe: nível atual, custo de melhoria, tempo de melhoria, custo mensal, benefícios, requisitos e impacto no clube.
 
 ## 8. Estilos de crescimento de clube
@@ -398,17 +427,24 @@ A comissão técnica influencia treinamento, tática, desenvolvimento de jogador
 - Diretor financeiro
 - Diretor de comunicação
 
-Cada cargo possui **atributos próprios**.
+Cada cargo possui **atributos próprios**. O conjunto abaixo estende, para todos os cargos, o padrão detalhado nas fontes apenas para o Auxiliar técnico (mantido como exemplo trabalhado); os atributos são coerentes com os efeitos das áreas/núcleos das seções 3 e 11.
 
-**Exemplo — Auxiliar técnico:**
+| Cargo | Atributos |
+| --- | --- |
+| Técnico | Definição tática; Gestão de vestiário; Desenvolvimento de jogadores; Leitura de jogo; Preparação de partida; Ajuste em tempo real |
+| Auxiliar técnico | Leitura tática; Capacidade de sugestão; Gestão de substituições; Correção defensiva; Correção ofensiva |
+| Preparador físico | Condicionamento; Controle de carga; Prevenção de lesão muscular; Recuperação pós-jogo; Periodização |
+| Médico | Diagnóstico; Tratamento; Prevenção; Gestão de recaída; Avaliação de aptidão |
+| Fisiologista | Avaliação fisiológica; Monitoramento de carga interna; Nutrição e suplementação; Longevidade do atleta veterano; Retorno pós-lesão |
+| Psicólogo | Controle emocional; Gestão de pressão; Integração e coesão; Resolução de conflito; Confiança e foco |
+| Analista de desempenho | Análise do adversário; Análise do próprio time; Estatística e dados; Recomendação de treino; Relatório pós-jogo |
+| Olheiro | Precisão de avaliação; Leitura de potencial; Cobertura regional; Identificação de risco; Leitura de personalidade |
+| Coordenador da base | Formação de jovens; Transição base→profissional; Identidade de jogo; Avaliação de promoção; Gestão de rotina/alojamento |
+| Diretor de futebol | Negociação; Rede de contatos; Planejamento de elenco; Gestão de contratos; Visão de projeto |
+| Diretor financeiro | Orçamento; Controle de folha; Gestão de dívida; Previsão de caixa; Conformidade financeira |
+| Diretor de comunicação | Gestão de imprensa; Controle de crise; Relação com torcida; Patrocínio e marketing; Proteção de imagem de jovens |
 
-- Leitura tática
-- Capacidade de sugestão
-- Gestão de substituições
-- Correção defensiva
-- Correção ofensiva
-
-> **Pendência:** as fontes detalham os atributos apenas do Auxiliar técnico. Definir o conjunto de atributos dos demais cargos (Técnico, Preparador físico, Médico, Fisiologista, Psicólogo, Analista, Olheiro, Coordenador da base e diretores).
+**Exemplo trabalhado — Auxiliar técnico:** Leitura tática · Capacidade de sugestão · Gestão de substituições · Correção defensiva · Correção ofensiva.
 
 ### Impacto na qualidade das decisões em partida
 
@@ -425,17 +461,23 @@ A IA offline age de forma **conservadora**, baseada na comissão técnica do clu
 
 Além do nível, funcionários podem ter **perfil**, o que adiciona estratégia sem depender apenas de número. Exemplos:
 
+Todas as áreas (e, por extensão, os seis núcleos) têm perfis. O conjunto abaixo estende os exemplos das fontes (equipe médica, comunicação e diretoria) às demais áreas de forma coerente; são qualitativos, sem número de balanceamento.
+
 | Área | Perfis possíveis |
 | --- | --- |
 | Equipe médica | Preventiva; Recuperação rápida; Especialista em jovens; Especialista em veteranos; Barata mas limitada; Cara mas eficiente |
 | Comunicação | Popular; Institucional; Agressiva; Transparente; Silenciosa; Focada em torcida jovem |
 | Diretoria | Conservadora; Negociadora; Ousada; Formadora; Financeira; Ambiciosa |
-
-> **Pendência:** as fontes trazem perfis apenas para equipe médica, comunicação e diretoria. Definir se as demais áreas (comissão técnica, olheiros, preparação física, análise etc.) também terão perfis e quais seriam.
+| Comissão técnica | Ofensiva; Defensiva; Formadora de jovens; Motivadora; Tática/estudiosa; Pragmática |
+| Olheiros | Regional; Internacional; Especialista em jovens; Caçadora de oportunidades (livres/baratos); Analítica (dados); Tradicional (campo) |
+| Preparação física | Intensa; Preventiva; Especialista em recuperação; Especialista em veteranos; Conservadora |
+| Análise de desempenho | Estatística/dados; Vídeo/tática; Focada no adversário; Focada no próprio time |
+| Categoria de base | Formadora agressiva; Paciente; Focada em identidade; Vendedora (revela para vender) |
+| Mental e disciplinar (psicólogo) | Disciplinadora; Acolhedora; Focada em liderança; Especialista em jovens |
 
 ## 11. Modelo de 6 núcleos (consolidação)
 
-O documento definitivo de escopo consolida a estrutura do **Grinta** em **seis núcleos funcionais**, cada um combinando estrutura, profissionais, orçamento, processos, moral, adaptação e especializações. É um segundo recorte da mesma realidade descrita nas seções 1–3: em vez de ~10 áreas independentes em escala 1–10, o clube é lido por seis núcleos, cada um em **escala 1–5**.
+O documento definitivo de escopo consolida a estrutura do **Grinta** em **seis núcleos funcionais**, cada um combinando estrutura, profissionais, orçamento, processos, moral, adaptação e especializações. Estes seis núcleos são a **camada oficial de modelagem** do clube (R-10): as ~10 áreas das seções 2–3 são **subdivisões** destes núcleos, e todo o sistema usa a **escala única 1–5**.
 
 **Escala de nível do núcleo:**
 
@@ -449,7 +491,7 @@ O documento definitivo de escopo consolida a estrutura do **Grinta** em **seis n
 
 O nível não representa apenas instalações: inclui capacidade, equipe, ferramentas e processos. A **eficiência real** pode ficar abaixo do nível nominal se houver orçamento insuficiente, sobrecarga, crise, profissionais inadequados ou baixa adaptação. Cada núcleo possui uma **especialização principal** e uma **secundária**; trocar de especialização exige investimento, tempo e adaptação, e pode reduzir a eficiência temporariamente.
 
-**Mapeamento das ~10 áreas (1–10) para os 6 núcleos (1–5):**
+**Composição dos seis núcleos a partir das áreas (subdivisões), na escala única 1–5:**
 
 | Núcleo | Áreas atuais mapeadas | Especializações (principal/secundária) | Principais efeitos |
 | --- | --- | --- | --- |
@@ -466,13 +508,11 @@ Notas de mapeamento:
 - A **dimensão física** do Estádio, do CT e da Academia pertence à infraestrutura granular (ver [seção 12](#12-infraestrutura-granular)), não ao núcleo. Só a leitura de "torcida/receita" do estádio entra no núcleo de comunicação e torcida.
 - **Análise de desempenho** alimenta tanto o núcleo técnico (leitura de jogo) quanto o núcleo de mercado e base (análise de dados de scouting).
 
-> **Pendência (escala a unificar):** as áreas usam **1–10** (seções 2–3) e os núcleos usam **1–5** (documento definitivo de escopo). A escala canônica única precisa ser fixada — provável mapeamento das faixas 1–10 para os 5 níveis, ou adoção de uma escala única em todo o sistema. Esta é a mesma pendência levantada em 3.2 para as sugestões em partida e deve ser resolvida em conjunto.
-
-> **Pendência (recorte a unificar):** convivem dois recortes da mesma estrutura — ~10 áreas independentes (seção 3) e 6 núcleos agregadores (esta seção). Definir se os núcleos são a camada oficial de modelagem (com as áreas como subdivisões) ou o contrário, e onde encaixar o novo núcleo mental e disciplinar.
+> **Resolução (R-10).** Escala e recorte ficam unificados: **escala única 1–5** em núcleos, áreas, comissão em partida e Motor de partida (resolve a divergência 1–10 × 1–5 antes apontada aqui e em 3.2); e os **seis núcleos são a camada oficial**, com as áreas como subdivisões e o **núcleo mental e disciplinar** como nova entidade de primeira classe (dá casa à antiga "estrutura psicológica"). O nível do núcleo é a agregação dos níveis das suas áreas; a **eficiência real** o modula por orçamento, sobrecarga, crise e adequação dos profissionais.
 
 ## 12. Infraestrutura granular
 
-O documento definitivo do simulador **rejeita explicitamente representar a infraestrutura como uma lista genérica de níveis**. A infraestrutura é composta por instalações, módulos, equipamentos, capacidades e condições reais. Isso convive em tensão com o modelo de níveis 1–10 usado para Estádio, CT e Academia nas seções 2–3 (ver pendência ao fim da seção).
+O documento definitivo do simulador **rejeita explicitamente representar a infraestrutura como uma lista genérica de níveis**. A infraestrutura é composta por instalações, módulos, equipamentos, capacidades e condições reais. Isso **substitui** o antigo tratamento por "nível" de Estádio, CT e Academia nas seções 2–3 (ver resolução ao fim da seção).
 
 **Áreas físicas:** Estádio; Centro de treinamento; Medicina e reabilitação; Desempenho e análise; Academia e formação; Administração; Tecnologia e dados; Comercial e hospitalidade; Transporte e logística.
 
@@ -531,7 +571,7 @@ Obras em andamento afetam capacidade do estádio, treinos, rotina médica, amist
 
 A infraestrutura tem valor, custo de manutenção, vida útil e impacto operacional. O clube pode comprar, vender, alugar, ampliar, substituir ou desativar ativos, respeitando contratos e aprovações. Medidas de eficiência, consumo e adaptação climática reduzem custos e riscos, sem gerar vantagens mágicas.
 
-> **Pendência (modelo a reconciliar):** o modelo atual trata Estádio, CT e Academia como áreas em escala 1–10 com "custo/tempo de implantação" fixos (seções 2, 3 e 6), enquanto o documento definitivo modela infraestrutura por dimensões granulares (propriedade/acesso, condição, capacidades, conformidade) e por projetos de 9 etapas com riscos e prazos reais. Definir se o "nível 1–10" passa a ser apenas uma leitura derivada dessas dimensões, ou se a infraestrutura sai do modelo de níveis enquanto os departamentos/núcleos o mantêm.
+> **Resolução (R-10).** A infraestrutura física **sai do modelo de níveis**: estádio, CT e academia são modelados pelas dimensões granulares acima (propriedade/acesso, condição, capacidades, conformidade) e por projetos de 9 etapas com prazos reais. Onde os departamentos/núcleos ainda exibem um "nível 1–5" ligado a essas instalações, ele é **leitura derivada** da dimensão de serviço/operacional (ex.: a capacidade do CT em R-13 alimenta o nível de serviço do CT que abastece o núcleo técnico), nunca a modelagem primária da obra. Os departamentos e núcleos mantêm o modelo de nível 1–5; a infraestrutura física, não.
 
 ## 13. Cargo, responsabilidade e delegação (funcionários)
 
@@ -566,4 +606,4 @@ Funcionários podem ficar **sobrecarregados, indisponíveis ou ausentes**. Isso 
 
 Funcionários evoluem (ganham experiência, melhoram competências, obtêm qualificações, mudam de função, são promovidos) ou regridem (perdem desempenho por idade, contexto ou desatualização) e podem se aposentar. O desenvolvimento depende de trabalho, formação, ambiente e oportunidade, não de progressão automática idêntica. Complementa o efeito da estrutura sobre veteranos e o ciclo de renovação já descrito na seção 4.
 
-> **Pendência (modelo a reconciliar):** a seção 4 modela funcionários como **multiplicadores numéricos de qualidade** (ex.: comissão nível 5 → 70% de aproveitamento), enquanto o documento definitivo afirma que eles **não são apenas bônus percentuais** e separa cargo, responsabilidade, delegação e carga de trabalho. Definir como o multiplicador agregado convive com a modelagem individual (competências, autonomia, sobrecarga) — provavelmente o multiplicador passa a ser um efeito emergente dessas variáveis, e não um parâmetro fixo por nível.
+> **Resolução (R-10).** O multiplicador agregado da seção 4 é **efeito emergente**, não parâmetro fixo: a **eficiência do núcleo** — e portanto a curva de aproveitamento de R-12 — resulta das competências, autonomia, carga de trabalho e disponibilidade dos profissionais descritas nesta seção, modulada por orçamento e crise (seção 11). "Multiplicador" e "modelagem individual" são a mesma coisa vista em dois níveis de detalhe: o número é a **leitura agregada** da simulação individual.

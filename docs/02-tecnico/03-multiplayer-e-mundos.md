@@ -374,7 +374,7 @@ O clube novo cresce **subindo de camada** (Liga Inicial → Liga de Acesso → L
 
 **Coexistência dos dois eixos.** As divisões por resultado (as Séries / Divisões 1, 2, 3…, com promoção e rebaixamento por desempenho) e as ligas por nível estrutural são **complementares, não substitutas**: a primeira organiza a disputa esportiva dentro de uma faixa; a segunda garante que o adversário de um clube tenha porte estrutural compatível. Ambas descrevem o mesmo mundo, por ângulos diferentes.
 
-> **Pendência:** a fonte apresenta os dois eixos (divisões por resultado e ligas por nível estrutural) sem especificar como se encaixam operacionalmente — se as ligas por nível são a moldura dentro da qual existem as Séries por resultado, se um clube pode subir de nível estrutural e de Série ao mesmo tempo, e quais os limiares exatos que movem um clube de uma liga de nível para outra. Definir a interação entre os dois sistemas.
+> **Recomendação (a ratificar — R-83):** os dois eixos combinam-se como **moldura × disputa**: a **liga por nível estrutural** (Inicial → Acesso → Intermediária → Principal → Elite) é a **moldura** dentro da qual existem as **Séries por resultado** (1, 2, 3…), e não o contrário. Um clube compete nas Séries **da sua liga de nível**; promoção/rebaixamento por resultado o movem entre Séries **dentro da mesma liga de nível**. A mudança de **liga de nível** é um eixo separado, guiado pelo **nível estrutural do clube** (1–10, faixas da tabela acima), não pelo resultado esportivo — logo subir de Série e subir de nível estrutural são eventos **independentes**, podendo ocorrer na mesma temporada, mas por gatilhos distintos. **Limiares:** o clube muda de liga de nível ao **cruzar a faixa de nível estrutural** (ex.: atingir nível 3 promove da Liga Inicial para a de Acesso; recuar para nível 2 rebaixa de volta), avaliado na **virada de temporada**, com **histerese** (margem para evitar oscilação a cada temporada) a calibrar. Racional: preserva o mérito dos clubes antigos (nível estrutural) sem massacrar novatos e mantém a disputa esportiva viva dentro de cada faixa.
 
 ### Modelo recomendado para começar
 
@@ -416,7 +416,7 @@ No fim da temporada: campeões definidos, rebaixados caem, promovidos sobem, usu
 
 Ruleset resumido do Exemplo B: usuário confirma a escalação antes das 19h; jogos simulam às 20h; ausente usa a última escalação; 5 ausências seguidas liberam o clube; transferências entre usuários passam por validação; jogadores podem recusar propostas; e bots completam os clubes vazios. Esse já é um modelo muito bom para começar.
 
-> **Pendência:** a fonte não especifica as **faixas exatas de número de usuários** que disparam a criação de uma nova divisão nem o momento em que um clube bot é convertido em vaga humana (regra de conversão automática vs. manual). Definir os limiares de dimensionamento.
+> **Recomendação (a ratificar — R-84):** limiares de dimensionamento do mundo. **Nova divisão/Série:** criar quando a divisão-alvo ultrapassar sua lotação (ex.: 20 clubes) e houver **fila de humanos** suficiente para formar a próxima — proposta: abrir nova Série quando **≥ 60% das vagas humanas** da divisão vigente estiverem ocupadas e existirem **≥ 20 humanos aguardando**; caso contrário, novos entrantes preenchem vagas de bots existentes antes de fragmentar em nova divisão. **Conversão bot → humano:** um clube-bot vira vaga humana de forma **automática** quando (a) está elegível (não em crise terminal, dentro da faixa de nível estrutural do entrante) e (b) há humano compatível na fila; conversões sensíveis (clubes de topo, disputa por uma vaga) passam por **confirmação manual** do admin. Racional: crescer por preenchimento antes de fragmentar mantém as divisões cheias e competitivas. Compartilha **R-84** com a penalidade de ausência (§8). Calibrar faixas por tamanho de mundo.
 
 ---
 
@@ -448,7 +448,7 @@ Pontos-chave:
 - A liberação do clube após 5 ausências seguidas é o único momento em que o usuário perde o comando — e ainda assim é por ausência prolongada, não por resultado.
 - O usuário gerencia entre rodadas; ele não joga a partida manualmente. Definir tática, treinar, negociar, conversar com jogadores e planejar a próxima rodada são as atividades do dia a dia.
 
-> **Pendência:** a "penalidade leve" por não escalar é citada como opção na fonte, mas não há definição de qual penalidade se aplica nem em que rodada. Decidir se haverá penalidade além do simples uso da última escalação.
+> **Recomendação (a ratificar — R-84):** penalidade por não escalar **além** do fallback. Proposta: **sem penalidade competitiva** nas 1ª–2ª ausências (só usa a última escalação / IA valida); a partir da **3ª ausência seguida**, além do alerta, aplica-se uma **penalidade leve e não retroativa** — ex.: pequena queda de **moral/entrosamento** do elenco e/ou leve redutor de desempenho do time no fallback — **nunca** punição direta no placar nem dedução de pontos. A liberação do clube na 5ª ausência (acima) permanece o único evento de perda de comando. Racional: cria incentivo suave à presença sem transformar ausência em derrota automática, preservando o princípio "nunca demitido por desempenho". Compartilha **R-84** com os limiares de dimensionamento (§7). Calibrar magnitude e rodada de início.
 
 ---
 

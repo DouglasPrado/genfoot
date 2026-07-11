@@ -68,7 +68,20 @@ Princípios do ciclo:
 - **Clubes** = instituições com memória.
 - **Fim de temporada** = julgamento e transformação do mundo.
 
-> **Pendência:** duração de cada fase (nº de rodadas/datas por fase) e critérios exatos de transição entre fases não foram definidos na fonte.
+A transição entre fases é **dirigida por marcos do calendário** (§4), não por número fixo de dias. Cada fase é um estado (`SeasonPhase`) com gatilhos de entrada e saída ancorados em datas do `SeasonCalendar`:
+
+```
+SeasonPhase {
+  phase: "preseason" | "start" | "mid" | "runIn" | "end" | "postseason" | "newSeason"
+  startTrigger    // marco que abre a fase
+  endTrigger      // marco que encerra a fase
+  unlockedEvents  // tipos de evento destravados (tabela acima)
+}
+```
+
+Critérios de transição (estrutura): **Pré-temporada → Início** na 1ª rodada oficial; **Início → Meio** ao completar o 1º terço das rodadas; **Meio → Reta final** ao entrar no último terço; **Reta final → Fim** na última rodada; **Fim → Pós-temporada** quando o motor de virada (§6) conclui o encerramento esportivo; **Pós-temporada → Nova temporada** ao gerar o calendário seguinte (passo 18 do checklist).
+
+> **Recomendação (a ratificar — R-58):** parametrizar a **duração de cada fase** por frações da temporada, não por número absoluto de datas (para acomodar ligas de tamanhos diferentes). Proposta de 1ª passada: pré-temporada ≈ 3–5 datas; **Início** = primeiros ~33% das rodadas; **Meio** = ~34–66%; **Reta final** = últimos ~33%; **Fim** = da última rodada até a homologação (§14.1); **Pós-temporada** = janela fixa de ~2–4 semanas virtuais de férias/evolução. Racional: frações mantêm o ritmo narrativo (adaptação → crise → decisão) em ligas de 12 a 24 clubes sem recalibrar por competição; os limites exatos são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 
@@ -155,7 +168,9 @@ ChampionshipRules {
 }
 ```
 
-> **Pendência:** valores de `reputationWeight` / `financialWeight` por tipo de campeonato e critérios de desempate de tabela não foram especificados na fonte.
+Os **critérios de desempate** são parte da estrutura de regras de cada campeonato: `ChampionshipRules` (§2) ganha um campo ordenado `tiebreakers` — lista aplicada em sequência até desempatar, com o conjunto de referência **pontos → nº de vitórias → saldo de gols → gols marcados → confronto direto → cartões (fair play) → sorteio**. Cada campeonato pode reordenar ou omitir critérios no seu regulamento; a ordem declarada é o que a homologação (§14.1) usa para fechar a tabela.
+
+> **Recomendação (a ratificar — R-59):** fixar `reputationWeight` e `financialWeight` (0–1) por tipo de campeonato, definindo quanto cada competição move a reputação (clube/jogador) e a receita ao virar a temporada. Proposta de 1ª passada: Mundial `rep 1,00 / fin 0,90`; Continental `0,85 / 0,85`; Liga nacional (elite) `0,70 / 1,00`; Copa nacional `0,55 / 0,70`; Estadual/regional `0,30 / 0,35`; Base `0,20 / 0,10`; Amistosos `0,05 / 0,15`. Racional: a liga nacional domina a **receita** recorrente, enquanto continental/mundial dominam o **prestígio**; os valores são de balanceamento e devem ser calibrados em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ### Geração das competições no início da temporada
 
@@ -440,7 +455,7 @@ A evolução é **multidimensional** e pode ser mista:
 - Jovem reserva: pode não evoluir em campo, mas evoluir em treino: `+Técnica +Disciplina −Ritmo de jogo`.
 - Veterano: perde físico, ganha liderança: `−Velocidade −Resistência +Liderança +Leitura de jogo`.
 
-> **Pendência:** fórmula/pesos de conversão desses fatores em ganho ou perda de atributo não foram definidos na fonte.
+> **Recomendação (a ratificar — R-60):** calcular a variação de cada dimensão de `PlayerSeasonDevelopment` como `Δdimensão = base(idade) + Σ(fator_i · peso_i)`, aplicada por dimensão (técnica, física, mental, tática). **Base etária** (curva de maturação/declínio): `≤ 21` → `+2`; `22–28` → `+0,5`; `29–31` → `0`; `32–34` → `−1,5`; `≥ 35` → `−3` (o físico declina antes do mental). **Fatores e pesos de 1ª passada** (cada fator normalizado 0–1, somado à base e arredondado): minutos jogados ×2,0 · qualidade de treino ×1,5 · nível dos campeonatos ×1,2 · potencial restante ×1,5 · moral/foco ×0,8 · pressão suportada ×0,6 (negativa se excedeu o limite mental) · disciplina/personalidade ×0,7 · penalidade por lesão `−(diasParado/30)` · relação com o técnico ×0,5. O ganho por dimensão é saturado em `[−4, +4]` por temporada, e a evolução permanece **multidimensional** (uma dimensão sobe enquanto outra cai). Racional: reproduz os três exemplos mistos da seção (jovem que evolui no treino, titular pressionado, veterano em declínio físico com ganho mental) sem virar "+2 de overall"; os pesos e a curva etária são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ### 6.5. Vida extra-campo no fim da temporada
 
@@ -498,7 +513,7 @@ Prêmios previstos:
 - Jogador mais evoluído
 - Jogador decepção
 
-> **Pendência:** critérios objetivos de eleição de cada prêmio e magnitude do efeito em reputação/mercado não foram definidos na fonte.
+> **Recomendação (a ratificar — R-61):** separar os prêmios em **objetivos** (contagem direta: artilheiro = mais gols; garçom = mais assistências; melhor goleiro por saldo de gols sofridos/defesas) e **subjetivos** (melhor jogador, revelação, seleção do campeonato, jogador mais evoluído, decepção), estes eleitos por `AwardScore = 0,5·médiaDeNotas (F15) + 0,3·contribuição para títulos/campanha + 0,2·impacto de reputação`, filtrado por elegibilidade (revelação: idade ≤ 21; decepção: alta expectativa/valor vs. baixo `AwardScore`). **Magnitude do efeito:** cada prêmio aplica `+reputationGain` e `marketValueMultiplier` proporcionais ao peso da competição (R-59) — 1ª passada: prêmio principal ×1,10 no valor de mercado e `+8` de reputação; secundários ×1,05 e `+4`; "decepção" inverte o sinal. Racional: dá regra auditável reutilizando a nota de partida (F15) e os pesos de campeonato (R-59); os coeficientes são de balanceamento e ficam para [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 
@@ -645,7 +660,7 @@ Cada divisão tem um **limite natural de força**, para impedir que um clube mui
 
 Se um clube passa do teto da sua divisão, ele é **obrigado a subir** (ou a competir numa liga superior) — não pode continuar dominando uma camada que já superou.
 
-> **Pendência:** os valores exatos de cada teto (folha, overall médio, nº de estrangeiros, faixa de reputação, nível máximo de estrutura) e a premiação por divisão não foram definidos na fonte. Calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+> **Recomendação (a ratificar — R-62):** expressar cada teto de divisão como **múltiplo da linha-base da divisão** (não valores absolutos, para escalar entre mundos). Proposta de 1ª passada: Liga Inicial → folha ≤ 1,0× base, overall médio ≤ 62, ≤ 3 estrangeiros, reputação ≤ 40, estrutura ≤ nível 2, premiação 1,0× base; Liga Intermediária → folha ≤ 3,0×, overall ≤ 74, ≤ 5 estrangeiros, reputação ≤ 70, estrutura ≤ nível 4, premiação ~3×; Elite → sem teto de força, premiação ~8×. Gatilho de "obrigado a subir": clube que excede **2 dos tetos** por 2 temporadas seguidas. Racional: múltiplos preservam o equilíbrio quando o valor absoluto do dinheiro varia por mundo; os números são de balanceamento e devem ser calibrados em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Os limites de estrangeiros aqui herdam a cota geral de **R-63** (§15.2).
 
 ### 13.2 Objetivos diferentes por estágio do clube
 
@@ -711,7 +726,7 @@ Além dos prêmios de campeonato já catalogados na [seção 7](#7-sistema-de-pr
 - Prêmios **subjetivos** (melhor jogador, melhor jovem, seleção da temporada) têm critérios próprios de eleição.
 - O **fair play** e a **seleção da temporada** são distinções de temporada que complementam — sem substituir — os prêmios por campeonato da seção 7.
 
-> **Pendência:** critérios objetivos de eleição de cada prêmio (especialmente melhor jovem, seleção da temporada e fair play) e a magnitude do efeito em reputação/mercado não foram definidos na fonte. Ver também a pendência da [seção 7](#7-sistema-de-premiacoes).
+Os critérios de eleição destes prêmios de temporada seguem o mesmo modelo objetivo/subjetivo proposto para os prêmios de campeonato em **R-61** ([seção 7](#7-sistema-de-premiacoes)), aplicado agora à temporada inteira: **melhor jovem** = maior `AwardScore` entre elegíveis por idade; **seleção da temporada** = maior `AwardScore` por posição; **fair play** = prêmio objetivo pelo menor índice disciplinar (cartões ponderados) do clube/jogador na temporada. A magnitude do efeito em reputação/mercado também segue R-61, com **peso de temporada ligeiramente acima** do prêmio equivalente de um único campeonato.
 
 ### 14.4 Premiações financeiras
 
@@ -789,7 +804,7 @@ A elegibilidade é validada e **congelada** na preparação pré-jogo. O sistema
 
 Se houver problema, o sistema tenta escalação automática e alternativas **antes** de declarar W.O. — o clube precisa manter um **elenco mínimo** apto e inscrito.
 
-> **Pendência:** os **números de estrangeiros** e demais limites por competição (`foreignPlayerLimit`, `squadRegistrationLimit`, `ageLimit`, cota de jovens formados) são **pendência de balanceamento** — a definir em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). O escopo estabelece a existência das regras, não os valores.
+> **Recomendação (a ratificar — R-63):** fixar os limites de inscrição por competição. Proposta de 1ª passada: `squadRegistrationLimit` = 26 (lista principal), com goleiros/base em cota própria; `foreignPlayerLimit` = 5 estrangeiros inscritos por partida (7 no elenco) na elite, mais restritivo nas divisões inferiores (herdado por R-62); `ageLimit` só em competições de base; cota de **jovens formados no clube** = mínimo de 2 na lista principal. A **nacionalidade** que alimenta `foreignPlayerLimit` é a `primaryNationality` do jogador (modelo em [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §1). Racional: números plausíveis e implementáveis que dão contorno à validação de escalação (§15.2) sem congelar o balanceamento; valores finais e variação por mundo/divisão a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 

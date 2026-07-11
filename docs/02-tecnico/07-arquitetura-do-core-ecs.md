@@ -71,6 +71,8 @@ Clube investe em nutrição
 
 A mesma mecânica cobre desde um lance de segundos até a evolução de um clube ao longo de temporadas.
 
+> **Recomendação (a ratificar — R-80):** o paradigma **Entity–Component–Effect–Event descrito aqui é o *runtime* do motor de ecossistema**, não um substituto do modelo relacional — **ECS e Prisma/Postgres coexistem**. A **fonte de verdade persistente** é o relacional ([`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md), [`./02-modelo-de-dados.md`](./02-modelo-de-dados.md)): entidades e componentes são **carregados** do Postgres para montar o grafo ECS em memória no início de um tick/simulação, os sistemas aplicam efeitos e eventos sobre esse grafo, e o resultado é **projetado de volta** para as tabelas de estado + `game_events` (event sourcing híbrido, ver `./00-arquitetura-geral.md` §4.2). Racional: o ECS dá a expressividade das cascatas emergentes sem números cravados, enquanto o relacional dá durabilidade, consultabilidade, integridade e auditoria — cada um no seu papel, não competindo. O `core` monta o ECS a partir de *snapshots* e **não** depende de Prisma (a hidratação/persistência é responsabilidade da camada de infraestrutura), preservando o motor headless e determinístico (§4.1/§4.3 de `./00-arquitetura-geral.md`).
+
 ---
 
 ## Entity System
@@ -443,7 +445,15 @@ Campos-chave:
 
 Leitura: jogadores sensíveis do mandante ganham +8 de pressão durante a partida, e o efeito vai diminuindo com o tempo.
 
-> **Pendência:** a gramática exata do `TargetSelector` (sintaxe de query `.where(...)`), o formato de `Condition` e `Multiplier`, e a ordem de resolução quando múltiplos efeitos incidem sobre o mesmo atributo não estão especificados no material de origem e precisam ser definidos.
+> **Recomendação (a ratificar — R-81):** gramática mínima e ordem de resolução do Effect System.
+>
+> **`TargetSelector`** — string de query `raiz.coleção.where(predicado)`. **Raiz:** `self`, `homeTeam`, `awayTeam`, `match`, `club`, `world`. **Coleção** (opcional; sem coleção, o alvo é a própria raiz): `players`, `staff`, `supporters`, `pieces`. **`.where(pred)`** (opcional): predicado sobre caminhos de componente (`attributes.*`, `state.*`, `mental.*`, `traits.*`, `relations.*`), com operadores `> >= < <= == !=`, combináveis por `&&`/`||` e agrupáveis por parênteses (ex.: `homeTeam.players.where(mental.sensitivity > 70 && state.fatigue < 60)`). O seletor resolve para um **conjunto de entidades**; efeito sem alvo resolvível é **no-op auditável**, nunca erro silencioso.
+>
+> **`Condition`** — `{ path, op, value }` (mesmos caminhos e operadores do `where`), avaliada **no momento da aplicação** sobre o alvo/contexto; a lista de condições é **AND** (lista vazia = sempre verdadeira). Falso ⇒ o efeito não se aplica naquele tick.
+>
+> **`Multiplier`** — `{ path, op, value, factor }`: se o predicado casa, multiplica o `value` do efeito por `factor` (ex.: dobrar pressão para `traits.bigGameChoker == true`). Multiplicadores são **comutativos** e aplicados em produto; a ordem entre eles não altera o resultado.
+>
+> **Ordem de resolução quando vários efeitos incidem no mesmo atributo (por tick, determinística):** (1) **coleta** todos os efeitos ativos cujo alvo inclui a entidade e cujas `conditions` são verdadeiras; (2) **ordena** por `(operation, sourcePriority, effectId)`, com prioridade de operação `set` → `add`/`subtract` → `multiply`, para que a multiplicação incida sobre a soma já formada; (3) aplica os `multipliers` a cada `value`; (4) **acumula** numa base única — primeiro o `set` de maior prioridade, depois `Σ(add − subtract)`, por fim `× Πmultiply`, com `clamp` final na escala oficial do atributo (ver R-82 em `./01-arquitetura-de-dados.md`); (5) registra a **proveniência** (quais efeitos contribuíram) para auditoria. O `effectId` como desempate garante determinismo (§4.1 de `./00-arquitetura-geral.md`); `set` concorrentes empatados resolvem pelo maior `sourcePriority` e, persistindo empate, pelo menor `effectId`.
 
 ---
 
@@ -652,7 +662,7 @@ O Development System **aplica**, via [Effects](#effect-system-o-coração-do-cor
 
 A definição da fórmula `developmentGain` — incluindo a distinção entre `baseLearningRate` (o quão rápido o jogador aprende) e `trainingFocus` (o quanto o treino aponta para aquele atributo) como fatores próprios e distintos — é dona de [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) (seção 6). Aqui interessa apenas o enquadramento arquitetural: no core, esse ganho não altera atributos diretamente, e sim através de `Effect`s aplicados pelo Development System.
 
-> **Pendência:** os intervalos numéricos, a normalização de cada fator e os pesos relativos devem ser definidos e centralizados no catálogo de fórmulas ([`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md)).
+> **Nota:** os intervalos numéricos, a normalização de cada fator e os pesos relativos da fórmula `developmentGain` são de balanceamento e vivem no catálogo de fórmulas ([`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md), Série R) e no game design ([`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) §6); aqui interessa apenas o enquadramento arquitetural (o ganho aplica-se via `Effect`s, nunca alterando atributos diretamente).
 
 ---
 

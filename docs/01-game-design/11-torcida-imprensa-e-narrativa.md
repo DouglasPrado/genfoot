@@ -61,7 +61,16 @@ Os principais segmentos são:
 | **Pragmática** | Prioriza resultado e eficiência acima de estilo. |
 | **Ligada à base e à identidade local** | Valoriza o uso de jovens formados e atletas da região. |
 
-> **Pendência:** a fonte não especifica proporções, tamanhos relativos ou pesos numéricos de cada segmento na composição da torcida total, nem regras de como a satisfação de cada segmento agrega na satisfação geral.
+**Estrutura da entidade (`FanSegment`).** Cada segmento é modelado como uma entidade própria da torcida do clube, com os campos:
+
+- `tipo` — um dos oito segmentos acima;
+- `share` — fração da torcida total que o segmento representa (0–1; a soma dos oito = 1);
+- `satisfacao` — avaliação do segmento na escala 0–100 (ver [§2](#2-satisfação-e-paciência));
+- `prioridades` — o que o segmento mais cobra (resultado, estilo, base, identidade, preço, comunicação…);
+- `paciencia` — tolerância própria do segmento a maus momentos;
+- `vocalidade` — quanto o segmento pesa na pressão pública e nos protestos, independentemente do `share`.
+
+> **Recomendação (a ratificar — [R-68](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** adotar uma composição-base de `share` por segmento para um clube genérico — Casual 0,22 · Fiel e local 0,18 · Jovem e digital 0,15 · Sócios 0,12 · Intensa/organizada 0,10 · Tradicionalista 0,10 · Pragmática 0,08 · Ligada à base/identidade local 0,05 — ajustada dinamicamente pelo perfil do clube (um clube formador amplia "base/identidade local"; um clube-vitrine amplia "jovem e digital"; um clube tradicional amplia "tradicionalista/organizada"). A **satisfação geral** é a média ponderada pelo `share`: `satisfaçãoGeral = Σ(share_i × satisfação_i)`. Já a **pressão pública** (protestos, cobrança, manifestações) usa uma segunda ponderação por `vocalidade` (organizada ×1,5 · sócios ×1,3 · jovem e digital ×1,2 · tradicionalista ×1,1 · demais ×1,0 · casual ×0,7), para que uma torcida barulhenta pese mais na crise do que seu tamanho sugere. Racional: separa "quão satisfeita está a torcida" (tamanho) de "quanto ela grita" (voz), reproduzindo o comportamento real sem inventar segmentos novos.
 
 **Notas de ligação:** a monetização e o impacto financeiro por segmento (sócios, bilheteria, marketing) são tratados em [economia da torcida](./03-economia.md).
 
@@ -92,7 +101,7 @@ A **paciência** depende de:
 | **71 a 85** | Satisfação |
 | **86 a 100** | Empolgação intensa |
 
-> **Pendência:** a fonte descreve a escala como "de referência". Não define as regras exatas de transição entre faixas, a velocidade de subida/queda por evento, nem como a satisfação geral se compõe a partir dos segmentos.
+> **Recomendação (a ratificar — [R-69](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** tratar a satisfação como um valor **contínuo 0–100**; as seis faixas são apenas rótulos sobre intervalos, com **histerese de ±2 pontos** na fronteira (subir de faixa exige +2 acima do limite, cair exige −2 abaixo) para evitar oscilação de rótulo. A cada evento processado a satisfação anda por um passo **assimétrico** rumo ao alvo — `S += α·impacto`, com `α_baixa = 1,0` (notícia ruim anda mais rápido) e `α_alta = 0,6` (recuperação é mais lenta) —, impacto de evento comum limitado a **±8** e eventos estruturais (título, acesso, rebaixamento, quebra de promessa) a **±15…±25**. Entre eventos há **reversão lenta** de ~1 ponto/semana rumo à linha-base ajustada pela expectativa (§3), e a **paciência** (esta seção) amortece `α_baixa` (mais paciência → queda mais suave). A composição da satisfação geral a partir dos segmentos segue [R-68](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11). Racional: "notícia ruim viaja mais rápido", um único evento nunca detona a faixa inteira, e a satisfação sempre gravita de volta ao que a expectativa justifica.
 
 **Notas de ligação:** os efeitos econômicos das faixas (queda de público, receita, patrocínio) constam em [economia da torcida](./03-economia.md); a modelagem de reação da torcida é conduzida pela [IA de imprensa/torcida](./07-inteligencia-artificial.md).
 
@@ -175,7 +184,7 @@ As rivalidades podem ser:
 
 As rivalidades possuem **intensidade variável e podem esfriar com o tempo**. **Clássicos regionais tradicionais perdem menos força.**
 
-> **Pendência:** a fonte não quantifica a "intensidade" da rivalidade (escala, valores) nem a taxa de esfriamento ao longo do tempo.
+> **Recomendação (a ratificar — [R-70](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** modelar a intensidade da rivalidade em escala **0–100** com quatro faixas — 0–20 latente · 21–50 ativa · 51–80 forte · 81–100 clássico consagrado. Cada evento gatilho a eleva: confronto decisivo/título disputado entre os dois +10…+20; acesso ou rebaixamento causado pelo outro +10…+15; goleada ou polêmica +5…+10; confronto repetido +2…+5. O **esfriamento é exponencial** por temporada rumo a um **piso dependente do tipo**: rivalidades regionais/históricas têm piso alto (~50) e meia-vida longa (~5 temporadas); rivalidades criadas por evento pontual têm piso baixo (~10) e meia-vida curta (~2 temporadas) — `intensidade −= (intensidade − piso)·(1 − 0,5^(1/meiaVida))` a cada temporada sem novo confronto. Racional: dá números à regra da fonte ("intensidade variável, clássicos regionais perdem menos força"), mantendo o clássico tradicional sempre quente e deixando rusgas circunstanciais esfriarem.
 
 ## 9. Clássicos
 
@@ -234,7 +243,20 @@ O clube pode responder a eventos por meio de **oito posturas**. Cada postura **a
 | 7 | Criticar arbitragem |
 | 8 | Prometer reação |
 
-> **Pendência:** a fonte não detalha os efeitos numéricos de cada postura sobre torcida, imprensa e vestiário, nem eventuais cooldowns ou custos de uso repetido.
+> **Recomendação (a ratificar — [R-71](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** fixar os efeitos-base de cada postura sobre **torcida / imprensa / vestiário** (deltas nas escalas 0–100, escalados por veracidade e contexto — uma postura desmentida pelos fatos inverte o sinal):
+>
+> | # | Postura | Torcida | Imprensa | Vestiário |
+> | --- | --- | --- | --- | --- |
+> | 1 | Assumir responsabilidade | +3 | +4 | +2 |
+> | 2 | Proteger o elenco | −1 | −2 | +5 |
+> | 3 | Cobrar jogadores | +3 | +1 | −4 |
+> | 4 | Explicar uma venda | +2 | +2 | +1 |
+> | 5 | Pedir paciência | +1 (reputação alta) / −2 (baixa) | 0 | +2 |
+> | 6 | Reforçar o projeto | +2 | +1 | +3 |
+> | 7 | Criticar arbitragem | +4 | −3 | +2 |
+> | 8 | Prometer reação | +5 | +2 | +1 |
+>
+> Repetir a **mesma** postura sem entrega esvazia o efeito: multiplicador **1,0 → 0,5 → 0,25** a cada reuso dentro de ~5 eventos, e a partir do 3º uso vazio no mesmo ciclo o sinal **inverte** (a torcida passa a punir o discurso repetido). "Prometer reação" cria promessa verificável (§13) e "criticar arbitragem" carrega risco disciplinar — ambas têm o decaimento e o backfire mais acentuados. Racional: dá deltas auditáveis e curtos (nada domina a satisfação sozinho), pune a retórica vazia e amarra as posturas de risco às consequências já previstas em promessas (§13) e disciplina.
 
 **Notas de ligação:** a estrutura de comunicação do clube e os profissionais responsáveis (imprensa, marketing) constam em [comunicação/estrutura](./04-estrutura-do-clube-e-staff.md).
 
@@ -270,6 +292,8 @@ A reputação do gestor possui **10 dimensões**. Ela **muda por padrões de dec
 | 9 | **Gestão de crise** | Capacidade de reagir a momentos difíceis. |
 | 10 | **Confiabilidade** | Cumprimento de acordos e previsibilidade. |
 
+As 10 dimensões **acumulam-se de forma independente** (cada uma 0–100) pelo mesmo mecanismo de padrões de decisão descrito em [R-72](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) para os rótulos de clube.
+
 **Notas de ligação:** a IA usa a reputação do gestor ao avaliar decisões sob pressão, ver [IA de imprensa/torcida](./07-inteligencia-artificial.md).
 
 ## 15. Reputação do clube
@@ -291,7 +315,7 @@ O clube pode ser reconhecido por **12 rótulos**. Essa imagem **influencia jogad
 | 11 | Físico |
 | 12 | Regional |
 
-> **Pendência:** a fonte não especifica se os rótulos são mutuamente exclusivos ou acumuláveis, nem os limiares para adquirir ou perder cada rótulo.
+> **Recomendação (a ratificar — [R-72](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** tratar os 12 rótulos como **acumuláveis, não exclusivos** — cada rótulo tem uma intensidade **0–100** acumulada por padrões de decisão numa janela deslizante. Um rótulo fica **ativo/exibido** ao cruzar o limiar **ON ≥ 60** sustentado por ~2 temporadas e **esmaece** ao cair abaixo do limiar **OFF ≤ 40** (histerese, para não piscar). Cada decisão qualificadora soma **+3…+8** ao rótulo pertinente; a ausência de reforço decai **~5/temporada**. Pares antagônicos (Ofensivo↔Defensivo, Comprador↔Vendedor, Formador↔Comprador, Pagador confiável↔Instável) não coexistem fortes: o dominante é exibido e o oposto decai mais rápido. As **10 dimensões da reputação do gestor** (§14) usam o mesmo mecanismo de acúmulo por padrão de decisão (cada uma 0–100, movida por padrões e não por evento isolado). Racional: reputação é imagem consolidada por repetição (§11), então precisa de acúmulo com histerese e de antagonismos que impeçam rótulos contraditórios simultâneos.
 
 ## 16. Protestos e apoio
 
@@ -381,7 +405,7 @@ A torcida pode **esfriar** por:
 
 O **crescimento é gradual**. A **expansão para públicos de outras regiões é possível com campanhas maiores e alcance de marca**.
 
-> **Pendência:** a fonte não quantifica a velocidade de crescimento/esfriamento nem o alcance máximo de expansão regional.
+> **Recomendação (a ratificar — [R-73](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** a torcida (tamanho) muda de forma **gradual e limitada**: crescimento orgânico de base **±2%/temporada**, com eventos somando por cima — título nacional +8…+15%, acesso +5…+10%, campanha heroica +5% — e esfriando por baixo — rebaixamento −8…−12%, apatia/crise prolongada −5…−10% —, com **teto de oscilação de ±20%/temporada** (nada viraliza da noite para o dia). A **expansão regional** exige presença sustentada na elite + investimento de marketing: cada nova região abre um potencial de novos torcedores proporcional à reputação e ao alcance de marca do clube, e o **número de regiões alcançáveis** escala com a divisão e com a estrutura de marketing/comunicação (ver [estrutura do clube](./04-estrutura-do-clube-e-staff.md)). Racional: preserva "crescimento gradual" e "expansão possível com campanhas maiores" da fonte, sem permitir salto de torcida instantâneo.
 
 **Notas de ligação:** o retorno financeiro do crescimento da torcida (bilheteria, sócios, marketing) é tratado em [economia da torcida](./03-economia.md).
 
@@ -403,7 +427,7 @@ Mudanças de **nome, escudo, cores, camisa e símbolos** afetam:
 
 **Homenagens, despedidas e registros fortalecem a memória do clube.**
 
-> **Pendência:** a fonte não define custos, cooldowns ou regras de validação específicas para rebranding neste ponto (a validação de identidade visual é tratada em outra seção do escopo).
+> **Recomendação (a ratificar — [R-74](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** submeter o rebranding a **cooldown + custo (em dinheiro do clube, nunca real — coerente com no-pay-to-win) + impacto de identidade**. Mudança de **nome/escudo**: no máximo 1 a cada ~3 temporadas; troca de **cores/camisa (kit)**: até 1 por temporada. Custo proporcional à receita do clube. O segmento **tradicionalista** (§1) sofre penalidade imediata de satisfação **−5…−20**, escalada pela profundidade da mudança e por quanta história é rompida, mitigada por comunicação (§12) e recuperada em 2–4 temporadas se resultado e identidade se mantiverem; **homenagens, números aposentados e registros** são eventos positivos de memória. A **validação de identidade visual** (unicidade, legalidade, moderação) permanece deferida à seção de identidade visual do escopo. Racional: transforma rebranding numa decisão com fricção e consequência de torcida, sem duplicar a validação visual que pertence a outro documento.
 
 ---
 

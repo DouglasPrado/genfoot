@@ -10,7 +10,7 @@ O princípio que rege tudo é a **interface em camadas**: o usuário recebe prim
 
 A informação é sempre acompanhada de **explicabilidade funcional**: o Grinta diz por que algo aconteceu (uma proposta rejeitada, um jovem estagnado, uma torcida revoltada) sem revelar fórmulas, atributos ocultos ou dados privados de adversários. Sobre essa base assenta o **catálogo de relatórios** (partida, elenco, base, financeiro, mercado, profissionais e fim de temporada) e a **memória persistente do mundo**: a história do mundo (record book), a linha do tempo de cada clube e de cada jogador, e os rankings de reputação.
 
-Este documento reproduz fielmente o conteúdo da Seção 20 da fonte, marcando explicitamente as decisões ainda abertas com `> **Pendência:**`.
+Este documento reproduz fielmente o conteúdo da Seção 20 da fonte. As decisões que a fonte deixava abertas foram fechadas nesta passada de resolução — como estrutura/extração no próprio corpo ou como recomendação a ratificar (Série R), conforme o mapa em [§7](#7-pendências-consolidadas).
 
 ## Sumário
 
@@ -18,6 +18,7 @@ Este documento reproduz fielmente o conteúdo da Seção 20 da fonte, marcando e
 2. [Notificações priorizadas](#2-notificações-priorizadas)
 3. [Caixa de decisões](#3-caixa-de-decisões)
 4. [Explicabilidade](#4-explicabilidade)
+   - [4.1 Plano de recuperação (entidade)](#41-plano-de-recuperação-entidade)
 5. [Catálogo de relatórios](#5-catálogo-de-relatórios)
    - [5.1 Relatórios de partida](#51-relatórios-de-partida)
    - [5.2 Relatórios de elenco](#52-relatórios-de-elenco)
@@ -106,7 +107,22 @@ Consequências importantes precisam de **explicação funcional**. Quando algo r
 
 O limite é claro: **a explicação não revela fórmulas, atributos ocultos nem dados privados de adversários.** Ela descreve os fatores em termos funcionais e compreensíveis — o suficiente para o gestor aprender e decidir melhor — sem transformar o jogo em uma planilha exposta nem quebrar a igualdade competitiva entregando informação secreta sobre os outros clubes.
 
-> **Pendência:** o **formato das incertezas** — como a explicação comunica aquilo que o clube não sabe com precisão — ainda precisa ser definido operacionalmente (ver §7).
+O **formato das incertezas** segue uma regra fixa: quando o clube não sabe algo com precisão, a explicação apresenta **faixa qualitativa + indicador de confiança**, nunca um número de falsa precisão — reutilizando o mesmo mecanismo de bandas do `ScoutReport` ([R-04](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)). A largura da faixa **estreita conforme a qualidade da comissão** (ver [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)): uma comissão fraca devolve "provavelmente entre X e Y, confiança baixa"; uma comissão forte devolve faixas estreitas e confiança alta. A incerteza é sempre **comunicada, jamais escondida atrás de um valor fingidamente exato**.
+
+### 4.1 Plano de recuperação (entidade)
+
+Quando o clube entra em crise, a diretoria não demite o usuário: ela abre um **plano de recuperação** — a entidade que dá forma à intervenção citada na explicabilidade acima ("por que o clube entrou em recuperação") e detalhada em [`01-mundo-persistente-e-clubes` §1.3](./01-mundo-persistente-e-clubes.md) e na crise econômica de [`03-economia`](./03-economia.md).
+
+**Estrutura da entidade (`RecoveryPlan`):**
+
+- `gatilho` — o que a abriu (dívida, sequência esportiva ruim, rebaixamento, folha estourada);
+- `metas` — objetivos corretivos verificáveis (reduzir a folha a X, sair da zona, quitar uma parcela);
+- `restricoes` — limites impostos enquanto durar (congelamento de contratações, obrigação de vender, teto de folha);
+- `prazo` — janela para cumprir as metas;
+- `acompanhamento` — status de cada meta e a autonomia devolvida conforme o cumprimento;
+- `desfecho` — encerrada com sucesso (autonomia restaurada, ver [`01-mundo` §1.3](./01-mundo-persistente-e-clubes.md)) ou agravada (restrições mais severas).
+
+O plano é fonte de primeira ordem para as outras camadas deste documento: cada meta e restrição vira **item da caixa de decisões** (§3) com prazo e ação padrão; sua abertura e desfecho geram **notificação** (§2) e **deixam memória** na linha do tempo do clube (§6.2). A modelagem dos núcleos que operam o plano (Gestão e diretoria) está em [`04-estrutura-do-clube-e-staff` §5](./04-estrutura-do-clube-e-staff.md).
 
 ---
 
@@ -205,9 +221,11 @@ O fechamento anual reúne, em um único documento:
 - recordes;
 - riscos e prioridades do próximo ciclo.
 
-> **Pendência:** faltam definir as **regras operacionais** dos relatórios — **frequência de cada relatório**, níveis de detalhe por qualidade da comissão, quais informações são sempre visíveis, formato das incertezas, e retenção/comparação histórica (ver §7).
+**Gatilhos e linha-base (estrutura).** Cada relatório tem um gatilho definido: os de **partida** são gerados a cada jogo (prévia antes, acompanhamento durante, análise depois); **elenco, base, financeiro, mercado e profissionais** são atualizados no tique semanal do mundo e ficam consultáveis a qualquer momento como snapshot; o **fim de temporada** é gerado uma vez por temporada. Independentemente da qualidade da comissão, uma **linha-base é sempre visível** — resultado, saldo, contratos vencendo, lesões e próximos compromissos —, pois informação que exige decisão nunca depende de comissão boa (coerente com a interface em camadas, §1).
 
-> **Pendência:** ainda é preciso decidir **se relatórios ou estatísticas pagos podem existir** sem fornecer informação competitiva adicional. Qualquer informação estratégica exclusiva entraria em conflito com a regra de igualdade competitiva (proibição de pay-to-win), então a possibilidade de relatórios avançados pagos precisa ser validada com cuidado (ver §7).
+> **Recomendação (a ratificar — [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** escalonar **detalhe, frequência e retenção** pela qualidade da comissão (escala de núcleo **1–5**, ver [`04-estrutura` R-10/R-12](./04-estrutura-do-clube-e-staff.md)): nível 1 → só resultado + resumo de uma linha; nível 3 → as quatro dimensões (resultado/desempenho/execução/contexto) resumidas; nível 5 → abertura completa das quatro dimensões + tendências + projeções + bandas de incerteza estreitas. **Retenção:** detalhe completo das últimas **3 temporadas**, sintetizado além disso; record book e linhas do tempo (§6) são permanentes. Racional: a comissão vira o eixo único de profundidade (sem duplicar sistemas), a linha-base garante que decidir nunca dependa de comissão, e a retenção limita custo sem perder a memória histórica.
+
+> **Recomendação (a ratificar — [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** **não** existir relatório ou estatística pago. Todos os relatórios são gratuitos e a **qualidade da comissão (conquistada no jogo)** é o único diferenciador de profundidade e precisão. O ponto sensível de [`14-monetizacao`](./14-monetizacao.md) (pendência de "relatórios premium") deve ser fechado na **mesma direção — não-pago**: qualquer formatação exclusiva paga tangencia a linha de "vantagem de scouting/informação" e contradiz tanto a interface em camadas (§1 — o que exige decisão sempre aparece de graça) quanto a regra de no-pay-to-win. A monetização fica restrita a cosméticos, slots e conveniências que **não tocam informação**. Racional: elimina o risco competitivo na raiz e resolve o conflito potencial entre este documento e [`14-monetizacao`](./14-monetizacao.md) sem deixar zona cinzenta.
 
 ---
 
@@ -274,31 +292,25 @@ Rankings de **clubes** e de **gestores** são atualizados conforme desempenho, c
 
 Princípio essencial: **o ranking representa reputação e trajetória, não um bônus oculto de força.** Estar bem ranqueado descreve o que o clube ou o gestor conquistou; não confere vantagem mecânica escondida sobre os demais.
 
-> **Pendência:** o catálogo final de recordes, os critérios de desempate, a separação por competição/temporada/mundo, as regras de correção após punição ou anulação, e as cerimônias/homenagens/recursos de consulta histórica ainda estão abertos (ver §7).
+**Regras operacionais da memória (estrutura).** O **catálogo de recordes** é exatamente o enumerado no record book (§6.1) — campeões, acessos/quedas, maiores vendas, artilheiros, assistências, goleiros, público, sequências, revelações, ídolos, crises, punições, rivalidades e partidas marcantes —, tratado como catálogo canônico. Os recordes são mantidos em **três escopos separados**: por **competição**, por **temporada** e **all-time do mundo**, cada um com sua própria tabela. **Desempate** de um recorde: prevalece a marca alcançada primeiro (mais antiga); persistindo o empate, a obtida em menos partidas; por fim, exibe-se como **empate compartilhado**. **Correção após punição ou anulação:** o registro oficial segue a **homologação** (resolução consolidada nº 7 do [registro de decisões](../99-decisoes/registro-de-decisoes.md)) — um resultado punido ou anulado é corrigido no recorde oficial, mas a **versão anterior nunca é apagada** (resolução nº 6; apoia-se no event sourcing de [`../02-tecnico/01-arquitetura-de-dados.md`](../02-tecnico/01-arquitetura-de-dados.md)). **Cerimônias, homenagens e consulta histórica** são camadas narrativas e de UI sobre esses dados — hall da fama, número aposentado (liga-se a [`11-torcida` §21](./11-torcida-imprensa-e-narrativa.md)) e consulta via linhas do tempo (§6.2–6.3) —, sem conferir qualquer bônus mecânico.
 
 ---
 
 ## 7. Pendências consolidadas
 
-Itens desta seção que permanecem abertos na fonte (Seção 25 do documento definitivo):
+Os itens que a fonte (Seção 25 do documento definitivo) deixava abertos foram resolvidos nesta passada — parte como **estrutura/extração** direto no corpo, parte como **recomendação a ratificar** (Série R). Nenhum permanece como pendência aberta:
 
-> **Pendência (relatórios e explicabilidade):**
-> - frequência de cada relatório;
-> - níveis de detalhe por qualidade da comissão;
-> - quais informações são sempre visíveis;
-> - formato das incertezas;
-> - retenção e comparação histórica;
-> - diferença exata entre relatório comum e qualquer recurso pago.
+| Tema | Resolução |
+| --- | --- |
+| Frequência de cada relatório | Estrutura, [§5.7](#57-relatório-de-fim-de-temporada) (gatilhos por tipo) |
+| Níveis de detalhe por qualidade da comissão | [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) |
+| Quais informações são sempre visíveis | Estrutura, [§5.7](#57-relatório-de-fim-de-temporada) (linha-base sempre visível) |
+| Formato das incertezas | Estrutura, [§4](#4-explicabilidade) (faixa qualitativa + confiança, bandas do `ScoutReport`) |
+| Retenção e comparação histórica | [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) (detalhe pleno nas últimas 3 temporadas) |
+| Relatórios/estatísticas pagos | [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) — **não-pago**; fecha o conflito com [`14-monetizacao`](./14-monetizacao.md) |
+| Catálogo de recordes, desempate, escopos, correção, cerimônias | Estrutura, [§6.4](#64-rankings-e-reputações) |
 
-> **Pendência (relatórios pagos):**
-> - se relatórios ou estatísticas pagos podem existir sem fornecer informação competitiva adicional. Qualquer informação estratégica exclusiva conflita com a regra de igualdade competitiva e precisa de validação cuidadosa.
-
-> **Pendência (recordes e memória):**
-> - catálogo final de recordes;
-> - critérios de desempate;
-> - separação por competição, temporada e mundo;
-> - regras de correção após punição ou anulação;
-> - cerimônias, homenagens e recursos de consulta histórica.
+> **Nota:** [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) e [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) são **recomendações a ratificar** — direção de trabalho até o martelo do dono do produto. As demais linhas foram fechadas por reconciliação/extração e não dependem de ratificação.
 
 ---
 

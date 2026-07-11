@@ -68,7 +68,7 @@ grinta/
 
 > **Resolvido (2026-07-11):** as fontes de arquitetura descreviam o monorepo apenas com o app `web`; o encaixe do app Expo está agora fixado como **`apps/mobile`** (jogador) e o admin renomeado para **`apps/admin`** (Next.js), consistente com [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e com [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md).
 >
-> **Pendência:** ainda restam a ratificar, na modelagem final, os pacotes de UI por plataforma (ex.: `ui`/`ui-native`) e a configuração de EAS/OTA, junto com a granularidade de pacotes da pendência da seção 2.
+> **Nota:** os pacotes de UI por plataforma (`ui` para o admin web, `ui-native` para o app mobile) e a configuração de EAS/OTA seguem a decisão de granularidade de pacotes da seção 2 (início enxuto, expansão sob demanda) e os contratos de cliente em [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md).
 
 ### Pacotes (`packages/`)
 
@@ -78,7 +78,7 @@ grinta/
 | `database` | Modelagem Prisma, models e acesso a dados. Apenas persiste e recupera o estado produzido pelo `core`. |
 | `shared` | Tipos, DTOs e contratos usados por todas as aplicações, garantindo tipagem ponta a ponta. |
 
-> **Pendência:** As fontes divergem quanto à granularidade dos pacotes. O chat de arquitetura mais detalhado descreve um conjunto amplo (`domain`, `rules`, `simulation`, `match-engine`, `economy-engine`, `progression-engine`, `ai-engine`, `contracts`, `events`, `testkit`, `observability`, além de um app `simulator-cli`), enquanto a arquitetura MVP consolida tudo em `core`, `database` e `shared`. Definir se a topologia oficial parte do conjunto enxuto (MVP) e se expande, ou já nasce granular. Ver `./06-roadmap-de-implementacao.md`.
+> **Resolvido (reconciliação):** a topologia oficial de pacotes **parte do conjunto enxuto** (`core`, `database`, `shared`) e **expande sob demanda** para o conjunto granular (`domain`, `rules`, `simulation`, `match-engine`, `economy-engine`, `progression-engine`, `ai-engine`, `contracts`, `events`, `testkit`, `observability`, além do app `simulator-cli`) conforme as fronteiras internas amadurecem — coerente com as fases de evolução da seção 10 e sem reescrever regras. O conjunto granular é o **alvo de destino**, não o ponto de partida; a extração de cada pacote acompanha a estabilização da fronteira do módulo/engine correspondente (ver `./06-roadmap-de-implementacao.md`).
 
 ---
 
@@ -93,9 +93,9 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 | Admin do mundo (web) | **Next.js 15** | Painel de operação do mundo. |
 | Banco de dados | **PostgreSQL** | Estado persistente do mundo e fonte única de verdade. |
 | ORM / Persistência | **Prisma** | Camada `packages/database`. |
-| Mensageria | **RabbitMQ** | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna (ver `./01-arquitetura-de-dados.md`). |
+| Mensageria / broker | **Redis + BullMQ** na fundação; **RabbitMQ** (durável, exchanges, filas quorum) ou **NATS** na evolução | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna. Broker inicial recomendado em R-78 (a ratificar); desenho durável em `./01-arquitetura-de-dados.md`. |
 | Cache / dados efêmeros | **Redis** | Cache, presença, rate limiting, adapter de Socket.IO e locks não críticos. Nunca fonte definitiva de dados competitivos. |
-| Fila / Assíncrono | **Redis + BullMQ** (fontes anteriores) / **RabbitMQ** (ux-do-jogo) | Ver pendência de mensageria abaixo. |
+| Fila / Assíncrono | **Redis + BullMQ** | Execução de jobs dos workers (retries, backoff, agendamento, dead letters), reaproveitando o Redis. Ver R-78. |
 | Tempo real | WebSocket com **Socket.IO** | Partidas ao vivo, presença e comandos em tempo real. |
 | Armazenamento de arquivos | **Cloudflare R2** | Escudos, avatares, relatórios, snapshots grandes, backups e arquivos históricos. |
 | Monorepo | PNPM Workspaces + Turborepo | Gerência de pacotes e build. |
@@ -106,9 +106,9 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 
 ### Framework da API
 
-> **Pendência:** As fontes não convergem para um único framework de API. Os chats anteriores citam **NestJS**, **Fastify** e **AdonisJS** como candidatos; o chat de UX (Bloco 25) decide explicitamente **NestJS + TypeScript**. Manter como pendência formal até ratificação, adotando NestJS como candidato preferencial. Critérios: suporte a WebSocket, integração com a mensageria, ergonomia de módulos e curva de adoção.
+> **Recomendação (a ratificar — R-77):** adotar **NestJS + TypeScript** como framework oficial da API. Racional: é o candidato preferencial já citado e a única escolha explícita das fontes (Bloco 25 de UX); atende diretamente os critérios levantados — suporte de primeira classe a **WebSocket/Socket.IO** (gateways), **módulos** que espelham os bounded contexts da seção 6, injeção de dependência que reforça a fronteira domínio↔infra, e integração pronta com a camada de mensageria (R-78) e com Zod nas fronteiras. **Fastify** entra como *adapter* HTTP sob o NestJS caso a latência exija (NestJS roda sobre Fastify), sem trocar o framework; **AdonisJS** fica descartado por acoplar ORM/estrutura próprios que conflitam com Prisma e com o desenho de módulos.
 
-> **Pendência (mensageria):** As fontes divergem sobre a camada de trabalho assíncrono. Chats anteriores adotam **Redis + BullMQ**; o Bloco 25 de UX adota **RabbitMQ** para mensageria durável (com exchanges, dead letters e evolução para filas quorum) e reserva o Redis apenas para cache/efêmero. Decidir a mensageria oficial. A modelagem de eventos (Outbox/Inbox) em `./01-arquitetura-de-dados.md` é independente do broker escolhido.
+> **Recomendação (a ratificar — R-78):** adotar **Redis + BullMQ** como broker/execução assíncrona oficial na fase de fundação. Racional: para um **monólito modular + workers** (seção 1), Redis + BullMQ entrega filas duráveis, retries, backoff, jobs agendados e dead letters reaproveitando o Redis já presente (cache, presença, adapter de Socket.IO), sem o custo operacional de introduzir e operar um broker AMQP cedo. A modelagem de **Outbox/Inbox** (ver `./01-arquitetura-de-dados.md`) é independente do broker e preserva a garantia `AT_LEAST_ONCE` + idempotência. **Evolução:** migrar para **RabbitMQ** (exchanges, filas quorum, roteamento por routing key) — ou **NATS** para fan-out de eventos de domínio — quando volume, roteamento e múltiplos consumidores justificarem (fase 2+, ver seção 10). **Reconciliação:** onde as seções 7–10 e o [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md) descrevem RabbitMQ, trata-se do **desenho-alvo de mensageria durável**; na fundação o broker é Redis + BullMQ até a ratificação.
 
 O restante da stack (Next.js, PostgreSQL, Prisma, Redis, Cloudflare R2, observabilidade e deploy) é consenso e é adotado como padrão.
 
@@ -205,7 +205,7 @@ O `core` se organiza em um conjunto de motores (engines) cooperantes, cada um re
 | Notification Engine | Notificações estratégicas e de partida | [inteligencia-artificial](../01-game-design/07-inteligencia-artificial.md) |
 | Anti-Cheat Engine | Risk score, multi-conta, manipulação, auditoria | [anti-abuso-e-onboarding](../01-game-design/09-anti-abuso-e-onboarding.md) |
 
-> **Pendência:** os nomes/limites exatos dos pacotes que implementam cada engine (ver a divergência de granularidade na seção 2) ainda serão fixados na modelagem final.
+> **Nota:** os nomes/limites exatos dos pacotes que implementam cada engine seguem a decisão de granularidade da seção 2 — os engines coexistem dentro do `core` no início e são extraídos para pacotes dedicados (`match-engine`, `economy-engine`, `progression-engine`, `ai-engine`, `events`) quando a fronteira de cada engine estabiliza.
 
 ---
 
@@ -319,7 +319,7 @@ A arquitetura evolui por fases; nenhuma delas exige reescrever as regras do jogo
 
 | Fase | Foco | Conteúdo |
 | --- | --- | --- |
-| **1 — Fundação** | Single-host | Um EasyPanel, um PostgreSQL, um Redis, um RabbitMQ, apps/workers separados, R2 externo. |
+| **1 — Fundação** | Single-host | Um EasyPanel, um PostgreSQL, um Redis (cache + broker BullMQ), apps/workers separados, R2 externo. Broker durável dedicado (RabbitMQ/NATS) só a partir da fase 2, se ratificado (R-78). |
 | **2 — Escala horizontal** | Réplicas | Mais réplicas de API/gateway/workers, Redis Adapter, pool de conexões, particionamento de filas, banco ampliado. |
 | **3 — Especialização** | Extração seletiva | Extrair (só com necessidade comprovada) motor de partidas, notificações, histórico, busca, analytics. |
 | **4 — Distribuição por mundo** | Sharding lógico | Mundos atribuídos a clusters, roteamento por `gameWorldId`, migração de mundo, filas por partição, workers por região. |

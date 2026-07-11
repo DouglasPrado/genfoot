@@ -68,7 +68,7 @@ A economia não deve ser igual para todos os clubes. Cada clube tem um **perfil 
 
 O perfil cria decisões distintas. Um gigante pensa "preciso contratar um craque para ganhar a Libertadores"; um pequeno pensa "preciso vender meu atacante antes que o contrato acabe"; um endividado pensa "mesmo que o jogador seja importante, preciso fazer caixa".
 
-> **Pendência:** Relacionar estes 7 perfis (dinâmicos, resultado da gestão) com os "perfis iniciais de identidade" da economia global (ver [seção 14.3](#143-clubes-começam-pequenos-mas-com-identidade)), que descrevem clubes recém-criados, todos equilibrados em poder mas diferentes em estilo. São eixos diferentes (situação financeira vs. identidade de estilo) e o modelo precisa definir como convivem.
+> **Reconciliação:** Os **7 perfis econômicos** acima são **estados dinâmicos** — resultado da gestão, que mudam a cada temporada. Os **perfis iniciais de identidade** de [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§3.2) são o **estilo de nascença**, de evolução lenta. Não são o mesmo eixo e **coexistem sem conflito**: todo clube nasce com um perfil de identidade nomeado *e*, ao mesmo tempo, no mesmo ponto econômico de largada — pequeno, caixa igual ([ECO-001](../02-tecnico/05-catalogo-de-regras-e-formulas.md)) e `financialHealth` na faixa "Estável" (ver [seção 6](#6-saúde-financeira-financialhealth)). Ao longo das temporadas a gestão desloca o clube entre os 7 perfis econômicos, enquanto a identidade persiste. Assim, um "Clube Formador" (identidade) pode estar hoje "endividado" (perfil econômico) sem contradição: a identidade descreve o **estilo**, o perfil econômico descreve a **situação financeira atual**. O modelo mantém os dois eixos como campos separados (identidade do clube × estado do `ClubEconomy`).
 
 ## 3. Entidades econômicas conceituais
 
@@ -283,7 +283,14 @@ Isso gera decisão de gestão: ingresso barato → estádio cheio → moral sobe
 
 As fórmulas abaixo são **conceituais**: descrevem quais fatores entram e em que direção puxam o resultado. Os pesos, coeficientes e números exatos são objeto de calibração.
 
-> **Pendência:** Todos os coeficientes, pesos e constantes das fórmulas desta seção (e das seções 6, 7, 9 e 14) precisam ser calibrados e formalizados no catálogo de fórmulas. Ver `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-41):** proposta de 1ª passada para os coeficientes das fórmulas **conceituais desta seção 5** (os das seções 6, 7, 9 e 14 ficam sob R-42, R-44, R-46 e R-49). Dinheiro sempre em unidade mínima (`BigInt amountMinor`, moeda-base do mundo).
+>
+> - **Valor de mercado (5.3):** `valorMinor = clamp(valorBase · (1 + Σδ), pisoMinor, tetoMinor)`, com `valorBase = C · (overall/100)^3.5 · fatorIdade`, `C = 2000000000` (R$ 20.000.000,00 — jogador overall 100 no pico) e `fatorIdade` (0.55 aos 17 → **1.00** no pico 21–26 → 0.35 aos 34). Cada `δ` é assinado e ∈ [−0.40, +0.60]: potencial `+`, fama `+`, escassez de posição `+`, interesse externo `+`, risco de lesão `−`, instabilidade `−`, contrato < 6 meses `−0.40`, pressão financeira do vendedor `−`. Piso `pisoMinor = 500000` (R$ 5.000,00). Escassez de posição e interesse externo vêm do estado global ([14.6](#146-preço-dos-jogadores-como-reflexo-do-universo), R-49).
+> - **Público esperado (5.2):** `público = clamp(torcidaAtiva · interesse · momento · forçaAdv · fatorPreço, 0, capacidadeEstádio)`, fatores ∈ [0,1] exceto `torcidaAtiva`; `fatorPreço = clamp(1.4 − 0.5·(preço/preçoRef), 0.15, 1.0)`. Receita = `público · preçoIngressoMinor`.
+> - **Receita mensal (5.1):** soma direta dos cinco blocos, sem pesos livres — cada bloco é o agregado das suas fontes.
+> - **Valor de patrocínio (5.4):** `patrocínioMinor = baseMinor · f(torcida) · f(divisão) · f(reputação) · f(estrelas) · f(campanha) · f(mercadoLocal)`, cada `f ∈ [0.5, 2.0]` (neutro 1.0), `baseMinor` proporcional ao estágio da liga ([ECO-008](../02-tecnico/05-catalogo-de-regras-e-formulas.md)).
+>
+> Calibração final no lote de simulações econômicas (evolução do universo por múltiplas temporadas).
 
 ### 5.1 Receita mensal
 
@@ -357,7 +364,7 @@ Um índice central de **0 a 100** resume a situação econômica do clube.
 
 O índice é calculado a partir de: caixa, dívida, folha salarial, receita recorrente, resultado esportivo, contratos futuros, pressão da torcida e confiança da diretoria.
 
-> **Pendência:** Definir os pesos de cada fator no cálculo de `financialHealth` e os limiares exatos que disparam cada efeito. Calibração em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-42):** `financialHealth = clamp(Σ w_i · sub_i, 0, 100)` (regra [ECO-004](../02-tecnico/05-catalogo-de-regras-e-formulas.md)), cada `sub_i` normalizado 0–100. Pesos de 1ª passada (somam 1.00): **liquidez** (meses de fôlego, caixa ÷ despesa mensal) **0.22** · **endividamento** (dívida ÷ receita anual) **0.20** · **folha ÷ receita** (`wageBill/monthlyRevenue`) **0.18** · **receita recorrente/previsibilidade** **0.12** · **resultado esportivo recente** **0.10** · **compromissos futuros** (parcelas/contratos) **0.08** · **pressão da torcida** **0.05** · **confiança da diretoria** **0.05**. As **faixas de efeito** são as da tabela desta seção 6 (limiares 90/70/50/30/10), tratadas como canônicas; para evitar oscilação, a troca de faixa exige **histerese de ±3 pontos** e persistência por ≥ 1 ciclo mensal. Calibração final no lote de simulações econômicas.
 
 Exemplo de efeitos encadeados com `financialHealth < 40`: diretoria força venda → orçamento de transferência cai → jogadores cobram atrasos → moral do elenco cai → empresários ficam agressivos.
 
@@ -654,7 +661,7 @@ Economia do Jogo =
 
 O sistema usa esse estado para responder perguntas como: tem jogador demais ou de menos? Tem dinheiro demais ou de menos? Tem muito veterano ou pouco jovem? Tem atacante demais ou goleiro de menos? Os preços estão altos demais? Os clubes estão acumulando caixa ou quebrando?
 
-> **Pendência:** A "fórmula do universo" é conceitual — o produto (×) entre grandezas heterogêneas é ilustrativo, não uma equação literal. Formalizar como um conjunto de indicadores e alvos calibrados em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-49):** a "fórmula do universo" não é um produto literal, e sim um **vetor de indicadores com alvo + banda de tolerância**, mantido no `GameEconomyState` ([14.9](#149-ciclo-de-balanceamento-por-temporada)) e regulado por [ECO-002](../02-tecnico/05-catalogo-de-regras-e-formulas.md)/[ECO-003](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Alvos de 1ª passada: **jogadores ativos ideais = clubes × 48** (23 elenco + **10** reserva de mercado, ponto médio da faixa 7–12 de [14.4](#144-dimensionamento-de-jogadores) + **15** base, ponto médio de 10–20); **`totalMoney` alvo = clubes × caixaMédioAlvo**, com `caixaMédioAlvo ≈ 1.5 × caixa inicial` (R-43) na maturidade; idade média alvo derivada da pirâmide (R-44). Cada indicador vira um **controlador dirigido por gap**: quando sai da banda (proposta: ±10% para contagens, ±15% para `totalMoney`), o balanceador de fim de temporada ([CMP-005](../02-tecnico/05-catalogo-de-regras-e-formulas.md)) age (gera safra, ajusta preços/salários). Calibração final no lote de simulações econômicas.
 
 ### 14.3 Clubes começam pequenos, mas com identidade
 
@@ -662,7 +669,13 @@ Do ponto de vista econômico, o **caixa inicial fixo e igual para todos** é a p
 
 O princípio fundador (todos nascem pequenos, com o mesmo caixa e elenco equilibrado, diferindo apenas em **identidade/estilo**), os **perfis iniciais nomeados** e os **números de referência do elenco inicial** (valor do caixa, quantidade e faixa etária dos jogadores, teto de força total e pontos de identidade) são de responsabilidade de [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§3.1–3.2, o princípio fundador). Aqui interessa apenas o efeito econômico: caixa igual na largada e elenco velho como estado inicial que o sistema global rebalanceia.
 
-> **Pendência:** Os valores exatos (caixa inicial padrão, força total do elenco inicial e distribuição de pontos de identidade por perfil) estão registrados em [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§3.1–3.2) e serão calibrados em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-43):** proposta de 1ª passada para os números de largada (a fonte de registro permanece [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) §3.1–3.2; aqui fixa-se o valor econômico concreto para ratificação).
+>
+> - **Caixa inicial padrão** (único e idêntico para todos — [ECO-001](../02-tecnico/05-catalogo-de-regras-e-formulas.md)): **R$ 5.000.000,00 → `500000000`** (`BigInt amountMinor`, moeda-base do mundo), gravado em `worldConfig.startingCash` / `WorldConfig.initialClubCashMinor`. Racional: ~6–10 meses de fôlego da folha de um clube de Liga Inicial, sem permitir contratar estrela na largada; preserva a economia fechada ([ECO-003](../02-tecnico/05-catalogo-de-regras-e-formulas.md)) e a justiça inicial.
+> - **Força total do elenco inicial:** teto comum de **1.500 pontos** repartidos entre setores (GK/defesa/meio/ataque), **23 jogadores** → média ≈ **65 de overall** por jogador. Elenco propositalmente **envelhecido**: ≈70% na faixa 29–34 e ≈30% em 26–28, potencial baixo (teto de evolução ≤ +3) e contratos curtos (1–2 temporadas) — é o déficit de pirâmide que o balanceador corrige ([14.5](#145-geração-baseada-em-aposentadoria-e-pirâmide-etária), R-44).
+> - **Pontos de identidade:** total fixo de **100 pontos** entre 6 dimensões (base, torcida, estrutura, elenco, finanças, disciplina); baseline neutro ≈ 16–17 por dimensão; cada perfil nomeado desloca ±10–15 pontos mantendo a soma 100 (ex.: "Clube Formador" = base 30 / elenco 12 / demais ~14–15).
+>
+> Calibração final no lote de simulações econômicas.
 
 O clube não nasce grande: fica grande. O crescimento ocorre em camadas (pequeno → emergente → médio → forte → grande → dominante) e depende de reputação, títulos, torcida, estrutura, saúde financeira, qualidade do elenco, jogadores revelados e histórico. Um clube rico mas mal administrado não vira grande automaticamente. Subir deve ser difícil.
 
@@ -736,7 +749,7 @@ A **posição** dos gerados também é balanceada (distribuição base aproximad
 
 A **qualidade** segue equilíbrio: como todos começam pequenos, nascem poucas estrelas (distribuição sugerida: comuns 60%, úteis 25%, promissores 10%, muito promissores 4%, joias raras 1%). O nível médio pode subir lentamente à medida que o universo amadurece.
 
-> **Pendência:** Confirmar e calibrar todas as porcentagens desta seção (pirâmide, posição, qualidade) e as regras de deslocamento da geração por déficit. Números são sugestões de brainstorming. Ver `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-44):** adotar como 1ª passada canônica as porcentagens já tabeladas nesta seção (regra [PLY-002](../02-tecnico/05-catalogo-de-regras-e-formulas.md)): **pirâmide** 16–20: 25% · 21–24: 25% · 25–29: 30% · 30–34: 15% · 35+: 5%; **posição** GK 8% · ZAG 16% · LAT 14% · VOL 12% · MEI 16% · PON 14% · ATA 12% · versáteis 8%; **qualidade** comuns 60% · úteis 25% · promissores 10% · muito promissores 4% · joias raras 1%. **Regra de deslocamento por déficit:** safra por faixa ∝ `gap_faixa = max(0, alvoPirâmide − atual)`; por aposentado, **1 reposição direta + fração 0.25 para o mercado** (100 aposentados → 100 + 25); universo envelhecido concentra a geração nas faixas jovens (ex. da seção: 60% em 16–20, 25% em 21–24, 10% em 25–29, 5% em 30–32), e universo jovem demais desloca para 21–29. Posição e qualidade da safra são reponderadas pelo déficit por posição/qualidade. Calibração final no lote de simulações econômicas.
 
 ### 14.6 Preço dos jogadores como reflexo do universo
 
@@ -857,7 +870,7 @@ Em crise, o clube pode sofrer redução orçamentária, congelamento de contrata
 
 Esses estágios refinam, em progressão narrativa, as faixas de `financialHealth` (ver [seção 6](#6-saúde-financeira-financialhealth)) e se conectam às punições econômicas e à inadimplência descritas na [seção 10](#10-dívidas-punições-e-loops-de-consequência).
 
-> **Pendência:** Definir o mapeamento entre os estágios de crise (estável→…→reestruturação) e as faixas de `financialHealth` da [seção 6](#6-saúde-financeira-financialhealth), além dos gatilhos que promovem ou rebaixam o clube entre estágios. Calibração em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-45):** mapeamento de 1ª passada entre estágios de crise e as faixas de `financialHealth` ([seção 6](#6-saúde-financeira-financialhealth), [ECO-004](../02-tecnico/05-catalogo-de-regras-e-formulas.md)): **estável** ↔ 70–100 · **atenção** ↔ 50–69 · **pressão** ↔ 30–49 · **crise** ↔ 10–29 · **insolvência** ↔ 0–9 · **reestruturação** = estado especial (entra a partir de insolvência com inadimplência/intervenção; sai quando `financialHealth ≥ 30` sustentado por ≥ 3 ciclos mensais). **Gatilhos:** promover/rebaixar um estágio exige cruzar o limiar de faixa com **histerese ±3** e persistência por ≥ 1 ciclo (mesma regra de R-42); além disso, **gatilhos duros** independem da faixa — atraso salarial > 2 meses força ≥ crise; dívida fiscal com bloqueio de inscrição força ≥ insolvência ([ECO-011](../02-tecnico/05-catalogo-de-regras-e-formulas.md), [CMP-017](../02-tecnico/05-catalogo-de-regras-e-formulas.md)). Calibração final no lote de simulações econômicas.
 
 ### 15.6 Índices de inflação por categoria
 
@@ -872,7 +885,7 @@ A inflação do mundo não é um número único. O universo mantém índices dis
 
 Isso estende o `MarketInflation` conceitual ([3.7](#37-marketinflation)), que trata salários, transferências e patrocínios, e opera sob o controle global de inflação ([14.7](#147-controle-de-inflação)). Uma regra é inegociável: **mudanças futuras de índice não reescrevem contratos já assinados** — a inflação afeta novos acordos, não os vigentes.
 
-> **Pendência:** Calibrar cada índice de inflação (preços, salários, transferências, construção, crédito, regional), suas faixas de variação por temporada e a interação com o controle global de inflação ([14.7](#147-controle-de-inflação)). Ver `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-46):** cada índice é um multiplicador que parte de **1.00** e é reajustado por temporada dentro de uma banda (governado por [ECO-012](../02-tecnico/05-catalogo-de-regras-e-formulas.md); contratos vigentes ficam imunes por [ECO-015](../02-tecnico/05-catalogo-de-regras-e-formulas.md)). Faixas de 1ª passada — **variação por temporada** / **banda acumulada**: preços gerais ±3% / [0.90, 1.30] · salários 0%…+5% (viés de alta) / [0.95, 1.50] · transferências −5%…+8% (mais volátil) / [0.85, 1.60] · construção +1%…+4% / [1.00, 1.40] · crédito (juros) base 0.5%–3.0% a.a., passo ±0.5 p.p./temporada · regional ±5% por região / [0.80, 1.30]. **Interação com o controle global ([14.7](#147-controle-de-inflação)):** se `totalMoney` desvia > ±15% do alvo (R-49), o balanceador congela salários/preços e reduz premiações até reconvergir. Calibração final no lote de simulações econômicas.
 
 ## 16. Observação e recrutamento (scouting)
 
@@ -908,7 +921,7 @@ A qualidade de um relatório depende da competência do olheiro, do tempo dedica
 
 O relatório pode conter avaliação atual, potencial estimado, pontos fortes e fracos, funções em que o jogador rende, personalidade percebida, adaptação provável, situação contratual conhecida, faixa de valor, uma recomendação e — crucialmente — um **nível de confiança**. O relatório nunca entrega a verdade absoluta: entrega uma **estimativa com incerteza declarada**. Um mesmo jogador pode ser lido como "83 a 88, risco emocional detectado" por um olheiro bom e como "70 a 90, risco subestimado" por um olheiro ruim.
 
-> **Pendência:** A formalização do `ScoutReport` (faixas estimadas, confiança, traços visíveis, riscos ocultos detectados e recomendação de contratar/monitorar/evitar/emprestar) e a curva de estreitamento da incerteza por número de observações estão registradas como pendência no [Sistema de jogadores](./02-sistema-de-jogadores.md) e no catálogo `../02-tecnico/05-catalogo-de-regras-e-formulas.md`. A dependência econômica a calibrar aqui é o custo de scouting contra o ganho de precisão da informação.
+> **Recomendação (a ratificar — R-47):** a estrutura do `ScoutReport` e a informação assimétrica ficam em [PLY-012](../02-tecnico/05-catalogo-de-regras-e-formulas.md) / [Sistema de jogadores](./02-sistema-de-jogadores.md) (não duplicar aqui). A **dependência econômica** — custo × precisão — recebe esta 1ª passada: **custo por observação** `custoObsMinor` proporcional ao foco, de **`2000000`** (R$ 20.000,00, missão regional) a **`20000000`** (R$ 200.000,00, missão intercontinental). **Estreitamento da incerteza:** largura da faixa estimada `w = w0 · n^(−0.5) · (1.4 − 0.8·competênciaNorm)`, com `w0 = 40` pontos de overall (1 observação), `n` = nº de observações e **piso `w_min = 4`** (a verdade nunca é revelada — [PLY-012](../02-tecnico/05-catalogo-de-regras-e-formulas.md)). O ganho marginal decresce por `n^(−0.5)`: o ROI de scouting satura por volta de **6–8 observações** por alvo, ponto em que o custo tende a superar o ganho de precisão. Calibração final no lote de simulações econômicas.
 
 ### 16.5 Relatórios contraditórios
 
@@ -962,7 +975,7 @@ O exame médico é uma **etapa do processo com poder de decisão**, não um cari
 
 O exame **não revela necessariamente todo o histórico médico** ao clube comprador sem as permissões aplicáveis — coerente com as camadas de informação médica assimétrica do [Sistema de jogadores](./02-sistema-de-jogadores.md). Ou seja, "aprovar com risco" pode significar que o comprador aceita uma incerteza que não conseguiu eliminar.
 
-> **Pendência:** Os limiares clínicos que separam aprovar / aprovar com risco / reprovar, e como cada resultado altera valor de mercado, prêmio de seguro e termos do contrato, precisam de calibração. Ver `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Recomendação (a ratificar — R-48):** o exame produz um `riscoMédico` 0–100 (histórico de lesão, idade, carga, achados), e os limiares de 1ª passada mapeiam os resultados da etapa ([ECO-016](../02-tecnico/05-catalogo-de-regras-e-formulas.md)): `risco < 30` → **aprovar** · `30 ≤ risco < 55` → **aprovar com risco** · `55 ≤ risco < 75` → **solicitar avaliação adicional** (trava) · `risco ≥ 75` → **reprovar**; **alterar termos** é a saída paralela disponível em "aprovar com risco". **Efeitos:** "aprovar com risco" reduz o valor de mercado (5.3) em `−0.5%·(risco−30)` (≈ −12% a risco 54); prêmio de seguro `= base·(1 + 0.03·risco)`; "alterar termos" propõe preço −10%…−25% e/ou contrato mais curto / cláusula de proteção. O exame não revela todo o histórico sem permissão ([PLY-012](../02-tecnico/05-catalogo-de-regras-e-formulas.md)): "aprovar com risco" pode ser incerteza aceita, não risco medido. Calibração final no lote de simulações econômicas.
 
 ### 17.4 Opção vs. obrigação de compra
 

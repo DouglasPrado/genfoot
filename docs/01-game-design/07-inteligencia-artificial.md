@@ -36,7 +36,7 @@ A IA do Grinta deve:
 
 O modelo técnico base é **Rule-based AI + Scoring System + Utility AI + arquitetura orientada a eventos**. Não se começa por machine learning, redes neurais ou IA generativa decidindo partidas/mercado — isso seria difícil de balancear, caro, imprevisível e quase impossível de depurar. A IA generativa entra apenas na narrativa (ver seção 5).
 
-> **Pendência:** definir a escala numérica canônica dos atributos e scores (o chat usa 0–100 em vários exemplos, mas não formaliza limites nem normalização entre módulos).
+> **Escala canônica:** todo atributo, traço e score de jogador usa **0–100**, declarado como escala canônica em [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md) §2 (é a faixa já dominante nos exemplos deste documento). Módulos que usam outra faixa por conveniência (ex.: energia/fadiga em %) convertem a partir de 0–100, nunca redefinem a escala. Os pesos e modificadores internos de score (§4.4) são um balanceamento à parte, ainda em aberto.
 
 ---
 
@@ -203,7 +203,7 @@ Controla: propostas, interesse de clubes, disputa por jogadores, renovações, v
 
 ### 3.4. Jogadores (comportamento)
 
-Cada jogador tem uma IA simples de comportamento com atributos mentais: ambição, lealdade, profissionalismo, pressão, disciplina, temperamento, ganância, liderança, resiliência, ego, adaptação.
+Cada jogador tem uma IA simples de comportamento movida pela fatia comportamental da **lista canônica de atributos, estados e traços** definida em [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md) §2 (escala 0–100) — esta seção **não mantém lista própria**. Pesam aqui: os **traços de personalidade** (ambição, lealdade, profissionalismo, temperamento, ganância, ego, adaptabilidade), os **atributos mentais** de mesmo nome que evoluem com treino (disciplina, liderança, resiliência) e o **estado** de pressão. A distinção importa: traços têm intensidade e visibilidade e enviesam o comportamento; atributos mentais são notas que sobem com treino; estados são temporários.
 
 Afeta decisões: aceitar renovação, pedir aumento, forçar saída, reclamar no banco, render mais em jogo grande, cair sob pressão, liderar elenco, causar crise, voltar melhor após lesão.
 

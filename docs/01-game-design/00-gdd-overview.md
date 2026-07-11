@@ -102,13 +102,13 @@ A diretoria influencia contratos, patrocínios, objetivos, pressão sobre o téc
 
 Cada jogador é único — não apenas um conjunto de números. Possui nome, nacionalidade, idade, posição, pé dominante, altura, peso, perfis físico/técnico/mental, personalidade, história de vida, potencial, fase atual, moral, forma física, relacionamento com o clube, ambição, histórico de lesões, histórico de clubes e eventos extracampo.
 
-Os atributos se dividem em três eixos:
+Os atributos se dividem em três eixos. A **lista canônica completa (escala 0–100), com o grid de goleiro e a distinção entre atributo, estado e traço, está em** [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md) §2 — este overview apenas a resume:
 
-- **Técnicos:** finalização, passe, cruzamento, drible, marcação, desarme, cabeceio, controle de bola, lançamento, chute de longe, bola parada, visão de jogo.
+- **Técnicos:** finalização, passe (curto e longo/lançamento), cruzamento, drible, controle de bola, marcação, desarme, cabeceio, chute de longe, bola parada, visão de jogo.
 - **Físicos:** velocidade, aceleração, força, resistência, impulsão, agilidade, equilíbrio, explosão, recuperação física.
-- **Mentais:** garra, determinação, liderança, frieza, concentração, disciplina, inteligência tática, coragem, regularidade, ambição, pressão emocional, lealdade.
+- **Mentais:** inteligência tática, tomada de decisão, concentração, disciplina, frieza, determinação/garra, liderança, regularidade, coragem, resiliência.
 
-> **Pendência:** esta lista de atributos mentais diverge da usada em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) (ambição, lealdade, profissionalismo, pressão, disciplina, temperamento, ganância, liderança, resiliência, ego, adaptação). A lista canônica de atributos mentais ainda precisa ser unificada — o dono do assunto é o doc do jogador [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md), que por ora não fecha a lista.
+Ambição, lealdade, profissionalismo, temperamento, ganância, ego e adaptabilidade **não são atributos**: são **traços de personalidade** (é a mesma reconciliação que unifica a lista de [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) §3.4); "pressão emocional" é um **estado**, não um atributo. O **goleiro** tem um grid próprio (reflexos, saída de gol, reposição, jogo aéreo, um-contra-um, defesa de pênalti). Todos detalhados na fonte canônica.
 
 A **história de vida** influencia a geração inicial gerando tendências (não regras absolutas). O jogador **evolui com o tempo** conforme idade, treinamento, minutos jogados, estrutura do clube, comissão, moral, lesões, estilo tático, posição usada, eventos extracampo, qualidade dos companheiros, pressão da torcida e momento da carreira.
 

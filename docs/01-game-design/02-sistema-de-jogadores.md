@@ -6,7 +6,7 @@
 
 O Sistema de Jogadores é o núcleo do **Grinta**. Ao contrário de managers clássicos como o Brasfoot, onde o atleta carrega atributos essencialmente fixos, aqui o jogador **nasce com uma tendência, não com um destino fixo**. Ele começa com uma base, um talento natural e um potencial, mas os clubes por onde passa, a metodologia de treino, os minutos jogados e os eventos de carreira empurram seus atributos para direções específicas. Dois jogadores gerados com o mesmo potencial podem terminar a carreira como atletas completamente diferentes.
 
-Este documento consolida o modelo conceitual do jogador: a fórmula de identidade, a separação entre atributo, estado e traço, a geração inicial, o sistema de potencial em camadas, as tabelas de treino e evolução, a memória acumulativa de jogador e clube, e o papel da personalidade. Ao final, registra o backlog de vazios de design que ainda precisam ser fechados.
+Este documento consolida o modelo conceitual do jogador: a fórmula de identidade, a separação entre atributo, estado e traço (com a **lista canônica de atributos** na §2), a geração inicial, o sistema de potencial em camadas, as tabelas de treino e evolução, a memória acumulativa de jogador e clube, e o papel da personalidade. Ao final, a §18 fecha os vazios de design que a fonte enumerava — consolidando-os em seções existentes, especificando-os como subsistemas, deferindo-os ao documento dono ou promovendo-os a recomendações a ratificar.
 
 > As fórmulas exatas e as definições de schema (tipos, campos, ranges) vivem em `../02-tecnico/02-modelo-de-dados.md` e `../02-tecnico/05-catalogo-de-regras-e-formulas.md`. Aqui tratamos apenas do conceito de design.
 
@@ -29,7 +29,7 @@ Este documento consolida o modelo conceitual do jogador: a fórmula de identidad
 15. [Elenco como grupo social](#15-elenco-como-grupo-social)
 16. [Medicina, saúde e recuperação](#16-medicina-saude-e-recuperacao)
 17. [Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores](#17-ciclo-de-vida-do-jogador-aposentadoria-funcionario-e-protecao-de-menores)
-18. [Backlog de gaps de design](#18-backlog-de-gaps-de-design)
+18. [Subsistemas complementares e recomendações a ratificar](#18-subsistemas-complementares-e-recomendacoes-a-ratificar)
 
 ---
 
@@ -98,6 +98,33 @@ A ordem de causalidade entre as três categorias é o coração do modelo:
 4. **Eventos alteram estados imediatamente e traços lentamente** — um evento forte muda a moral hoje e, se recorrente, pode reconfigurar um traço.
 
 > Exemplo de cadeia: jogador com traço "sensível a críticas" + mídia criticando → pressão sobe mais → confiança cai mais → joga pior. Se houver bom suporte psicológico, ao longo do tempo ele pode evoluir estabilidade emocional (mudança lenta de traço).
+
+### Lista canônica de atributos, estados e traços
+
+Esta subseção é a **fonte única** da lista de atributos do jogador. O overview [`00-gdd-overview.md`](./00-gdd-overview.md) (§7) e a IA de comportamento [`07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) (§3.4) apenas **referenciam** esta lista — não mantêm listas próprias. Ela unifica as três listas que antes divergiam.
+
+> **Escala canônica: 0–100** para todo atributo, estado, traço e score de jogador no Grinta. É a escala já dominante no corpus (exemplos de geração nesta seção e na §3, pesos e scores da IA em [`07-inteligencia-artificial.md`](./07-inteligencia-artificial.md), telas de [`../04-ui-ux/`](../04-ui-ux/)) e vale para todos os módulos. Quando um módulo usa outra faixa por conveniência (ex.: energia/fadiga em %), ele **converte** a partir de 0–100, nunca redefine a escala. Os tipos e ranges de schema ficam em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md).
+
+**Atributos técnicos (0–100)** — estruturais; evoluem pelos treinos técnicos da §6:
+finalização, chute de longe, passe curto, passe longo (lançamento), cruzamento, drible, controle de bola (domínio / primeiro toque), marcação, desarme, cabeceio, bola parada (falta / escanteio / pênalti), visão de jogo.
+
+**Atributos físicos (0–100)** — evoluem pelos treinos físicos da §6:
+velocidade, aceleração, força, resistência, impulsão, agilidade, equilíbrio, explosão, recuperação física.
+
+**Atributos mentais (0–100)** — características mentais **estruturais** (mudam devagar), evoluídas pelos treinos mentais e táticos da §6:
+inteligência tática (leitura de jogo / posicionamento), tomada de decisão, concentração / foco, disciplina, frieza, determinação / garra, liderança, regularidade, coragem, resiliência.
+
+**Atributos de goleiro (0–100)** — grid próprio do goleiro, somado aos atributos físicos e mentais comuns:
+reflexos, posicionamento de gol, saída de gol (domínio de área / cruzamentos), reposição com os pés, jogo aéreo, um-contra-um, defesa de pênalti, comando de área / comunicação.
+
+**Overall / média** é **derivado**, não armazenado como atributo: é a média ponderada do grid conforme a posição e a função (§10). Os pesos de agregação por posição são decisão de balanceamento — ver **R-09** (§18.3).
+
+#### Atributos mentais ≠ traços de personalidade
+
+Esta é a reconciliação central das três listas. O que [`07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) §3.4 chamava de "atributos mentais" (ambição, lealdade, profissionalismo, temperamento, ganância, ego, adaptação) **não** integra o grid 0–100: são **traços de personalidade** (categoria "Traço" acima), que carregam intensidade e visibilidade e alimentam a IA de comportamento — não são notas que sobem com treino. Da mesma forma, "pressão emocional", que [`00-gdd-overview.md`](./00-gdd-overview.md) §7 listava entre os mentais, é um **estado**, não um atributo.
+
+- **Traços canônicos de personalidade** (cada um com intensidade 0–100 + visibilidade `visível` / `detectado por scout` / `oculto`): ambição, lealdade, profissionalismo, temperamento, ganância, ego, adaptabilidade — mais os traços comportamentais da §14 (raçudo, frio em decisão, instável emocionalmente, influenciável, sensível a críticas, profissional exemplar). `disciplina`, `liderança` e `resiliência` existem **como atributo mental** (nota que evolui com treino) e podem ter um **traço correlato** de tendência estável (ex.: "líder nato", "indisciplinado", "resiliente") — são planos distintos, não duplicação.
+- **Estados canônicos** (temporários, 0–100; §2, categoria "Estado"): moral, fadiga, confiança, pressão (emocional), motivação, forma recente, ansiedade, foco do jogo.
 
 ---
 
@@ -169,7 +196,7 @@ Jogador gerado — Rafael Nascimento, 16 anos, origem no futebol de rua, famíli
 
 > Resultado final: não virou só um driblador — virou um jogador completo por causa dos clubes e treinos. O mesmo atleta gerado, em clubes diferentes, teria terminado como perfis distintos.
 
-> **Pendência:** a estrutura completa de safra (`YouthClass`) e o motor de geração por clube (`YouthGenerationEngine`) pertencem ao Sistema de Base/Clube; aqui documentamos apenas a geração individual do atleta. Verificar limite de escopo com o documento de base quando existir.
+> **Fronteira de escopo:** a estrutura completa de safra (`YouthClass`) e o motor de geração por clube (`YouthGenerationEngine`) pertencem ao Sistema de Base/Clube; este documento é dono apenas da **geração individual** do atleta descrita acima. A competição por um mesmo jovem entre clubes (ver §18.4) e a especialização da base por posição (§11) também são resolvidas no documento de base, consumindo os fatores definidos aqui.
 
 ---
 
@@ -626,7 +653,7 @@ A promoção de um jovem ao elenco principal deve considerar: nível atual, pote
 
 Regra dupla: **promover não garante desenvolvimento**, e **manter um jovem sem jogar pode prejudicar sua trajetória** (ver seção 9 — temporada no banco tende à estagnação).
 
-> A moral coletiva do elenco emerge das morais individuais e do ambiente. A formalização de um índice de vestiário e do sistema de relações entre jogadores segue em aberto (ver seção 18).
+> A moral coletiva do elenco emerge das morais individuais e do ambiente. O **índice de clima de vestiário** (`LockerRoomClimate`) e o **sistema de relações/química entre jogadores** (`PlayerChemistry`) estão especificados na §18.2, com seus valores propostos em R-03 e R-07.
 
 ---
 
@@ -738,64 +765,73 @@ Geração e promoção são **processos diferentes**. Surgir no mundo (geração
 
 Um jovem não promovido pode: permanecer na base, ser emprestado, mudar de clube, ser liberado, ou encerrar a busca por uma carreira profissional.
 
-> **Pendência:** a transição de jogador para funcionário (técnico, olheiro, dirigente) e o schema de papéis de staff pertencem ao Sistema de Clube/Funcionários; aqui registramos apenas a regra de persistência de identidade. Verificar limite de escopo com o documento de clube quando existir.
+> **Fronteira de escopo:** a transição de jogador para funcionário (técnico, olheiro, dirigente) e o schema de papéis de staff pertencem ao Sistema de Clube/Funcionários ([`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md)). Este documento é dono apenas da **regra de persistência de identidade**: a pessoa e sua memória de jogador (§13) sobrevivem à mudança de papel (pessoa ≠ carreira, conforme as regras transversais do overview).
 
 ---
 
-## 18. Backlog de gaps de design
+## 18. Subsistemas complementares e recomendações a ratificar
 
-Os vazios de design abaixo foram enumerados na fonte e permanecem em aberto. Cada um precisa de resolução própria antes de virar regra fechada.
+Os vazios de design enumerados na fonte são fechados aqui por quatro caminhos: **(18.1)** consolidados quando já cobertos por outra seção; **(18.2)** especificados como subsistema (entidade/estado) próprio do jogador; **(18.3)** promovidos a **Recomendação (a ratificar — R-XX)** quando dependiam de um valor de balanceamento ou de uma decisão de produto; **(18.4)** deferidos ao documento dono quando o assunto não é do sistema de jogadores. Nenhum permanece como pendência aberta.
 
-> **Pendência:** Compatibilidade jogador-clube — formalizar o cálculo de encaixe (estilo do clube + posição + personalidade + pressão do ambiente + metodologia + técnico + idioma/cultura + necessidade de minutos) e como ele modula o ganho de desenvolvimento.
+### 18.1. Gaps já cobertos por outras seções
 
-> **Pendência:** Empréstimos como ferramenta estratégica — tratar empréstimo como decisão de desenvolvimento, com variáveis do clube destino (nível da liga, minutos esperados, posição de uso, pressão local, qualidade do técnico, estrutura médica, estilo, distância cultural, torcida, visibilidade) e retornos "melhor/igual/pior".
+- **Aproveitamento de potencial (camada única de cálculo).** O sistema único já existe: as três camadas da §4 (natural → aproveitável → funcional) alimentam a fórmula de `developmentGain` da §6, com fatores de formação, minutos, suporte e penalidades; os coeficientes numéricos vivem em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+- **Eventos de reversão.** O catálogo de caminhos de recuperação por tipo de crise já está na §9 ("Eventos de reversão", tabela Crise → revertida por).
+- **Reputação, tradição, momento e expectativa como variáveis separadas.** Já separadas na §13 ("As quatro variáveis institucionais"), com velocidades de mudança e fluxos.
+- **Especialização da base por posição.** É o lado-clube da §11 (reputação específica por posição) somado à `DevelopmentSignature` da §7; o motor de safra que a produz pertence ao documento de base (fronteira de escopo na §3).
+- **Qualidade do treinamento por área.** A taxonomia de treino está na §6 (técnico / físico / tático / mental), à qual se soma o **treino de goleiro** (reflexos, saída, reposição, jogo aéreo, um-contra-um, defesa de pênalti). A "resposta individual diferente por jogador" é o `baseLearningRate` já definido na fórmula da §6.
 
-> **Pendência:** Clima do vestiário — definir um índice de vestiário (moral do elenco + confiança no técnico + liderança interna + satisfação contratual + distribuição de minutos + estabilidade política − panelas − conflitos − salários atrasados − promessas quebradas) e seus efeitos coletivos.
+### 18.2. Subsistemas especificados (entidades e estados)
 
-> **Pendência:** Identidade tática do clube separada do técnico — modelar a cultura tática que sobrevive à troca de treinador e o custo de encaixe quando o clube muda de filosofia.
+**Função e estilo individual do jogador.** Além da posição, o jogador tem uma **função** e um **estilo** — os arquétipos da §10 elevados a atributo estrutural. Enumeração canônica por linha: goleiro (`clássico` / `líbero` / `shot-stopper`); zagueiro (`construtor` / `marcador` / `cobertura` / `líder` / `físico`); lateral (`marcador` / `ala ofensivo` / `construtor`); volante (`destruidor` / `organizador` / `box-to-box` / `regista`); meia (`criativo` / `avançado` / `chegador`); ponta (`driblador` / `finalizador` / `trabalhador`); atacante (`pivô` / `móvel` / `finalizador` / `pressionador`). A função é resultado do histórico de desenvolvimento (§8, §10), não fixa no nascimento.
 
-> **Pendência:** Estilo individual do jogador — além de posição, dar função e estilo (ex.: zagueiro construtor / marcador / cobertura / líder / físico; volante destruidor / organizador / box-to-box / regista; atacante pivô / móvel / finalizador / pressionador).
+**`ScoutReport` (visibilidade e incerteza).** O que o clube enxerga de um alvo é um relatório, não a verdade (§3). Campos conceituais: `targetPlayerId`, `scoutId` e `scoutQuality`; `estimatedAttributes` como **faixas** (mín–máx, não valor exato); `estimatedPotential` como faixa; `confidence` (0–100); `visibleTraits` e `detectedHiddenRisks`; `recommendation` ∈ {`CONTRATAR`, `MONITORAR`, `EVITAR`, `EMPRESTAR`}. A largura das faixas cai com a qualidade do olheiro e a verdade converge com o tempo de observação — valores em **R-04**. Coerente com a regra transversal "informação incompleta nunca vira zero" do overview.
 
-> **Pendência:** Estados por setor na partida — modelar estado ofensivo, defensivo e de meio separadamente, com contágio entre setores (ex.: goleiro falha → confiança defensiva cai → saída de bola piora).
+**Riscos ocultos.** Não são uma categoria nova: são **traços e riscos com visibilidade `oculto`** (§2), gerados na §3 (passos 15–16) e só revelados com o tempo ou por bom scout — ego alto não percebido, risco físico oculto, pressão familiar por dinheiro, empresário agressivo, saudade, não adaptação à cidade. Entram no `ScoutReport` como `detectedHiddenRisks` apenas quando o olheiro é bom o bastante.
 
-> **Pendência:** Relações entre jogadores — entrosamento entre zagueiros, conexão lateral-ponta, dupla de volantes, meia-atacante, goleiro-defesa, liderança do capitão sobre jovens, e seus impactos em partida e vestiário.
+**Empréstimo (`LoanSpell`) como ferramenta de desenvolvimento.** Empréstimo é decisão de desenvolvimento, não só de mercado. Campos do destino: `leagueLevel`, `expectedMinutes`, `usePosition`, `localPressure`, `coachQuality`, `medicalStructure`, `style`, `culturalDistance`, `fanbase`, `visibility`. O retorno é classificado como **melhor / igual / pior** que a saída, conforme minutos reais × qualidade da formação recebida — limiares em **R-05**. A responsabilidade médica durante o empréstimo segue a §16 (quem trata, quem paga, onde reabilita, como o clube de origem é informado).
 
-> **Pendência:** Riscos ocultos — atributos e riscos que só aparecem depois (ego alto não percebido, risco físico oculto, pressão familiar por dinheiro, empresário agressivo, saudade, não adaptação à cidade).
+**Empresário (`Agent`).** Entidade que influencia o jogador e a negociação. Campos: `influenceOverPlayer` (0–100), `aggressiveness` (0–100), `commissionDrive` (0–100), `boardRelationship`, `marketReputation`. Gatilhos de evento (§9): `PRESSIONA_RENOVACAO`, `VAZA_PROPOSTA`, `FORCA_SAIDA`, `ACALMA_JOGADOR`, `CRIA_CRISE`. A matemática de comissão e de contrato é da economia ([`./03-economia.md`](./03-economia.md)); aqui trata-se do **efeito do empresário sobre o jogador**. Parâmetros de influência e limiares de gatilho em **R-08**.
 
-> **Pendência:** Visibilidade e incerteza do scout — formalizar o `ScoutReport` com faixas estimadas, confiança, traços visíveis, riscos ocultos detectados e uma recomendação (contratar / monitorar / evitar / emprestar), e como a verdade se revela com o tempo.
+**Clima de vestiário (`LockerRoomClimate`) — estado coletivo.** Estado do elenco (§15), 0–100, derivado de: moral do elenco, confiança no técnico (`CoachTrust`), liderança interna, satisfação contratual, distribuição de minutos e estabilidade política, **menos** panelas, conflitos, salários atrasados e promessas quebradas. Modula moral individual, integração e desempenho coletivo. Pesos do índice em **R-03**.
 
-> **Pendência:** Aproveitamento de potencial — consolidar as três camadas (natural, aproveitável, funcional) num único sistema de cálculo com fatores de formação, minutos, suporte e penalidades.
+**Química / entrosamento (`PlayerChemistry`) — relações entre jogadores.** Grafo de relações entre pares do elenco (§15), cada aresta com `type` (dupla de zagueiros, lateral-ponta, dupla de volantes, meia-atacante, goleiro-defesa, mentoria capitão→jovem) e `strength` (0–100). Cresce com minutos jogados juntos, idioma/afinidade e mentoria; afeta partida (entrosamento setorial) e vestiário. Magnitude dos efeitos em **R-07**.
 
-> **Pendência:** Empresário do jogador — influência sobre o jogador, agressividade na negociação, busca por comissão, relação com a diretoria, reputação no mercado e eventos (pressiona renovação, vaza proposta, força saída, acalma jogador, cria crise).
+**Contratos — lado do jogador.** A entidade `Contract` (salário, tempo, multa, bônus, cláusulas, status prometido, empresário) é da economia ([`./03-economia.md`](./03-economia.md); overview §11). Este documento é dono do **efeito do contrato sobre o jogador**: a `satisfação contratual` (estado), o cumprimento/quebra de promessa de titularidade/liberação que altera moral (§15), e os eventos de carreira de valorização, acomodação e "último ano de contrato" (§9).
 
-> **Pendência:** Contratos que impactam moral e desempenho — modelar salário, tempo, multa, promessas, bônus, status no elenco, cláusulas e promessa de titularidade/liberação, com eventos de valorização, acomodação e último ano de contrato.
+**Ciclo de seleção — lado do jogador.** O ciclo completo (convocação, relação clube-seleção, prestígio, força da federação, calendário) é de [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md). Aqui ficam os **estados do jogador**: `convocado`, a decisão do clube (`liberado` / `vetado` / `negociado`), a reação do jogador, o desempenho externo e o `estado de retorno` (cansaço, moral, lesão), que alimentam a memória do jogador (§13) e a confiança médica clube-seleção.
 
-> **Pendência:** Sistema de seleção como ciclo completo — convocação, decisão do clube (liberar/vetar/negociar), reação do jogador, desempenho externo, estados de retorno e a relação clube-seleção (confiança médica, histórico de liberação/lesão, prestígio, força da federação).
+**Jogador como ativo múltiplo.** Princípio de design: o atleta tem valor em **seis dimensões** — esportivo, financeiro, emocional, de marca, de tradição e de torcida. Vender um ídolo pode melhorar o caixa e destruir moral e identidade ao mesmo tempo. Conecta o valor de mercado (§12), a memória do clube (§13, ídolos) e a economia; nenhuma decisão sobre o jogador deve olhar só a dimensão financeira.
 
-> **Pendência:** Eventos com duração, intensidade, decaimento e cascata — padronizar a estrutura de evento (intensidade, duração, alvo, origem, efeitos imediatos/futuros, cascata, reversão) e as curvas de decaimento.
+### 18.3. Recomendações a ratificar (Série R)
 
-> **Pendência:** Eventos de reversão — catálogo de caminhos de recuperação para cada tipo de crise (jogador vaiado, técnico pressionado, jovem queimado, mídia negativa, lesão grave, má fase, torcida irritada).
+> **Recomendação (a ratificar — [R-02](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** modelar a **compatibilidade jogador-clube** como fator multiplicativo `playerCompatibility` (0–1) da fórmula de desenvolvimento (§6), média ponderada proposta de: estilo do clube ×0,25, função/posição usada ×0,20, personalidade/traços ×0,15, pressão do ambiente ×0,10, metodologia/qualidade de treino ×0,15, relação com o técnico ×0,10, idioma/cultura ×0,05. Racional: consolida os fatores qualitativos já listados na §6 num único multiplicador auditável, com o encaixe de estilo e de função dominando o ganho.
 
-> **Pendência:** Rivalidade dinâmica — rivalidades que crescem com finais, disputas por título, transferências polêmicas, provocações, goleadas e brigas de torcida, elevando a pressão de jogos futuros.
+> **Recomendação (a ratificar — [R-03](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** fixar o índice `LockerRoomClimate` (0–100) como `0,30·moral + 0,20·CoachTrust + 0,15·liderança interna + 0,15·satisfação contratual + 0,10·distribuição de minutos + 0,10·estabilidade política − penalidades (panelas, conflitos, salários atrasados, promessas quebradas, até −40 somadas)`. Racional: moral e confiança no técnico devem dominar, e as penalidades precisam de teto para não zerar o clima com um único evento.
 
-> **Pendência:** Ecossistema da liga — nível técnico, premiação, visibilidade, calendário, arbitragem, regras financeiras, força comercial e exposição internacional, e seu impacto no crescimento do clube e na valorização dos jogadores.
+> **Recomendação (a ratificar — [R-04](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** definir as bandas de incerteza do `ScoutReport` por qualidade do olheiro: olheiro ruim → faixa de ±10 sobre o atributo real e `confidence ≤ 40`; olheiro bom → faixa de ±3 e `confidence ≥ 80`; a faixa estreita ~30% a cada ciclo de observação continuada. Racional: reproduz o exemplo "70–90" vs "83–88" da §3 como regra, mantendo a informação sempre como faixa, nunca como zero.
 
-> **Pendência:** Competição por talentos — outros clubes disputando o mesmo jovem, com decisão influenciada por chance de jogar, estrutura da base, reputação formadora, salário/ajuda, distância da família, ídolos, pressão familiar e empresário.
+> **Recomendação (a ratificar — [R-05](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** classificar o retorno de um `LoanSpell` por `scoreEmprestimo = minutosReais% × qualidadeFormaçãoRecebida (compatibilidade R-02)`: **melhor** se `≥ 0,60`, **igual** se `0,30–0,60`, **pior** se `< 0,30` (ou lesão grave / moral despencada). Racional: liga o resultado do empréstimo aos mesmos fatores de desenvolvimento do resto do sistema, evitando um modelo paralelo.
 
-> **Pendência:** Custo de manutenção da grandeza e freios de bola de neve — crescimento que aumenta salários, expectativa, custo operacional, pressão e risco financeiro, para evitar snowball infinito.
+> **Recomendação (a ratificar — [R-06](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** padronizar o `CareerEvent` com os campos já listados na §9 (intensidade, duração, alvo, origem, efeitos imediatos/futuros, chance de cascata, chance de reversão) e curvas de decaimento por faixa: curto (meia-vida ~3 dias), médio (~3 semanas), longo (~1 temporada), histórico (não decai — vira tradição, §13). Racional: fixa uma única estrutura de evento reutilizável e dá meias-vidas concretas às quatro durações que a §9 já nomeia.
 
-> **Pendência:** Qualidade do treinamento por área — separar treino técnico, físico, tático, mental, de goleiros, de bola parada, individual, coletivo, de transição, de finalização e defensivo, com resposta individual diferente por jogador.
+> **Recomendação (a ratificar — [R-07](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** dimensionar a `PlayerChemistry`: cada aresta soma até **±8** ao desempenho setorial em partida (dupla entrosada vs. recém-formada) e cresce ~2/temporada de minutos juntos, com bônus de mentoria capitão→jovem acelerando a evolução mental do jovem. Racional: efeito perceptível mas não dominante frente aos atributos individuais, coerente com "relações afetam moral e desempenho tanto quanto atributos" (§15) sem sobrepujá-los.
 
-> **Pendência:** Especialização da base por posição — clubes que formam melhor certos perfis (goleiros, laterais, pontas, volantes, zagueiros, meias criativos) conforme preparador específico + metodologia + histórico.
+> **Recomendação (a ratificar — [R-08](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** parametrizar o `Agent`: gatilho de evento dispara quando `aggressiveness + commissionDrive − boardRelationship > 120` diante de proposta externa ou último ano de contrato; `influenceOverPlayer` pondera o quanto o empresário desloca a decisão do jogador (0 = ignora, 100 = decide por ele). Racional: torna o empresário um ator com peso calibrável nos eventos de renovação/saída sem reescrever a economia de contratos.
 
-> **Pendência:** Reputação, tradição, momento e expectativa como variáveis separadas — quatro eixos com velocidades de mudança distintas e seus fluxos (resultado → momento; títulos recentes → reputação; títulos acumulados → tradição; investimento → expectativa → pressão).
+> **Recomendação (a ratificar — [R-09](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** definir os **pesos de agregação do `overall` por posição** sobre o grid canônico da §2 (ex.: atacante = 0,45 técnico + 0,20 físico + 0,20 mental + 0,15 finalização-específica; goleiro = 0,60 grid de goleiro + 0,25 mental + 0,15 físico). Racional: o corpus usa "overall/nota" (overview §10, IA) sem definir a fórmula; ancorar os pesos na posição impede que um atributo irrelevante para a função infle a nota.
 
-> **Pendência:** Qualidade da decisão da diretoria — eficiência de gestão (planejamento + scout + governança + estabilidade + conhecimento esportivo + negociação − política interna − decisões emocionais − pressão externa) modulando o retorno do investimento.
+### 18.4. Gaps que pertencem a outros documentos (fronteira de escopo)
 
-> **Pendência:** Jogadores como ativos múltiplos — modelar o atleta como ativo esportivo, financeiro, emocional, de marca, de tradição e de torcida (ex.: vender um ídolo pode melhorar o caixa mas destruir moral e identidade).
+Estes assuntos não são do sistema de jogadores; ficam registrados com o dono e o gancho do lado-jogador.
 
-> **Pendência:** Papéis internos do clube — diretor de base, coordenador de transição, gerente de elenco, analista de mercado, responsável por contratos, psicólogo da base, head de performance, coordenador médico, diretor de metodologia, entre outros.
-
-> **Pendência:** Linha do tempo da temporada — encaixar todos os eventos em ciclos (diário, semanal, mensal, janela, temporada, multitemporada) para que não fiquem soltos.
-
-> **Pendência:** Narrativa gerada — transformar eventos e memórias em texto narrativo por jogador, para reforçar a imersão de "cada atleta tem uma carreira própria".
+- **Identidade tática do clube separada do técnico** → [`./05-motor-de-partida.md`](./05-motor-de-partida.md) e o documento de clube/tática. O lado-jogador é o **custo de encaixe** quando o clube muda de filosofia — a compatibilidade de R-02.
+- **Estados por setor na partida** (ofensivo / defensivo / meio, com contágio "goleiro falha → confiança defensiva cai") → estado de partida do [`./05-motor-de-partida.md`](./05-motor-de-partida.md); o insumo deste documento é a `confiança` individual (§2) e a `PlayerChemistry` setorial (§18.2).
+- **Rivalidade dinâmica** → [`./11-torcida-imprensa-e-narrativa.md`](./11-torcida-imprensa-e-narrativa.md) e mundo persistente; o lado-jogador é a pressão elevada de clássicos, via memória de jogador e clube (§9, §13).
+- **Ecossistema da liga** (nível técnico, premiação, arbitragem, exposição) → [`./06-temporada-e-competicoes.md`](./06-temporada-e-competicoes.md) + [`./03-economia.md`](./03-economia.md) + [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md); impacta a valorização dos jogadores (§12) como entrada externa.
+- **Competição por talentos** (vários clubes disputando o mesmo jovem) → documento de base/clube (fronteira de escopo na §3); os fatores de decisão cruzam o `ScoutReport` (R-04) e o empresário (R-08).
+- **Custo de manutenção da grandeza e freios de bola de neve** → [`./03-economia.md`](./03-economia.md) e [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (anti-snowball).
+- **Qualidade da decisão da diretoria** (índice de eficiência de gestão) → [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md); o `BoardProfile` já aparece em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) §2.3.
+- **Papéis internos do clube** (diretor de base, coordenador de transição, head de performance, etc.) → [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md); a estrutura de **suporte ao atleta** já está na §14.
+- **Linha do tempo da temporada** (ciclos diário → multitemporada) → [`./06-temporada-e-competicoes.md`](./06-temporada-e-competicoes.md); os eventos de carreira (§9, R-06) são encaixados nesses ciclos.
+- **Narrativa gerada por jogador** → [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) §3.8 (IA narrativa) + [`./13-relatorios-notificacoes-e-memoria.md`](./13-relatorios-notificacoes-e-memoria.md); o insumo é a memória do jogador (§13).
