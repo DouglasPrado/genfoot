@@ -369,3 +369,13 @@ Para dar a um clube recém-criado a capacidade de recuperar o atraso frente a cl
 Isso **não dá jogador apelão** nem quebra a justiça inicial (caixa fixo idêntico, elenco equilibrado): dá **capacidade de recuperar o atraso** — um "catch-up" estrutural. O programa opera junto com as divisões por nível estrutural (a Liga Inicial em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)) e com o mercado segmentado e as receitas proporcionais ao estágio da liga (ver [`./03-economia.md`](./03-economia.md), seções 7.3 e 9.5), que protegem a entrada do clube novo.
 
 > **Pendência:** os parâmetros do programa (percentual de redução do custo de upgrade, redução do tempo de construção, tamanho do bônus de base, grau de proteção dos contratos iniciais e multiplicador das premiações de liga inicial) não foram definidos na fonte — são citados como plano, não como números. Calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+
+### 2.9 Escolha da liga na entrada
+
+Como o mundo é organizado em **ligas/salas independentes**, cada uma com seu próprio calendário e temporada (Decisão 2 — ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md)), um novo usuário não é obrigado a entrar em uma liga madura contra clubes gigantes: ele escolhe o **tipo de liga** ao entrar (Decisão 3). As opções previstas são:
+
+- **Liga nova** — liga zerada, todos os clubes pequenos e equilibrados (o começo mais justo).
+- **Liga em andamento** — assume um clube disponível em uma liga já existente (com os cuidados de [2.1](#21-criar-clube-novo-ou-assumir-existente) e o [Programa de Clube Novo](#28-programa-de-clube-novo-catch-up-estrutural) quando aplicável).
+- **Liga temática / especial** — ligas com regras próprias: acelerada, de veteranos, econômica difícil, com draft inicial, hardcore, casual, etc. Dão flexibilidade para diferentes perfis de jogador e eventos, sem alterar o core.
+
+> **Pendência (decisão em aberto):** a **Decisão 3** foi proposta com recomendação **C** (permitir as três opções, incluindo ligas temáticas/especiais), mas a fonte não registra o fechamento explícito. As regras de cada liga temática (o que muda em "acelerada", "veteranos", "econômica difícil", "draft", "hardcore", "casual") também ainda não foram especificadas.

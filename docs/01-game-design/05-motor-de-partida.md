@@ -21,10 +21,11 @@ Este documento descreve a filosofia, as etapas, a resolução de lances, os sist
 11. [Ações táticas e substituições com custo e cooldown](#11-acoes-taticas-e-substituicoes-com-custo-e-cooldown)
 12. [Sistema online vs offline](#12-sistema-online-vs-offline)
 13. [Comissão técnica como gate de qualidade](#13-comissao-tecnica-como-gate-de-qualidade)
-14. [Arquitetura conceitual do engine](#14-arquitetura-conceitual-do-engine)
-15. [Pós-jogo e consequências](#15-pos-jogo-e-consequencias)
-16. [Fases finais e situações críticas](#16-fases-finais-e-situacoes-criticas)
-17. [Pontos críticos a resolver](#17-pontos-criticos-a-resolver)
+14. [Reputação tática do usuário (cross-match)](#14-reputacao-tatica-do-usuario-cross-match)
+15. [Arquitetura conceitual do engine](#15-arquitetura-conceitual-do-engine)
+16. [Pós-jogo e consequências](#16-pos-jogo-e-consequencias)
+17. [Fases finais e situações críticas](#17-fases-finais-e-situacoes-criticas)
+18. [Pontos críticos a resolver](#18-pontos-criticos-a-resolver)
 
 ---
 
@@ -37,7 +38,7 @@ Quatro princípios orientam toda a simulação:
 - **Posse perigosa (threat), não só posse de bola.** Ter a bola não é criar perigo. O motor separa posse de posse ofensiva efetiva, permitindo que um time com menos posse vença por jogar melhor em transição.
 - **O placar emerge dos eventos.** Nunca se define "força 80 vs força 70 → provável 2×1". O motor gera volume, chances, qualidade das chances, finalizações, defesas, erros, cartões, lesões, substituições e mudanças emocionais — e o placar surge disso.
 
-A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 17](#17-pontos-criticos-a-resolver)).
+A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 18](#18-pontos-criticos-a-resolver)).
 
 ## 2. As cinco etapas e as entradas/saídas da partida
 
@@ -112,7 +113,7 @@ Consequência: um jogador bom em um time bagunçado rende menos, e um jogador me
 
 Dentro de cada bloco, o motor calcula quem controla mais o jogo, quem cria mais, quem erra mais, quem cansa mais, quem se expõe mais e quem tem maior risco emocional, de lesão ou de cartão.
 
-**Granularidade variável (ver também [seção 17](#17-pontos-criticos-a-resolver)):**
+**Granularidade variável (ver também [seção 18](#18-pontos-criticos-a-resolver)):**
 
 | Tipo de partida | Nível de simulação |
 | --- | --- |
@@ -135,7 +136,7 @@ Um erro comum seria "time mais forte = mais posse = mais gols", o que tornaria o
 - Qualidade da defesa
 - Qualidade do goleiro
 
-Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 17](#17-pontos-criticos-a-resolver)).
+Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 18](#18-pontos-criticos-a-resolver)).
 
 ## 6. Resolução de ataque em 9 passos
 
@@ -217,7 +218,7 @@ A aleatoriedade respeita o contexto: azar deve ser explicado, nunca gratuito.
 - **Aumentam moral:** gol marcado, defesa difícil do goleiro, torcida apoiando, boa sequência de ataques, adversário expulso, virada no placar.
 - **Reduzem moral:** gol sofrido, erro individual, pênalti perdido, cartão vermelho, pressão da torcida, sequência de derrotas, jogador vaiado.
 
-Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 17](#17-pontos-criticos-a-resolver)).
+Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 18](#18-pontos-criticos-a-resolver)).
 
 **Curvas não-lineares e efeitos de contexto.** Fadiga e moral não escalam de forma linear:
 
@@ -393,7 +394,7 @@ O auxiliar **complementa** o usuário, não o substitui: mesmo com comissão ní
 
 > O detalhamento da inteligência da comissão e da IA fica em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md).
 
-## 14. Arquitetura conceitual do engine
+## 15. Arquitetura conceitual do engine
 
 O motor separa quatro responsabilidades: (1) o que está acontecendo no jogo; (2) como o jogo calcula os eventos; (3) como o usuário/IA pode interferir; (4) como o resultado afeta o mundo depois.
 
@@ -465,7 +466,7 @@ O motor separa o que é interno do que é visível para performance e UX:
 
 > Os modelos `MatchSimulation`, `Tick`, `MatchEvent` e `DecisionPoint` são definidos em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md).
 
-## 15. Pós-jogo e consequências
+## 16. Pós-jogo e consequências
 
 Depois do apito final, a partida **não termina nela mesma — ela altera o universo do jogo**. Um time pequeno que vence favorito ganha moral, torcida, destaque na mídia, valorização de jogadores e reputação para o técnico; um favorito que perde em casa vê a torcida cobrar, a diretoria pressionar, a moral cair e a imprensa criar crise, tornando os próximos jogos mais tensos.
 
@@ -481,7 +482,7 @@ Algumas decisões tomadas dentro da partida têm consequência **depois**, conec
 - **Recuar demais** pode irritar a torcida se o time for favorito.
 - **Substituir uma estrela cedo** preserva o físico, mas pode gerar insatisfação.
 
-## 16. Fases finais e situações críticas
+## 17. Fases finais e situações críticas
 
 As competições de mata-mata exigem fases além dos 90 minutos, e o fim de jogo, as lesões e as expulsões tardias têm lógica própria — não são exceções, e sim parte da simulação. O motor precisa **receber as regras da competição** (número de substituições, prorrogação, pênaltis, VAR, critério de desempate — ver os parâmetros por competição na [seção 12](#12-sistema-online-vs-offline)).
 
@@ -536,7 +537,7 @@ Os acréscimos podem depender de lesões, substituições, VAR, cera, cartões e
 
 > **Pendência:** se as ações de cera existirão como comando explícito do usuário ainda está em aberto na fonte ("Ações de cera podem existir?"). Caso existam, precisam carregar risco real (cartão, irritação do adversário, pressão da arbitragem).
 
-## 17. Pontos críticos a resolver
+## 18. Pontos críticos a resolver
 
 Os itens abaixo consolidam o "Veredito": a base é forte, mas são brechas de execução que precisam ser fechadas antes de virar implementação real.
 

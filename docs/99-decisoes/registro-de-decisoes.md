@@ -6,6 +6,22 @@ Este é o log central de decisões do **Grinta**. Ele preserva a numeração ori
 
 ---
 
+## 0. Decisões fundacionais (série 1–3)
+
+As três primeiras decisões da árvore, que definem a natureza do jogo. Foram tomadas como "uma pergunta por vez" no início do processo.
+
+| ID | Decisão | Escolha | Documento |
+|----|---------|---------|-----------|
+| 1 | Escopo real do jogo | **C** — gestor online **completo**: gestão do clube, economia, elenco, staff, mercado, campeonatos, evolução, IA e **simulação robusta** de partidas, todos com profundidade parecida e influenciando-se | [Visão e pitch](../00-produto/01-visao-e-pitch.md), [GDD overview](../01-game-design/00-gdd-overview.md) |
+| 2 | Ritmo do mundo online | **B** — **ligas/salas independentes**, cada uma com seu próprio calendário, temporada, economia e histórico (uma liga pode estar na temp. 3, outra na 20); com lógica persistente | [Multiplayer e mundos](../02-tecnico/03-multiplayer-e-mundos.md) |
+| 3 | Entrada de novos usuários | Recomendação **C** (liga nova / em andamento / temática-especial) — **resposta não fechada na fonte** | [Anti-abuso e onboarding §2.9](../01-game-design/09-anti-abuso-e-onboarding.md) |
+
+> **Nota sobre a numeração:** os IDs saltam de 3 para 1801. As decisões intermediárias (~4–1800) foram tomadas ao longo dos chats temáticos (motor de partida, economia, jogadores, IA, campeonatos, staff, etc.) **sem numeração explícita** — o conteúdo delas está distribuído pelos documentos de game design e técnicos correspondentes, não neste registro numérico.
+
+> **Pendência:** a Decisão 3 está com recomendação C, mas sem fechamento explícito na fonte. Ver [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md) §2.9.
+
+---
+
 ## 1. Decisões de Escopo (série 18xx–19xx)
 
 As decisões de escopo estão agrupadas por faixa temática, preservando os IDs de marco (abertura e fechamento de cada bloco). Cada faixa aponta para o documento de game design correspondente.

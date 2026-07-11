@@ -8341,3 +8341,2122 @@ Os pontos mais críticos para fechar são:
 10. Fazer sugestões expirarem quando o contexto muda.
 
 Com esses ajustes, o motor fica muito mais robusto, justo, escalável e explicável.
+
+
+# Documento Definitivo de Escopo — Simulação de Partidas
+
+## 1. Visão geral
+
+A simulação de partidas será o coração do jogo. Ela não deve funcionar como um sorteio de placar, mas como um motor vivo, dinâmico e explicável, onde o resultado surge da combinação entre jogadores, tática, comissão técnica, estrutura do clube, contexto emocional, estado físico, clima, gramado, arbitragem, torcida, decisões do usuário e reações do adversário.
+
+O placar será consequência dos acontecimentos da partida. O motor deverá calcular microeventos, disputas, padrões táticos, riscos, chances, decisões e consequências. Cada resultado importante deverá ter causa rastreável, permitindo que o usuário entenda por que venceu, empatou ou perdeu.
+
+A regra central da simulação é:
+
+**O motor calcula a realidade da partida. A comissão técnica interpreta essa realidade. O usuário ou a IA toma decisões. Os jogadores executam conforme sua capacidade. O pós-jogo aplica as consequências no clube, no elenco, na torcida, na imprensa e na temporada.**
+
+A partida não será um evento isolado. Ela será o ponto de encontro entre todos os sistemas do jogo: elenco, tática, estrutura, evolução, economia, torcida, reputação, comissão técnica, mercado, mídia e narrativa.
+
+---
+
+## 2. Princípios fundamentais da simulação
+
+A simulação deverá seguir os seguintes princípios:
+
+1. O motor não sorteia o placar diretamente. Ele gera eventos, e o placar nasce desses eventos.
+2. Cada jogador terá atributos efetivos variáveis durante a partida, não apenas atributos fixos.
+3. A tática deverá alterar o comportamento real do time, não apenas aplicar bônus simples.
+4. Toda ação tática terá benefício, custo, risco, tempo de adaptação e impacto contextual.
+5. O usuário online terá controle estratégico, mas não poderá abusar de microgerenciamento infinito.
+6. O usuário offline continuará competitivo por meio do plano pré-jogo e da IA da comissão técnica.
+7. A comissão técnica será um interpretador da realidade da partida, melhorando alertas, sugestões, execução e IA offline.
+8. A partida deverá ter memória interna para identificar padrões recentes.
+9. Eventos importantes deverão registrar causalidade para alimentar explicações, pós-jogo, imprensa e avaliação da comissão.
+10. A simulação deverá ser calibrável, auditável e consistente em diferentes níveis de detalhamento.
+
+---
+
+## 3. Estados da partida
+
+A partida terá diferentes estados funcionais:
+
+### 3.1. Pré-jogo
+
+No pré-jogo, o sistema prepara o contexto inicial da partida.
+
+Devem ser considerados:
+
+* clubes envolvidos;
+* escalações;
+* jogadores titulares e reservas;
+* tática inicial;
+* plano de jogo;
+* comissão técnica;
+* moral do elenco;
+* fadiga acumulada;
+* lesões e riscos físicos;
+* entrosamento;
+* mando de campo;
+* torcida;
+* clima;
+* gramado;
+* arbitragem;
+* importância da partida;
+* momento da temporada;
+* fase emocional do clube;
+* contexto da competição.
+
+O pré-jogo deverá gerar o estado inicial da partida, incluindo moral, risco físico, força por setor, equilíbrio tático, pressão emocional e tendências de jogo.
+
+### 3.2. Partida em andamento
+
+Durante a partida, o motor deverá processar a evolução do jogo em ciclos de simulação. Cada ciclo deverá atualizar o estado físico, emocional, tático e estatístico da partida.
+
+A partida poderá ser acompanhada pelo usuário de forma visual e estratégica, com notificações, linha do tempo, alertas, pontos de decisão e ações rápidas.
+
+### 3.3. Pontos de decisão
+
+Durante o jogo, o sistema poderá gerar pontos de decisão quando detectar problemas, riscos ou oportunidades relevantes.
+
+Esses pontos poderão ser apresentados ao usuário quando ele estiver online ou tratados pela IA quando ele estiver offline, de acordo com o plano pré-jogo, a autonomia definida e a qualidade da comissão técnica.
+
+### 3.4. Pós-jogo
+
+Após o apito final, a partida deverá alimentar os demais sistemas do jogo.
+
+O pós-jogo deverá gerar:
+
+* estatísticas;
+* notas dos jogadores;
+* avaliação das decisões do usuário;
+* avaliação da comissão técnica;
+* atualização de moral;
+* atualização de fadiga;
+* lesões e agravamentos;
+* evolução de jogadores;
+* reação da torcida;
+* narrativa da imprensa;
+* impactos financeiros;
+* impactos de reputação;
+* consequências para a temporada.
+
+---
+
+## 4. Entidades funcionais principais
+
+### 4.1. Clube
+
+O clube influencia a partida de maneira indireta, por meio de sua estrutura, torcida, reputação, comissão, gestão, elenco e ambiente.
+
+O clube deverá possuir elementos funcionais como:
+
+* reputação;
+* torcida;
+* estrutura geral;
+* finanças;
+* diretoria;
+* equipe médica;
+* comunicação;
+* centro de treinamento;
+* comissão técnica.
+
+A estrutura do clube não deverá funcionar como bônus mágico. Ela deverá influenciar sistemas específicos.
+
+Exemplos:
+
+* equipe médica melhor reduz risco de lesões, melhora leitura de risco físico e recuperação;
+* comunicação melhor controla crises, torcida e pressão emocional;
+* comissão técnica melhor interpreta o jogo, sugere ações, executa mudanças e comanda melhor quando o usuário está offline;
+* centro de treinamento e planejamento impactam preparação, familiaridade tática e desenvolvimento.
+
+### 4.2. Jogador
+
+O jogador será uma entidade individual e única. Ele não será definido apenas por uma nota geral.
+
+Cada jogador deverá ter:
+
+* posição;
+* função;
+* atributos técnicos;
+* atributos físicos;
+* atributos mentais;
+* atributos táticos;
+* moral;
+* fadiga;
+* risco de lesão;
+* personalidade;
+* comportamento em campo;
+* familiaridade tática;
+* entrosamento;
+* histórico físico;
+* estado emocional.
+
+Os atributos técnicos podem incluir passe, finalização, cruzamento, drible, desarme e domínio.
+
+Os atributos físicos podem incluir velocidade, força, resistência, impulsão, aceleração e capacidade de repetição de esforço.
+
+Os atributos mentais podem incluir decisão, concentração, frieza, liderança, agressividade, disciplina e coragem.
+
+Os atributos táticos podem incluir posicionamento, leitura de jogo, obediência tática, movimentação e recomposição.
+
+A personalidade do jogador deverá influenciar seu comportamento em campo. Exemplos de traços:
+
+* decisivo;
+* nervoso;
+* raçudo;
+* frio;
+* irregular;
+* líder;
+* indisciplinado;
+* criativo;
+* obediente taticamente;
+* egoísta;
+* jogador de jogo grande;
+* jogador que sente pressão.
+
+Dois jogadores com atributos parecidos poderão se comportar de forma diferente. Um atacante frio e decisivo poderá aparecer pouco, mas decidir em uma chance. Outro atacante móvel e ansioso poderá participar mais do jogo, mas desperdiçar chances importantes.
+
+### 4.3. Comissão técnica
+
+A comissão técnica será um dos sistemas mais importantes da partida.
+
+Ela deverá afetar:
+
+* qualidade da leitura do jogo;
+* quantidade e qualidade dos pontos de decisão;
+* antecedência dos alertas;
+* precisão das sugestões;
+* clareza das explicações;
+* impacto das recomendações;
+* risco de diagnósticos imprecisos;
+* capacidade da IA offline;
+* velocidade de adaptação tática;
+* qualidade de comunicação das mudanças;
+* avaliação pós-jogo.
+
+A comissão não deverá dar bônus artificial de vitória. Seu valor estará em interpretar melhor o jogo, sugerir melhor, executar melhor e reduzir erros de decisão.
+
+A comissão técnica deverá possuir atributos funcionais como:
+
+* leitura tática;
+* comunicação;
+* gestão emocional;
+* preparação física;
+* treino ofensivo;
+* treino defensivo;
+* bola parada;
+* substituições;
+* adaptação;
+* autonomia offline.
+
+Esses atributos não deverão ser apenas decorativos. Cada um deverá impactar um sistema específico.
+
+### 4.4. Tática
+
+A tática representa o plano de comportamento coletivo do time.
+
+Ela deverá incluir:
+
+* formação;
+* mentalidade;
+* intensidade;
+* linha defensiva;
+* pressão;
+* marcação;
+* foco ofensivo;
+* ritmo;
+* estilo de passe;
+* largura;
+* risco;
+* transição;
+* funções individuais.
+
+A tática não deve funcionar apenas como “ofensivo soma ataque” ou “defensivo soma defesa”. Ela deve mudar a maneira como o time joga.
+
+Exemplos:
+
+* pressão alta aumenta roubadas no campo ofensivo, mas aumenta fadiga, risco de cartão, risco de lesão e espaço nas costas;
+* defesa baixa protege a área, mas reduz posse ofensiva e chama pressão;
+* ataque pelos lados explora laterais fracos, mas pode expor o próprio lado;
+* controle de posse reduz caos, mas pode criar menos chances claras;
+* jogo direto pode funcionar em gramado ruim ou com atacantes fortes, mas pode desperdiçar posse se o time não tiver perfil adequado.
+
+### 4.5. Plano de jogo
+
+O plano de jogo será a base da estratégia antes da partida e também o principal guia da IA quando o usuário estiver offline.
+
+O plano poderá definir:
+
+* tática inicial;
+* comportamento se estiver vencendo;
+* comportamento se estiver perdendo;
+* comportamento se estiver empatando;
+* resposta a expulsões;
+* resposta a lesões;
+* resposta a fadiga alta;
+* resposta a cartões;
+* regras de substituição;
+* preferência de risco;
+* autonomia do auxiliar;
+* comportamentos por minuto ou contexto.
+
+Exemplos de regras funcionais:
+
+* se estiver vencendo após os 75 minutos, reduzir intensidade e proteger resultado;
+* se estiver perdendo após os 70 minutos, aumentar ofensividade;
+* se jogador passar de risco físico alto, substituir se houver reserva adequado;
+* se zagueiro for expulso, recompor a defesa sacrificando jogador ofensivo;
+* se volante estiver pendurado e cometendo faltas, reduzir agressividade ou substituir.
+
+---
+
+## 5. Cálculo interno da partida
+
+### 5.1. Atributos efetivos
+
+Os jogadores não deverão atuar apenas com seus atributos base. A cada contexto, o motor deverá calcular atributos efetivos.
+
+O atributo efetivo será influenciado por:
+
+* atributo base;
+* moral;
+* fadiga;
+* entrosamento;
+* familiaridade tática;
+* função exercida;
+* posição correta ou improvisada;
+* pressão emocional;
+* personalidade;
+* clima;
+* gramado;
+* qualidade da oposição;
+* apoio dos companheiros;
+* instrução tática;
+* estado físico;
+* risco de lesão.
+
+Um jogador com finalização média poderá finalizar muito bem se estiver livre, confiante e em uma chance clara. Um jogador tecnicamente melhor poderá finalizar mal se estiver cansado, pressionado e emocionalmente instável.
+
+### 5.2. Estado físico
+
+A fadiga deverá ser atualizada durante a partida.
+
+Ela será influenciada por:
+
+* posição;
+* intensidade;
+* pressão alta;
+* distância percorrida;
+* número de duelos;
+* idade;
+* resistência;
+* clima;
+* gramado;
+* calendário;
+* preparação física;
+* estilo de jogo;
+* ações individuais.
+
+A fadiga deverá afetar:
+
+* velocidade;
+* aceleração;
+* força;
+* precisão de passe;
+* concentração;
+* finalização;
+* recomposição;
+* tomada de decisão;
+* risco de lesão;
+* risco de erro;
+* risco de cartão por atraso no lance.
+
+A fadiga não deverá ser linear. Ela deverá ter faixas de impacto:
+
+* fadiga baixa: impacto pequeno;
+* fadiga média: queda gradual;
+* fadiga alta: queda relevante;
+* fadiga muito alta: risco grande de erro, lesão e colapso físico.
+
+### 5.3. Moral e estado emocional
+
+A moral deverá mudar durante a partida.
+
+Eventos que podem aumentar moral:
+
+* gol marcado;
+* boa defesa;
+* chance criada;
+* sequência de domínio;
+* torcida apoiando;
+* adversário expulso;
+* virada;
+* liderança positiva.
+
+Eventos que podem reduzir moral:
+
+* gol sofrido;
+* erro individual;
+* cartão;
+* pênalti perdido;
+* vaias;
+* pressão do jogo;
+* sequência de ataques sofridos;
+* crise do clube;
+* má fase recente.
+
+A moral deverá afetar:
+
+* decisão;
+* frieza;
+* erro técnico;
+* agressividade;
+* disciplina;
+* confiança para driblar;
+* confiança para finalizar;
+* risco de apagão defensivo;
+* resposta a pressão.
+
+A personalidade definirá como cada jogador reage. Um jogador decisivo pode crescer em jogo grande. Um jogador ansioso pode errar mais. Um líder pode estabilizar o time. Um jogador indisciplinado pode se exceder.
+
+### 5.4. Momentum
+
+O momentum representa o momento psicológico e tático da partida.
+
+Ele deverá ser influenciado por:
+
+* gols;
+* chances;
+* pressão recente;
+* domínio territorial;
+* torcida;
+* moral coletiva;
+* fadiga;
+* substituições;
+* mudanças táticas;
+* erros importantes;
+* sequência de ataques;
+* expulsões;
+* lesões.
+
+O momentum não deve garantir gols. Ele deve aumentar a probabilidade de gerar ataques, vencer duelos equilibrados e pressionar o adversário.
+
+O sistema deverá evitar bola de neve exagerada. Um time que sofre gol não deverá sempre desmoronar. A resposta dependerá de resiliência emocional, liderança, experiência, gestão emocional da comissão, torcida, importância do jogo e momento da temporada.
+
+### 5.5. Controle por zonas
+
+O campo deverá ser interpretado por setores funcionais.
+
+Setores principais:
+
+* defesa esquerda;
+* defesa central;
+* defesa direita;
+* meio esquerdo;
+* meio central;
+* meio direito;
+* ataque esquerdo;
+* ataque central;
+* ataque direito.
+
+Para cada setor, o motor deverá calcular forças ofensivas, defensivas, fadiga local, pressão, duelos recentes, erros recentes, risco e confiança.
+
+O controle de zona será influenciado por:
+
+* jogadores presentes;
+* função dos jogadores;
+* qualidade técnica;
+* força física;
+* estado mental;
+* fadiga;
+* tática;
+* apoio de companheiros;
+* superioridade numérica;
+* entrosamento;
+* qualidade adversária;
+* pressão sofrida;
+* estabilidade tática.
+
+O controle de zona determinará onde os ataques tendem a nascer, quais setores estão vulneráveis e quais oportunidades podem ser exploradas.
+
+### 5.6. Posse e posse perigosa
+
+O motor deverá separar posse comum de posse perigosa.
+
+A posse comum representa controle de bola.
+
+A posse perigosa representa controle em zonas que realmente ameaçam o adversário.
+
+Um time poderá ter muita posse e criar pouco. Outro poderá ter menos posse e criar chances melhores por meio de contra-ataques.
+
+A posse perigosa será influenciada por:
+
+* controle em zonas ofensivas;
+* criatividade;
+* movimentação;
+* vantagem de setor;
+* falhas adversárias;
+* ritmo;
+* verticalidade;
+* compactação defensiva adversária;
+* pressão sobre o portador da bola.
+
+### 5.7. Geração de ataques
+
+A cada ciclo de simulação, o motor deverá definir a quantidade e o tipo de ataques relevantes.
+
+A geração de ataques será influenciada por:
+
+* ritmo;
+* mentalidade;
+* posse perigosa;
+* momentum;
+* desorganização adversária;
+* vantagem por zona;
+* fraqueza adversária;
+* fadiga defensiva;
+* qualidade criativa;
+* estilo de jogo.
+
+Nem todo ataque deverá virar chance. Muitos ataques terminarão em passe errado, desarme, cruzamento bloqueado, recuo, falta ou perda de posse.
+
+### 5.8. Tipos de ataque
+
+O tipo de ataque deverá nascer da tática e das vantagens do momento.
+
+Tipos possíveis:
+
+* ataque pelo lado esquerdo;
+* ataque pelo lado direito;
+* ataque pelo centro;
+* bola longa;
+* contra-ataque;
+* cruzamento;
+* infiltração;
+* chute de fora;
+* bola parada;
+* pressão pós-perda.
+
+Exemplos:
+
+* se o time tem foco pelos lados e o lateral adversário está cansado, aumentam os ataques por aquele setor;
+* se o adversário está exposto e o time tem jogadores velozes, aumentam os contra-ataques;
+* se o gramado está ruim, o jogo curto perde eficiência e o jogo direto pode ganhar relevância.
+
+### 5.9. Duelos
+
+Ataques e defesas deverão ser resolvidos por duelos.
+
+Exemplos de duelos:
+
+* ponta contra lateral;
+* centroavante contra zagueiro;
+* meia criador contra volante;
+* goleiro contra finalizador;
+* zagueiro contra atacante em bola aérea;
+* volante contra meia entre linhas.
+
+Um duelo não deverá gerar apenas vitória ou derrota. Ele poderá resultar em:
+
+* drible completo;
+* cruzamento bloqueado;
+* falta sofrida;
+* escanteio;
+* perda de bola;
+* passe para trás;
+* erro técnico;
+* cartão;
+* lesão por contato;
+* rebote;
+* chance criada.
+
+### 5.10. Criação de chances
+
+Depois que um ataque progride, o motor deverá calcular se ele vira chance.
+
+A criação de chance será influenciada por:
+
+* qualidade da progressão;
+* criatividade;
+* movimentação ofensiva;
+* erro defensivo;
+* vantagem numérica;
+* zona do campo;
+* compactação adversária;
+* pressão no portador;
+* fadiga ofensiva;
+* entrosamento;
+* decisão do jogador.
+
+As chances poderão ser classificadas funcionalmente como:
+
+* chance fraca;
+* chance média;
+* chance clara;
+* chance muito clara.
+
+### 5.11. Finalização e gol
+
+Quando uma chance gerar finalização, o motor deverá calcular a qualidade da finalização e a resposta defensiva.
+
+A finalização será influenciada por:
+
+* finalização efetiva;
+* frieza;
+* tipo da chance;
+* pé dominante;
+* ângulo;
+* distância;
+* pressão do marcador;
+* fadiga;
+* moral;
+* personalidade;
+* importância do jogo.
+
+A resposta defensiva será influenciada por:
+
+* posicionamento do goleiro;
+* reflexo;
+* confiança;
+* visão da bola;
+* cobertura defensiva;
+* qualidade do bloqueio;
+* dificuldade do chute;
+* desvios;
+* clima;
+* gramado.
+
+O gol deverá nascer do confronto entre qualidade da chance, qualidade da finalização, defesa do goleiro, pressão defensiva e aleatoriedade controlada.
+
+Se não for gol, o resultado poderá ser:
+
+* defesa;
+* chute para fora;
+* bloqueio;
+* escanteio;
+* rebote;
+* erro grosseiro;
+* contra-ataque adversário.
+
+### 5.12. Aleatoriedade controlada
+
+A simulação deverá ter surpresa, mas não caos.
+
+A aleatoriedade será dividida em:
+
+* variação normal;
+* erro humano;
+* evento raro.
+
+A variação normal garante que jogadores bons também errem e jogadores medianos também acertem.
+
+O erro humano aparece por fadiga, pressão, baixa concentração, clima, gramado ou momento emocional.
+
+Eventos raros podem incluir:
+
+* frango;
+* gol contra;
+* golaço improvável;
+* lesão precoce;
+* expulsão boba;
+* pênalti polêmico;
+* falha grave.
+
+Eventos raros devem ser realmente raros e precisam ser explicáveis pelo contexto sempre que possível.
+
+---
+
+## 6. Sistema tático
+
+### 6.1. Mentalidade
+
+A mentalidade poderá variar de defensiva a ofensiva.
+
+Mentalidade defensiva tende a gerar:
+
+* maior proteção;
+* maior compactação;
+* menor volume ofensivo;
+* menor presença na área;
+* maior chance de chamar pressão.
+
+Mentalidade ofensiva tende a gerar:
+
+* maior volume ofensivo;
+* maior presença no ataque;
+* maior risco de transição;
+* maior exposição defensiva;
+* maior desgaste.
+
+### 6.2. Intensidade
+
+A intensidade definirá o esforço coletivo.
+
+Intensidade alta gera:
+
+* mais pressão;
+* mais duelos;
+* mais velocidade;
+* maior desgaste;
+* maior risco de lesão;
+* maior risco de cartão.
+
+Intensidade baixa reduz desgaste, mas pode diminuir pressão, agressividade e capacidade de reação.
+
+### 6.3. Linha defensiva
+
+Linha alta:
+
+* recupera a bola mais longe do próprio gol;
+* pressiona o adversário;
+* aumenta risco de bola nas costas;
+* exige zagueiros rápidos, compactação e boa leitura.
+
+Linha baixa:
+
+* protege a área;
+* reduz espaço em profundidade;
+* chama pressão;
+* reduz posse ofensiva;
+* aumenta risco de cruzamentos e bolas rondando a área.
+
+### 6.4. Marcação
+
+A marcação poderá variar em intensidade e estilo.
+
+Marcação forte:
+
+* aumenta pressão nos duelos;
+* aumenta chance de recuperar a bola;
+* pode forçar erro adversário;
+* aumenta faltas;
+* aumenta cartões;
+* aumenta desgaste;
+* pode gerar pênaltis.
+
+Marcação individual pode reduzir a influência de um jogador específico, mas pode abrir espaços em outros setores se for mal executada.
+
+Marcação por zona protege a estrutura, mas pode permitir liberdade para jogadores criativos se a equipe não tiver boa compactação.
+
+### 6.5. Foco ofensivo
+
+O time poderá atacar:
+
+* pelo lado esquerdo;
+* pelo lado direito;
+* pelo centro;
+* com bola longa;
+* com cruzamentos;
+* com infiltrações;
+* com chutes de fora;
+* com bola parada;
+* com contra-ataques.
+
+Cada foco dependerá da capacidade dos jogadores e das vulnerabilidades adversárias.
+
+### 6.6. Ritmo
+
+O ritmo poderá variar entre controle, aceleração, cadência, jogo direto e contra-ataque.
+
+Controlar posse:
+
+* reduz caos;
+* conserva resultado;
+* pode diminuir agressividade ofensiva.
+
+Acelerar:
+
+* cria mais transições;
+* aumenta chances;
+* aumenta erros;
+* aumenta fadiga.
+
+Jogo direto:
+
+* pode funcionar com atacantes fortes ou rápidos;
+* pode ser melhor em gramado ruim;
+* pode desperdiçar posse se não houver perfil adequado.
+
+---
+
+## 7. Execução das decisões táticas
+
+### 7.1. Comando não é execução automática
+
+O usuário pode dar uma ordem, mas a execução dependerá do elenco, da comissão, do contexto e do estado emocional.
+
+O fluxo será:
+
+1. comando dado;
+2. comando compreendido;
+3. comando executado;
+4. resultado em campo.
+
+Exemplos:
+
+* o usuário manda marcar forte, mas jogadores cansados e indisciplinados cometem faltas sem recuperar a bola;
+* o usuário manda controlar posse, mas o meio-campo pouco técnico erra passes e chama pressão;
+* o usuário manda pressionar alto, mas zagueiros lentos ficam expostos nas costas.
+
+### 7.2. Capacidade de execução por estilo
+
+Cada elenco terá aptidão para certos estilos.
+
+Pressão alta exige:
+
+* resistência;
+* velocidade;
+* agressividade controlada;
+* compactação;
+* comunicação.
+
+Controle de posse exige:
+
+* passe;
+* técnica;
+* visão;
+* calma;
+* entrosamento.
+
+Contra-ataque exige:
+
+* velocidade;
+* passe vertical;
+* decisão;
+* atacantes de profundidade.
+
+Defesa baixa exige:
+
+* concentração;
+* jogo aéreo;
+* disciplina;
+* força;
+* goleiro seguro.
+
+O motor deverá calcular a compatibilidade entre elenco, tática e contexto.
+
+### 7.3. Tempo de adaptação
+
+Mudanças táticas não terão efeito total imediato.
+
+Uma mudança de formação, mentalidade ou estrutura exigirá adaptação.
+
+No início da mudança, poderá haver desorganização. Depois de alguns minutos, os jogadores começam a encaixar. O efeito completo dependerá de comunicação, inteligência tática, familiaridade com a formação, entrosamento, pressão do jogo e quantidade de mudanças recentes.
+
+### 7.4. Estabilidade e confusão tática
+
+Mudanças excessivas deverão gerar instabilidade.
+
+Trocar mentalidade, formação ou pressão muitas vezes em pouco tempo poderá causar:
+
+* confusão;
+* perda de compactação;
+* erros de posicionamento;
+* queda de entrosamento;
+* espaços entre linhas;
+* aumento de erros defensivos.
+
+A comissão técnica e jogadores inteligentes reduzem esse custo, mas não o eliminam.
+
+---
+
+## 8. Usuário online
+
+Quando o usuário estiver online, ele poderá atuar como técnico ativo.
+
+Ele poderá:
+
+* mudar formação;
+* mudar mentalidade;
+* alterar intensidade;
+* ajustar linha defensiva;
+* alterar pressão;
+* mudar marcação;
+* atacar por setor específico;
+* controlar posse;
+* acelerar jogo;
+* jogar em contra-ataque;
+* fazer substituições;
+* marcar jogador adversário;
+* proteger jogador pendurado;
+* reduzir agressividade;
+* dar instruções emocionais;
+* reagir a lesões, expulsões e riscos.
+
+O usuário online não controlará cada lance, mas receberá alertas estratégicos quando houver algo relevante.
+
+A vantagem do usuário online deverá existir, mas ser moderada. Acompanhar o jogo deve premiar leitura e decisão, não permitir abuso.
+
+---
+
+## 9. Usuário offline
+
+Quando o usuário estiver offline, a partida continuará.
+
+A IA da comissão técnica assumirá decisões dentro dos limites definidos pelo plano pré-jogo, pela autonomia permitida e pela qualidade da comissão.
+
+A IA offline deverá agir principalmente em:
+
+* lesões;
+* expulsões;
+* jogador exausto;
+* risco extremo de lesão;
+* jogador pendurado em situação perigosa;
+* formação quebrada;
+* goleiro lesionado;
+* recomposição obrigatória.
+
+Com comissão melhor, a IA offline também poderá:
+
+* proteger vantagem;
+* buscar empate;
+* explorar setor vulnerável;
+* trocar jogador por desempenho;
+* fazer ajuste temporário;
+* seguir o plano pré-jogo com inteligência.
+
+A regra de ouro é:
+
+**Online significa controle estratégico. Offline significa continuidade justa.**
+
+O usuário offline não deve ser abandonado, mas também não deve receber o mesmo potencial de otimização de um usuário presente e atento.
+
+---
+
+## 10. Pontos de decisão
+
+### 10.1. Tipos de ponto de decisão
+
+Os pontos de decisão poderão ser classificados como:
+
+* problema;
+* oportunidade;
+* risco;
+* emergência.
+
+Problemas podem incluir:
+
+* lado vulnerável;
+* meio-campo dominado;
+* atacante isolado;
+* zagueiro perdendo duelos;
+* goleiro inseguro;
+* saída de bola pressionada;
+* excesso de cruzamentos sofridos.
+
+Oportunidades podem incluir:
+
+* lateral adversário cansado;
+* zagueiro adversário com cartão;
+* goleiro adversário inseguro;
+* espaço nas costas da defesa;
+* vantagem de velocidade;
+* adversário emocionalmente abalado;
+* setor adversário desprotegido.
+
+Riscos podem incluir:
+
+* jogador com risco de lesão;
+* jogador pendurado e agressivo;
+* fadiga extrema;
+* pressão adversária crescente;
+* time perdendo controle emocional;
+* risco de colapso físico.
+
+Emergências incluem:
+
+* lesão grave;
+* expulsão;
+* goleiro fora;
+* formação inválida;
+* decisão obrigatória.
+
+### 10.2. Qualidade do ponto de decisão
+
+A qualidade do ponto de decisão dependerá da comissão técnica.
+
+Uma comissão fraca pode avisar tarde, de forma genérica ou incompleta.
+
+Uma comissão forte pode detectar antes, explicar a causa, sugerir alternativas e apresentar trade-offs.
+
+Exemplo de leitura baixa:
+
+“O adversário está pressionando.”
+
+Exemplo de leitura alta:
+
+“O adversário está explorando seu lado esquerdo porque seu lateral está cansado, o volante está atrasando a cobertura e o ponta adversário tem vantagem de velocidade.”
+
+### 10.3. Sugestões
+
+Cada sugestão deverá ter:
+
+* benefício esperado;
+* risco;
+* custo físico;
+* custo tático;
+* impacto emocional;
+* tempo para efeito;
+* validade contextual;
+* compatibilidade com o elenco.
+
+Sugestões não devem ser botões mágicos. Elas apenas orientam decisões melhores dentro do contexto.
+
+### 10.4. Expiração de sugestões
+
+Sugestões podem perder validade.
+
+Uma sugestão deverá expirar se:
+
+* o jogador-alvo for substituído;
+* o placar mudar;
+* o adversário mudar formação;
+* o jogador necessário sair;
+* o contexto tático mudar;
+* a oportunidade desaparecer;
+* a janela de decisão expirar.
+
+---
+
+## 11. Níveis da comissão técnica
+
+### 11.1. Nível 1 — reativo
+
+A comissão nível 1 detecta apenas situações óbvias e reage tarde.
+
+Características:
+
+* alertas genéricos;
+* poucas sugestões;
+* baixa precisão;
+* IA offline limitada ao essencial;
+* maior chance de diagnóstico incompleto.
+
+Exemplos de alertas:
+
+* “O adversário está pressionando.”
+* “Seu jogador está muito cansado.”
+
+### 11.2. Nível 2 — proteção
+
+A comissão nível 2 identifica riscos básicos.
+
+Detecta:
+
+* jogador pendurado;
+* fadiga alta;
+* setor sob pressão;
+* adversário muito ofensivo.
+
+Exemplo:
+
+“Seu lado esquerdo está sendo atacado com frequência.”
+
+### 11.3. Nível 3 — ajuste
+
+A comissão nível 3 identifica padrões táticos úteis.
+
+Detecta:
+
+* domínio no meio;
+* atacante isolado;
+* lateral em desvantagem;
+* linha defensiva exposta;
+* jogador em risco.
+
+Exemplo:
+
+“O adversário está explorando seu lateral esquerdo, que já demonstra fadiga.”
+
+### 11.4. Nível 4 — exploração
+
+A comissão nível 4 identifica problemas e oportunidades com antecedência.
+
+Detecta:
+
+* fraquezas adversárias;
+* padrões de ataque;
+* oportunidades de contra-ataque;
+* espaços entre linhas;
+* risco futuro próximo.
+
+Exemplo:
+
+“O adversário está adiantando o lateral esquerdo e deixando espaço para seu ponta atacar nas costas.”
+
+### 11.5. Nível 5 — antecipação
+
+A comissão nível 5 faz leitura preditiva, contextual e personalizada.
+
+Detecta:
+
+* padrões antes de virarem crise;
+* riscos futuros;
+* armadilhas táticas;
+* momento ideal para mudar o jogo;
+* oportunidades de alto impacto.
+
+Exemplo:
+
+“O adversário está atraindo sua pressão para o centro e invertendo rápido no seu lado esquerdo. Se mantiver esse padrão, há alto risco de chance clara nos próximos minutos.”
+
+---
+
+## 12. IA adversária e resposta tática
+
+O adversário não deverá ser passivo.
+
+Se o usuário explorar o mesmo padrão por muito tempo, o adversário poderá reagir conforme qualidade da comissão, estilo do técnico e contexto do jogo.
+
+Exemplos:
+
+* dobrar marcação no setor atacado;
+* substituir lateral cansado;
+* dar cobertura com volante;
+* mudar foco de ataque;
+* explorar espaço deixado pelo usuário;
+* baixar linhas;
+* aumentar pressão;
+* mudar formação.
+
+A resposta adversária deverá gerar novas oportunidades e riscos. A partida deve funcionar como um xadrez tático, no qual cada ajuste pode criar uma consequência.
+
+---
+
+## 13. Notificações e interface funcional
+
+### 13.1. Tipos de notificação
+
+As notificações deverão ser filtradas para evitar excesso de informação.
+
+Categorias:
+
+* críticas;
+* táticas;
+* narrativas;
+* oportunidades;
+* resumo offline.
+
+Notificações críticas incluem lesão, expulsão, pênalti, jogador em risco extremo ou decisão obrigatória.
+
+Notificações táticas incluem setor vulnerável, mudança de formação adversária, domínio no meio, jogador adversário vulnerável e perda de controle.
+
+Notificações narrativas incluem torcida empurrando, jogador crescendo no jogo, goleiro em grande atuação e adversário nervoso.
+
+### 13.2. Filtro de notificações
+
+O sistema não deve avisar tudo.
+
+Não deve avisar apenas porque o adversário atacou uma vez por um lado. Deve avisar quando houver padrão consistente, risco relevante ou ação possível.
+
+A comissão técnica deverá influenciar a qualidade das notificações, não gerar spam.
+
+### 13.3. Tela da partida
+
+A tela da partida deverá permitir acompanhamento estratégico.
+
+Elementos desejáveis:
+
+* placar;
+* minuto;
+* eventos recentes;
+* momentum;
+* posse;
+* pressão;
+* fadiga por setor;
+* alertas ativos;
+* sugestões da comissão;
+* ações rápidas;
+* substituições disponíveis;
+* linha do tempo;
+* campo tático simplificado;
+* resumo de padrões.
+
+A interface poderá ter modo compacto e modo detalhado.
+
+O modo compacto mostrará placar, eventos e decisões importantes.
+
+O modo detalhado mostrará setores, trade-offs, padrões, fadiga, momentum e leitura tática mais profunda.
+
+---
+
+## 14. Memória de padrões
+
+O motor deverá manter memória dos acontecimentos recentes da partida.
+
+A memória deverá registrar:
+
+* ataques por zona;
+* duelos vencidos e perdidos;
+* erros recentes;
+* pressão recente;
+* riscos acumulados;
+* mudanças táticas recentes;
+* resposta às mudanças;
+* desempenho de jogadores;
+* setores explorados.
+
+Essa memória alimentará:
+
+* pontos de decisão;
+* momentum;
+* fadiga localizada;
+* ajustes da IA;
+* notificações;
+* relatórios pós-jogo;
+* análise da comissão.
+
+Sem memória, a partida pareceria uma sequência desconectada de sorteios.
+
+---
+
+## 15. Causalidade dos eventos
+
+Eventos importantes devem registrar causa.
+
+Exemplo de causalidade:
+
+* gol sofrido;
+* causa primária: lado esquerdo vulnerável;
+* causa secundária: lateral cansado;
+* causa terciária: volante sem cobertura;
+* ação anterior relevante: usuário manteve pressão alta;
+* alerta anterior: comissão havia avisado risco no setor.
+
+A causalidade será usada para:
+
+* explicar resultado;
+* gerar pós-jogo;
+* avaliar decisões;
+* avaliar comissão;
+* produzir narrativa da imprensa;
+* ensinar o usuário;
+* validar justiça do motor.
+
+O usuário deve entender por que algo aconteceu, mesmo quando houve azar.
+
+---
+
+## 16. Eventos internos, visíveis e narrativos
+
+O motor calculará muitos eventos internos que não precisam aparecer ao usuário.
+
+Eventos internos podem incluir perdas de posição, pequenos erros, duelos comuns e coberturas atrasadas.
+
+Eventos visíveis incluem gols, chances claras, cartões, lesões, substituições, mudanças táticas, pênaltis, grandes defesas e pontos de decisão.
+
+Eventos narrativos dão vida ao jogo, mas não exigem ação imediata.
+
+A separação entre evento interno, visível e narrativo evita excesso de informação e melhora a experiência.
+
+---
+
+## 17. Cartões e arbitragem
+
+### 17.1. Faltas e cartões
+
+Faltas deverão nascer de duelos, agressividade, atraso no lance, pressão e contexto.
+
+A chance de falta será influenciada por:
+
+* agressividade do jogador;
+* marcação forte;
+* atraso no duelo;
+* fadiga;
+* diferença de velocidade;
+* árbitro;
+* disciplina;
+* concentração;
+* estado emocional.
+
+A chance de cartão será influenciada por:
+
+* gravidade da falta;
+* rigor do árbitro;
+* repetição de faltas;
+* nervosismo;
+* contexto do lance;
+* disciplina;
+* pressão da torcida.
+
+### 17.2. Perfil de arbitragem
+
+O árbitro deverá ter perfil funcional.
+
+Características possíveis:
+
+* rigor;
+* caseirismo;
+* controle emocional;
+* tolerância a contato;
+* chance de pênalti;
+* critério disciplinar.
+
+Isso afetará marcação forte, faltas, cartões, pênaltis, pressão da torcida e jogadores indisciplinados.
+
+Comissão alta pode detectar o perfil do árbitro durante o jogo e recomendar ajustes.
+
+---
+
+## 18. Lesões e equipe médica
+
+Lesões não devem ser puramente aleatórias.
+
+O risco de lesão será influenciado por:
+
+* histórico físico;
+* fadiga;
+* intensidade;
+* clima;
+* gramado;
+* número de sprints;
+* número de duelos;
+* idade;
+* preparação física;
+* equipe médica;
+* lesões anteriores;
+* contato físico.
+
+Lesões poderão ser:
+
+* leves;
+* moderadas;
+* graves;
+* musculares;
+* por pancada;
+* recorrentes;
+* agravadas.
+
+A equipe médica deverá afetar:
+
+* detecção precoce;
+* leitura de risco;
+* redução de risco;
+* tempo de recuperação;
+* chance de agravar se o jogador continuar em campo.
+
+Quando um jogador sentir desconforto, o usuário poderá decidir entre manter ou substituir.
+
+Manter preserva qualidade técnica no curto prazo, mas aumenta risco de agravamento. Substituir protege o jogador, mas reduz opções e pode alterar o rendimento.
+
+---
+
+## 19. Clima e gramado
+
+O clima e o gramado deverão afetar a partida de forma específica.
+
+### 19.1. Chuva
+
+A chuva pode:
+
+* reduzir domínio;
+* prejudicar passe curto;
+* prejudicar drible;
+* aumentar escorregões;
+* aumentar rebotes;
+* aumentar erro do goleiro em bola molhada;
+* favorecer jogo físico e chute de fora.
+
+### 19.2. Calor
+
+O calor pode:
+
+* aumentar fadiga;
+* reduzir pressão alta sustentada;
+* reduzir intensidade de sprints;
+* aumentar risco muscular.
+
+### 19.3. Gramado ruim
+
+Gramado ruim pode:
+
+* prejudicar técnica;
+* prejudicar passe rasteiro;
+* reduzir velocidade da bola;
+* favorecer bola longa;
+* aumentar lesões;
+* aumentar erro de domínio.
+
+Esses fatores deverão gerar decisões táticas reais. Em gramado ruim, jogo direto pode ser melhor. Em calor, pressão máxima é arriscada. Na chuva, chutes de fora podem gerar rebotes.
+
+---
+
+## 20. Bola parada
+
+A bola parada deverá ter sistema próprio.
+
+Tipos:
+
+* escanteio;
+* falta lateral;
+* falta frontal;
+* pênalti;
+* cruzamento parado.
+
+A qualidade da bola parada será influenciada por:
+
+* qualidade da cobrança;
+* jogada ensaiada;
+* altura;
+* impulsão;
+* posicionamento;
+* bloqueios;
+* defesa aérea;
+* goleiro;
+* marcação;
+* comissão técnica;
+* treino de bola parada.
+
+Comissão com boa bola parada poderá gerar melhores sugestões, preparar jogadas ensaiadas, defender melhor cruzamentos e identificar vulnerabilidades adversárias.
+
+---
+
+## 21. Importância do jogo e contexto da temporada
+
+A partida deverá considerar importância e contexto.
+
+Fatores:
+
+* final;
+* clássico;
+* mata-mata;
+* jogo comum;
+* luta por título;
+* luta contra rebaixamento;
+* necessidade de vitória;
+* empate suficiente;
+* time já classificado;
+* calendário apertado;
+* próximo jogo importante.
+
+Isso afeta:
+
+* pressão emocional;
+* torcida;
+* mídia;
+* nervosismo;
+* motivação;
+* cartões;
+* moral;
+* risco de erro;
+* comportamento da IA.
+
+Um time que precisa vencer aceita mais risco. Um time para o qual o empate basta pode proteger o resultado. Um time com jogo decisivo próximo pode poupar atletas.
+
+---
+
+## 22. Substituições
+
+Substituições deverão ser decisões estratégicas reais.
+
+Elas devem considerar:
+
+* fadiga;
+* risco de lesão;
+* cartão;
+* desempenho;
+* nota;
+* função;
+* encaixe tático;
+* posição;
+* placar;
+* tempo de jogo;
+* próximo jogo;
+* importância da competição;
+* personalidade;
+* reação emocional do jogador;
+* entrosamento;
+* impacto no setor.
+
+Substituir não é apenas trocar uma nota por outra. A troca altera energia, função, equilíbrio, moral, entrosamento, risco e comportamento tático.
+
+Substituir um jogador cedo por erro pode afetar sua moral. Jogadores profissionais aceitam melhor. Jogadores jovens, instáveis ou egoístas podem reagir mal.
+
+---
+
+## 23. Jogadores fora de posição e funções
+
+O motor deverá diferenciar posição e função.
+
+Exemplos de função:
+
+* meia armador;
+* meia box-to-box;
+* meia atacante;
+* volante marcador;
+* volante construtor;
+* lateral ofensivo;
+* lateral defensivo;
+* ponta aberto;
+* ponta invertido;
+* centroavante pivô;
+* centroavante de profundidade.
+
+Jogadores improvisados em posição ou função inadequada terão penalidades conforme versatilidade, inteligência tática, familiaridade e contexto.
+
+Efeitos de má adaptação:
+
+* pior posicionamento;
+* pior tomada de decisão;
+* pior cobertura;
+* queda técnica;
+* risco de erro;
+* menor estabilidade coletiva.
+
+---
+
+## 24. Sinergia e equilíbrio coletivo
+
+O motor deverá avaliar o time como conjunto, não apenas jogadores isolados.
+
+Exemplos de sinergia:
+
+* lateral ofensivo com ponta que não recompõe pode deixar lado vulnerável;
+* volante construtor com meia criativo melhora posse;
+* dois atacantes lentos prejudicam contra-ataque;
+* zagueiro lento com linha alta aumenta risco nas costas;
+* laterais ofensivos demais podem desequilibrar transição defensiva.
+
+O time deverá ter balanços coletivos:
+
+* equilíbrio defensivo;
+* equilíbrio do meio;
+* equilíbrio ofensivo;
+* equilíbrio de transição;
+* equilíbrio aéreo;
+* equilíbrio de velocidade;
+* equilíbrio criativo.
+
+Um time com bons jogadores pode ser desequilibrado e render menos do que o esperado.
+
+---
+
+## 25. Final de jogo, acréscimos, prorrogação e pênaltis
+
+### 25.1. Fim de jogo
+
+Os últimos minutos terão lógica própria.
+
+Time vencendo tende a:
+
+* proteger resultado;
+* reduzir risco;
+* ganhar tempo;
+* substituir por cansaço;
+* defender bola aérea.
+
+Time perdendo tende a:
+
+* aumentar presença ofensiva;
+* aceitar risco;
+* usar bola longa;
+* pressionar;
+* buscar cruzamentos;
+* expor transição.
+
+Isso dependerá de perfil do técnico, importância do jogo, competição, moral e comissão.
+
+### 25.2. Acréscimos
+
+Acréscimos poderão depender de:
+
+* lesões;
+* substituições;
+* checagens;
+* cera;
+* cartões;
+* confusões.
+
+### 25.3. Prorrogação
+
+Em competições que exigirem, a prorrogação deverá aumentar o peso da fadiga, do risco físico, da tensão emocional e da tomada de decisão.
+
+### 25.4. Pênaltis
+
+Disputas de pênaltis deverão ter lógica própria.
+
+O batedor será influenciado por:
+
+* qualidade em pênaltis;
+* frieza;
+* moral;
+* pressão;
+* fadiga;
+* personalidade;
+* importância da cobrança.
+
+O goleiro será influenciado por:
+
+* reflexo;
+* leitura;
+* altura;
+* confiança;
+* histórico;
+* estado emocional.
+
+---
+
+## 26. Modo online, offline e granularidade de simulação
+
+A simulação deverá ter diferentes níveis de granularidade, mas manter coerência de universo.
+
+### 26.1. Simulação completa
+
+Usada em partidas acompanhadas pelo usuário.
+
+Calcula detalhes, eventos, decisões, notificações, padrões e interação ao vivo.
+
+### 26.2. Simulação intermediária
+
+Usada em partidas do clube do usuário quando ele estiver offline.
+
+Calcula blocos, eventos importantes, IA offline, riscos, substituições e resumo para retorno.
+
+### 26.3. Simulação resumida
+
+Usada em partidas entre clubes sem usuário acompanhando.
+
+Calcula resultado, estatísticas básicas, eventos importantes, gols, cartões, lesões e causas principais.
+
+O mesmo modelo lógico deve sustentar todos os níveis, para que as partidas pareçam pertencer ao mesmo mundo.
+
+---
+
+## 27. Retorno do usuário à partida
+
+Quando o usuário voltar online durante uma partida, ele deverá receber resumo inteligente.
+
+O resumo deverá conter:
+
+* minuto em que saiu;
+* minuto atual;
+* placar;
+* eventos importantes;
+* ações tomadas pela IA;
+* situação atual;
+* alertas ativos;
+* riscos;
+* oportunidades;
+* sugestão atual da comissão.
+
+Exemplo funcional:
+
+“Você voltou aos 64 minutos. Enquanto esteve offline, seu volante recebeu amarelo, o adversário aumentou a pressão e sua comissão reduziu a agressividade dele. O jogo está empatado, seu lateral esquerdo está cansado e o adversário domina o meio.”
+
+---
+
+## 28. Relatório pós-jogo
+
+O pós-jogo deverá explicar a partida.
+
+Deverá incluir:
+
+* placar;
+* estatísticas;
+* finalizações;
+* finalizações no alvo;
+* chances claras;
+* posse;
+* posse perigosa;
+* xG aproximado;
+* escanteios;
+* faltas;
+* cartões;
+* lesões;
+* momentum por fase;
+* setores explorados;
+* melhores jogadores;
+* piores jogadores;
+* notas;
+* decisões importantes;
+* avaliação da comissão;
+* reação da torcida;
+* narrativa da imprensa;
+* impactos no clube.
+
+### 28.1. Avaliação das decisões
+
+O jogo deverá avaliar decisões com base em trade-offs, não apenas certo ou errado.
+
+Exemplo:
+
+“Recuar a linha reduziu bolas nas costas, mas aumentou cruzamentos sofridos.”
+
+Uma decisão pode ter sido correta mesmo se o resultado foi ruim por um evento de baixa probabilidade.
+
+### 28.2. Avaliação da comissão
+
+O relatório deverá mostrar como a comissão atuou.
+
+Exemplos:
+
+* identificou corretamente o lado vulnerável;
+* recomendou substituição preventiva;
+* demorou a perceber domínio adversário no meio;
+* interpretou mal o problema;
+* protegeu um jogador de lesão;
+* executou bem o plano offline.
+
+Isso justifica investimento em estrutura.
+
+### 28.3. Explicação de azar
+
+O sistema deverá explicar partidas em que o resultado não acompanhou o volume.
+
+Exemplo:
+
+“O time criou mais chances, mas finalizou mal e o goleiro adversário teve atuação excepcional.”
+
+Isso evita sensação de injustiça.
+
+---
+
+## 29. Torcida, imprensa e reputação
+
+A torcida deverá influenciar a partida e reagir ao resultado.
+
+Torcida apoiando pode aumentar moral, intensidade e pressão no adversário.
+
+Torcida vaiando pode reduzir moral, aumentar ansiedade e gerar erro.
+
+A torcida pode crescer com o clube, mas também cobrar mais conforme reputação aumenta.
+
+A imprensa deverá gerar narrativa baseada em fatos da partida, não em textos aleatórios.
+
+Exemplos de narrativa:
+
+* vitória construída por ajuste tático;
+* técnico demorou a reagir;
+* goleiro salvou o time;
+* jogador jovem decidiu;
+* torcida perdeu paciência;
+* comissão identificou bem a vulnerabilidade adversária;
+* derrota apesar de boa atuação.
+
+Essas narrativas afetam moral, reputação, pressão, torcida e mercado.
+
+---
+
+## 30. Efeitos de longo prazo das decisões
+
+Algumas decisões de partida deverão afetar o futuro.
+
+Exemplos:
+
+* forçar jogador cansado pode ajudar no jogo, mas aumentar risco físico futuro;
+* substituir estrela cedo pode preservar físico, mas gerar insatisfação;
+* recuar demais sendo favorito pode irritar torcida;
+* vencer com ajuste tático aumenta reputação do técnico/usuário;
+* perder por insistir em risco pode afetar confiança do elenco;
+* proteger jogador pendurado pode evitar suspensão;
+* ignorar alerta médico pode agravar lesão.
+
+A partida alimenta a temporada e a narrativa do clube.
+
+---
+
+## 31. Confiança entre elenco e comando
+
+O jogo poderá considerar confiança do elenco no comando.
+
+A confiança aumenta com decisões coerentes, bons resultados, proteção de jogadores e leitura tática positiva.
+
+A confiança cai com mudanças caóticas, exposição injusta de jogadores, decisões incoerentes, má fase e conflitos.
+
+A confiança afeta:
+
+* adaptação às ordens;
+* moral;
+* obediência tática;
+* estabilidade;
+* reação emocional.
+
+---
+
+## 32. Reputação tática do usuário
+
+Com o tempo, o usuário poderá desenvolver reputação tática.
+
+Exemplos de estilo percebido:
+
+* ofensivo;
+* defensivo;
+* reativo;
+* pragmático;
+* intenso;
+* arriscado;
+* desenvolvedor;
+* analítico.
+
+Adversários poderão se preparar contra padrões recorrentes.
+
+Se o usuário sempre pressiona alto, adversários podem explorar bolas longas nas costas. Se sempre recua após abrir vantagem, adversários podem aumentar pressão e cruzamentos.
+
+Isso impede que uma estratégia seja dominante para sempre.
+
+---
+
+## 33. Justiça competitiva e antiabuso
+
+O sistema deverá impedir exploração abusiva de comandos.
+
+Ações com alto potencial deverão ter contrapesos.
+
+### 33.1. Pressão alta
+
+Benefícios:
+
+* recupera bola mais cedo;
+* força erro;
+* aumenta volume ofensivo.
+
+Custos:
+
+* fadiga;
+* espaço nas costas;
+* cartões;
+* lesões;
+* perda de eficiência se usada demais.
+
+### 33.2. Marcação forte
+
+Benefícios:
+
+* dificulta criação adversária;
+* aumenta duelos;
+* pode intimidar.
+
+Custos:
+
+* faltas;
+* cartões;
+* pênaltis;
+* desgaste;
+* lesões.
+
+### 33.3. Recuar cedo
+
+Benefícios:
+
+* protege profundidade;
+* reduz espaço;
+* defende vantagem.
+
+Custos:
+
+* chama pressão;
+* reduz posse;
+* aumenta cruzamentos sofridos;
+* pode irritar torcida;
+* pode reduzir moral ofensiva.
+
+### 33.4. Atacar setor vulnerável
+
+Benefícios:
+
+* explora fraqueza real;
+* aumenta chances.
+
+Custos:
+
+* adversário pode ajustar;
+* pode expor o próprio setor;
+* pode perder efeito com repetição.
+
+---
+
+## 34. Modo de execução e consistência
+
+A partida deverá ser processada com autoridade do servidor. O cliente apenas envia comandos e recebe atualizações.
+
+Comandos do usuário deverão ser validados:
+
+* o usuário controla o clube?
+* a partida está ativa?
+* a ação ainda é válida?
+* há substituições disponíveis?
+* o jogador está disponível?
+* a janela de decisão não expirou?
+* a ação é permitida pela competição?
+
+A partida nunca deverá travar indefinidamente. Decisões críticas terão janela de resposta. Se o usuário não responder, a IA ou o plano pré-jogo assumirá.
+
+Em partidas entre dois usuários online, comandos deverão ser processados em ordem válida, com aplicação no próximo ciclo apropriado, evitando vantagem por latência.
+
+---
+
+## 35. Auditoria, balanceamento e calibração
+
+O motor deverá ser calibrável e auditável.
+
+Deverá registrar informações internas para desenvolvimento e balanceamento, como:
+
+* chance real de gol;
+* causa dos gols;
+* ação que influenciou o evento;
+* setor de origem;
+* xG;
+* probabilidade aplicada;
+* principais modificadores;
+* cadeia causal.
+
+Isso não aparece para o usuário comum, mas é essencial para depuração.
+
+O motor deverá ser testado em massa para calibrar:
+
+* gols por jogo;
+* finalizações;
+* cartões;
+* lesões;
+* empates;
+* viradas;
+* goleadas;
+* vitórias de favoritos;
+* zebras;
+* vantagem de mando;
+* impacto da comissão;
+* impacto do usuário online;
+* quantidade de alertas.
+
+A simulação deverá funcionar tanto em clubes pequenos quanto em clubes evoluídos.
+
+Em níveis baixos, haverá mais erros, oscilação e dificuldade tática. Em níveis altos, haverá mais consistência, intensidade, leitura e punição a falhas pequenas. Ainda assim, a imprevisibilidade do futebol deve permanecer.
+
+---
+
+## 36. Regras de competição
+
+O motor deverá receber as regras da competição.
+
+Regras possíveis:
+
+* número de substituições;
+* prorrogação;
+* pênaltis;
+* mando único;
+* campo neutro;
+* critérios de desempate;
+* limite de inscrições;
+* regras específicas de suspensão;
+* formato mata-mata ou pontos corridos.
+
+A simulação deve respeitar essas regras em decisões, substituições, prorrogação, pênaltis e pós-jogo.
+
+---
+
+## 37. Fluxo completo da partida
+
+O fluxo consolidado da simulação será:
+
+1. carregar contexto da partida;
+2. calcular pressão, clima, gramado, torcida e importância;
+3. calcular estado inicial dos jogadores;
+4. calcular aptidão do time para a tática escolhida;
+5. calcular estabilidade inicial;
+6. iniciar ciclos de simulação;
+7. atualizar fadiga, moral e momentum;
+8. calcular controle por setores;
+9. gerar ataques e duelos;
+10. resolver chances e eventos;
+11. atualizar memória de padrões;
+12. registrar causalidade;
+13. detectar riscos, problemas e oportunidades;
+14. comissão interpreta os sinais;
+15. gerar pontos de decisão filtrados;
+16. usuário ou IA envia comando;
+17. validar comando;
+18. calcular qualidade de execução;
+19. aplicar impacto com tempo de adaptação;
+20. adversário pode reagir;
+21. salvar estado e eventos;
+22. emitir notificações;
+23. finalizar partida;
+24. gerar relatório;
+25. aplicar consequências no mundo do jogo.
+
+---
+
+## 38. Módulos funcionais do sistema de partida
+
+O sistema de partida será composto pelos seguintes módulos funcionais:
+
+### 38.1. Núcleo de simulação
+
+Responsável por processar a partida, gerar eventos, atualizar estados, resolver duelos, chances, gols, faltas e lesões.
+
+### 38.2. Núcleo tático
+
+Responsável por interpretar formações, mentalidades, funções, estilos, intensidade, pressão, linha defensiva, marcação, foco ofensivo e estabilidade.
+
+### 38.3. Núcleo de decisão
+
+Responsável por detectar problemas, riscos e oportunidades, gerar pontos de decisão e controlar urgência, validade e expiração.
+
+### 38.4. Núcleo da comissão técnica
+
+Responsável por transformar sinais internos em leitura para o usuário, gerar sugestões, melhorar execução, controlar IA offline e avaliar a própria atuação.
+
+### 38.5. Núcleo de IA offline
+
+Responsável por seguir plano pré-jogo, agir em emergências, proteger o time e tomar decisões proporcionais à qualidade da comissão.
+
+### 38.6. Núcleo de notificações
+
+Responsável por filtrar, priorizar e entregar alertas críticos, táticos, narrativos e resumos.
+
+### 38.7. Núcleo de memória de padrões
+
+Responsável por registrar padrões recentes de ataques, duelos, erros, riscos, pressão e respostas táticas.
+
+### 38.8. Núcleo de causalidade
+
+Responsável por registrar por que eventos importantes aconteceram.
+
+### 38.9. Núcleo de execução
+
+Responsável por separar comando dado de comando executado, calculando qualidade de execução conforme jogadores, comissão, contexto e estabilidade.
+
+### 38.10. Núcleo de reação adversária
+
+Responsável por permitir que o adversário perceba padrões e ajuste a estratégia conforme sua comissão e estilo.
+
+### 38.11. Núcleo de bola parada
+
+Responsável por escanteios, faltas, pênaltis, cruzamentos parados, jogadas ensaiadas e defesa aérea.
+
+### 38.12. Núcleo de arbitragem
+
+Responsável por faltas, cartões, pênaltis, rigor, caseirismo, controle emocional e critérios do árbitro.
+
+### 38.13. Núcleo de clima e gramado
+
+Responsável por aplicar efeitos específicos de chuva, calor, frio, gramado ruim e outras condições.
+
+### 38.14. Núcleo de regras da competição
+
+Responsável por substituições, prorrogação, pênaltis, critérios e limitações.
+
+### 38.15. Núcleo de pós-jogo
+
+Responsável por estatísticas, notas, moral, lesões, evolução, torcida, imprensa, reputação, finanças e avaliação das decisões.
+
+### 38.16. Núcleo de balanceamento
+
+Responsável por calibrar taxas de gols, finalizações, cartões, lesões, zebras, domínio, alertas e impactos sistêmicos.
+
+---
+
+## 39. Decisões aprovadas consolidadas
+
+As decisões aprovadas para o escopo da simulação são:
+
+1. A partida será simulada por um motor dinâmico, não por sorteio direto de placar.
+2. O motor calculará microeventos e o placar nascerá deles.
+3. A partida terá comportamento diferente para usuário online e offline.
+4. Usuário online poderá realizar ações táticas e substituições durante a partida.
+5. Usuário offline será representado por IA baseada em plano pré-jogo e comissão técnica.
+6. A IA offline deve agir principalmente no essencial, mas pode ser mais sofisticada conforme a comissão.
+7. A comissão técnica impactará leitura, sugestões, execução, alertas, IA offline e pós-jogo.
+8. O nível da comissão alterará a qualidade, a antecedência e a precisão dos pontos de decisão.
+9. Sugestões de comissão alta não serão bônus mágicos, mas leituras melhores com execução mais qualificada.
+10. A partida terá pontos de decisão dinâmicos baseados em problemas, riscos e oportunidades.
+11. As decisões deverão ter trade-offs e não apenas efeitos positivos.
+12. Mudanças táticas terão tempo de adaptação.
+13. Mudanças excessivas gerarão confusão e instabilidade.
+14. O motor deverá separar comando de execução.
+15. A capacidade do elenco para executar estilos será considerada.
+16. A partida terá memória de padrões.
+17. Eventos importantes terão causalidade registrada.
+18. O adversário poderá reagir aos padrões do usuário.
+19. A simulação deverá ter diferentes níveis de granularidade para performance.
+20. Notificações deverão ser filtradas, evitando excesso.
+21. O pós-jogo deverá explicar decisões, eventos e consequências.
+22. O motor deverá ser calibrável, auditável e testável em massa.
+23. A partida deverá alimentar moral, reputação, torcida, imprensa, evolução, lesões, finanças e temporada.
+24. A estrutura do clube afetará a partida de forma indireta, especialmente por comissão, equipe médica, comunicação e preparação.
+25. Jogadores deverão ser únicos, com atributos, personalidade, comportamento, função e contexto.
+26. Tática deverá alterar comportamento real do time, não apenas números.
+27. Clima, gramado, arbitragem, torcida, importância do jogo e campeonato deverão influenciar a simulação.
+28. Bola parada terá sistema próprio.
+29. Prorrogação e pênaltis deverão existir quando a competição exigir.
+30. A experiência deve ser explicável: o usuário precisa entender por que algo aconteceu.
+
+---
+
+## 40. Pendências e pontos a definir
+
+Algumas decisões ainda precisam ser detalhadas futuramente.
+
+### 40.1. Duração real da partida online
+
+Ainda não foi definido se a partida online terá duração em tempo real curto, blocos com pausa estratégica ou modelo híbrido. A direção mais adequada é o modelo híbrido, no qual a partida flui automaticamente e eventos relevantes abrem decisões.
+
+### 40.2. Quantidade exata de alertas por partida
+
+Foi definido que deve haver filtro e limite, mas os números exatos ainda precisam ser balanceados.
+
+Direção sugerida:
+
+* alertas críticos sem limite;
+* pontos de decisão táticos em quantidade controlada;
+* oportunidades filtradas;
+* narrativas sem excesso.
+
+### 40.3. Escala exata dos níveis da comissão
+
+A escala funcional de 1 a 5 foi aprovada conceitualmente, mas os valores exatos de impacto, limites e progressão ainda precisam ser calibrados.
+
+### 40.4. Profundidade visual da interface
+
+Foi definido que a interface deve ter modo compacto e detalhado, mas o layout final ainda deverá ser desenhado.
+
+### 40.5. Grau de autonomia da IA offline
+
+Foi definido que haverá autonomia configurável, mas ainda falta determinar os níveis exatos e seus limites práticos.
+
+### 40.6. Sistema de técnico contratado
+
+Foi discutida a possibilidade de o clube ter técnico e auxiliar com perfis próprios, mas ainda falta decidir se o usuário será sempre o técnico, se será gestor/diretor, ou se poderá contratar técnico com personalidade e estilo.
+
+### 40.7. Uso de cera e gestão de tempo
+
+Foi levantada a possibilidade de ações como ganhar tempo no fim do jogo, mas ainda não foi aprovada como sistema definitivo.
+
+### 40.8. Precisão das informações adversárias
+
+Foi definido que o usuário não deve ter informação perfeita do adversário e que a comissão deve estimar melhor conforme nível, mas ainda falta definir quais dados serão exibidos em cada nível.
+
+### 40.9. Integração com treino semanal
+
+Foi definido que a familiaridade tática deve importar e que treino semanal pode influenciar execução, mas o sistema completo de treino ainda precisa ser detalhado em outro escopo.
+
+---
+
+## 41. Síntese final
+
+A simulação de partidas será um sistema robusto, estratégico, explicável e integrado ao restante do jogo.
+
+A partida não será apenas:
+
+“escalar time e esperar resultado”.
+
+Ela será:
+
+“preparar plano, acompanhar padrões, interpretar alertas, tomar decisões, lidar com riscos, executar mudanças, reagir ao adversário e viver consequências”.
+
+O usuário que entende seu elenco, prepara bem o plano, investe em comissão, lê a partida e toma boas decisões poderá superar adversários mais fortes. O usuário offline continuará competitivo se tiver plano, estrutura e comissão adequados.
+
+O motor deve gerar histórias compreensíveis:
+
+* o time venceu porque explorou um setor vulnerável;
+* perdeu porque insistiu em pressão alta com elenco cansado;
+* empatou porque recuou cedo demais;
+* sofreu gol porque ignorou alerta de lateral cansado;
+* venceu mesmo sofrendo porque o goleiro teve grande atuação;
+* perdeu apesar de jogar bem porque finalizou mal;
+* melhorou depois de uma substituição;
+* desmoronou por falta de liderança;
+* reagiu por boa gestão emocional;
+* foi salvo pela comissão ou prejudicado por leitura ruim.
+
+Esse modelo transforma a partida em um organismo vivo e conecta diretamente jogadores, tática, estrutura, comissão, torcida, economia, narrativa e evolução do clube.
