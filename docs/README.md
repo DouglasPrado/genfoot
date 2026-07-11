@@ -10,14 +10,15 @@ Esta documentação foi consolidada a partir das conversas de brainstorming em [
 
 ## Como navegar
 
-A documentação está organizada em quatro áreas, do "porquê" ao "como":
+A documentação está organizada em áreas, do "porquê" ao "como":
 
 | Área | O que contém |
 | --- | --- |
 | [`00-produto/`](#00--produto) | Visão, pitch, identidade de marca e a referência histórica que originou o design. |
 | [`01-game-design/`](#01--game-design-gdd) | O GDD — o design de cada sistema do jogo (o "o quê" e o "porquê"). |
-| [`02-tecnico/`](#02--técnico) | Arquitetura, modelo de dados, regras executáveis e roadmap (o "como"). |
+| [`02-tecnico/`](#02--técnico) | Arquitetura, modelo de dados, regras executáveis, plataforma e roadmap (o "como"). |
 | [`03-guia-do-jogador/`](#03--guia-do-jogador) | O guia oficial voltado a quem joga. |
+| [`04-ui-ux/`](#04--uiux) | Interface: telas e fluxos do app do jogador (Expo) e do admin (Next.js). |
 | [`99-decisoes/`](#99--decisões) | O registro central de decisões (ADR log), preservando a numeração original. |
 
 **Ponto de entrada recomendado:** comece pela [Visão de Produto](00-produto/01-visao-e-pitch.md) e depois pelo [GDD Overview](01-game-design/00-gdd-overview.md), que resume todos os sistemas e aponta para o detalhe de cada um.
@@ -42,7 +43,12 @@ A documentação está organizada em quatro áreas, do "porquê" ao "como":
 - [07 · Inteligência Artificial](01-game-design/07-inteligencia-artificial.md) — Decision Engine e hierarquia de IAs.
 - [08 · Estádio, Região e Clima](01-game-design/08-estadio-regiao-e-clima.md)
 - [09 · Anti-abuso e Onboarding](01-game-design/09-anti-abuso-e-onboarding.md)
-- [10 · Experiência do Usuário e Telas](01-game-design/10-experiencia-e-telas.md) — ciclo do dia a dia, tela inicial, ações, notificações, telas de indicadores.
+- [10 · Experiência do Usuário e Telas](01-game-design/10-experiencia-e-telas.md) — ciclo do dia a dia, central/agenda, automações, telas de indicadores.
+- [11 · Torcida, Imprensa e Narrativa](01-game-design/11-torcida-imprensa-e-narrativa.md) — torcida segmentada, satisfação, imprensa, reputação do gestor/clube.
+- [12 · Seleções e Calendário Internacional](01-game-design/12-selecoes-e-calendario-internacional.md)
+- [13 · Relatórios, Notificações e Memória](01-game-design/13-relatorios-notificacoes-e-memoria.md) — caixa de decisões, record book, linhas do tempo.
+- [14 · Monetização](01-game-design/14-monetizacao.md) — catálogos permitido/proibido, justiça competitiva.
+- [15 · Fluxos Completos do Jogo](01-game-design/15-fluxos-completos.md) — golden paths ponta a ponta.
 
 ### 02 · Técnico
 
@@ -54,11 +60,17 @@ A documentação está organizada em quatro áreas, do "porquê" ao "como":
 - [05 · Catálogo de Regras e Fórmulas](02-tecnico/05-catalogo-de-regras-e-formulas.md) — IDs estáveis, máquinas de estado, invariantes.
 - [06 · Roadmap de Implementação](02-tecnico/06-roadmap-de-implementacao.md)
 - [07 · Arquitetura do Core (ECS)](02-tecnico/07-arquitetura-do-core-ecs.md) — modelo Entity–Component–Effect–Event do motor de ecossistema.
-- [08 · Frontend, Cliente e Tempo Real](02-tecnico/08-frontend-cliente-e-tempo-real.md) — stack de frontend, PWA/mobile-first, contratos de API e realtime-gateway.
+- [08 · Frontend, Cliente e Tempo Real](02-tecnico/08-frontend-cliente-e-tempo-real.md) — dois clientes (app Expo + admin Next.js), contratos de API e realtime-gateway.
+- [09 · Operação e Administração do Mundo](02-tecnico/09-operacao-e-admin-do-mundo.md) — painel admin, health checks de balanceamento, permissões.
 
 ### 03 · Guia do Jogador
 
 - [Guia Oficial do Jogador](03-guia-do-jogador/README.md) — estrutura de 42 capítulos + spec do site de docs.
+
+### 04 · UI/UX
+
+- [Interface do Grinta](04-ui-ux/README.md) — telas e fluxos dos dois clientes: **app do jogador (Expo/React Native)** e **admin (Next.js)**.
+- [00 · Visão Geral e Design System](04-ui-ux/00-visao-geral-e-design-system.md)
 
 ### 99 · Decisões
 
@@ -86,8 +98,11 @@ A documentação está organizada em quatro áreas, do "porquê" ao "como":
 | `ux-do-jogo.md` | [02-tecnico/04-plataforma-seguranca-operacoes](02-tecnico/04-plataforma-seguranca-operacoes.md) (admin/segurança/ops); [02-tecnico/08-frontend-cliente-e-tempo-real](02-tecnico/08-frontend-cliente-e-tempo-real.md) (frontend/PWA/API/tempo real) |
 | `como-construir-jogo-regras.md` | [02-tecnico/05-catalogo-de-regras-e-formulas](02-tecnico/05-catalogo-de-regras-e-formulas.md); [06-roadmap-de-implementacao](02-tecnico/06-roadmap-de-implementacao.md) |
 | `guia-jogador-initial.md` | [03-guia-do-jogador/README](03-guia-do-jogador/README.md) |
+| `documento-definitivo-escopo.md` (.docx) | consolidação funcional autoritativa → alimentou [11-torcida-imprensa](01-game-design/11-torcida-imprensa-e-narrativa.md), [12-selecoes](01-game-design/12-selecoes-e-calendario-internacional.md), [13-relatorios](01-game-design/13-relatorios-notificacoes-e-memoria.md), [14-monetizacao](01-game-design/14-monetizacao.md), [15-fluxos](01-game-design/15-fluxos-completos.md), [02-tecnico/09-operacao](02-tecnico/09-operacao-e-admin-do-mundo.md) e o [registro de decisões](99-decisoes/registro-de-decisoes.md) |
+| `escopo-definitivo-simulador.md` (.docx) | consolidação funcional complementar → enriqueceu economia (comercial/contábil/scouting), jogadores (elenco social/medicina), temporada (homologação), experiência (central/agenda/automações), motor e regras transversais |
+| `escopo-definitivo-estrutural-operacional.md` (.docx) | consolidação técnica → integridade numérica e governança de dados em [01-arquitetura-de-dados](02-tecnico/01-arquitetura-de-dados.md) e [00-arquitetura-geral](02-tecnico/00-arquitetura-geral.md) |
 
-> **Nota:** dois chats têm nomes que não refletem o conteúdo — `ux-do-jogo.md` é, na verdade, arquitetura técnica (backend/plataforma/segurança **e** frontend/cliente/tempo real, dividido entre os docs [04](02-tecnico/04-plataforma-seguranca-operacoes.md) e [08](02-tecnico/08-frontend-cliente-e-tempo-real.md)), e `lista-envolvidos-jogo.md` é o design do sistema de jogadores (não uma lista de pessoas). O `ux-do-jogo.md` define a stack de frontend e a estratégia mobile-first/PWA (com app nativo futuro), mas **não** um desenho tela a tela (fluxos de UI/UX detalhados) — essa spec de telas ainda precisa ser criada.
+> **Nota:** dois chats têm nomes que não refletem o conteúdo — `ux-do-jogo.md` é, na verdade, arquitetura técnica (backend/plataforma/segurança **e** frontend/cliente/tempo real, dividido entre os docs [04](02-tecnico/04-plataforma-seguranca-operacoes.md) e [08](02-tecnico/08-frontend-cliente-e-tempo-real.md)), e `lista-envolvidos-jogo.md` é o design do sistema de jogadores (não uma lista de pessoas). O desenho **tela a tela** dos dois clientes (app do jogador em Expo, admin em Next.js) vive na área [`04-ui-ux/`](04-ui-ux/), em construção.
 
 ## Convenções
 
