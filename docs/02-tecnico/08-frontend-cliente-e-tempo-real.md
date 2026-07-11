@@ -202,6 +202,17 @@ O tempo real é servido por um **processo dedicado**, o `realtime-gateway`, sepa
 
 > **Regra fechada:** o gateway **não é fonte de verdade**. O **WebSocket não substitui a API oficial** — ele acelera a entrega de estado, mas a verdade permanece no PostgreSQL, acessado via API.
 
+### Autenticação e autorização do WebSocket
+
+O handshake do WebSocket **não** reutiliza credenciais longas. A conexão é aberta com um **token efêmero / credencial de curta duração**, específica para o tempo real, derivada da sessão HTTP já autenticada (ver o modelo de autenticação e autorização do jogador em [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) §3). Segredos e tokens longos **nunca** são expostos no canal WebSocket nem em armazenamentos de interface.
+
+- **Handshake com credencial curta.** O cliente obtém um token efêmero e o apresenta na abertura da conexão; o `realtime-gateway` **valida a credencial antes de admitir o socket**.
+- **Autorização no gateway.** A validação ocorre no gateway (nunca no cliente), combinando usuário, sessão, mundo, clube e visibilidade aplicável. Autenticar **não** implica autorizar: cada **assinatura** de sala (usuário/clube/mundo/partida) é autorizada **separadamente**.
+- **Vínculo à sessão HTTP autenticada.** A sessão do socket é vinculada à sessão HTTP autenticada; se essa sessão for revogada ou expirar, o socket perde autorização.
+- **Reconexão revalida.** Toda reconexão exige **nova validação** da credencial, além da recuperação de sequência (ver [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)).
+
+> **Pendência:** o formato exato da credencial efêmera (tipo de token, tempo de vida, endpoint de emissão/renovação), o protocolo de reautorização por assinatura e o comportamento em revogação/expiração de sessão ainda **não** estão fixados; serão detalhados junto ao modelo de sessão em [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) §3.
+
 ### Usos do WebSocket
 
 O WebSocket é utilizado para: partidas, presença, notificações, atualizações de negociação, mudança de tabela, eventos do mundo e estado de jobs relevantes.

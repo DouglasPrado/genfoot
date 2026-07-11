@@ -108,6 +108,8 @@ Os atributos se dividem em três eixos:
 - **Físicos:** velocidade, aceleração, força, resistência, impulsão, agilidade, equilíbrio, explosão, recuperação física.
 - **Mentais:** garra, determinação, liderança, frieza, concentração, disciplina, inteligência tática, coragem, regularidade, ambição, pressão emocional, lealdade.
 
+> **Pendência:** esta lista de atributos mentais diverge da usada em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) (ambição, lealdade, profissionalismo, pressão, disciplina, temperamento, ganância, liderança, resiliência, ego, adaptação). A lista canônica de atributos mentais ainda precisa ser unificada — o dono do assunto é o doc do jogador [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md), que por ora não fecha a lista.
+
 A **história de vida** influencia a geração inicial gerando tendências (não regras absolutas). O jogador **evolui com o tempo** conforme idade, treinamento, minutos jogados, estrutura do clube, comissão, moral, lesões, estilo tático, posição usada, eventos extracampo, qualidade dos companheiros, pressão da torcida e momento da carreira.
 
 → ver detalhe em [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md)
@@ -179,7 +181,7 @@ Cada grupo tem quantidade controlada de clubes; a IA completa vagas quando não 
 
 A partida **não é um sorteio por overall**. O motor considera força dos times, tática, formação, estilo, moral, cansaço, entrosamento, jogadores decisivos, clima, mando de campo, pressão da torcida, arbitragem, momento da temporada, substituições, lesões, cartões e estratégia do técnico.
 
-A simulação é dividida em blocos de tempo (0-5, 5-10, ... acréscimos). Em cada bloco calcula-se controle do jogo, posse, pressão, chance de ataque, qualidade da jogada, chance de finalização e de gol, riscos de falta/cartão/lesão, cansaço acumulado e mudanças emocionais. Eventos possíveis incluem gol, finalização, defesa, escanteio, falta, cartões, lesão, pênalti, impedimento, substituição, alteração tática, erro individual, jogada genial, contra-ataque, cera e acréscimos.
+A simulação é dividida em blocos de tempo (0-5, 5-10, ... acréscimos). Em cada bloco calcula-se controle do jogo, posse, pressão, chance de ataque, qualidade da jogada, chance de finalização e de gol, riscos de falta/cartão/lesão, cansaço acumulado e mudanças emocionais. *(A granularidade dos blocos e a sequência de passos aqui são ilustrativas — os blocos e o número de passos do loop/resolução são apenas aproximados; a referência canônica, com a divisão real dos blocos e as etapas exatas do tick loop e da resolução de ataque, é [`./05-motor-de-partida.md`](./05-motor-de-partida.md).)* Eventos possíveis incluem gol, finalização, defesa, escanteio, falta, cartões, lesão, pênalti, impedimento, substituição, alteração tática, erro individual, jogada genial, contra-ataque, cera e acréscimos.
 
 → ver detalhe em [`./05-motor-de-partida.md`](./05-motor-de-partida.md)
 
@@ -211,7 +213,7 @@ O core é baseado em decisão por camadas (Estado do Mundo → Clube → Elenco 
 
 A **moral do elenco** é impactada por vitórias/derrotas, sequências ruins, salários atrasados, falta de minutos, promessas quebradas, críticas públicas, relação com técnico, ambiente interno, títulos, propostas recusadas e lesões. A **torcida** (perfis: paciente, exigente, apaixonada, impaciente, fiel, modista, regional, nacional) influencia pressão, renda, moral, diretoria, ambiente, apoio em casa e crescimento. O **departamento de comunicação** controla crises e narrativas: em nível baixo uma derrota vira crise maior; em nível alto o clube reduz danos, protege o elenco e controla a narrativa.
 
-→ ver detalhe em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) e [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md)
+→ ver detalhe em [`./11-torcida-imprensa-e-narrativa.md`](./11-torcida-imprensa-e-narrativa.md), [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) e [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md)
 
 ## 20. Eventos Externos
 
@@ -233,9 +235,9 @@ Ao encerrar a temporada o sistema executa: classificação final, premiações e
 
 ## 23. Notificações
 
-Notificações **estratégicas** (jogo começou, sofreu gol, lesão, jogador cansado, vermelho, proposta recebida, contrato vencendo, torcida insatisfeita, jogador quer sair, olheiro achou promessa, comissão recomenda mudança, crise financeira) e **de partida** (contexto do momento + ações sugeridas, ex.: "min 58, vencendo 1x0 mas o adversário aumentou a pressão; volante cansado e amarelado → substituir / recuar / manter posse / reduzir intensidade").
+Notificações **estratégicas** (jogo começou, sofreu gol, lesão, jogador cansado, vermelho, proposta recebida, contrato vencendo, torcida insatisfeita, jogador quer sair, olheiro achou promessa, comissão recomenda mudança, crise financeira) e **de partida** (contexto do momento + ações sugeridas, ex.: "min 58, vencendo 1x0 mas o adversário aumentou a pressão; volante cansado e amarelado → substituir / recuar / manter posse / reduzir intensidade"). *(A separação em duas categorias aqui é ilustrativa; a taxonomia canônica — em 4 níveis: crítica, importante, informativa e narrativa — é [`./13-relatorios-notificacoes-e-memoria.md`](./13-relatorios-notificacoes-e-memoria.md).)*
 
-→ ver detalhe em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) e [`./05-motor-de-partida.md`](./05-motor-de-partida.md)
+→ ver detalhe em [`./13-relatorios-notificacoes-e-memoria.md`](./13-relatorios-notificacoes-e-memoria.md), [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) e [`./05-motor-de-partida.md`](./05-motor-de-partida.md)
 
 ## 24. Arquitetura Lógica do Core
 
@@ -325,3 +327,11 @@ O jogo pode ser separado nos ~20 blocos abaixo, que este overview cobre:
 | IA (clube, comissão, jogador, mercado, narrativa), eventos, moral, notificações | [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) |
 | Estádio, região e clima | [`./08-estadio-regiao-e-clima.md`](./08-estadio-regiao-e-clima.md) |
 | Anti-abuso e onboarding de novos usuários | [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) |
+| Experiência do usuário e telas (fluxos de UX) | [`./10-experiencia-e-telas.md`](./10-experiencia-e-telas.md) |
+| Torcida, imprensa e narrativa | [`./11-torcida-imprensa-e-narrativa.md`](./11-torcida-imprensa-e-narrativa.md) |
+| Seleções e calendário internacional | [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) |
+| Relatórios, notificações e memória do mundo | [`./13-relatorios-notificacoes-e-memoria.md`](./13-relatorios-notificacoes-e-memoria.md) |
+| Monetização e justiça competitiva | [`./14-monetizacao.md`](./14-monetizacao.md) |
+| Fluxos completos do jogo | [`./15-fluxos-completos.md`](./15-fluxos-completos.md) |
+| UI/UX — design system, navegação, telas mobile e admin | [`../04-ui-ux/`](../04-ui-ux/) (índice em [`../04-ui-ux/README.md`](../04-ui-ux/README.md)) |
+| Documentos técnicos — arquitetura, modelo de dados, regras/fórmulas, operação e admin do mundo | [`../02-tecnico/`](../02-tecnico/) (inclui [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md)) |

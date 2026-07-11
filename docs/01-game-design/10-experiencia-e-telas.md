@@ -39,7 +39,7 @@ O documento cobre: o ciclo do dia a dia do gestor (com os blocos narrativos "ant
    - [7.2 Tela de mercado](#72-tela-de-mercado)
    - [7.3 Tela do jogador](#73-tela-do-jogador)
 8. [Partida ao vivo](#8-partida-ao-vivo)
-9. [Pendências de desenho tela-a-tela](#9-pendências-de-desenho-tela-a-tela)
+9. [Desenho tela-a-tela](#9-desenho-tela-a-tela)
 
 ---
 
@@ -248,7 +248,7 @@ Quando um prazo expira durante a ausência, o resumo de retorno deverá informar
 3. **Qual consequência ocorreu.**
 4. **Se ainda existe alguma forma de correção.**
 
-> **Pendência:** O desenho tela-a-tela da Central, da Agenda e dos lembretes (layout, agrupamento visual dos blocos, interações de filtro/ordenação e a criação de lembretes) ainda precisa ser especificado.
+> **Resolvido (2026-07-11):** o desenho tela-a-tela da Central, da Agenda e dos lembretes foi especificado na área de UI/UX — ver [`../04-ui-ux/04-mobile-telas-central-home-decisoes.md`](../04-ui-ux/04-mobile-telas-central-home-decisoes.md) (telas `M-DECISIONS`, `M-DECISION-DETAIL`) e [`../04-ui-ux/10-mobile-telas-competicoes-calendario-selecoes.md`](../04-ui-ux/10-mobile-telas-competicoes-calendario-selecoes.md) (`M-CALENDAR`).
 
 ---
 
@@ -344,7 +344,7 @@ Toda execução fica **auditável**. O usuário poderá revisar, para cada dispa
 
 Na troca de controlador, as **automações pessoais** do controlador anterior são **desativadas** — não são herdadas ativamente. As **regras e políticas institucionais** do clube continuam válidas, coerente com a continuidade de controle descrita em [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md).
 
-> **Pendência:** O construtor de automações (a interface de criação e edição de regras — como o usuário monta gatilho, condições, limites e prazo de validade) ainda precisa ser desenhado tela-a-tela.
+> **Resolvido (2026-07-11):** o construtor de automações foi desenhado tela-a-tela em [`../04-ui-ux/04-mobile-telas-central-home-decisoes.md`](../04-ui-ux/04-mobile-telas-central-home-decisoes.md) (telas `M-AUTOMATIONS` e `M-AUTOMATION-EDIT`).
 
 ---
 
@@ -409,19 +409,8 @@ Este documento não duplica esse desenho — apenas o referencia.
 
 ---
 
-## 9. Pendências de desenho tela-a-tela
+## 9. Desenho tela-a-tela
 
-> **Pendência:** O desenho tela-a-tela detalhado do restante da experiência ainda precisa ser especificado, incluindo (mas não se limitando a):
->
-> - Mercado de transferências detalhado (fluxo de negociação, propostas, contra-propostas, empresários)
-> - Tela e fluxo de treino do elenco
-> - Categorias de base / gestão da base
-> - Tela de tática detalhada
-> - Tela de escalação detalhada
-> - Conversas com atletas e imprensa (fluxos de interação)
-> - Tabela e calendário (layout e navegação)
-> - Central de notícias / eventos
-> - Central, Agenda e lembretes (layout, agrupamento dos blocos e interações) — ver Seção 5
-> - Construtor de automações (criação e edição de regras) — ver Seção 6
+> **Resolvido (2026-07-11):** o desenho tela-a-tela completo da experiência foi especificado na área [`../04-ui-ux/`](../04-ui-ux/) — 97 telas do app do jogador (Expo) nos docs `03`–`12` e 15 telas do admin (Next.js) no doc `21`. Isso cobre o que antes estava listado como pendência aqui: mercado/negociação, treino, base, tática, escalação, conversas/imprensa, tabela/calendário, central de notícias, Central/Agenda/lembretes e o construtor de automações.
 
-> **Pendência:** Definir a granularidade de exibição de cada indicador das telas de indicadores (Seção 7) — se numérico, faixa, rótulo qualitativo (ex.: "boa", "média") ou barra visual.
+> **Pendência:** Definir a granularidade de exibição de cada indicador das telas de indicadores (Seção 7) — se numérico, faixa, rótulo qualitativo (ex.: "boa", "média") ou barra visual. (O layout das telas de indicadores está em `../04-ui-ux/09-mobile-telas-financas-estrutura-estadio.md`; falta só fixar essa convenção de exibição.)

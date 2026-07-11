@@ -44,7 +44,7 @@ grinta/
 ├── apps/
 │   ├── api/        # Camada HTTP/WebSocket, autenticação, orquestração de casos de uso
 │   ├── mobile/     # App do jogador (Expo/React Native): elenco, escalação, partida, mercado, competições — Android+iOS
-│   ├── web/        # Admin do mundo (Next.js): operação, RBAC, correções, moderação, equilíbrio
+│   ├── admin/      # Admin do mundo (Next.js): operação, RBAC, correções, moderação, equilíbrio
 │   ├── worker/     # Processamento assíncrono (simulações, partidas, jobs pesados)
 │   └── scheduler/  # Disparo de tarefas agendadas (avanço de dias/temporadas, eventos futuros)
 │
@@ -60,13 +60,15 @@ grinta/
 | --- | --- |
 | `api` | Expõe a interface HTTP e WebSocket, cuida de autenticação e orquestra os casos de uso sobre o domínio. |
 | `mobile` | **App do jogador** em Expo/React Native (Android+iOS) com as telas do jogo (elenco, escalação, central da partida, mercado, classificação, finanças). Cliente não-autoritativo: consome só a API oficial e o WebSocket. Distribuído nas lojas via EAS, não roda como contêiner de servidor. |
-| `web` | **Admin do mundo** em Next.js: painel de operação (RBAC, saúde econômica/demográfica, correções, moderação/anti-abuso, testes de equilíbrio). Cliente não-autoritativo, também consumindo só a API oficial e o WebSocket. |
+| `admin` | **Admin do mundo** em Next.js: painel de operação (RBAC, saúde econômica/demográfica, correções, moderação/anti-abuso, testes de equilíbrio). Cliente não-autoritativo, também consumindo só a API oficial e o WebSocket. |
 | `worker` | Executa trabalho pesado e assíncrono via filas: simulação de partidas, temporadas longas e processamento de eventos. |
 | `scheduler` | Agenda e dispara tarefas temporais do mundo (avanço do relógio do jogo, rodadas, eventos programados). |
 
-> **Decisão (2026-07-11):** a stack de interface foi fixada em **app do jogador = Expo/React Native (mobile)** e **admin do mundo = Next.js (web)**. Antes, o `web` (Next.js) era o painel do jogador (PWA); ver a evolução e os contratos em [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/).
+> **Decisão (2026-07-11):** a stack de interface foi fixada em **app do jogador = Expo/React Native (`apps/mobile`)** e **admin do mundo = Next.js (`apps/admin`)**. Antes, esse app (então nomeado `apps/web`, em Next.js) era o painel do jogador (PWA); ver a evolução e os contratos em [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/).
 
-> **Pendência:** as fontes de arquitetura descreviam o monorepo apenas com o app `web`; o encaixe exato do app Expo no monorepo (nome/caminho — aqui assumido `apps/mobile` conforme [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md) —, pacotes de UI por plataforma como `ui`/`ui-native`, e configuração de EAS/OTA) precisa ser ratificado na modelagem final junto com a granularidade de pacotes da pendência da seção 2.
+> **Resolvido (2026-07-11):** as fontes de arquitetura descreviam o monorepo apenas com o app `web`; o encaixe do app Expo está agora fixado como **`apps/mobile`** (jogador) e o admin renomeado para **`apps/admin`** (Next.js), consistente com [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e com [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md).
+>
+> **Pendência:** ainda restam a ratificar, na modelagem final, os pacotes de UI por plataforma (ex.: `ui`/`ui-native`) e a configuração de EAS/OTA, junto com a granularidade de pacotes da pendência da seção 2.
 
 ### Pacotes (`packages/`)
 
@@ -86,7 +88,7 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 
 | Camada | Tecnologia | Observação |
 | --- | --- | --- |
-| Linguagem | TypeScript / Node.js LTS | Base única para domínio, API, workers, app mobile e admin. Modo `strict` obrigatório (ver seção 4 do estilo de código). |
+| Linguagem | TypeScript / Node.js LTS | Base única para domínio, API, workers, app mobile e admin. TypeScript em modo `strict` obrigatório (ver princípios transversais na seção 4). |
 | App do jogador (mobile) | **Expo / React Native** | Cliente principal do jogador, Android+iOS (decisão 2026-07-11). Distribuído via EAS. |
 | Admin do mundo (web) | **Next.js 15** | Painel de operação do mundo. |
 | Banco de dados | **PostgreSQL** | Estado persistente do mundo e fonte única de verdade. |
@@ -242,7 +244,7 @@ Todos os **processos de servidor** compartilham o mesmo código-base e pacotes, 
 
 | Processo | Responsabilidade |
 | --- | --- |
-| `web` | **Admin do mundo** (Next.js): navegação, cache local, sincronização e comunicação com API/WebSocket para a operação do mundo. Não executa regras oficiais. |
+| `admin` | **Admin do mundo** (Next.js): navegação, cache local, sincronização e comunicação com API/WebSocket para a operação do mundo. Não executa regras oficiais. |
 | `api` | Autenticação, commands síncronos, queries, validação, autorização, transações e criação de eventos. |
 | `realtime-gateway` | Conexões WebSocket, salas (usuário/clube/mundo/partida), presença, entrega em tempo real e recuperação de sequência. **Não é fonte de verdade.** |
 | `world-scheduler` | Relógios dos mundos, processamentos diários, disparo de partidas, prazos, expirações e tarefas agendadas. |
@@ -262,8 +264,8 @@ A infraestrutura inicial é projetada para caber em uma única instância operac
 
 ### EasyPanel, rede e serviços
 
-- Cada processo é um serviço Docker no EasyPanel (`football-web`, `football-api`, `football-realtime`, `football-world-scheduler`, `football-simulation-worker`, `football-async-worker`, `football-notification-worker`, além de `football-postgres`, `football-redis`, `football-rabbitmq` e os serviços de observabilidade).
-- **Rede privada:** PostgreSQL, Redis e RabbitMQ **não** são expostos à internet. Publicáveis apenas `web`, `api` e `realtime-gateway`.
+- Cada processo é um serviço Docker no EasyPanel (`football-admin`, `football-api`, `football-realtime`, `football-world-scheduler`, `football-simulation-worker`, `football-async-worker`, `football-notification-worker`, além de `football-postgres`, `football-redis`, `football-rabbitmq` e os serviços de observabilidade).
+- **Rede privada:** PostgreSQL, Redis e RabbitMQ **não** são expostos à internet. Publicáveis apenas `admin`, `api` e `realtime-gateway`.
 - **TLS/HTTPS** obrigatório no acesso público, com terminação no proxy do EasyPanel. Cloudflare pode fornecer DNS, proxy, CDN, proteção básica e cache de arquivos públicos.
 - **Volumes persistentes** para PostgreSQL, RabbitMQ, Redis, Grafana e (conforme retenção) Loki/Prometheus.
 

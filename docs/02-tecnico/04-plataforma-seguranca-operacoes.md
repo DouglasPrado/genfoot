@@ -331,6 +331,14 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
 - Estratégias: `ROLLING`, `BLUE_GREEN`, `CANARY`, `RECREATE`, conforme capacidade.
 - Verificação pós-deployment: health checks, taxa de erro, latência, jobs, filas, invariantes, fluxos críticos e logs. **Rollback** dispara quando erros críticos sobem, invariantes falham, processamento quebra, migração é incompatível ou segurança é afetada.
 - **Código antigo × schema novo**: a compatibilidade é planejada para permitir rollback seguro; um deployment incompatível é bloqueado ou exige migração compatível.
+- **Drenagem na troca de versão (graceful drain)**: durante a atualização, a substituição de instâncias respeita drenagem ordenada (fonte: escopo estrutural-operacional §6.3 e §23.4):
+    - Serviços **sem estado** só são substituídos após aprovação de saúde da nova instância.
+    - **Conexões de tempo real entram em drenagem**, orientam a reconexão e preservam a resincronização — o cliente detecta lacunas, solicita resincronização e recebe um retrato de estado válido antes de continuar; **a reinicialização da conexão não reinicia a partida**.
+    - **Processos de execução** param de buscar novas tarefas, concluem ou devolvem as tarefas ativas e salvam pontos de recuperação (checkpoints).
+    - **Executores de partida antigos deixam de receber partidas novas e concluem as já iniciadas**; uma nova versão do executor recebe **apenas partidas novas** enquanto a versão anterior finaliza as em andamento.
+    - Novas versões podem ser liberadas **progressivamente por mundos ou escopos controlados**; a reversão reutiliza artefatos anteriores, **sem recompilação**.
+
+> **Pendência:** a fonte não fixa parâmetros de drenagem — janela/timeout de drain das conexões de tempo real e prazo-limite para conclusão das partidas em andamento antes de forçar checkpoint/handoff. Definir na modelagem operacional.
 
 ### Manutenção
 
@@ -358,7 +366,7 @@ Parar escrita  →  Migrar leitura  →  Validar  →  Arquivar dado  →  Remov
 > Detalhamento em [Arquitetura de dados e transações](./01-arquitetura-de-dados.md).
 
 - **Monólito modular** (sem microsserviços prematuros); processos especializados (ex.: motor de partidas) implantados à parte.
-- Backend **NestJS/TypeScript**; frontend **Next.js** (mobile-first, PWA); monorepo pnpm + Turborepo.
+- Backend **NestJS/TypeScript** (candidato preferencial — ver pendência de framework de API em [`./00-arquitetura-geral.md`](./00-arquitetura-geral.md)); **dois clientes distintos** — o **app do jogador é Expo/React Native (nativo)** e o **admin é Next.js** —, detalhados em [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) e [`../04-ui-ux/`](../04-ui-ux/); monorepo pnpm + Turborepo.
 - **PostgreSQL** como banco principal, **Prisma** como ORM, **Redis** para cache/estado temporário, **RabbitMQ** para mensageria, **Cloudflare R2** para arquivos e backups.
 - API principal **REST versionada**; tempo real por **WebSocket/Socket.IO**, que **não é fonte de verdade**.
 - Commands idempotentes; agregados críticos com **concorrência otimista**; servidor autoritativo.
