@@ -686,6 +686,8 @@ Tamanho Real do Clube =
 | 61–80 | Clube grande |
 | 81–100 | Clube gigante |
 
+> **Reconciliação:** A escada nominal de porte descrita em [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§4) tem **seis** estágios (pequeno → emergente → médio → forte → grande → dominante), enquanto o índice de Tamanho Real acima usa **cinco** faixas numéricas — não é contradição, apenas duas granularidades da mesma escala. Correspondência: **pequeno** ≈ 0–20 (pequeno); **emergente** ≈ 21–40 (em crescimento); **médio** ≈ 41–60 (médio); **forte** e **grande** ≈ 61–80 (grande), como sub-faixas de transição do topo; **dominante** ≈ 81–100 (gigante). Os seis rótulos são a leitura narrativa do crescimento; as cinco faixas são o índice canônico usado no cálculo.
+
 ### 14.4 Dimensionamento de jogadores
 
 A quantidade ideal de jogadores é derivada da quantidade de clubes, porque o universo precisa de mercado, base e reposição — não apenas 23 por clube.

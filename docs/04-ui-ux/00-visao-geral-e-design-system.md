@@ -110,7 +110,7 @@ Componentes reutilizados em toda a área (nomeados aqui para as telas referencia
 
 ## 6. Padrão de indicadores
 
-O GDD deixou em aberto a granularidade dos indicadores ([doc 10, §7 pendência](../01-game-design/10-experiencia-e-telas.md)). Convenção desta área:
+O GDD deixou em aberto a granularidade dos indicadores ([doc 10, §9 pendência](../01-game-design/10-experiencia-e-telas.md)). Convenção desta área:
 
 - **Modo simples (padrão):** rótulo qualitativo + cor + `Meter`/`Gauge` (ex.: Moral "boa", Saúde financeira "atenção", faixa de fadiga por setor). As faixas nomeadas seguem as fontes (ex.: saúde financeira 0–100 em 6 faixas — [`03-economia.md §6`](../01-game-design/03-economia.md)).
 - **Modo detalhado (sob demanda):** valor numérico e/ou faixa com incerteza (ex.: scouting "potencial 70–90, confiança baixa"; atributos 0–100; xG). Ativado por `SegmentedControl` ou toque no indicador.

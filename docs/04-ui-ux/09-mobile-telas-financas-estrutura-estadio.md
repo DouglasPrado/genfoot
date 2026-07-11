@@ -13,10 +13,10 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 - **Objetivo:** dar sinais claros da saúde financeira (traduz o modelo econômico em indicadores).
 - **Como se chega:** aba Clube; Home; MF-13.
 - **Layout:** cartões de indicadores + faixa de saúde + atalhos.
-- **Componentes e dados** (tela financeira do [doc 10, §5.1](../01-game-design/10-experiencia-e-telas.md) + `ClubEconomy`): **caixa atual**, **receita mensal**, **despesa mensal**, **resultado mensal**, **folha salarial** (vs. teto), **orçamento de transferências**, **dívida**, **saúde financeira** (índice 0–100 em 6 faixas: Excelente/Estável/Atenção/Pressão/Crise/Colapso), **pressão da diretoria**, **meta financeira**, força de patrocínio.
+- **Componentes e dados** (tela financeira do [doc 10, §7.1](../01-game-design/10-experiencia-e-telas.md) + `ClubEconomy`): **caixa atual**, **receita mensal**, **despesa mensal**, **resultado mensal**, **folha salarial** (vs. teto), **orçamento de transferências**, **dívida**, **saúde financeira** (índice 0–100 em 6 faixas: Excelente/Estável/Atenção/Pressão/Crise/Colapso), **pressão da diretoria**, **meta financeira**, força de patrocínio.
 - **Ações:** → `M-ACCOUNTING`, `M-BUDGET`, `M-COMMERCIAL`, `M-MATCHDAY-REVENUE`, `M-DEBT`.
 - **Estados:** faixa de saúde colorida; alerta crítico de projeção → `M-DECISIONS`/[MF-16](02-mobile-fluxos.md#mf-16--crise-financeira).
-- **Referências:** [`03-economia §3.1, §6`](../01-game-design/03-economia.md); [`10-experiencia §5.1`](../01-game-design/10-experiencia-e-telas.md).
+- **Referências:** [`03-economia §3.1, §6`](../01-game-design/03-economia.md); [`10-experiencia §7.1`](../01-game-design/10-experiencia-e-telas.md).
 
 ## `M-ACCOUNTING` — Contabilidade
 
