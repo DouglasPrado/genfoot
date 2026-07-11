@@ -190,6 +190,10 @@ Afeta o desenvolvimento geral do elenco. Impacta: qualidade do treino, evoluçã
 | 5 | Treinos consistentes |
 | 10 | Desenvolvimento de elite |
 
+Além do nível, o CT tem **capacidade operacional** própria (def-simulador §7.5): **disponibilidade de campos**, **capacidade de treinar categorias diferentes simultaneamente** (profissional + base) e **integração de grupos**. **Conflitos de agenda e indisponibilidade de áreas** do CT devem ser possíveis — treinar todas as categorias ao mesmo tempo pode competir por campos/horários, exigindo priorização.
+
+> **Pendência:** número de campos por nível de CT, limites de sessões simultâneas e como o conflito de agenda se resolve (fila, prioridade, perda de qualidade) não foram fixados na fonte.
+
 ### 3.9 Estádio
 
 Afeta receita, torcida e pressão. Impacta: bilheteria, crescimento de torcida, mando de campo, satisfação da torcida, patrocínio, reputação do clube e custo de manutenção.

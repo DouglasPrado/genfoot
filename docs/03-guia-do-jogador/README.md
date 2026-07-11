@@ -316,7 +316,7 @@ A redação de cada Parte deve puxar dos documentos de game design correspondent
 | **IX — Plano de jogo** | 35–39 | [`00-gdd-overview.md`](../01-game-design/00-gdd-overview.md); [`10-experiencia-e-telas.md`](../01-game-design/10-experiencia-e-telas.md) (ciclo do gestor e automações); [`15-fluxos-completos.md`](../01-game-design/15-fluxos-completos.md) (e transversal a todos os demais) |
 | **X — Referência** | 40–42 | Todos os documentos de game design (consolidação), com destaque para [`09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md) (Cap. 40 — Regras gerais), [`13-relatorios-notificacoes-e-memoria.md`](../01-game-design/13-relatorios-notificacoes-e-memoria.md) (Cap. 41 — Glossário e referência) e [`14-monetizacao.md`](../01-game-design/14-monetizacao.md) (justiça competitiva) |
 
-> **Pendência:** Confirmar se haverá um documento de game design dedicado a finanças/economia (Cap. 11) e a contratos/mercado (Caps. 19–21), hoje distribuídos entre os arquivos acima. Os documentos `03` e `05` da série `01-game-design/` não existem no momento desta revisão — verificar lacunas de numeração.
+> **Nota:** a série `01-game-design/` vai de `00` a `16` sem lacunas. As fontes canônicas de finanças/economia (Cap. 11) e do motor de partida (Cap. 24) são [`03-economia.md`](../01-game-design/03-economia.md) e [`05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md), já referenciadas na tabela acima.
 
 ---
 

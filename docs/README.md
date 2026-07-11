@@ -49,6 +49,7 @@ A documentação está organizada em áreas, do "porquê" ao "como":
 - [13 · Relatórios, Notificações e Memória](01-game-design/13-relatorios-notificacoes-e-memoria.md) — caixa de decisões, record book, linhas do tempo.
 - [14 · Monetização](01-game-design/14-monetizacao.md) — catálogos permitido/proibido, justiça competitiva.
 - [15 · Fluxos Completos do Jogo](01-game-design/15-fluxos-completos.md) — golden paths ponta a ponta.
+- [16 · Glossário Conceitual de Entidades](01-game-design/16-glossario-de-entidades.md) — ~75 objetos funcionais do jogo, em linguagem de produto.
 
 ### 02 · Técnico
 

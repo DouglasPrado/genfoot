@@ -56,6 +56,12 @@ O estádio no **Grinta** é tratado como um ativo com vida própria — esportiv
 | Capacidade baixa | Reduz bilheteria máxima; aumenta pressão por expansão; pode gerar estádio lotado; melhora atmosfera em jogos menores |
 | Capacidade alta | Aumenta o potencial de receita; aumenta a manutenção; pode gerar estádio vazio se a torcida for pequena |
 
+### Setores do estádio
+
+O estádio não é só uma capacidade agregada: ele é dividido em **setores** (def-simulador §7.4), cada um com **capacidade, preço de ingresso e ocupação próprios**. Isso permite políticas de preço por setor (arquibancada, cadeiras, camarotes, visitante) e influencia bilheteria, hospitalidade e atmosfera de forma diferenciada. O estádio ainda considera, além dos setores: **capacidade autorizada** (a licenciada pode ser menor que a física — ver §6), condição do gramado, segurança, acessos, hospitalidade, iluminação, vestiários, comunicação e operação em dias de partida.
+
+> **Pendência:** os setores-padrão, suas capacidades relativas e a mecânica de preço por setor não foram detalhados numericamente na fonte.
+
 ### Ocupação depende de demanda, preço e contexto
 
 **A ocupação não é fixa** (Decisão 1804): resulta de demanda, preço e contexto. Fatores considerados: tamanho da torcida, fase do time, rivalidade, competição, horário, clima, preço do ingresso, conforto, segurança, campanha, jogadores populares e objetivo da temporada.
