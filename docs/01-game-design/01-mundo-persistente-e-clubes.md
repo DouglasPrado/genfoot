@@ -1,6 +1,6 @@
 # Mundo Persistente e Clubes
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/organizacao-de-pensamentos.md, chats/planejamento-agrupado-do-jogo.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/organizacao-de-pensamentos.md, chats/planejamento-agrupado-do-jogo.md, chats/documento-definitivo-escopo.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
 
 ## Resumo
 
@@ -46,11 +46,44 @@ Em linha geral:
 
 ### 1.3 O usuário nunca é demitido
 
-O usuário é o **gestor permanente da sua instituição**: o vínculo com o clube é persistente e não é encerrado por resultados ruins. Diferente de managers em que o técnico é dispensado, aqui o usuário mantém o comando do clube ao longo de todo o mundo persistente. A pressão da diretoria e da torcida existe como mecânica de consequência (cobrança, moral, narrativas), mas não resulta em perda do clube.
+A permanência do usuário é uma **regra central e resolvida autoritativamente pelas fontes**: o vínculo com o clube é persistente e **não é encerrado por resultados ruins**. Mesmo em rebaixamento, crise financeira ou insolvência, o usuário **continua no clube** — ao contrário de managers em que o técnico é dispensado. A reconstrução do clube passa a fazer parte da experiência.
 
-> **Pendência:** As fontes não descrevem explicitamente a regra "usuário nunca é demitido" nem os efeitos concretos da pressão de diretoria/torcida sobre a permanência. Confirmar o modelo exato (o usuário é dono/presidente vitalício do clube? há alguma consequência de cobrança além de moral e narrativa?).
+A pressão da diretoria e da torcida existe como mecânica de consequência, mas **atua sobre a autonomia, nunca sobre a permanência**. Diante de má gestão, crise financeira ou quebra de política, a diretoria pode:
 
-### 1.4 Histórico do mundo
+- restringir as decisões do usuário e exigir **aprovação obrigatória para gastos**;
+- **baixar limites** de orçamento e **bloquear novas obrigações**;
+- impor **intervenção de um departamento** e **exigência de vendas**;
+- estabelecer **metas corretivas** e um **plano de recuperação**.
+
+Ou seja, o usuário pode **perder autonomia e operar sob intervenção**, mas nunca perde o clube. Uma boa gestão, por outro lado, amplia autonomia, orçamento e confiança.
+
+> **Fonte:** regra confirmada em def-simulador §4.7 ("Usuário nunca demitido") e §27.2, reforçada em def-escopo §25.10 e na contradição consolidada nº 2 de §27.10 ("o usuário nunca é demitido, mas pode perder autonomia e operar sob intervenção"). Os efeitos concretos sobre a autonomia constam de def-simulador §4.6.
+
+### 1.4 Encerramento administrativo de clubes de IA
+
+Clubes **sem usuário** (controlados pela inteligência do jogo) podem, em situação extrema, **falir, fundir-se, mudar de identidade ou ser substituídos** ao fim de uma temporada. Esse encerramento é **administrativo e ocorre entre temporadas** — nunca durante a competição em andamento. O processo:
+
+- **preserva os registros históricos** do clube (títulos, trajetória, ídolos, recordes);
+- **trata contratos, jogadores e obrigações** herdados, para que atletas e dívidas não desapareçam;
+- indica claramente a **continuidade** — jurídica, esportiva, direitos históricos, títulos reconhecidos, dívidas assumidas, patrimônio, torcida e identidade cultural.
+
+Mudanças de nome, cidade, escudo, estádio, proprietário ou controlador **não criam automaticamente um novo clube**: a identidade e o histórico permanecem contínuos, e partidas antigas seguem exibindo a identidade da época.
+
+Já os **clubes pertencentes a usuários não desaparecem**: em crise, entram em **recuperação financeira e esportiva** (ver [1.3](#13-o-usuário-nunca-é-demitido)), nunca em encerramento.
+
+### 1.5 Arquivamento de mundo inativo
+
+Um **mundo inteiro sem atividade** pode ser **arquivado administrativamente**. O arquivamento:
+
+- ocorre com **aviso prévio** aos usuários envolvidos;
+- **preserva o histórico** do mundo;
+- aplica **regras de congelamento** do estado.
+
+O arquivamento **não é uma mecânica normal de jogo nem um reset competitivo** — é uma operação administrativa de manutenção do universo, distinta da continuidade automática descrita em [1.1](#11-o-mundo-continua).
+
+> **Pendência:** os critérios exatos de arquivamento de mundo inativo (gatilho de inatividade, prazo do aviso prévio e política de manutenção de mundo) ainda não estão fechados — def-escopo §25.4. Ver registro de decisões, [§4.1.4](../99-decisoes/registro-de-decisoes.md).
+
+### 1.6 Histórico do mundo
 
 O jogo guarda o histórico que dá identidade e apego ao universo:
 
