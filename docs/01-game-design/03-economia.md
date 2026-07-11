@@ -615,13 +615,11 @@ O sistema usa esse estado para responder perguntas como: tem jogador demais ou d
 
 ### 14.3 Clubes começam pequenos, mas com identidade
 
-Todos os clubes gerados começam pequenos: baixa reputação, estrutura simples, estádio pequeno, torcida pequena, **caixa inicial fixo e igual para todos**, elenco equilibrado e mesma capacidade inicial de crescimento. As diferenças não são de poder, mas de **identidade** (estilo).
+Do ponto de vista econômico, o **caixa inicial fixo e igual para todos** é a porta de entrada do sistema fechado: nenhum clube começa com vantagem financeira, e todo o dinheiro que passa a circular depois é gerado pelos ciclos descritos nas seções seguintes. Os clubes nascem pequenos — baixa reputação, estrutura simples, torcida pequena — e com um elenco inicial equilibrado e propositalmente **envelhecido**, o que cria o déficit de pirâmide etária que o balanceador corrige ao longo das temporadas (ver [14.5](#145-geração-baseada-em-aposentadoria-e-pirâmide-etária)).
 
-Cada clube recebe um **perfil inicial** com pontuação total fixa (por exemplo, 100 pontos de identidade distribuídos entre base, torcida, estrutura, elenco, finanças e disciplina). A soma é sempre igual; o que muda é a distribuição. Perfis de exemplo: Formador (base melhor), Operário (físico e garra), Organizado (disciplina e finanças), Popular (torcida maior), Técnico (passe e controle), Defensivo (zaga e marcação).
+O princípio fundador (todos nascem pequenos, com o mesmo caixa e elenco equilibrado, diferindo apenas em **identidade/estilo**), os **perfis iniciais nomeados** e os **números de referência do elenco inicial** (valor do caixa, quantidade e faixa etária dos jogadores, teto de força total e pontos de identidade) são de responsabilidade de [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§3.1–3.2, o princípio fundador). Aqui interessa apenas o efeito econômico: caixa igual na largada e elenco velho como estado inicial que o sistema global rebalanceia.
 
-O elenco inicial também é equilibrado: cerca de 23 jogadores, idade entre 30 e 34 anos, qualidade média parecida, potencial limitado, contratos curtos e risco de aposentadoria próximo — com pequenas variações de setor entre clubes, mantendo a força total equilibrada.
-
-> **Pendência:** Definir o valor do caixa inicial padrão, a força total do elenco inicial e a distribuição de pontos de identidade por perfil. Valores de brainstorming nos chats-fonte: caixa inicial de R$ 1.000.000 igual para todos, força total do elenco ~1.500 pontos distribuída entre setores e 100 pontos de identidade por perfil. Calibração em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> **Pendência:** Os valores exatos (caixa inicial padrão, força total do elenco inicial e distribuição de pontos de identidade por perfil) estão registrados em [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (§3.1–3.2) e serão calibrados em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
 
 O clube não nasce grande: fica grande. O crescimento ocorre em camadas (pequeno → emergente → médio → forte → grande → dominante) e depende de reputação, títulos, torcida, estrutura, saúde financeira, qualidade do elenco, jogadores revelados e histórico. Um clube rico mas mal administrado não vira grande automaticamente. Subir deve ser difícil.
 

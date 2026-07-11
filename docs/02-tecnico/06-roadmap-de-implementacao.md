@@ -69,133 +69,13 @@ As decisões já tomadas precisam sair do formato de conversa e virar **fonte of
 | 4 | **Eventos de Domínio** | Fatos imutáveis emitidos pelo domínio. |
 | 5 | **Invariantes** | Condições que nunca podem ser violadas. |
 
-### 2.1 Catálogo de Regras
-
-Cada regra recebe um identificador estável. Exemplos:
-
-- `ECO-001` — Todos os clubes iniciam com o mesmo valor-base em caixa.
-- `ECO-002` — A oferta monetária depende da quantidade de clubes ativos.
-- `PLY-001` — Cada jogador é único.
-- `PLY-002` — A geração de jogadores considera o equilíbrio etário do universo.
-- `MAT-001` — Partidas online permitem intervenções táticas em tempo real.
-- `USR-001` — O usuário não pode ser demitido.
-
-Cada regra deve conter a seguinte estrutura:
-
-```ts
-interface GameRule {
-  id: string;
-  name: string;
-  description: string;
-  inputs: string[];
-  outputs: string[];
-  dependencies: string[];
-  invariants: string[];
-  configurable: boolean;
-}
-```
-
-### 2.2 Catálogo de Fórmulas
-
-Separado das regras, permite balancear o jogo sem reescrever o domínio:
-
-```ts
-interface GameFormula {
-  id: string;
-  version: number;
-  parameters: Record<string, number>;
-  calculate(input: unknown): unknown;
-}
-```
-
-Fórmulas previstas: evolução técnica; fadiga; risco de lesão; geração de jogadores; inflação; preço de mercado; receita de clubes; impacto da comissão técnica; crescimento estrutural; probabilidade de eventos; desempenho em partidas.
-
-### 2.3 Máquinas de Estado
-
-**Partida:**
-
-```
-SCHEDULED → PRE_MATCH → LIVE → PAUSED_FOR_DECISION → LIVE → FINISHED → PROCESSED
-```
-
-**Temporada:**
-
-```
-PLANNING → REGISTRATION → IN_PROGRESS → FINALIZING → OFF_SEASON → COMPLETED
-```
-
-### 2.4 Eventos de Domínio
-
-Exemplos: `WorldCreated`, `SeasonStarted`, `PlayerGenerated`, `PlayerRetired`, `MatchScheduled`, `MatchStarted`, `GoalScored`, `TacticalInstructionIssued`, `PlayerInjured`, `TransferCompleted`, `ClubStructureUpgraded`, `SeasonCompleted`.
-
-### 2.5 Invariantes
-
-Condições que nunca podem ser violadas:
-
-- Um jogador só pode possuir um contrato ativo.
-- Uma partida finalizada não pode voltar ao estado `LIVE`.
-- A classificação deve corresponder aos resultados processados.
-- O dinheiro transferido deve sair de uma entidade e entrar em outra.
-- Nenhum jogador aposentado pode ser escalado.
-- O número de jogadores deve permanecer dentro da faixa de equilíbrio do universo.
+Os **5 artefatos oficiais** — catálogo de regras (com IDs estáveis e a interface `GameRule`), catálogo de fórmulas (interface `GameFormula`), máquinas de estado de partida e temporada, eventos de domínio e invariantes — estão integralmente especificados em [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md). O roadmap apenas exige que eles existam **antes** de escrever qualquer código de produção; a especificação executável (interfaces, IDs, estados, eventos e invariantes) é responsabilidade daquele documento.
 
 ---
 
 ## 3. Fundações transversais: determinismo e event sourcing
 
-Duas fundações valem para **todo** o código, desde o dia 1.
-
-### 3.1 Determinismo desde o primeiro dia
-
-Todas as decisões aleatórias devem usar uma **semente (seed) controlada**. Nunca use `Math.random()` diretamente.
-
-```ts
-const random = new SeededRandom({
-  worldSeed: world.seed,
-  context: `match:${match.id}:minute:${minute}`,
-});
-```
-
-Com determinismo, a mesma entrada produz o mesmo resultado, o que permite: reproduzir bugs, repetir partidas em testes, auditar resultados, comparar versões do motor, evitar divergência entre servidores e investigar suspeitas de manipulação.
-
-O universo é a entidade raiz. Como economia, jogadores, temporadas e clubes são compartilhados, **quase todas as tabelas devem carregar `worldId`**, permitindo múltiplos servidores, mundos com quantidades diferentes de clubes, regras versionadas, ambientes de teste, simulação paralela e reinício de universo sem afetar outros jogos.
-
-```ts
-interface GameWorld {
-  id: string;
-  name: string;
-  seed: string;
-  currentDate: Date;
-  currentSeason: number;
-  status: WorldStatus;
-  rulesetVersion: string;
-  economyStateId: string;
-}
-```
-
-### 3.2 Estado atual + histórico de eventos (híbrido)
-
-Não é necessário event sourcing puro. Recomenda-se um modelo **híbrido**:
-
-- **Tabelas de estado:** `players`, `clubs`, `contracts`, `matches`, `standings`, `club_finances`, `competitions`.
-- **Registro imutável de eventos:** `game_events`.
-
-```ts
-interface GameEventRecord {
-  id: string;
-  worldId: string;
-  aggregateType: string;
-  aggregateId: string;
-  eventType: string;
-  gameDate: Date;
-  sequence: number;
-  payload: unknown;
-  rulesetVersion: string;
-  createdAt: Date;
-}
-```
-
-O log de eventos é essencial para notificações, narrativa do jogo, histórico de atletas, partidas ao vivo, auditoria financeira, estatísticas, replay e processamento assíncrono.
+As fundações transversais (determinismo por seed — o `SeededRandom` derivado da semente do mundo — e event sourcing híbrido, com tabelas de estado atual convivendo com o registro imutável `game_events`) estão especificadas em [`./00-arquitetura-geral.md`](./00-arquitetura-geral.md) §4. O roadmap apenas exige que ambas estejam **em pé desde o Bloco 1**, valendo para todo o código desde o dia 1.
 
 > O detalhamento das tabelas de estado, do `game_events` e do esquema Prisma está em [`./02-modelo-de-dados.md`](./02-modelo-de-dados.md).
 
@@ -241,42 +121,11 @@ estrutura + elenco + desempenho + reputação + finanças + torcida + gestão
 
 Implementar: competição; edição; fases; grupos; rodadas; partidas; critérios de desempate; classificação; promoção; rebaixamento; premiação; calendário.
 
-O formato deve ser **configurável por dados**:
-
-```ts
-interface CompetitionFormat {
-  participantCount: number;
-  phases: CompetitionPhaseDefinition[];
-  tieBreakers: TieBreaker[];
-  promotionRules: MovementRule[];
-  relegationRules: MovementRule[];
-}
-```
+O formato deve ser **configurável por dados**, não por código (interface `CompetitionFormat` especificada em [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §6).
 
 ### Bloco 5 — Motor de partidas
 
-Começar pela **simulação integral, sem intervenção humana**.
-
-Entrada e saída:
-
-```ts
-interface MatchSimulationInput {
-  home: TeamSnapshot;
-  away: TeamSnapshot;
-  homeTactics: Tactics;
-  awayTactics: Tactics;
-  context: MatchContext;
-  seed: string;
-}
-
-interface MatchSimulationResult {
-  score: Score;
-  events: MatchEvent[];
-  playerPerformances: PlayerPerformance[];
-  physicalConsequences: PhysicalImpact[];
-  tacticalReport: TacticalReport;
-}
-```
+Começar pela **simulação integral, sem intervenção humana**. As interfaces de entrada e saída do motor (`MatchSimulationInput` e `MatchSimulationResult`) estão especificadas em [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §6.
 
 A partida é simulada em intervalos pequenos:
 
@@ -315,11 +164,11 @@ Antes de escrever o primeiro código de produção, o próximo trabalho concreto
 | 3 | **Agregados e entidades** | Definição das raízes de agregado e das entidades que cada uma contém. |
 | 4 | **Value Objects** | IDs tipados, dinheiro, percentuais, probabilidades, datas do jogo, etc. |
 | 5 | **Enums definitivos** | Status de mundo, estados de partida e temporada, tipos de evento, posições, etc. |
-| 6 | **Eventos de domínio** | Catálogo definitivo (ver seção 2.4). |
+| 6 | **Eventos de domínio** | Catálogo definitivo (ver [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §4). |
 | 7 | **Comandos** | Comandos que disparam mudanças de estado (ex.: `UpgradeStructure`, `TransferPlayer`). |
-| 8 | **Máquinas de estado** | Ciclos de vida de partida e temporada (ver seção 2.3). |
-| 9 | **Fórmulas configuráveis** | Catálogo versionado e parametrizado (ver seção 2.2). |
-| 10 | **Invariantes** | Condições inquebráveis (ver seção 2.5). |
+| 8 | **Máquinas de estado** | Ciclos de vida de partida e temporada (ver [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §3). |
+| 9 | **Fórmulas configuráveis** | Catálogo versionado e parametrizado (ver [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §2). |
+| 10 | **Invariantes** | Condições inquebráveis (ver [`./05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md) §5). |
 | 11 | **Estrutura Prisma** | Esquema de persistência — fechado **por último**, quando o comportamento já estiver validado. |
 | 12 | **Ordem de implementação** | A sequência de blocos e entregas (seções 4 e 6). |
 | 13 | **Cenários de teste** | Testes unitários, de propriedade, de invariantes e de longo prazo (seção 8). |

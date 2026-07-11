@@ -463,29 +463,17 @@ Essa reputação é um ciclo de retroalimentação: ela **atrai mais talentos** 
 
 ## 12. Impacto no valor de mercado
 
-O histórico influencia o valor de mercado. Um jogador formado em clube bom ou com passagem por metodologia forte deve valer mais.
+O histórico de desenvolvimento (seções 7–8) é uma das entradas do valor de mercado: um jogador formado em clube reconhecido, com metodologia forte e evolução constante, deve valer mais que outro de mesma nota atual com trajetória instável. A **contribuição específica deste sistema** ao preço são os fatores de formação e carreira:
 
-Composição conceitual do valor de mercado:
-
-```
-Valor de Mercado = atributos atuais
-                 + potencial
-                 + idade
-                 + posição
-                 + reputação do clube formador
-                 + minutos jogados
-                 + competição disputada
-                 + seleção
-                 + histórico de evolução
-                 + personalidade
-                 - lesões
-                 - instabilidade
-                 - salário alto
-```
+- **reputação do clube formador** (ver seção 11);
+- **histórico de evolução** — a trajetória acumulada em `PlayerDevelopmentHistory` (seção 8);
+- **minutos jogados e competição disputada**;
+- **seleção** e demais eventos de carreira;
+- **personalidade e estabilidade** — a instabilidade derruba o valor.
 
 > Exemplo: dois jogadores nota 70. O Jogador A foi formado em clube reconhecido, tem boa disciplina e evolução constante. O Jogador B passou por clubes instáveis, teve lesões e moral oscilante. O Jogador A vale mais, mesmo com a mesma nota atual.
 
-> A fórmula exata de valuation está em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+> A **fórmula completa de valor de mercado** — com os fatores econômicos e de escassez (qualidade atual, potencial, fama, escassez de posição, interesse externo, risco de lesão, tempo de contrato, pressão financeira do clube) — é de responsabilidade da economia: ver [`./03-economia.md`](./03-economia.md#53-valor-de-mercado) (§5.3). Os coeficientes exatos de valuation ficam em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
 
 ---
 

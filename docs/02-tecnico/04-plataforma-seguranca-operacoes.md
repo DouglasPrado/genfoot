@@ -429,31 +429,9 @@ A estratégia de testes combina dez tipos, cada um cobrindo uma classe de risco:
 
 ## 13. Modelo de dados e integridade
 
-> Schema canônico detalhado em [Modelo de dados](./02-modelo-de-dados.md).
+O modelo é **relacional, histórico, versionado, auditável e preparado para múltiplos mundos e clusters** — o schema representa as regras do mundo e protege suas invariantes estruturais.
 
-O modelo é **relacional, histórico, versionado, auditável e preparado para múltiplos mundos e clusters**. O schema representa as regras do mundo — a aplicação não compensa permanentemente um banco incapaz de proteger suas invariantes estruturais.
-
-### Multi-mundo e particionamento
-
-- Usuários são **globais**; entidades esportivas pertencem a um mundo.
-- Toda relação competitiva crítica carrega **`gameWorldId`**, a **chave de particionamento** desde o primeiro schema (particionamento físico introduzido só por necessidade comprovada).
-- **Foreign keys compostas** impedem relações entre mundos diferentes; propriedade, dinheiro e elegibilidade usam FKs explícitas.
-- Mundos poderão ser movidos para clusters diferentes no futuro.
-
-### Identidade, tipos e versionamento
-
-- Identificadores internos em **UUIDv7**, separados de códigos públicos; models em PascalCase, banco em snake_case.
-- Entidades críticas têm `version`; datas reais em `timestamptz`; tempo simulado em `worldTick`.
-- Dinheiro em **unidade mínima**; percentuais e atributos em inteiros escalados; JSONB só em estruturas versionadas adequadas.
-- Enums estáveis para ciclos fechados; taxonomias expansíveis em catálogos; regulamentos versionados; traduções fora de enums.
-
-### Invariantes protegidas no banco
-
-Regras críticas são protegidas em mais de uma camada — **validação da aplicação + invariante do domínio + constraint do banco**. O PostgreSQL protege: unicidade, valores não negativos, estados válidos, relações obrigatórias, associação ativa exclusiva, inscrição única. Sobreposições temporais críticas e exclusões de histórico são bloqueadas; cascade só para filhos descartáveis; soft delete não é padrão universal; snapshots são imutáveis; unicidades condicionais via índices parciais. Agregados têm limites claros; **locks têm ordem documentada** (para evitar deadlock); **idempotência é protegida por constraints**; **gerações têm seeds persistidas**; **status só muda por casos de uso**.
-
-### Prisma fora do domínio
-
-O **Prisma permanece fora do domínio**: é a camada de modelagem relacional e de operações comuns, complementada por **migrações SQL nativas** e SQL direto dentro da infraestrutura. Transações são curtas e **chamadas externas não ocorrem dentro de transações**. Views e materialized views são reconstruíveis e **não são fonte de verdade**. Toda invariante crítica tem sua camada de proteção definida.
+As convenções canônicas de modelagem — chaves (UUIDv7, escopo `(world_id, id)`), tipos (dinheiro em unidade mínima, PascalCase/snake_case, tempo real vs. tempo do mundo), uso de JSONB, particionamento por mundo (`gameWorldId`) e FKs compostas, invariantes protegidas no banco (constraints como última defesa) e o papel do Prisma fora do domínio — são definidas em [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md) (seção "Convenções de dados e tipos" e Decisões 19.7–19.10). O schema concreto (models e enums) está em [`./02-modelo-de-dados.md`](./02-modelo-de-dados.md).
 
 ---
 

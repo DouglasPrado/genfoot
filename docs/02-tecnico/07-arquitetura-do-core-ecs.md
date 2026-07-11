@@ -319,13 +319,7 @@ Exemplos de traços:
 - **Clube:** copeiro, formador, pressionado, instável politicamente, vendedor, tradicional.
 - **Torcida:** exigente, fiel, impaciente, apaixonada, hostil.
 
-Os traços fazem o mesmo evento gerar reações diferentes. Diante do evento *torcida vaia*:
-
-| Traço do jogador | Reação |
-| --- | --- |
-| Sensível a críticas | pressão +10 |
-| Raçudo | pressão +3, garra +5 |
-| Frio em decisão | quase não sente |
+Os traços fazem o mesmo evento gerar reações diferentes — ex.: diante de *torcida vaia*, um jogador "sensível a críticas" ganha pressão +10, enquanto um "frio em decisão" quase não sente. A tabela completa de reação por traço a esse evento é dona de [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) (seção 14).
 
 O campo `visibility` (`visible` / `hidden` / `scouted`) é o que sustenta a incerteza dos relatórios de olheiro (ver [Youth System](#youth-system-safra-por-soma-de-peças)).
 
@@ -654,46 +648,9 @@ Ver também: [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-d
 
 ## Development System
 
-A evolução de um jogador é calculada como um produto de fatores positivos menos penalidades, sempre limitada pelo potencial restante.
+O Development System **aplica**, via [Effects](#effect-system-o-coração-do-core), a fórmula de ganho de desenvolvimento por atributo: a evolução é um produto de fatores positivos (capacidade de aprendizado, potencial restante, foco e qualidade do treino, compatibilidade, minutos, idade, personalidade, suporte e moral) menos penalidades (lesão, pressão, fadiga), sempre limitada pelo potencial restante e calculada **por atributo**.
 
-Forma conceitual:
-
-```
-Evolução =
-  potencial disponível
-  × qualidade do treino
-  × compatibilidade jogador-clube
-  × minutos jogados
-  × idade
-  × personalidade
-  × suporte do clube
-  × moral
-  - lesões
-  - fadiga
-  - pressão negativa
-  - má adaptação
-```
-
-Forma lógica:
-
-```
-developmentGain =
-    baseLearningRate        // capacidade de aprendizado do jogador (fator próprio)
-  * remainingPotential
-  * trainingFocus           // foco do treino no atributo (fator próprio, distinto de trainingQuality)
-  * trainingQuality
-  * playerCompatibility
-  * minutesFactor
-  * ageFactor
-  * personalityFactor
-  * supportFactor
-  * moraleFactor
-  - injuryPenalty
-  - pressurePenalty
-  - fatiguePenalty
-```
-
-`baseLearningRate` (o quão rápido o jogador aprende) e `trainingFocus` (o quanto o treino aponta para aquele atributo) são fatores **distintos**: aprender rápido sem foco, ou focar muito num jogador que não aprende, resultam em ganho baixo. O cálculo roda **por atributo** — ex.: o ganho em passe usa o `trainingFocus` de passe e o `remainingPotential` técnico.
+A definição da fórmula `developmentGain` — incluindo a distinção entre `baseLearningRate` (o quão rápido o jogador aprende) e `trainingFocus` (o quanto o treino aponta para aquele atributo) como fatores próprios e distintos — é dona de [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) (seção 6). Aqui interessa apenas o enquadramento arquitetural: no core, esse ganho não altera atributos diretamente, e sim através de `Effect`s aplicados pelo Development System.
 
 > **Pendência:** os intervalos numéricos, a normalização de cada fator e os pesos relativos devem ser definidos e centralizados no catálogo de fórmulas ([`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](./05-catalogo-de-regras-e-formulas.md)).
 
@@ -741,35 +698,11 @@ YouthClass {
 
 ### Geração individual do jogador
 
-Cada jovem nasce com história própria. Fluxo de geração:
-
-1. Gerar talento natural
-2. Gerar nacionalidade/região
-3. Gerar história familiar
-4. Gerar condição social
-5. Gerar acesso inicial ao futebol
-6. Gerar personalidade base
-7. Gerar corpo/genética
-8. Gerar posição provável
-9. Aplicar influência cultural/regional leve
-10. Aplicar influência da estrutura do clube
-11. Aplicar influência dos olheiros
-12. Gerar atributos atuais
-13. Gerar potencial natural
-14. Gerar potencial aproveitável
-15. Gerar traços ocultos
-16. Gerar riscos
-17. Gerar relatório do olheiro com incerteza
+Para cada jovem da safra, o Youth System **instancia o fluxo de geração individual do atleta** (talento natural, origem/região, história familiar, condição social, personalidade base, genética, posição, influências cultural/clube/olheiros, atributos atuais, potencial natural/aproveitável, traços ocultos, riscos e relatório do olheiro). O passo a passo completo (~17 passos) é definido em [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) (seção 3) — o core apenas o executa dentro do `YouthGenerationEngine`.
 
 ### Relatório de olheiro com incerteza
 
-O jogador real tem dados ocultos; o olheiro só enxerga estimativas com intervalo de confiança que depende da qualidade da peça de scouting.
-
-| Dado real | Olheiro ruim vê | Olheiro bom vê |
-| --- | --- | --- |
-| potencial 86 | 70–90 | 83–88 |
-| disciplina 42 | desconhecida | preocupante |
-| risco emocional 70 | baixo | moderado |
+O jogador real tem dados ocultos; o olheiro só enxerga estimativas com intervalo de confiança que depende da qualidade da peça de scouting (ex.: um potencial real 86 vira "70–90" para olheiro ruim e "83–88" para olheiro bom). A tabela completa de incerteza do olheiro é dona de [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md) (seção 3); aqui fica só o schema `ScoutReport` que a materializa.
 
 ```ts
 ScoutReport {
@@ -810,21 +743,7 @@ MatchTeamState
 └── apoio externo
 ```
 
-Força efetiva de cada setor:
-
-```
-Força efetiva do setor =
-    qualidade dos jogadores do setor
-  + tática
-  + moral
-  + confiança
-  + entrosamento
-  + apoio
-  - pressão
-  - fadiga
-  - desorganização
-  - eventos negativos
-```
+A força efetiva de cada setor combina qualidade dos jogadores do setor, tática, moral, confiança, entrosamento e apoio, menos pressão, fadiga, desorganização e eventos negativos. A fórmula é dona de [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-de-partida.md) (atributos coletivos dinâmicos) e formalizada em `./05-catalogo-de-regras-e-formulas.md` (F1–F21, em especial F5 — controle de zona e força de setor). O core apenas expõe o `MatchTeamState` acima como estado por setor.
 
 Cascata típica dentro da partida:
 
