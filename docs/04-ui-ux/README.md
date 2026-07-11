@@ -28,8 +28,10 @@ O princípio herdado do frontend técnico atravessa toda a área: **o servidor �
 | 10 | [Mobile — Competições, Calendário e Seleções](10-mobile-telas-competicoes-calendario-selecoes.md) | Tabela, calendário/agenda, competição/regulamento, artilharia, fim de temporada, seleções, histórico e legado. |
 | 11 | [Mobile — Comunicação, Torcida e Moral](11-mobile-telas-comunicacao-torcida-moral.md) | Moral do elenco, torcida, imprensa/coletiva, conversas com atletas, feed de eventos/narrativa, reputação. |
 | 12 | [Mobile — Perfil, Configurações e Loja](12-mobile-telas-perfil-config-loja.md) | Perfil do clube/usuário, configurações, monetização/loja, suporte. |
+| 13 | [Mobile — Complementos: Social, Mundo e Adendos](13-mobile-complementos-social-mundo-e-adendos.md) | Telas da **auditoria de completude**: ver outro clube/gestor, múltiplos mundos, espectar partidas, busca, comparar, entrosamento, retreinar, relatórios, sócio-torcedor, produtos, cláusulas + adendos às telas 03–12. |
 | 20 | [Admin — Fluxos](20-admin-fluxos.md) | Todos os fluxos de operação do mundo. |
 | 21 | [Admin — Telas](21-admin-telas.md) | Login/RBAC, painel do mundo, saúde econômica/demográfica, competições, correções, moderação/anti-abuso, W.O./punições, suporte/recurso, testes de equilíbrio. |
+| 22 | [Admin — Complementos: Plataforma e Adendos](22-admin-complementos-plataforma.md) | Telas da **auditoria de completude**: IAM/RBAC administrável, feature flags/kill switches, jobs/DLQ, incidentes, backups/recuperação, manutenção, broadcast, privacidade/compliance, report de bug + adendos ao doc 21. |
 
 ## Convenções desta área
 

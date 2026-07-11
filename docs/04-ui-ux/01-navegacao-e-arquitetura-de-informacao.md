@@ -228,6 +228,25 @@ Todas as telas do app, com ID e documento de detalhe. IDs `M-*`.
 | `M-BUG-REPORT` | Report de bug |
 | `M-SUPPORT` | Suporte e recursos |
 
+### Complementos: social, mundo e gestão → [doc 13](13-mobile-complementos-social-mundo-e-adendos.md)
+*Telas adicionadas após a auditoria de completude (2026-07-11).*
+| ID | Tela |
+| --- | --- |
+| `M-MY-WORLDS` | Meus mundos e clubes |
+| `M-CLUB-VIEW` | Perfil público de outro clube |
+| `M-MANAGER-PROFILE` | Perfil público de outro gestor |
+| `M-WORLD-STRUCTURE` | Estrutura do mundo (divisões/pirâmide) |
+| `M-MESSAGES` | Mensagens entre gestores |
+| `M-LIVE-WORLD` | Rodada ao vivo / espectar partidas |
+| `M-SEARCH` | Busca global |
+| `M-COMPARE` | Comparar jogadores |
+| `M-TEAMBALANCE` | Entrosamento e equilíbrio do elenco |
+| `M-RETRAIN` | Mudança de posição / arquétipo |
+| `M-REPORTS` | Central de relatórios |
+| `M-MEMBERSHIP` | Sócio-torcedor |
+| `M-PRODUCTS` | Produtos / merchandising |
+| `M-CLAUSES` | Cláusulas e obrigações condicionais |
+
 ## 5. Sitemap completo — admin
 
 Telas do admin (Next.js), IDs `A-*`. Detalhe em [doc 21](21-admin-telas.md).
@@ -249,5 +268,19 @@ Telas do admin (Next.js), IDs `A-*`. Detalhe em [doc 21](21-admin-telas.md).
 | `A-SUPPORT` | Suporte e recursos | `/worlds/[id]/support` |
 | `A-BALANCE` | Testes de equilíbrio / SimulationLab / health checks | `/worlds/[id]/balance` |
 | `A-RULES` | Versionamento de regras | `/worlds/[id]/rules` |
+
+### Complementos: plataforma e segurança → [doc 22](22-admin-complementos-plataforma.md)
+*Telas adicionadas após a auditoria de completude (2026-07-11).*
+| ID | Tela | Rota |
+| --- | --- | --- |
+| `A-IAM` | Operadores, papéis e sessões (RBAC) | `/iam` |
+| `A-FLAGS` | Feature flags e kill switches | `/flags` |
+| `A-OPS` | Jobs, filas, DLQ e reconciliação | `/worlds/[id]/ops` |
+| `A-INCIDENTS` | Incidentes | `/incidents` |
+| `A-BACKUPS` | Backups e recuperação | `/worlds/[id]/backups` |
+| `A-MAINTENANCE` | Janelas de manutenção | `/worlds/[id]/maintenance` |
+| `A-BROADCAST` | Comunicação a usuários | `/broadcast` |
+| `A-PRIVACY` | Privacidade e compliance (data-subject) | `/privacy` |
+| `A-BUGS` | Report de bug e vulnerabilidades | `/bugs` |
 
 > **Pendência herdada:** o layout fino, os limiares de alerta e a matriz papel↔ação do admin seguem as pendências de [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md). Esta área especifica a UI; os valores finais vivem lá.
