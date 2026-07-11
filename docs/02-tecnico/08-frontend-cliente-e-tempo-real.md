@@ -124,7 +124,7 @@ Mudanças incompatíveis (`BREAKING`) exigem **nova versão** da API. Um aplicat
 
 ### Contrato de command (HTTP)
 
-Todo command enviado à API oficial carrega:
+Este documento define o **envelope** genérico do command; os **nomes** dos commands (`commandType`) e sua intenção vivem no [Catálogo de Commands](./10-catalogo-de-commands.md). Todo command enviado à API oficial carrega:
 
 | Campo | Descrição |
 | --- | --- |

@@ -63,6 +63,7 @@ A documentação está organizada em áreas, do "porquê" ao "como":
 - [07 · Arquitetura do Core (ECS)](02-tecnico/07-arquitetura-do-core-ecs.md) — modelo Entity–Component–Effect–Event do motor de ecossistema.
 - [08 · Frontend, Cliente e Tempo Real](02-tecnico/08-frontend-cliente-e-tempo-real.md) — dois clientes (app Expo + admin Next.js), contratos de API e realtime-gateway.
 - [09 · Operação e Administração do Mundo](02-tecnico/09-operacao-e-admin-do-mundo.md) — painel admin, health checks de balanceamento, permissões.
+- [10 · Catálogo de Commands](02-tecnico/10-catalogo-de-commands.md) — nomes canônicos das ações que os clientes enviam à API.
 
 ### 03 · Guia do Jogador
 
@@ -74,8 +75,8 @@ A documentação está organizada em áreas, do "porquê" ao "como":
 - [00 · Visão Geral e Design System](04-ui-ux/00-visao-geral-e-design-system.md) — princípios, decisão de stack, tokens, componentes, estados, template de tela.
 - [01 · Navegação e Arquitetura de Informação](04-ui-ux/01-navegacao-e-arquitetura-de-informacao.md) — tab bar, stacks, deep links e o **sitemap completo** (111 telas mobile + 24 admin).
 - [02 · Mobile — Fluxos](04-ui-ux/02-mobile-fluxos.md) — os 16 golden paths + plataforma + micro-fluxos (MF-00…MF-25).
-- **Mobile — Telas** (docs 03–12): [Onboarding](04-ui-ux/03-mobile-telas-onboarding-e-conta.md) · [Central/Home](04-ui-ux/04-mobile-telas-central-home-decisoes.md) · [Elenco/Jogador/Medicina](04-ui-ux/05-mobile-telas-elenco-jogador-treino-medicina.md) · [Tática/Partida](04-ui-ux/06-mobile-telas-tatica-escalacao-partida.md) · [Mercado/Contratos](04-ui-ux/07-mobile-telas-mercado-transferencias-contratos.md) · [Base](04-ui-ux/08-mobile-telas-base-e-formacao.md) · [Finanças/Estrutura/Estádio](04-ui-ux/09-mobile-telas-financas-estrutura-estadio.md) · [Competições/Calendário/Seleções](04-ui-ux/10-mobile-telas-competicoes-calendario-selecoes.md) · [Comunicação/Torcida/Moral](04-ui-ux/11-mobile-telas-comunicacao-torcida-moral.md) · [Perfil/Config/Loja](04-ui-ux/12-mobile-telas-perfil-config-loja.md).
-- **Admin (Next.js):** [20 · Fluxos](04-ui-ux/20-admin-fluxos.md) (AF-00…AF-10) · [21 · Telas](04-ui-ux/21-admin-telas.md) (painel do mundo, moderação, correções, W.O./sanções, filas, audit log, balanceamento).
+- **Mobile — Telas** (docs 03–12): [Onboarding](04-ui-ux/03-mobile-telas-onboarding-e-conta.md) · [Central/Home](04-ui-ux/04-mobile-telas-central-home-decisoes.md) · [Elenco/Jogador/Medicina](04-ui-ux/05-mobile-telas-elenco-jogador-treino-medicina.md) · [Tática/Partida](04-ui-ux/06-mobile-telas-tatica-escalacao-partida.md) · [Mercado/Contratos](04-ui-ux/07-mobile-telas-mercado-transferencias-contratos.md) · [Base](04-ui-ux/08-mobile-telas-base-e-formacao.md) · [Finanças/Estrutura/Estádio](04-ui-ux/09-mobile-telas-financas-estrutura-estadio.md) · [Competições/Calendário/Seleções](04-ui-ux/10-mobile-telas-competicoes-calendario-selecoes.md) · [Comunicação/Torcida/Moral](04-ui-ux/11-mobile-telas-comunicacao-torcida-moral.md) · [Perfil/Config/Loja](04-ui-ux/12-mobile-telas-perfil-config-loja.md) · [Complementos social/mundo](04-ui-ux/13-mobile-complementos-social-mundo-e-adendos.md).
+- **Admin (Next.js):** [20 · Fluxos](04-ui-ux/20-admin-fluxos.md) (AF-00…AF-10) · [21 · Telas](04-ui-ux/21-admin-telas.md) (painel do mundo, moderação, correções, W.O./sanções, filas, audit log, balanceamento) · [22 · Complementos de plataforma](04-ui-ux/22-admin-complementos-plataforma.md) (feature flags, kill switches, DLQ, deploy, backups).
 
 ### 99 · Decisões
 
