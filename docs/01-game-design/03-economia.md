@@ -1,6 +1,6 @@
 # Economia do Jogo
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/economics-initial.md, chats/planejamento-agrupado-do-jogo.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/economics-initial.md, chats/planejamento-agrupado-do-jogo.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
 
 A economia de **Grinta** é o motor invisível que gera histórias. Ela não é apenas o "saldo do clube": é um ecossistema financeiro que explica por que um clube vende uma promessa, por que outro entra em crise, por que um jogador aceita ganhar menos para ficar, por que empresários inflam salários, por que uma joia de país menor sai barata ou por que um clube rico destrói o mercado.
 
@@ -22,6 +22,7 @@ Este documento tem dois níveis complementares. O **nível do clube** descreve c
 12. [Arquitetura EconomicEngine](#12-arquitetura-economicengine)
 13. [Eventos econômicos](#13-eventos-econômicos)
 14. [Economia global balanceada](#14-economia-global-balanceada)
+15. [Contabilidade e disciplina financeira](#15-contabilidade-e-disciplina-financeira)
 
 ---
 
@@ -470,6 +471,46 @@ Um clube novo precisa ganhar dinheiro suficiente para evoluir — não o mesmo d
 
 Cada clube tem, assim, uma **economia própria proporcional ao seu estágio**: o novato não recebe a receita da elite, mas também não enfrenta os custos dela, e consegue financiar sua evolução dentro da própria camada. Os patrocínios seguem a mesma lógica da fórmula de [5.4](#54-valor-de-patrocínio), em que a divisão e a reputação do clube pesam no valor — um título de Liga Inicial melhora o patrocínio **local**, mesmo que o clube ainda seja irrelevante globalmente.
 
+### 9.6 Sistema comercial e ativos de marca
+
+A área comercial transforma atenção, torcida, desempenho, reputação e ativos do clube em receitas e relacionamentos. Suas atividades principais são patrocínios, fornecedores, bilheteria (ver [4.3](#43-bilheteria-dinâmica)), hospitalidade, produtos, programas de associação (sócio-torcedor), direitos de nome, campanhas e uso de imagem e conteúdo.
+
+O clube pode oferecer **ativos comerciais específicos**, cada um negociável de forma independente:
+
+- espaços do uniforme;
+- placas e mídia do estádio;
+- nome do estádio ou instalação (naming);
+- conteúdo digital;
+- patrocínio de treino;
+- patrocínio de base;
+- camarotes;
+- experiências;
+- campanhas temáticas.
+
+O interesse e o valor de um patrocinador dependem de alcance, torcida, divisão, reputação, desempenho, mercado regional, compatibilidade de marca, histórico do clube e das entregas prometidas (a fórmula agregada está em [5.4](#54-valor-de-patrocínio)). Um contrato comercial pode combinar valor fixo, bônus, metas, exclusividade, direitos, obrigações, penalidades e condições de renovação.
+
+**Exclusividade:** direitos exclusivos não podem ser vendidos simultaneamente a parceiros incompatíveis. O sistema precisa impedir a sobreposição de exclusividade entre patrocinadores concorrentes — vender a mesma exclusividade duas vezes gera conflito contratual.
+
+### 9.7 Entregas e obrigações comerciais
+
+Assinar um patrocínio não gera apenas receita: cria **obrigações**. O clube pode precisar exibir a marca, realizar campanha, disponibilizar espaço, produzir conteúdo, participar de evento ou entregar hospitalidade. Essas entregas são um compromisso, não um bônus.
+
+O descumprimento tem consequência econômica direta: falhar nas entregas pode **reduzir o pagamento**, **impedir a renovação** ou **gerar conflito** com o parceiro. A receita comercial, portanto, não é garantida pelo simples fato de existir contrato — depende de o clube honrar o que prometeu.
+
+### 9.8 Hospitalidade
+
+Camarotes, áreas especiais e experiências têm capacidade, custo e público próprios, distintos da bilheteria comum. Dependem de estrutura, operação e mercado: um clube sem infraestrutura ou sem mercado local para hospitalidade premium não converte esse ativo em receita, por maior que seja a torcida.
+
+### 9.9 Produtos, estoque e sazonalidade
+
+Os produtos do clube não são receita automática: envolvem produção, estoque, custo, preço, demanda, sazonalidade, campanhas e obsolescência. Uma temporada histórica, uma contratação popular ou um novo uniforme podem aumentar a demanda; um estoque excessivo, ao contrário, gera custo e risco (produto encalhado, obsolescência de coleção). A gestão de produtos é, assim, uma decisão de planejamento, não apenas de venda.
+
+### 9.10 Marca do clube
+
+A marca cresce por história, torcida, identidade, resultados, jogadores marcantes, comunicação, presença regional, competição e consistência institucional. Uma marca forte melhora as oportunidades comerciais (patrocínio, produtos, hospitalidade), mas **não substitui** desempenho, infraestrutura ou capacidade de entrega — sem elas, a marca não se converte em receita sustentável.
+
+> O sentimento, a memória e os protestos da torcida, a imprensa, as narrativas e a comunicação do clube — que também influenciam marca e receita — são tratados em [`./11-torcida-imprensa-e-narrativa.md`](./11-torcida-imprensa-e-narrativa.md). Aqui interessa apenas o efeito comercial direto.
+
 ## 10. Dívidas, punições e loops de consequência
 
 ### 10.1 Dívida como risco estratégico
@@ -743,3 +784,88 @@ Fim da temporada
 Exemplo prático: com 50 clubes, ~1.150 profissionais esperados, 1.080 ativos, 120 aposentando, 200 livres e idade média de 31,8 anos, o sistema detecta falta de profissionais, muitas aposentadorias e idade alta. Gera cerca de 320 jogadores (120 por aposentadoria, 70 para o déficit, 100 jovens para renovar a pirâmide, 30 prontos para o mercado imediato), distribuídos majoritariamente nas faixas jovens. Resultado: a idade média cai, os clubes têm reposição, o mercado não fica vazio e as aposentadorias não quebram o jogo.
 
 Esse ciclo global resolve, de uma vez, a justiça inicial, a inflação de mercado, o excesso ou a falta de jogadores, o envelhecimento do universo, os clubes ricos ou quebrados demais, o mercado artificial e os elencos eternos — criando um mundo de futebol fechado e regulado onde cada temporada recalcula a saúde do ecossistema.
+
+## 15. Contabilidade e disciplina financeira
+
+Ter dinheiro em caixa não é o mesmo que poder gastá-lo, e gerar receita não é o mesmo que recebê-la. Esta seção descreve as distinções contábeis que impedem o jogador de tratar todo o saldo como dinheiro livre e que dão realismo à gestão financeira de Grinta. Ela vale igualmente para os **clubes controlados pelo jogo**, que seguem as mesmas limitações — não podem criar dinheiro para contratar, ignorar dívidas nem sustentar folhas impossíveis.
+
+### 15.1 Caixa, orçamento e compromissos
+
+O sistema separa claramente grandezas que costumam ser confundidas:
+
+- **Caixa disponível** — o dinheiro que o clube efetivamente tem.
+- **Saldo bancário** — o saldo em conta, que pode diferir do caixa operacional.
+- **Valores restritos** — recursos que existem, mas estão vinculados a uma finalidade e não podem ser usados livremente.
+- **Orçamento autorizado** — o que a diretoria permitiu gastar em cada área, o que não implica que o dinheiro já esteja disponível.
+- **Compromissos assumidos** — gastos já comprometidos que ainda não saíram do caixa.
+
+Além disso, o clube acompanha contas a pagar, contas a receber, dívidas, patrimônio, resultado econômico e projeções futuras. **Possuir dinheiro em caixa não significa possuir autorização orçamentária; possuir orçamento aprovado não significa que o dinheiro já esteja disponível.**
+
+O orçamento pode ser dividido por áreas — folha salarial, transferências, funcionários, infraestrutura, formação, operações, comercial e reserva de emergência. A diretoria pode permitir realocação entre áreas, negar alterações ou exigir aprovação.
+
+### 15.2 Regime de competência
+
+Receitas e despesas são reconhecidas quando são **economicamente geradas**, e os pagamentos podem ocorrer em datas diferentes. O jogador precisa distinguir:
+
+- receita já conquistada e ainda não recebida;
+- despesa já assumida e ainda não paga;
+- pagamento antecipado;
+- parcela futura;
+- **obrigação condicionada** (só se torna devida se uma condição ocorrer).
+
+As transferências ilustram bem essa separação: o valor esportivo acordado, o cronograma de pagamento e o impacto contábil são coisas distintas. Uma compra pode gerar pagamento imediato, parcelas, bônus condicionais, comissão, participação em venda futura e compromissos ainda não ativados; uma venda pode gerar lucro ou prejuízo econômico diferente do caixa recebido no momento.
+
+O histórico financeiro não pode ser corrigido apagando valores anteriores: erros são tratados por ajustes e reversões identificadas.
+
+### 15.3 Cenários orçamentários
+
+Como parte das receitas é incerta, o planejamento trabalha com **cenários** em paralelo, e receitas incertas nunca são tratadas como dinheiro garantido:
+
+- esperado;
+- conservador;
+- otimista;
+- com acesso;
+- com permanência;
+- com rebaixamento.
+
+Isso conversa com as receitas proporcionais ao estágio da liga (ver [9.5](#95-receitas-e-patrocínios-proporcionais-ao-estágio-da-liga)): um mesmo elenco tem orçamentos diferentes conforme o clube suba, permaneça ou caia de divisão — inclusive porque a folha pode prever reduções automáticas por rebaixamento.
+
+### 15.4 Reservas de recurso
+
+Ao avançar em decisões relevantes, o clube pode **reservar recursos** para impedir que o mesmo orçamento seja comprometido duas vezes (por exemplo, prometer o mesmo dinheiro a duas contratações). Uma reserva pode estar:
+
+- consumida;
+- parcialmente consumida;
+- liberada;
+- expirada.
+
+A reserva é o mecanismo que garante a coerência entre o orçamento autorizado e os compromissos assumidos ([15.1](#151-caixa-orçamento-e-compromissos)).
+
+### 15.5 Estágios de crise e insolvência
+
+A situação financeira evolui por estágios, do saudável ao terminal:
+
+```
+estável → atenção → pressão → crise → insolvência → reestruturação
+```
+
+Em crise, o clube pode sofrer redução orçamentária, congelamento de contratações, obrigação de vender, renegociação de dívidas, intervenção financeira, perda de licença ou rebaixamento administrativo conforme o regulamento. O usuário continua no clube, mas passa a trabalhar sob restrições mais severas. A diretoria pode aportar recursos ou conceder empréstimos conforme seu perfil e capacidade — com condições, metas, limites, participação em decisões ou exigência de recuperação —, mas **não há resgate automático** sempre que o usuário gasta mal.
+
+Esses estágios refinam, em progressão narrativa, as faixas de `financialHealth` (ver [seção 6](#6-saúde-financeira-financialhealth)) e se conectam às punições econômicas e à inadimplência descritas na [seção 10](#10-dívidas-punições-e-loops-de-consequência).
+
+> **Pendência:** Definir o mapeamento entre os estágios de crise (estável→…→reestruturação) e as faixas de `financialHealth` da [seção 6](#6-saúde-financeira-financialhealth), além dos gatilhos que promovem ou rebaixam o clube entre estágios. Calibração em `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.
+
+### 15.6 Índices de inflação por categoria
+
+A inflação do mundo não é um número único. O universo mantém índices distintos por categoria, que evoluem separadamente:
+
+- preços gerais;
+- salários;
+- transferências;
+- construção;
+- crédito;
+- custos regionais.
+
+Isso estende o `MarketInflation` conceitual ([3.7](#37-marketinflation)), que trata salários, transferências e patrocínios, e opera sob o controle global de inflação ([14.7](#147-controle-de-inflação)). Uma regra é inegociável: **mudanças futuras de índice não reescrevem contratos já assinados** — a inflação afeta novos acordos, não os vigentes.
+
+> **Pendência:** Calibrar cada índice de inflação (preços, salários, transferências, construção, crédito, regional), suas faixas de variação por temporada e a interação com o controle global de inflação ([14.7](#147-controle-de-inflação)). Ver `../02-tecnico/05-catalogo-de-regras-e-formulas.md`.

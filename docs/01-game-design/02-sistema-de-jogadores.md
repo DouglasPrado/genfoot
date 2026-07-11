@@ -1,6 +1,6 @@
 # Sistema de Jogadores
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/lista-envolvidos-jogo.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/lista-envolvidos-jogo.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
 
 ## Resumo
 
@@ -26,7 +26,10 @@ Este documento consolida o modelo conceitual do jogador: a fórmula de identidad
 12. [Impacto no valor de mercado](#12-impacto-no-valor-de-mercado)
 13. [Memória do jogador e memória do clube](#13-memoria-do-jogador-e-memoria-do-clube)
 14. [Personalidade e decisões fora de campo](#14-personalidade-e-decisoes-fora-de-campo)
-15. [Backlog de gaps de design](#15-backlog-de-gaps-de-design)
+15. [Elenco como grupo social](#15-elenco-como-grupo-social)
+16. [Medicina, saúde e recuperação](#16-medicina-saude-e-recuperacao)
+17. [Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores](#17-ciclo-de-vida-do-jogador-aposentadoria-funcionario-e-protecao-de-menores)
+18. [Backlog de gaps de design](#18-backlog-de-gaps-de-design)
 
 ---
 
@@ -559,7 +562,187 @@ Um jogador pode estar pressionado mesmo com o time indo bem — por contrataçã
 
 ---
 
-## 15. Backlog de gaps de design
+## 15. Elenco como grupo social
+
+O elenco não é uma lista de jogadores — é um **grupo social** com estrutura própria. Ele possui hierarquia, lideranças, grupos, relações, papéis, expectativas, conflitos, mentorias e cultura. Essas dinâmicas afetam moral, integração e desempenho tanto quanto os atributos individuais das seções anteriores.
+
+### Papel no elenco
+
+Cada jogador tem um papel esperado dentro do grupo:
+
+- jogador-chave
+- titular
+- rotação
+- reserva
+- desenvolvimento
+- liderança
+- mentor
+
+O papel deve ser **coerente com contrato, comunicação e utilização real**. Um jogador tratado como reserva mas remunerado e comunicado como estrela gera incoerência e tensão.
+
+### Promessas
+
+Promessas feitas ao jogador podem envolver: minutos, posição, papel, renovação, transferência, reforços, competição e desenvolvimento.
+
+Cada promessa carrega **prazo, contexto e estado**. Ponto central do modelo: uma promessa que se tornou impossível por **evento externo** (uma lesão de outro atleta, uma janela frustrada, uma mudança de calendário) pode ser **renegociada** e **não é tratada automaticamente como quebra deliberada** — a intenção e o contexto importam, não apenas o resultado.
+
+### Liderança formal e informal
+
+O clube pode definir uma estrutura de liderança:
+
+- capitão
+- vice-capitão
+- conselho de jogadores
+- líderes informais
+- mentores
+
+A liderança depende de personalidade, tempo de casa, reputação, relação e comportamento — **não apenas de atributo técnico**. Ela dialoga com o traço "líder natural" (seção 2) e com o treino de liderança e mentoria (seção 6).
+
+### Grupos e relações
+
+Jogadores podem formar grupos por: idioma, nacionalidade, idade, formação, tempo de clube, amizade e função.
+
+Grupos podem **ajudar a integração ou gerar divisão**. O sistema **não trata toda afinidade como problema**: um grupo por idioma pode acolher um estrangeiro recém-chegado tanto quanto isolar-se do resto do elenco.
+
+### Conflitos
+
+Conflitos podem surgir por: disputa de posição, promessa quebrada, declaração pública, diferença salarial percebida, liderança, transferência, conduta e falta de minutos.
+
+Diante de um conflito, o usuário pode **conversar, mediar, alterar papéis ou aceitar as consequências**.
+
+### Jogadores insatisfeitos
+
+A insatisfação pode produzir: queda de moral, pedido de conversa, pedido de saída, menor disposição para renovar, influência sobre o grupo e reação pública.
+
+Regra: a insatisfação **não causa perda técnica instantânea obrigatória**, mas afeta comportamento e ambiente ao longo do tempo.
+
+### Integração de novos jogadores
+
+Um recém-chegado precisa se adaptar a: clube, cidade, idioma, tática, grupo, treino e expectativa. Pré-temporada, líderes, compatriotas e funcionários podem acelerar essa adaptação.
+
+### Jovens no elenco principal
+
+A promoção de um jovem ao elenco principal deve considerar: nível atual, potencial, minutos disponíveis, ambiente, treino, proteção física, papel e pressão.
+
+Regra dupla: **promover não garante desenvolvimento**, e **manter um jovem sem jogar pode prejudicar sua trajetória** (ver seção 9 — temporada no banco tende à estagnação).
+
+> A moral coletiva do elenco emerge das morais individuais e do ambiente. A formalização de um índice de vestiário e do sistema de relações entre jogadores segue em aberto (ver seção 18).
+
+---
+
+## 16. Medicina, saúde e recuperação
+
+A saúde do jogador é um subsistema próprio: existe um **estado médico real**, gerido pela comissão médica, que interage com carga, fadiga e decisões de uso ao longo da carreira.
+
+### Estado médico
+
+Cada jogador pode possuir: condição geral, fadiga, dor, lesão, restrição, tratamento, reabilitação e processo de retorno.
+
+### Risco de lesão
+
+O risco de lesão depende de: carga, fadiga, histórico, perfil físico, idade, condição do gramado, contato, clima, qualidade preventiva e decisões de uso.
+
+Regra: uma lesão **não é um evento totalmente independente das decisões anteriores**. Sobrecarga e uso de jogador fatigado elevam a probabilidade — o que conecta a medicina ao treino de prevenção (seção 6).
+
+### Diagnóstico
+
+A equipe médica trabalha com: suspeita inicial, exames, diagnóstico, gravidade, faixa de recuperação e risco de retorno. A estimativa **pode mudar com novas informações**.
+
+### Confidencialidade médica
+
+O conhecimento sobre o estado do jogador se distribui em **quatro camadas distintas**, que não coincidem — o mesmo princípio de informação assimétrica da seção 3:
+
+| Camada | O que enxerga |
+|---|---|
+| Diagnóstico real | a verdade clínica do estado do jogador |
+| Comissão técnica | o que a equipe médica reporta internamente |
+| Comunicação pública | o que é oficialmente divulgado |
+| Outros clubes | o que o mercado consegue inferir |
+
+### Tratamento
+
+Cada tratamento possui: objetivo, duração, custo, responsável, risco, alternativas e impacto na carreira.
+
+### Reabilitação progressiva (7 estágios)
+
+A reabilitação é progressiva e ordenada, do controle da dor até a volta à competição:
+
+1. Controle da dor
+2. Recuperação de movimento
+3. Fortalecimento
+4. Treino individual
+5. Treino parcial
+6. Treino completo
+7. Liberação competitiva
+
+### Retorno ao jogo ≠ liberação médica
+
+A liberação médica **não garante ritmo nem confiança**. O retorno considera: risco, condição, carga, minutos previstos, importância da partida, recomendação médica e decisão esportiva.
+
+O usuário pode **assumir risco dentro de seus limites**, mas a **consequência é real** — forçar um retorno precoce pode gerar recaída (ver seção 9, cadeia de eventos e reversão).
+
+### Dor e fadiga sem lesão
+
+Um jogador pode estar disponível e ainda assim apresentar: dor leve, fadiga acumulada, risco aumentado e necessidade de limite de minutos — mesmo sem uma lesão diagnosticada.
+
+### Responsabilidade médica em empréstimo
+
+Lesões durante um empréstimo exigem definir: **quem trata**, **quem paga**, **onde ocorre a reabilitação**, **como o clube de origem recebe informações** e **o que acontece no retorno**. Esse ponto se articula com o tratamento de empréstimo como ferramenta estratégica (ver seção 18).
+
+### Continuidade sazonal
+
+Lesões e tratamentos **não desaparecem na virada de temporada**. Um jogador lesionado continua o mesmo processo normalmente na temporada seguinte.
+
+---
+
+## 17. Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores
+
+O jogador é uma **pessoa persistente** dentro do mundo, com início, meio e fim de carreira. Esta seção fecha o ciclo de vida: a passagem de atleta a funcionário, o encerramento da carreira e as regras específicas para menores.
+
+### Pessoa e carreira: o jogador vira funcionário
+
+O jogador é uma pessoa persistente. Após encerrar a carreira, ele pode futuramente **tornar-se funcionário** (técnico, olheiro, dirigente, etc.), **mantendo a mesma identidade e história**. Ele não é descartado nem substituído por um novo registro: carrega a sua memória de jogador (seção 13) para o novo papel.
+
+### Aposentadoria contextual
+
+A aposentadoria **não é definida apenas por idade**. Ela é **contextual** e considera: idade, condição física, lesões, motivação, contrato, papel, família, propostas e objetivos pessoais.
+
+Jogadores da mesma idade podem decidir de forma diferente. A aposentadoria pode estar em um destes estados:
+
+- considerada
+- anunciada
+- adiada
+- confirmada
+- imposta por decisão médica excepcional
+
+### Aposentadoria médica
+
+Uma lesão grave **não encerra automaticamente** a carreira. A aposentadoria médica exige **avaliação, diagnóstico, risco e confirmação** (articula-se com o subsistema de medicina, seção 16).
+
+### Proteção de menores
+
+O jogo trata menores com regras próprias:
+
+- regras de movimentação
+- responsabilidade institucional
+- alojamento adequado quando necessário
+- educação abstrata
+- privacidade
+- limites de carga
+
+Essas proteções dialogam com a promoção de jovens ao elenco principal (seção 15) e com a proteção física no desenvolvimento.
+
+### Geração ≠ promoção
+
+Geração e promoção são **processos diferentes**. Surgir no mundo (geração) não é o mesmo que ser promovido ao elenco principal — um jogador pode existir na base por anos antes de chegar ao profissional.
+
+Um jovem não promovido pode: permanecer na base, ser emprestado, mudar de clube, ser liberado, ou encerrar a busca por uma carreira profissional.
+
+> **Pendência:** a transição de jogador para funcionário (técnico, olheiro, dirigente) e o schema de papéis de staff pertencem ao Sistema de Clube/Funcionários; aqui registramos apenas a regra de persistência de identidade. Verificar limite de escopo com o documento de clube quando existir.
+
+---
+
+## 18. Backlog de gaps de design
 
 Os vazios de design abaixo foram enumerados na fonte e permanecem em aberto. Cada um precisa de resolução própria antes de virar regra fechada.
 

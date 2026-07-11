@@ -1,6 +1,6 @@
 # Temporada e Competições
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/campeonatos-fim-de-temporadas.md · **Revisão:** 2026-07-10
+> **Status:** Rascunho consolidado · **Fontes:** chats/campeonatos-fim-de-temporadas.md, chats/escopo-definitivo-simulador.md, chats/documento-definitivo-escopo.md · **Revisão:** 2026-07-11
 
 A temporada é o **relógio principal** do core do **Grinta**. Ela organiza calendário, evolução dos jogadores, finanças, reputação, mercado, torcida e diretoria, e — ao virar — **recalcula o mundo do jogo**. Não serve apenas para "passar o ano": é um ciclo de causa e consequência em que o mundo reage ao que aconteceu.
 
@@ -23,6 +23,8 @@ Este documento define a temporada e suas fases, os campeonatos como entidades in
 11. [Nova temporada: objetivos e narrativa](#11-nova-temporada-objetivos-e-narrativa)
 12. [Exemplos práticos](#12-exemplos-praticos)
 13. [Equilíbrio competitivo para clubes novos](#13-equilibrio-competitivo-para-clubes-novos)
+14. [Homologação e transição entre temporadas](#14-homologacao-e-transicao-entre-temporadas)
+15. [Licenciamento e inscrição de jogadores](#15-licenciamento-e-inscricao-de-jogadores)
 
 ---
 
@@ -667,6 +669,127 @@ Além das ligas por nível, existe **copa aberta a todos os clubes** — mas com
 - **chance de exposição** para o clube pequeno.
 
 O clube menor provavelmente não vence sempre, mas pode surpreender — e ganhar reputação, torcida e receita ao avançar. Isso especializa o formato de copa nacional eliminatória já descrito na [seção 2](#2-campeonatos-como-entidades-independentes) para o cenário de portes desiguais.
+
+---
+
+## 14. Homologação e transição entre temporadas
+
+O motor de virada (seção 6) descreve **o que** o mundo recalcula ao virar. Esta seção detalha as **nuances de encerramento**: uma competição pode acabar antes da temporada administrativa, e a temporada só fecha quando todos os processos obrigatórios estão prontos. Enquanto isso, o registro histórico distingue o que já é oficial do que ainda é provisório.
+
+### 14.1 Homologação de competições
+
+Uma competição só é **homologada** quando um conjunto de condições está satisfeito:
+
+- partidas obrigatórias concluídas;
+- resultados pendentes resolvidos;
+- recursos relevantes tratados;
+- punições aplicadas;
+- critérios de desempate calculados;
+- classificação consistente.
+
+A posição esportiva final (inclusive **acessos e rebaixamentos**) pode ainda depender de **licença, recursos e decisões administrativas** antes da confirmação — ver [seção 15](#15-licenciamento-e-inscricao-de-jogadores) e o encerramento esportivo da [seção 6](#6-fim-de-temporada-o-motor-de-virada-checklist-de-20-passos). A temporada só é concluída depois de todas as competições relevantes estarem homologadas.
+
+### 14.2 Título provisório vs. oficial
+
+O jogo pode **celebrar um campeão em campo** (título provisório), mas o **registro histórico oficial aguarda a homologação**. Enquanto a competição não é homologada, uma **correção** pode alterar tabela, prêmio e classificação livremente.
+
+Depois da homologação, mudar um resultado é **excepcional** e obedece a um rito:
+
+- reabrir formalmente o processo necessário;
+- criar uma **nova versão** do registro;
+- **preservar a versão anterior** (a memória do mundo não é apagada);
+- recalcular as consequências;
+- comunicar os afetados.
+
+Essa separação entre **fato provisório** e **fato oficial** é o que permite exibir o troféu no gramado sem comprometer a integridade do histórico permanente (seção 8).
+
+### 14.3 Prêmios individuais da temporada
+
+Além dos prêmios de campeonato já catalogados na [seção 7](#7-sistema-de-premiacoes), o fechamento da temporada consolida distinções em nível de temporada. O conjunto de referência inclui: **campeão e vice, artilheiro, líder de assistências, melhor jogador, melhor goleiro, melhor jovem, melhor técnico, seleção da temporada e fair play**.
+
+- Prêmios **objetivos** (artilheiro, líder de assistências) seguem contagem direta.
+- Prêmios **subjetivos** (melhor jogador, melhor jovem, seleção da temporada) têm critérios próprios de eleição.
+- O **fair play** e a **seleção da temporada** são distinções de temporada que complementam — sem substituir — os prêmios por campeonato da seção 7.
+
+> **Pendência:** critérios objetivos de eleição de cada prêmio (especialmente melhor jovem, seleção da temporada e fair play) e a magnitude do efeito em reputação/mercado não foram definidos na fonte. Ver também a pendência da [seção 7](#7-sistema-de-premiacoes).
+
+### 14.4 Premiações financeiras
+
+A premiação de uma competição **não** é sempre um pagamento único e imediato. O fechamento pode gerar:
+
+- **recebimentos imediatos**;
+- **parcelas** (valores distribuídos ao longo do tempo);
+- **valores retidos** (liberados sob condição);
+- **compensações de dívida** (abatidos de pendências do clube);
+- **bônus contratuais** disparados pela campanha.
+
+Isso conecta o resultado esportivo ao orçamento da temporada seguinte, que considera divisão, competições, receita prevista, contratos, folha, dívidas, obras, reservas e cenários de acesso ou rebaixamento.
+
+### 14.5 Transição contratual escalonada
+
+A virada de temporada processa **expirações, renovações, opções, gatilhos, aumentos, reduções, retornos de empréstimo e transferências futuras**. Ponto central: **a virada da temporada não encerra todos os contratos na mesma data**. Cada vínculo vira no seu próprio marco (data de expiração, gatilho por desempenho, janela de opção), de modo que a transição contratual é um processo escalonado, não um evento único. Ver o passo *Atualizar contratos* na [seção 6](#6-fim-de-temporada-o-motor-de-virada-checklist-de-20-passos).
+
+### 14.6 Ausência do usuário durante a transição
+
+Se o usuário está ausente durante a transição, a **inteligência do clube** pode processar efeitos automáticos, mas com **limites de autoridade**: não deve assumir grandes dívidas, vender jogadores-chave nem alterar a identidade do clube sem autoridade. A transição roda de forma segura na ausência, preservando as decisões estruturais para quando o usuário retornar.
+
+> **Nota de ligação:** o comportamento do clube offline em partidas (escalação automática, plano offline) é tratado em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md). Aqui trata-se apenas do processamento automático **na virada de temporada**.
+
+---
+
+## 15. Licenciamento e inscrição de jogadores
+
+Duas travas administrativas condicionam a participação competitiva: o **licenciamento** (o clube está apto a disputar a competição?) e a **inscrição** (este jogador está apto a atuar por este clube nesta competição?). Ambas rodam **entre temporadas** e nas **janelas** definidas pelo calendário (seção 4), e alimentam a validação de escalação antes de cada partida.
+
+### 15.1 Licenciamento competitivo
+
+Divisões e competições podem exigir **padrões mínimos** do clube para conceder a licença de participação:
+
+- **estádio** (o licenciamento de estádio em si está detalhado em [`./08-estadio-regiao-e-clima.md`](./08-estadio-regiao-e-clima.md));
+- **segurança**;
+- **situação financeira**;
+- **elenco**;
+- **estrutura médica**;
+- **base**;
+- **ausência de atrasos graves**;
+- **conformidade administrativa**.
+
+O descumprimento normalmente gera, em ordem de severidade:
+
+| Consequência | Quando se aplica |
+| --- | --- |
+| **Plano de adequação** | Descumprimento tratável dentro de um prazo |
+| **Restrições** | Limitações competitivas ou de mercado enquanto pendente |
+| **Multas** | Sanção financeira pelo descumprimento |
+| **Impedimento de acesso / rebaixamento administrativo** | Medidas **extremas**, reservadas a casos graves |
+
+Por isso a confirmação de **acesso e rebaixamento** (seção 14.1) pode depender da licença, e não só da posição na tabela: um clube pode conquistar a vaga no campo e ainda assim não ser confirmado se não atender aos padrões mínimos da divisão de destino.
+
+### 15.2 Inscrição e elegibilidade por competição
+
+Cada competição possui **regras próprias de inscrição**, expressas nos campos `squadRegistrationLimit`, `foreignPlayerLimit` e `ageLimit` de `ChampionshipRules` (seção 2). O regulamento define:
+
+- **lista principal** de inscritos (com tratamento próprio para goleiros e categorias);
+- **limites regionais ou de estrangeiros**;
+- **jovens formados no clube** — podem ter regras especiais, desde que o regulamento estabeleça **idade, quantidade e elegibilidade**;
+- **períodos de alteração** da lista (fora deles, a lista fica congelada).
+
+Princípio central: **contratar um jogador não garante que ele esteja imediatamente apto a atuar.** Uma contratação concluída fora do prazo pode deixar o jogador **sem inscrição até a próxima janela**. Um jogador não pode pertencer a dois clubes nem participar de dois estados oficiais conflitantes.
+
+A elegibilidade é validada e **congelada** na preparação pré-jogo. O sistema **impede** de entrar em campo:
+
+- jogador suspenso;
+- atleta não inscrito;
+- contrato inativo;
+- jogador já transferido;
+- limite de estrangeiros ultrapassado;
+- jogador inelegível pela categoria;
+- número insuficiente de atletas;
+- ausência de goleiro quando houver alternativa válida.
+
+Se houver problema, o sistema tenta escalação automática e alternativas **antes** de declarar W.O. — o clube precisa manter um **elenco mínimo** apto e inscrito.
+
+> **Pendência:** os **números de estrangeiros** e demais limites por competição (`foreignPlayerLimit`, `squadRegistrationLimit`, `ageLimit`, cota de jovens formados) são **pendência de balanceamento** — a definir em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). O escopo estabelece a existência das regras, não os valores.
 
 ---
 
