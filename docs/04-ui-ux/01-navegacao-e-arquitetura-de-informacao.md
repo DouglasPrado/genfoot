@@ -286,4 +286,4 @@ Telas do admin (Next.js), IDs `A-*`. Detalhe em [doc 21](21-admin-telas.md).
 | `A-PRIVACY` | Privacidade e compliance (data-subject) | `/privacy` |
 | `A-BUGS` | Report de bug e vulnerabilidades | `/bugs` |
 
-> **Pendência herdada:** o layout fino, os limiares de alerta e a matriz papel↔ação do admin seguem as pendências de [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md). Esta área especifica a UI; os valores finais vivem lá.
+> **Endereçado (Série R — R-86/R-87):** o layout fino, limiares de alerta e a matriz papel↔ação do admin foram especificados como recomendações a ratificar em [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md).

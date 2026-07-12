@@ -27,9 +27,9 @@ Telas de competições (tabela, chaveamento, regulamento, artilharia), calendár
   - **Regulamento** (`ChampionshipRules`: promoção/rebaixamento, vagas continentais, limite de inscrição, limite de estrangeiros, idade, prêmios).
   - **Artilharia/Estatísticas/Prêmios** (top scorer, best player, garçom, revelação, etc.).
   - **Qualificação** (regras de vaga entre competições).
-- **Ações:** abrir clube/jogo/jogador; seguir competição.
+- **Ações:** abrir clube/jogo/jogador; **ligações para `M-CLUB-VIEW`** dos adversários da competição; seguir competição.
 - **Estados:** dados provisórios antes da homologação; *loading* por aba.
-- **Tempo real/notificações:** `worldSequence` atualiza tabela (evento "mudança de tabela").
+- **Tempo real/notificações:** `worldSequence` atualiza tabela (evento "mudança de tabela"); **sorteio/chaveamento ao vivo** (evento).
 - **Referências:** [`06-temporada §2, §3, §7`](../01-game-design/06-temporada-e-competicoes.md).
 
 ## `M-CALENDAR` — Calendário / agenda da temporada

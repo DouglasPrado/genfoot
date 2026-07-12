@@ -211,7 +211,7 @@ O handshake do WebSocket **não** reutiliza credenciais longas. A conexão é ab
 - **Vínculo à sessão HTTP autenticada.** A sessão do socket é vinculada à sessão HTTP autenticada; se essa sessão for revogada ou expirar, o socket perde autorização.
 - **Reconexão revalida.** Toda reconexão exige **nova validação** da credencial, além da recuperação de sequência (ver [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)).
 
-> **Pendência:** o formato exato da credencial efêmera (tipo de token, tempo de vida, endpoint de emissão/renovação), o protocolo de reautorização por assinatura e o comportamento em revogação/expiração de sessão ainda **não** estão fixados; serão detalhados junto ao modelo de sessão em [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) §3.
+> **Recomendação (a ratificar — R-95):** credencial efêmera de sessão — proposta: access token JWT curto (~15 min) + refresh token rotativo (endpoint `/auth/refresh`), reautorização do WebSocket por assinatura do token, revogação por lista de sessões no servidor (logout/expiração fecham o socket).
 
 ### Usos do WebSocket
 

@@ -436,7 +436,7 @@ score =
 - disruptionRisk    * 10
 ```
 
-> **Pendência:** os pesos acima são exemplos do chat; os valores canônicos de cada modificador precisam ser definidos e balanceados junto ao motor de partida e à economia.
+> **Nota (Série R — R-22):** os pesos de cada modificador do Decision Engine foram propostos como recomendação a ratificar junto ao [catálogo de fórmulas](../02-tecnico/05-catalogo-de-regras-e-formulas.md); calibração final no lote de simulação.
 
 ### 4.5. Log de decisão (auditabilidade)
 

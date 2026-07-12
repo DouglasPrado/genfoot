@@ -60,7 +60,7 @@ O estádio no **Grinta** é tratado como um ativo com vida própria — esportiv
 
 O estádio não é só uma capacidade agregada: ele é dividido em **setores** (def-simulador §7.4), cada um com **capacidade, preço de ingresso e ocupação próprios**. Isso permite políticas de preço por setor (arquibancada, cadeiras, camarotes, visitante) e influencia bilheteria, hospitalidade e atmosfera de forma diferenciada. O estádio ainda considera, além dos setores: **capacidade autorizada** (a licenciada pode ser menor que a física — ver §6), condição do gramado, segurança, acessos, hospitalidade, iluminação, vestiários, comunicação e operação em dias de partida.
 
-> **Pendência:** os setores-padrão, suas capacidades relativas e a mecânica de preço por setor não foram detalhados numericamente na fonte.
+> **Recomendação (a ratificar — R-89):** setores-padrão do estádio, capacidades relativas e preço por setor — proposta de 1ª passada (ex.: Arquibancada/Cadeira/Camarote/Visitante com multiplicadores de preço 1.0/1.8/4.0/0.9), a calibrar.
 
 ### Ocupação depende de demanda, preço e contexto
 
@@ -364,6 +364,6 @@ A viagem longa é um fator estratégico e um calendário ruim amplifica seus efe
 
 ## 14. Pendências
 
-> **Pendência:** Valores numéricos concretos (faixas de capacidade por divisão, percentuais de deterioração, custos de manutenção, magnitude do bônus de mando, elasticidade de preço x ocupação, custo e fadiga por faixa de distância de viagem, probabilidades climáticas por região e magnitude de cada efeito de clima) não foram definidos nas decisões de origem e precisam ser especificados no balanceamento.
+> **Recomendação (a ratificar — R-90):** valores concretos de estádio/região (capacidade por divisão, deterioração, custo de manutenção, bônus de mando, elasticidade preço×ocupação, custo/fadiga por distância) como calibração inicial; ajuste fino no lote de simulação.
 
-> **Pendência:** As Decisões 1867–1873 (região e custo de vida, adaptação de jogador, mudança de cidade, clube novo, balanceamento de região, viagem e divisões, regionalização do calendário) têm sobreposição com temas de economia, jogador e calendário de outros documentos. Confirmar com o time onde cada regra deve residir de forma canônica para evitar duplicidade.
+> **Nota (reconciliação):** as Decisões 1867–1873 (região, custo de vida, adaptação, mudança de cidade, clube novo, balanceamento regional, regionalização do calendário) são compartilhadas com economia e jogadores; os números vivem nas recomendações de economia (R-41..R-49) e no catálogo técnico, sem duplicação aqui.

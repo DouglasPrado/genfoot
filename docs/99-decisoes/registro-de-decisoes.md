@@ -18,7 +18,7 @@ As três primeiras decisões da árvore, que definem a natureza do jogo. Foram t
 
 > **Nota sobre a numeração:** os IDs saltam de 3 para 1801. As decisões intermediárias (~4–1800) foram tomadas ao longo dos chats temáticos (motor de partida, economia, jogadores, IA, campeonatos, staff, etc.) **sem numeração explícita** — o conteúdo delas está distribuído pelos documentos de game design e técnicos correspondentes, não neste registro numérico.
 
-> **Pendência:** a Decisão 3 está com recomendação C, mas sem fechamento explícito na fonte. Ver [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md) §2.9.
+> **Resolvido (Série R — R-55):** Decisão 3 fechada como **C** (liga nova / em andamento / temática), com regras mínimas das ligas temáticas. Detalhe em [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md) §2.9.
 
 ---
 
@@ -74,7 +74,7 @@ Detalhado em [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-desi
 |----|------------------------|-----------|
 | **1961** | Filosofia do onboarding: inserir o usuário no mundo sem quebrar o equilíbrio (criar/assumir clube, mostrar riscos, caixa fixo, entrada em temporada avançada, objetivos justos, pré-temporada, evitar exploração de clubes fortes e preservar a história do mundo) | [Anti-abuso e onboarding](../01-game-design/09-anti-abuso-e-onboarding.md) |
 
-> **Pendência:** O bloco de Onboarding e entrada tardia foi apenas iniciado (Decisão 1961). As decisões subsequentes ainda não foram registradas nos chats de origem e precisam ser fechadas.
+> **Endereçado (Série R — R-50..R-57):** o bloco de Onboarding e entrada tardia foi consolidado como recomendações a ratificar (critérios de clube disponível, entrada em temporada em andamento, anti-captura, Programa de Clube Novo, arquivamento de mundo, elenco/caixa inicial). Ratificação pendente.
 
 ---
 
@@ -88,6 +88,8 @@ Detalhado em [`../02-tecnico/01-arquitetura-de-dados.md`](../02-tecnico/01-arqui
 | 19.8 | Foreign keys e relações entre domínios: relações oficiais no mesmo banco usam FKs fortes, com escopo composto por `world_id`, `ON DELETE RESTRICT` por padrão, e referências lógicas apenas quando projeções, histórico ou separação física justificarem | [Arquitetura de dados](../02-tecnico/01-arquitetura-de-dados.md) |
 | 19.9 | Índices, paginação e particionamento: índices orientados por access patterns, paginação por cursor e particionamento somente quando volume, retenção ou manutenção comprovarem a necessidade | [Arquitetura de dados](../02-tecnico/01-arquitetura-de-dados.md) |
 | 19.10 | Transações, concorrência e locks: estratégia híbrida — `READ COMMITTED` como padrão, optimistic concurrency nos agregados, row/advisory locks em seções críticas, `SERIALIZABLE` seletivo, `SKIP LOCKED` para claims e Process Managers para operações longas | [Arquitetura de dados](../02-tecnico/01-arquitetura-de-dados.md) |
+
+> **Nota sobre a numeração (19.1–19.6):** a série de arquitetura foi consolidada nas fontes já a partir de **19.7** (as decisões 19.1–19.6 correspondem à discussão introdutória de arquitetura — stack, topologia monólito-modular, bounded contexts, event sourcing híbrido, determinismo por seed — que foi absorvida diretamente em [`../02-tecnico/00-arquitetura-geral.md`](../02-tecnico/00-arquitetura-geral.md) sem numeração ADR própria). A stack em aberto dessa faixa foi fechada na Série R (**R-77..R-82**). Não há decisão 19.1–19.6 perdida: o conteúdo está no doc de arquitetura geral.
 
 ---
 
@@ -129,15 +131,15 @@ Panorama dos blocos de design conforme registrado no chat de escopo.
 | Monetização sem pay-to-win | Cosméticos, slots, relatórios premium, passe cosmético, conveniência permitida e limites rígidos |
 | Recordes, histórico e memória do mundo | Record book, linha do tempo, histórico de clubes/jogadores, ídolos, rankings e rivalidades históricas |
 
-> **Pendência:** Onboarding e entrada tardia — bloco iniciado na Decisão 1961 (filosofia), mas ainda não fechado.
+> **Endereçado (Série R — R-50..R-57):** onboarding e entrada tardia especificados como recomendações a ratificar.
 >
-> **Pendência:** Relatórios e explicabilidade — bloco ainda não iniciado.
+> **Endereçado (Série R — R-75/R-76):** relatórios (não-pagos, detalhe por comissão) e explicabilidade especificados; detalhe em [`../01-game-design/13-relatorios-notificacoes-e-memoria.md`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).
 >
-> **Pendência:** Admin e operação do mundo — bloco ainda não iniciado.
+> **Endereçado (Série R — R-86/R-87):** admin e operação do mundo especificados (painel de saúde, governança de correções, 6 níveis de papéis); detalhe em [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../04-ui-ux/21-admin-telas.md`](../04-ui-ux/21-admin-telas.md).
 >
-> **Pendência:** Monetização sem pay-to-win — bloco ainda não iniciado.
+> **Endereçado (Série R — R-75):** monetização sem pay-to-win consolidada (relatórios não-pagos; catálogo cosmético); detalhe em [`../01-game-design/14-monetizacao.md`](../01-game-design/14-monetizacao.md).
 >
-> **Pendência:** Recordes, histórico e memória do mundo — bloco ainda não iniciado.
+> **Endereçado (Série R — R-76):** recordes, histórico e memória do mundo especificados (record book/timelines permanentes); detalhe em [`../01-game-design/13-relatorios-notificacoes-e-memoria.md`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).
 
 > **Nota:** O detalhamento operacional de cada pendência acima — espelhando a Seção 25 do documento definitivo de escopo e a Seção 27 do escopo definitivo do simulador — está consolidado na [seção 4](#4-decisões-pendentes-ambiguidades-e-pontos-a-fechar). Os recursos deliberadamente adiados estão na [seção 5](#5-fora-de-escopo-inicial).
 
@@ -161,7 +163,7 @@ Esta seção consolida os temas que ainda **não receberam decisão operacional 
 | **4.1.8 Catálogo inicial de competições e geografia** (25.8) | Estrutura de liga, divisões, copa, regionais, base e expansão | quantidade inicial de divisões por mundo; número/formato dos regionais; mapa de regiões e distâncias; calendário internacional inicial; regras definitivas de estrangeiros; critérios de entrada em competições continentais |
 | **4.1.9 Recursos aprovados para expansão futura** (25.9) | Previstos, não detalhados no núcleo | competições continentais/internacionais; seleções de base; gestão de seleções por usuários; gramado sintético/híbrido; naming rights; mudança de cidade; camisa aposentada; parcerias oficiais entre clubes; relações individuais profundas entre jogadores; protocolo especial de concussão; eventos e exploração comercial detalhada do estádio |
 
-> **Pendência:** todos os itens de 4.1.1 a 4.1.9 seguem abertos na fonte (def-escopo §25). São parâmetros e regras operacionais a fechar — nenhum altera os princípios já aprovados.
+> **Endereçado (Série R):** os parâmetros operacionais de 4.1.1–4.1.9 foram convertidos em recomendações a ratificar (economia R-41..R-49, onboarding R-50..R-57, temporada R-58..R-63, torcida R-68..R-74, plataforma R-77..R-88). A **calibração final** sai do lote de simulação (R-34/R-88). Nenhum altera os princípios já aprovados.
 
 > **Nota (25.7):** os valores numéricos de balanceamento **não** representam novas decisões de escopo; são parâmetros de calibração que não podem alterar os princípios aprovados.
 
@@ -192,7 +194,7 @@ A fonte marca explicitamente os seguintes pontos como **já resolvidos** — reg
 | **4.2.8 Ritmo numérico final do mundo** (27.8) | Tempo oficial, persistência e prazos definidos; valores exatos de duração de dia, semana, temporada, partidas e janelas a calibrar em testes de equilíbrio |
 | **4.2.9 Quantidades iniciais de conteúdo** (27.9) | Modelo completo de clubes, jogadores, funcionários, competições e divisões definido; quantidades iniciais por mundo a calcular por capacidade, ritmo e testes econômicos |
 
-> **Pendência:** o nome **Grinta** é usado em toda a documentação como nome de trabalho, mas ainda **não está juridicamente confirmado** (def-simulador §27.1). O **título do papel do usuário** na interface também segue em aberto (§27.2).
+> **Ação externa pendente / Resolvido:** o nome **Grinta** segue como nome de trabalho até **verificação jurídica de marca** (ação de mundo real, não de spec — ver [`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)). O **papel do usuário** foi ratificado como **Gestor+Técnico** ([R-01](#61-r-01--papel-do-usuário)); o rótulo exato na interface é detalhe de UI a definir no design.
 
 #### 4.2.10 Contradições consolidadas (27.10)
 
@@ -339,4 +341,20 @@ Fonte: [`../02-tecnico/`](../02-tecnico/). Resolve **P0.2** (paradigma do core) 
 
 > **Reconciliação de caixa inicial:** R-43 é a fonte única do valor (**R$ 5.000.000 = `500000000` amountMinor**). R-51 e as referências textuais a "R$ 1.000.000" em `01-mundo` e `09-anti-abuso` ficam superadas — alinhamento textual pendente (ver BACKLOG P1).
 
-> Entradas R-89+ são acrescentadas conforme o loop alcança novas `[DECISÃO]`/`[TUNING]` remanescentes.
+### Pendências finais diversas (R-89..R-96) · RECOMENDADAS (a ratificar)
+
+Fonte: resolução das pendências pequenas restantes (estádio, experiência, monetização, fluxos, frontend, UI).
+
+- **R-89** setores-padrão do estádio + preço por setor (multiplicadores 1ª passada) · **R-90** valores numéricos de estádio/região (capacidade por divisão, deterioração, manutenção, mando, elasticidade preço×ocupação) · **R-91** granularidade de exibição dos indicadores (rótulo+barra por padrão; número exato só quando a comissão revela) · **R-92** catálogo de cosméticos de lançamento (puramente estético) · **R-93** conteúdo do passe de temporada cosmético · **R-94** apêndice de fluxos de exceção (follow-up de conteúdo) · **R-95** credencial efêmera de sessão (JWT ~15 min + refresh rotativo `/auth/refresh` + revogação por lista de sessões) · **R-96** árvore de diálogo do `M-CONVO` (deltas de moral/relação modulados por perfil mental 0–100 e `CoachTrust`).
+
+- **R-97** site do guia do jogador (subdomínio `docs.`, rotas `/guia/<parte>/<capitulo>`, PDF versionado).
+
+### Design system e conteúdo (R-98..R-100) · RECOMENDADAS (a ratificar)
+
+Fonte: [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md), [`../04-ui-ux/14-wireframes-telas-densas.md`](../04-ui-ux/14-wireframes-telas-densas.md), [`../03-guia-do-jogador/`](../03-guia-do-jogador/).
+
+- **R-98** valores concretos dos design tokens (cor hex light/dark com contraste AA, tipografia Inter, espaço 4-pt, raio, elevação, toque ≥44pt) — a ajustar à identidade de marca final.
+- **R-99** specs de API dos 10 componentes-chave (Button, Card, Header, TabBar, Input, Badge, Sheet, ListRow, StatTile, Toast) + wireframes das 6 telas densas (M-HOME, M-LIVE, M-SEASON-CLOSE, M-STRUCTURE, M-SQUAD, M-NEGOTIATION).
+- **R-100** construir o site do guia (template Astro navegável, §5 do guia) e encaixar os 42 capítulos já redigidos — tarefa de engenharia/build.
+
+> **Estado da Série R:** R-01 RATIFICADA; R-02..R-100 RECOMENDADAS (a ratificar). São a fila de decisões/valores que aguardam o martelo do dono do produto — nenhuma foi carimbada como canônica em silêncio. São a fila de decisões/valores que aguardam o martelo do dono do produto. Nenhuma foi carimbada como canônica em silêncio. Entradas R-97+ seriam acrescentadas se novas `[DECISÃO]`/`[TUNING]` surgirem.

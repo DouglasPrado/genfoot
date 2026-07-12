@@ -4,7 +4,7 @@
 
 O **Guia Oficial do Jogador** é a documentação voltada a quem joga **Grinta** — um manager de futebol online com jogadores únicos e mundo persistente, na tradição de simuladores como o Brasfoot, porém em um mundo que nunca reinicia. Este README define o propósito, a estrutura completa dos 42 capítulos, os padrões de conteúdo, a especificação técnica do site de documentação e o mapeamento com os documentos de game design.
 
-O conteúdo detalhado de cada capítulo ainda será redigido, puxando das decisões já fechadas nos documentos de game design em [`../01-game-design/`](../01-game-design/). Este documento é o esqueleto oficial dessa redação.
+O conteúdo dos 42 capítulos **foi redigido** (2026-07-11), puxando das decisões já fechadas nos documentos de game design em [`../01-game-design/`](../01-game-design/). Este documento é o índice/esqueleto oficial; o texto de cada Parte vive em seu próprio arquivo (ver [§7](#7-capítulos-redigidos)).
 
 ---
 
@@ -16,7 +16,7 @@ O conteúdo detalhado de cada capítulo ainda será redigido, puxando das decis�
 - [4. Blocos padronizados e camadas de conteúdo](#4-blocos-padronizados-e-camadas-de-conteúdo)
 - [5. Especificação técnica do site de documentação](#5-especificação-técnica-do-site-de-documentação)
 - [6. Mapeamento Partes do guia → docs de game design](#6-mapeamento-partes-do-guia--docs-de-game-design)
-- [7. Pendências de redação](#7-pendências-de-redação)
+- [7. Capítulos redigidos](#7-capítulos-redigidos)
 
 ---
 
@@ -295,7 +295,7 @@ game/
 
 Isso garante que o jogador tenha o guia **disponível offline, sem depender de internet nem de instalar o PWA**, abrindo direto o `guide/index.html` embarcado. Ele é distinto do pacote `.zip` (que precisa ser baixado e descompactado à parte) e do guia contextual (que exibe regras específicas dentro da interface do jogo): aqui, o manual completo já vem embutido na própria instalação.
 
-> **Pendência:** Definir domínio público oficial, esquema de rotas contextuais dentro do jogo e política de geração/nomeação do PDF por versão.
+> **Recomendação (a ratificar — R-97):** site do guia em subdomínio `docs.<domínio-oficial>` (domínio a definir na verificação de marca — ver [identidade](../00-produto/02-identidade-e-nome.md)); rotas contextuais espelhando a hierarquia de capítulos (`/guia/<parte>/<capitulo>`), com deep-link a partir do app; PDF gerado por versão de conteúdo, nomeado `grinta-guia-v<major.minor>.pdf`, regenerado a cada release do guia.
 
 ---
 
@@ -320,29 +320,21 @@ A redação de cada Parte deve puxar dos documentos de game design correspondent
 
 ---
 
-## 7. Pendências de redação
+## 7. Capítulos redigidos
 
-O conteúdo detalhado de cada capítulo e Parte ainda será escrito. Enquanto isso, cada item abaixo permanece aberto:
+O conteúdo dos **42 capítulos foi redigido** (2026-07-11), puxando das decisões fechadas nos documentos de game design (§6) e seguindo os blocos padronizados (§4: `REGRA`/`ATENÇÃO`/`EXEMPLO`/`COMO O JOGO AVALIA`) e as camadas Resumo/Regras completas/Estratégia. Nenhum capítulo expõe fórmulas internas, números exatos ou probabilidades. Cada Parte vive em seu próprio arquivo:
 
-- **Parte I — Começando a jogar**
-  > **Pendência:** Redigir Caps. 1–4 a partir do GDD overview e do doc de mundo persistente.
-- **Parte II — O mundo do jogo**
-  > **Pendência:** Redigir Caps. 5–7; o Cap. 6 (Tempo e calendário) deve transcrever, sem alterações, as regras já fechadas no bloco de calendário e temporadas.
-- **Parte III — Gestão do clube**
-  > **Pendência:** Redigir Caps. 8–11 a partir do doc de estrutura do clube e staff; detalhar economia dinâmica no Cap. 11.
-- **Parte IV — Jogadores de futebol**
-  > **Pendência:** Redigir Caps. 12–17 a partir do sistema de jogadores.
-- **Parte V — Elenco e mercado**
-  > **Pendência:** Redigir Caps. 18–21; o Cap. 21 (Jogadores livres) deve transcrever, sem alterações, as regras já fechadas no bloco de contratos.
-- **Parte VI — Tática e partidas**
-  > **Pendência:** Redigir Caps. 22–28 a partir dos docs de IA e sistema de jogadores.
-- **Parte VII — Competições e temporadas**
-  > **Pendência:** Redigir Caps. 29–31 a partir do doc de temporada e competições.
-- **Parte VIII — Relações e ambiente do clube**
-  > **Pendência:** Redigir Caps. 32–34.
-- **Parte IX — Plano de jogo**
-  > **Pendência:** Redigir Caps. 35–39.
-- **Parte X — Referência**
-  > **Pendência:** Redigir Caps. 40–42 (regras gerais, glossário e FAQ) consolidando os demais documentos.
-- **Site de documentação**
-  > **Pendência:** Construir o primeiro artefato — template visual navegável (menu, busca, página inicial, página de regra, versão mobile e impressão) — antes de encaixar os capítulos.
+| Parte | Capítulos | Arquivo |
+|---|---|---|
+| I — Começando a jogar | 1–4 | [parte-01-comecando-a-jogar.md](parte-01-comecando-a-jogar.md) |
+| II — O mundo do jogo | 5–7 | [parte-02-o-mundo-do-jogo.md](parte-02-o-mundo-do-jogo.md) |
+| III — Gestão do clube | 8–11 | [parte-03-gestao-do-clube.md](parte-03-gestao-do-clube.md) |
+| IV — Jogadores de futebol | 12–17 | [parte-04-jogadores.md](parte-04-jogadores.md) |
+| V — Elenco e mercado | 18–21 | [parte-05-elenco-e-mercado.md](parte-05-elenco-e-mercado.md) |
+| VI — Tática e partidas | 22–28 | [parte-06-tatica-e-partidas.md](parte-06-tatica-e-partidas.md) |
+| VII — Competições e temporadas | 29–31 | [parte-07-competicoes-e-temporadas.md](parte-07-competicoes-e-temporadas.md) |
+| VIII — Relações e ambiente do clube | 32–34 | [parte-08-relacoes-e-ambiente.md](parte-08-relacoes-e-ambiente.md) |
+| IX — Plano de jogo | 35–39 | [parte-09-plano-de-jogo.md](parte-09-plano-de-jogo.md) |
+| X — Referência | 40–42 | [parte-10-referencia.md](parte-10-referencia.md) |
+
+> **Recomendação (a ratificar — R-100):** construir o **site do guia** — template Astro navegável (menu, busca, página inicial, página de regra, versão mobile e impressão/PDF, §5) e encaixar estes capítulos como conteúdo. É tarefa de engenharia (build) a partir da spec do §5 e de [R-97](../99-decisoes/registro-de-decisoes.md); o conteúdo dos capítulos já está redigido acima.

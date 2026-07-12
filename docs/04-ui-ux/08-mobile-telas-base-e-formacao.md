@@ -11,10 +11,10 @@ Telas de categorias de base, captação, ficha do jovem, plano de carreira, ment
 - **Objetivo:** gerir as categorias e o funil de formação.
 - **Como se chega:** aba Elenco → Base; relatório da base.
 - **Layout:** lista de jovens por categoria + indicadores da base.
-- **Componentes e dados:** por categoria: jovens em formação (foto, idade, posição, potencial estimado, prontidão, moral, risco de saída, contrato/empréstimo); **relatório da base** ([doc 13, §5.3](../01-game-design/13-relatorios-notificacoes-e-memoria.md)): capacidade, desenvolvimento, planos, prontidão, risco de saída, contratos, empréstimos, **reputação formadora**. Indicadores do **departamento de base/CT** (nível → quantidade/qualidade/chance de joias).
+- **Componentes e dados:** por categoria: jovens em formação (foto, idade, posição, potencial estimado, prontidão, moral, risco de saída, contrato/empréstimo); **relatório da base** ([doc 13, §5.3](../01-game-design/13-relatorios-notificacoes-e-memoria.md)): capacidade, desenvolvimento, planos, prontidão, risco de saída, contratos, empréstimos, **reputação formadora específica** por posição/perfil ("forma laterais", "revela goleiros", "recupera promessas") em vez de genérica [`02 §11`]. Indicadores do **departamento de base/CT** (nível → quantidade/qualidade/chance de joias).
 - **Ações:** abrir jovem (`M-YOUTH-PLAYER`); captar (`M-YOUTH-INTAKE`); definir mentoria (`M-MENTORING`); promover (`M-PROMOTE`).
 - **Estados:** vazio (base fraca/nível baixo); jovem em risco de saída realçado.
-- **Referências:** [`02-jogadores §15, §17`](../01-game-design/02-sistema-de-jogadores.md); [`04-estrutura §3.7`](../01-game-design/04-estrutura-do-clube-e-staff.md).
+- **Referências:** [`02-jogadores §11, §15, §17`](../01-game-design/02-sistema-de-jogadores.md); [`04-estrutura §3.7`](../01-game-design/04-estrutura-do-clube-e-staff.md).
 
 ## `M-YOUTH-INTAKE` — Captação / peneira
 
@@ -28,7 +28,7 @@ Telas de categorias de base, captação, ficha do jovem, plano de carreira, ment
 ## `M-YOUTH-PLAYER` — Ficha do jovem
 
 - **Objetivo:** acompanhar e desenvolver o jovem (reusa a ficha de jogador com foco em formação).
-- **Componentes e dados:** dados pessoais, atributos e **potencial em camadas** (com incerteza), traços (com visibilidade), inclinações naturais (aprende técnica/físico/tática rápido/devagar; responde a pressão/crítica; corpo frágil/explosão), estados, contrato de formação, plano de carreira, mentor vinculado, prontidão para o profissional.
+- **Componentes e dados:** dados pessoais, atributos e **potencial em camadas** (com incerteza), traços (com visibilidade), inclinações naturais (aprende técnica/físico/tática rápido/devagar; responde a pressão/crítica; corpo frágil/explosão), estados, contrato de formação, plano de carreira, mentor vinculado, prontidão para o profissional; bloco **"Proteção do menor"** (alojamento, educação, limites de carga, movimentação) além da confidencialidade [`02 §17`].
 - **Ações:** definir plano (`M-CAREER-PLAN`); vincular mentor (`M-MENTORING`); treinar com profissional; emprestar/promover/vender/liberar.
 - **Estados:** proteção de menores (confidencialidade); estimativas com confiança.
 - **Referências:** [`02-jogadores §4, §14, §15, §17`](../01-game-design/02-sistema-de-jogadores.md).

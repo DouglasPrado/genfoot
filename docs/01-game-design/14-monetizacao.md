@@ -67,8 +67,8 @@ Essa fronteira é o que mantém o passe de temporada e todos os itens de coleç�
 
 ## 5. Pendências em aberto
 
-> **Pendência:** definir o **catálogo final de cosméticos** — a lista exata de identidades visuais, uniformes, temas e itens comemorativos que entram no lançamento.
+> **Recomendação (a ratificar — R-92):** catálogo final de cosméticos de lançamento (identidades visuais, uniformes, temas, itens comemorativos) — escopo puramente estético, a fechar junto ao roadmap de produto.
 
-> **Pendência:** definir o **conteúdo do passe de temporada cosmético** — quais recompensas o compõem, garantindo que todas permaneçam puramente cosméticas.
+> **Recomendação (a ratificar — R-93):** conteúdo do passe de temporada cosmético — recompensas puramente estéticas (temas de UI, itens comemorativos, personalização de estádio sem efeito esportivo); nada altera resultado/economia/potencial.
 
-> **Pendência:** decidir se **"relatórios premium" podem existir** como conveniência paga. Ponto sensível: qualquer relatório que entregue informação de scouting, dado oculto ou análise não disponível gratuitamente cruzaria a linha de "vantagem de scouting" e "informação oculta" (Seção 3) e seria proibido. Só é admissível se apresentar exclusivamente informação já acessível, com formatação ou organização mais conveniente, sem qualquer capacidade competitiva exclusiva.
+> **Resolvido (Série R — R-75):** relatórios premium **não existem** — todos os relatórios são gratuitos e a qualidade da comissão é o único diferenciador (no-pay-to-win). Vender informação de scouting/dado oculto cruzaria a linha e fica proibido.

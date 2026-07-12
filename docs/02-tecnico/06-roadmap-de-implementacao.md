@@ -149,7 +149,7 @@ Estes blocos estendem o mundo já funcional. Não fazem parte do núcleo mínimo
 | 9 | **Entrada tardia de usuários** | Simular 10/20/30 temporadas e então dar a um novo usuário um clube pequeno com oportunidades reais de crescimento, sem criar um clube artificialmente forte. |
 | 10 | **API e interface** | Somente quando o mundo já funcionar por linha de comando: autenticação, painel do clube, elenco, calendário, classificação, finanças, mercado, infraestrutura, notificações, central da partida, comandos em tempo real. |
 
-> **Pendência:** os detalhes internos dos blocos 6 a 10 (fórmulas econômicas, regras de mercado, arquitetura da IA e escopo da API/UI) devem ser consolidados em documentos próprios conforme forem especificados.
+> **Nota:** os detalhes internos dos blocos 6–10 já estão consolidados nos documentos próprios — economia ([`../01-game-design/03-economia.md`](../01-game-design/03-economia.md)), regras/fórmulas ([`05-catalogo`](05-catalogo-de-regras-e-formulas.md)), IA ([`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md)) e API/UI ([`08-frontend`](08-frontend-cliente-e-tempo-real.md), [`10-commands`](10-catalogo-de-commands.md), [`../04-ui-ux/`](../04-ui-ux/)).
 
 ---
 

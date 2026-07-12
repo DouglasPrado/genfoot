@@ -368,7 +368,7 @@ Este documento descreve **todos os fluxos** do app do jogador (Expo), ponta a po
 2. Tela mostra o **perfil mental** do jogador e o motivo; usuário escolhe uma opção de resposta.
 3. Consequência aplicada em moral/promessas/relação; pode abrir renovação ([MF-20](#mf-20--renovação-de-contrato)) ou promessa registrada em **`M-PROMISES`**.
 
-> **Pendência (fonte):** a árvore fina de opções de resposta e seus efeitos numéricos não estão especificados no GDD — a tela prevê o padrão de diálogo; os efeitos ficam a definir.
+> **Recomendação (a ratificar — R-96):** a árvore fina de opções de resposta do `M-CONVO` e seus efeitos numéricos — proposta: cada opção mapeia deltas em moral/relação/promessa modulados pelo perfil mental do jogador (atributos 0–100) e por `CoachTrust`; efeitos calibrados junto ao sistema de jogadores (R-03/R-08).
 
 **Referências:** [`07-ia §3.4,§6`](../01-game-design/07-inteligencia-artificial.md).
 

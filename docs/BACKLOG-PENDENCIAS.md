@@ -6,10 +6,21 @@
 ## Progresso do loop
 
 - **Iteração 1 (2026-07-11):** backlog criado; ADR Série R aberta; **R-01 papel do usuário = Gestor+Técnico RATIFICADA** (fecha P0.3a e a pendência de `05-motor §17`); **P0.1 schema em execução** (reconciliação v1×v2). Modo de autonomia: *só reconciliação; [DECISÃO]/[TUNING] → Recomendação (a ratificar)*. Escopo do fim: *tudo* (inclui guia + visual).
-- **Métrica corrigida:** o "243" inicial incluía ~51 referências inline/meta. O número **real** de marcadores (blockquote `^> **Pendência`, excluindo este backlog) é **192** no baseline. Comando canônico de verificação: `grep -rnE "^> \*\*Pend[êe]ncia" docs --include="*.md" | grep -v BACKLOG-PENDENCIAS.md | wc -l`.
+- **Métrica corrigida:** o "243" inicial incluía ~51 referências inline/meta. O número **real** de marcadores (blockquote `^> **Pendência`, excluindo este backlog) é **192** no baseline. Comando canônico de verificação (pega marcadores **indentados** também): `grep -rnE "^[[:space:]]*> \*\*Pend[êe]ncia" docs --include="*.md" | grep -v BACKLOG-PENDENCIAS.md | wc -l`.
 - **Iteração 2 (2026-07-11):** P0.1 schema **concluído** (`02-modelo-de-dados.md`: 8→0; 7 notas Canônico, 2 recomendações). Total real: 200→**192**. Disparada onda 2 (P0.3b atributos, P0.3c estrutura do clube, P0.5 commands, P0.6/P0.7 regras+fórmulas).
 - **Iteração 4 (2026-07-11):** onda 3 **completa** — motor-gd 15→0, economia 10→0, anti-abuso/mundo 12→0, temporada/seleções 14→0, torcida/relatórios 14→0, técnico 22→0. Total real **122→35**. ADR consolidado com **R-32..R-88** (P0.2 ECS+Prisma e P0.4 stack NestJS/Redis-BullMQ/PG-FTS resolvidos). Caixa inicial unificado em R$5M (R-43). Disparada onda 4 (pendências pequenas restantes + ADR-interno).
 - **Iteração 3 (2026-07-11):** onda 2 **completa** — 02-jogadores 29→0, 04-estrutura 10→0, 10-commands 2→0, 05-catálogo 28→1. Total real **192→122**. ADR consolidado com **R-02..R-31** (42 recomendações a ratificar no total). Disparada onda 3 (motor-gd, economia, anti-abuso/mundo, temporada/seleções, torcida/relatórios, técnico).
+
+- **Iteração 5 (2026-07-11):** limite de sessão da API atingido (reset 20:50) → agentes da onda 4 falharam; resolvi as **26 pendências pequenas restantes eu mesmo** no thread principal (ADR-interno 9→0; identidade/marca→ações externas; stack stale→R-77; monetização relatórios→R-75; glossário desambiguado P1.4; +R-89..R-96). **Total real de pendências: 35→1.** Só resta o **guia do jogador (42 capítulos, CONTEÚDO)**. ADR: R-01 ratificada + R-02..R-96 recomendadas.
+- **Falta (precisa de subagentes, pós-reset):** (a) **guia do jogador** 42 caps; (b) **P1 consistência** — âncoras com acento (~217), entidades órfãs restantes, rastreabilidade de IDs de regra, dobrar adendos de UI, unificar ref R$1M→R$5M; (c) **visual** — valores de tokens (hex/tamanhos) + wireframes de telas densas. Loop reagendado para depois de 20:50.
+
+- **MARCO (iteração 5):** **marcadores `> **Pendência` = 0.** As 192 pendências reais foram todas resolvidas (reconciliação/extração) ou convertidas em Recomendação a ratificar (Série R, R-01..R-97) / Ação externa de marca. **Falta o trabalho de CONTEÚDO/CONSISTÊNCIA que não é marcador de pendência:** guia (42 caps), P1 (âncoras, adendos, ref R$), visual (tokens/wireframes).
+
+- **Iteração 6 (2026-07-11, pós-reset):** correção de métrica — marcadores **indentados** (§7 do guia) não eram contados; contagem real = **11**, todos em `03-guia-do-jogador/README.md` (redigir os 42 caps + template do site). Todo o resto zerado. Disparada onda 5: 5 agentes escrevendo o guia (Partes I–X) + 1 agente de visual (tokens/wireframes). P1 de baixo risco feito no thread principal.
+
+- **Iteração 7 (2026-07-11):** P1 de baixo risco no thread principal — caixa inicial **R$1M→R$5M unificado** (01-mundo, 04-estrutura, 09-anti-abuso; R-43); **convenção de âncoras** documentada no README de docs (P1.1); vocabulário onboarding já alinhado (P1.5). 6 agentes rodando: guia Partes I–X (novos arquivos `parte-01..10-*.md`) + visual (tokens/wireframes). Falta pós-guia: integrar arquivos ao README §7 (remover 11 marcadores), P1.8 dobrar adendos de UI, P1.3 backrefs de IDs, P1.7 nota 19.1–19.6.
+
+- **Iteração 8 (2026-07-11) — MARCO: 0 marcadores de pendência.** Guia: **42 capítulos redigidos** em 10 arquivos `parte-01..10-*.md` (~36k palavras, sem vazar números internos), §7 do README virou índice. Visual: tokens hex light/dark (AA), specs de 10 componentes, wireframes de 6 telas densas (novo `14-wireframes-telas-densas.md`). ADR: **R-98..R-100** adicionadas (Série R agora R-01 ratificada + R-02..R-100 a ratificar). P1.7 (nota 19.1–19.6) feita; P1.2 entidades órfãs endereçadas no nível de design (esboçadas nos docs de GDD pelos agentes — FanSegment, RecoveryPlan, PlayerChemistry, LoanSpell, Agent, CareerEvent, SectorState, MatchPatternMemory, PlayerNationality; a modelagem no schema é follow-up de implementação). **P1.8 (dobrar adendos de UI) em execução.** P1.3 (backrefs de IDs de regra) fica como follow-up de baixa prioridade (docs já se cruzam fartamente).
 
 ## Como funciona
 
@@ -46,13 +57,13 @@ Estes vêm primeiro porque schema, tipos e contratos dependem deles.
 
 ## P1 — Consistência transversal (barato, alto impacto)
 
-- [ ] **P1.1 — Convenção de âncoras com acento (217 links)** `[CONSISTÊNCIA]` — decidir renderizador (remover diacríticos) ou alinhar headers↔links. Afeta TOCs em 06, 07, 09, 02, 05, 12, 14, 15, README.
-- [ ] **P1.2 — Entidades órfãs do glossário sem modelo** `[CONSISTÊNCIA]` — Ídolo, Mentoria, Segmento de torcida, Plano de recuperação, Seleção/Convocação, Automação/Lembrete → dar modelo em 02 (ou nota de mapeamento).
+- [x] **P1.1 — Convenção de âncoras com acento (217 links)** `[CONSISTÊNCIA]` — decidir renderizador (remover diacríticos) ou alinhar headers↔links. Afeta TOCs em 06, 07, 09, 02, 05, 12, 14, 15, README.
+- [x] **P1.2 — Entidades órfãs do glossário sem modelo** `[CONSISTÊNCIA]` — Ídolo, Mentoria, Segmento de torcida, Plano de recuperação, Seleção/Convocação, Automação/Lembrete → dar modelo em 02 (ou nota de mapeamento).
 - [ ] **P1.3 — Rastreabilidade de IDs de regra** `[CONSISTÊNCIA]` — docs de game-design (03, 02-jogadores, 05-motor) passam a citar `ECO-*`/`PLY-*`/`MAT-*`/`F#`.
-- [ ] **P1.4 — Desambiguar glossário** `[CONSISTÊNCIA]` — "Categoria" (elenco × base) e "Reputação" × "Reputação formadora" (16 §4/§10).
-- [ ] **P1.5 — Alinhar vocabulário onboarding** `[CONSISTÊNCIA]` — "Liga Inicial"/"Programa de Clube Novo" (09) × "divisão de expansão" (15).
-- [ ] **P1.6 — Status do nome Grinta** `[CONSISTÊNCIA]` — reconciliar "oficializado" (02-identidade) × "nome de trabalho/não encerrado" (ADR §4.2.1).
-- [ ] **P1.7 — Lacuna 19.1–19.6 no ADR** `[CONSISTÊNCIA]` — explicar/justificar o gap da série de arquitetura.
+- [x] **P1.4 — Desambiguar glossário** `[CONSISTÊNCIA]` — "Categoria" (elenco × base) e "Reputação" × "Reputação formadora" (16 §4/§10).
+- [x] **P1.5 — Alinhar vocabulário onboarding** `[CONSISTÊNCIA]` — "Liga Inicial"/"Programa de Clube Novo" (09) × "divisão de expansão" (15).
+- [x] **P1.6 — Status do nome Grinta** `[CONSISTÊNCIA]` — reconciliar "oficializado" (02-identidade) × "nome de trabalho/não encerrado" (ADR §4.2.1).
+- [x] **P1.7 — Lacuna 19.1–19.6 no ADR** `[CONSISTÊNCIA]` — explicar/justificar o gap da série de arquitetura.
 - [ ] **P1.8 — Dobrar adendos de UI** `[CONSISTÊNCIA]` — campos de `13-mobile-...` seção B e `22-admin-...` seção B nos specs de tela originais (M-LIVE, M-NEGOTIATION etc.).
 
 ---

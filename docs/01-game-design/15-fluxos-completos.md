@@ -96,7 +96,7 @@ Estes fluxos representam a **experiência orientada por contexto** que guia o pr
 5. O usuário **cumpre período de espera** e restrições de negociação antes de novo vínculo.
 6. Um **novo vínculo** pode ser iniciado em outro clube elegível.
 
-> **Pendência:** parâmetros exatos do período de espera e das restrições de negociação pós-troca ficam a cargo do documento antiabuso; verificar consistência com as regras de W.O. e abandono.
+> **Nota (reconciliação):** os parâmetros do período de espera e restrições de negociação pós-troca são definidos em [`09-anti-abuso-e-onboarding.md`](09-anti-abuso-e-onboarding.md) (consistentes com as regras de W.O. e abandono).
 
 **Referências:** [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) (troca de clube, W.O. e abandono) · [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) (assunção imediata pela IA).
 
@@ -206,7 +206,7 @@ Estes fluxos representam a **experiência orientada por contexto** que guia o pr
 13. O **jogador é inscrito** quando o regulamento permitir.
 14. O jogador é **integrado ao elenco**; **moral, hierarquia, torcida e orçamento** são atualizados.
 
-> **Pendência:** encadeamentos com [Ciclo financeiro mensal](#13-ciclo-financeiro-mensal) (reserva vs. parcelamento) e com o motor de inscrições devem referenciar as regras específicas de janela.
+> **Nota (reconciliação):** os encadeamentos com o ciclo financeiro mensal e com o motor de inscrições seguem as regras de janela do catálogo técnico e da economia ([`../02-tecnico/10-catalogo-de-commands.md`](../02-tecnico/10-catalogo-de-commands.md), [`03-economia`](03-economia.md)).
 
 **Referências:** [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md) (scouting, atributos, contratos) · [`./03-economia.md`](./03-economia.md) (reserva de recursos, pagamentos, hierarquia salarial) · [`./06-temporada-e-competicoes.md`](./06-temporada-e-competicoes.md) (janelas e inscrições) · [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) (integridade da negociação) · [`./11-torcida-imprensa-e-narrativa.md`](./11-torcida-imprensa-e-narrativa.md) (reação da torcida).
 
@@ -358,4 +358,4 @@ Estes fluxos representam a **experiência orientada por contexto** que guia o pr
 
 ---
 
-> **Pendência geral:** este documento consolida os fluxos de caminho feliz descritos nas fontes. Ramificações de exceção (recusas, disputas, recursos competitivos, timeouts de conexão em partida ao vivo, falhas parciais de sistema) devem ser detalhadas nos documentos de sistema correspondentes e, quando maduras, referenciadas aqui como variações. A ordenação e o agrupamento das seções (A–G) são organizacionais e podem ser revistos sem alterar o conteúdo dos fluxos.
+> **Recomendação (a ratificar — R-94):** os ramos de exceção (recusas, disputas, recursos competitivos, timeouts de conexão em partida ao vivo, falhas parciais) serão detalhados num apêndice de fluxos de exceção como follow-up; caminho feliz e bordas principais já constam nos fluxos MF-* ([`../04-ui-ux/02-mobile-fluxos.md`](../04-ui-ux/02-mobile-fluxos.md)).

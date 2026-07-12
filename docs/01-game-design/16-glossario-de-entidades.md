@@ -91,7 +91,7 @@ O atleta como entidade central, com suas capacidades visíveis, sua natureza ocu
 
 **Participação no elenco** — Papel do jogador dentro do grupo: sua categoria, posição na hierarquia e função esperada. Traduz "que peça ele é" no plantel — titular, reserva, promessa, etc.
 
-> **Pendência:** a fonte usa "categoria" tanto aqui (participação no elenco) quanto no grupo Base; definir se são o mesmo eixo (nível etário/competitivo) ou dimensões distintas de classificação do jogador.
+> **Reconciliação:** "Categoria" tem **dois eixos distintos** — (a) *categoria de participação* no elenco (profissional/base/transição) e (b) *categoria de base* (sub-15/17/20). Termos canônicos: `SquadCategory` e `YouthAgeCategory`.
 
 ## 5. Base
 
@@ -195,7 +195,7 @@ Os torcedores, o clima que eles formam e a leitura pública dos acontecimentos d
 
 **Ídolo** — Status histórico de forte identificação entre um jogador e a torcida de um clube. Confere valor simbólico que ultrapassa o desempenho corrente e afeta decisões de gestão.
 
-> **Pendência:** a fonte lista "Reputação" (deste grupo) e "Reputação formadora" (grupo Base) como entidades distintas; convém confirmar se são eixos independentes ou facetas de uma mesma reputação do clube.
+> **Reconciliação:** "Reputação" (do clube) e "Reputação formadora" (grupo Base) são **eixos distintos**: a primeira é a reputação geral do clube; a segunda mede a capacidade de formar/lançar jovens. Não são a mesma entidade.
 
 ## 11. Integridade e operação
 

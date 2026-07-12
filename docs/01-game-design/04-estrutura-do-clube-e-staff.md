@@ -401,7 +401,7 @@ Como todos começam pequenos, os clubes podem crescer por caminhos diferentes co
 | **Competitivo** | Comissão técnica, Preparação física, Equipe médica, Análise de desempenho | Melhora performance imediata, reduz lesões, maximiza o elenco atual; pode sofrer no futuro se não formar jovens |
 | **Popular** | Estádio, Comunicação, Marketing, Torcida | Cresce receita, aguenta melhor as crises, atrai patrocinadores; precisa converter isso em futebol |
 
-**Exemplos de clubes iniciais** — todos começam no nível geral 1 com R$ 1.000.000 de caixa, mas com perfis distintos definidos por pequenos ajustes de pontualidade (+/- 1 nível em áreas específicas):
+**Exemplos de clubes iniciais** — todos começam no nível geral 1 com o mesmo caixa inicial (**R$ 5.000.000**, ver [R-43](../99-decisoes/registro-de-decisoes.md)), mas com perfis distintos definidos por pequenos ajustes de pontualidade (+/- 1 nível em áreas específicas):
 
 - **Clube Azul (formador inicial):** comissão técnica e base nível 2, demais áreas nível 1; +1 base, +1 comissão técnica, -1 diretoria.
 - **Clube Vermelho (popular inicial):** diretoria, comunicação e estádio nível 2, demais nível 1; +1 comunicação, +1 estádio, -1 base.

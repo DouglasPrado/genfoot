@@ -85,9 +85,9 @@ Em resumo, entre todos os candidatos Grinta foi o que reuniu sonoridade curta e 
 
 ## Pendências
 
-> **Pendência:** Verificação jurídica de marca no **INPI**, com busca nominal e por similaridade nas **classes de software, jogos e entretenimento** (e mercadologicamente próximas), antes da adoção definitiva. O INPI considera possibilidade de confusão ou associação entre produtos/serviços semelhantes, então a busca não pode se restringir à classe exata.
+> **Ação externa pendente:** verificação jurídica de marca no **INPI** (busca nominal e por similaridade nas classes de software/jogos/entretenimento) antes da adoção definitiva de **Grinta**. Tarefa de mundo real, não de especificação.
 
-> **Pendência:** Verificação de **disponibilidade de domínios** (`.com`, `.com.br` e afins) e de identificadores em lojas de aplicativos e redes sociais. Os chats registraram que o território digital de "Grinta" já está congestionado por produtos ligados ao futebol — um app **Grinta Football** (resultados, estatísticas, escalações), um app **Grinta** de organização/reserva de partidas amadoras (atualizado em jun/2026), uma plataforma francesa Grinta de fut-5, uma plataforma esportiva europeia Grinta e a **Grintafy** (descoberta de jogadores, com quase 2 milhões de usuários declarados). Avaliar impacto em SEO, resultados de loja e expansão internacional, e definir estratégia de diferenciação (ex.: submarca/sufixo de produto).
+> **Ação externa pendente:** verificação de disponibilidade de domínios (`.com`, `.com.br`) e de handles em lojas de apps e redes sociais. O território digital de "Grinta" está congestionado — aquisição/variação de marca a cargo do produto.
 
 ## Diretrizes de marca
 
@@ -103,7 +103,7 @@ Da linha de Grinta:
 
 - **GRINTA — Não basta ter talento. É preciso ter raça.**
 
-> **Pendência:** As taglines abaixo foram concebidas para o candidato "Onze" e permanecem como referência de tom; precisam ser reavaliadas/adaptadas para Grinta antes de uso oficial.
+> **Nota:** as taglines abaixo foram concebidas para o candidato "Onze" e ficam apenas como referência de tom; a versão oficial para **Grinta** faz parte do trabalho de identidade de marca.
 >
 > - Construa um clube. Dispute uma era.
 > - O futebol não para.
@@ -122,8 +122,16 @@ A estrutura de submarcas por módulo foi proposta originalmente para "Onze" e de
 | Grinta World | Universo online / mundo persistente |
 | Grinta News | Notícias do jogo |
 
-> **Pendência:** Confirmar o conjunto e a nomenclatura final das submarcas quando os módulos do jogo estiverem definidos no roadmap de produto.
+> **Ação externa pendente:** conjunto e nomenclatura final das submarcas a confirmar quando os módulos do jogo estiverem fixados no roadmap de produto.
 
 ### Elementos visuais
 
-> **Pendência:** Definir símbolo, tipografia, paleta de cores e sistema visual da marca Grinta. Os chats indicaram o caminho (personalidade no símbolo, tipografia e slogan; potencial visual alto para a palavra), mas não especificaram elementos gráficos.
+A primeira versão do sistema visual da **Grinta** está definida (v0.1):
+
+- **Símbolo e logotipo:** logotipo **B1** — wordmark “GRINTA” com o símbolo “G” carregando uma bola em movimento. Vetor puro; o “G” funciona isolado como app icon e selo de submarcas.
+- **Paleta:** “vermelho + lima ácida”, direção “de jogo” (eFootball/Fortnite) — herói `#FF1F3D → #FF6A00`, acento lima `#CBFF2E`, base grafite `#0E0F12`, mais semânticos funcionais.
+- **Tipografia:** por ora, stack do sistema (display em itálico pesado que ecoa o wordmark; mono tabular para números). Licenciar uma display face própria segue como passo futuro.
+
+Assets e tokens em [`marca/`](marca/README.md); o sistema completo (tokens + componentes) está especificado em [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md).
+
+> **Ação externa pendente:** as fontes definitivas e a evolução do sistema visual (v1) dependem de licenciamento de tipografia e da validação de marca no INPI/domínios — tarefas de mundo real, não de especificação (ver acima). Os valores iniciais de design tokens/tipografia estão propostos em [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-geral-e-design-system.md) (R-98).

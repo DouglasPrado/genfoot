@@ -9,10 +9,10 @@ Perfil do clube, identidade/rebranding, configurações, loja/monetização, pas
 ## `M-CLUB-PROFILE` — Perfil do clube
 
 - **Objetivo:** a "capa" institucional do clube.
-- **Componentes e dados** (perfil do [doc 01, §2](../01-game-design/01-mundo-persistente-e-clubes.md)): nome, escudo, país/região, caixa, elenco (resumo), comissão, diretoria (nível), estrutura (resumo por área), torcida (perfil/pressão), **reputação** (faixa), histórico (atalho), divisão/campeonato atual, **estilo de jogo**, cultura interna, **nível institucional**.
+- **Componentes e dados** (perfil do [doc 01, §2](../01-game-design/01-mundo-persistente-e-clubes.md)): nome, escudo, país/região, caixa, elenco (resumo), comissão, diretoria (nível), estrutura (resumo por área), torcida (perfil/pressão), **reputação** (faixa), histórico (atalho), divisão/campeonato atual, **estilo de jogo**, cultura interna, **nível institucional**, índice de **Tamanho Real do Clube** (0–100, pequeno→gigante) [`03 §14.3`].
 - **Ações:** → `M-IDENTITY`, `M-HISTORY`, `M-REPUTATION`, `M-STRUCTURE`, `M-CLUB-LEAVE`.
 - **Estados:** identidade versionada por época (histórico).
-- **Referências:** [`01-mundo §2, §4`](../01-game-design/01-mundo-persistente-e-clubes.md).
+- **Referências:** [`01-mundo §2, §4`](../01-game-design/01-mundo-persistente-e-clubes.md); [`03-economia §14.3`](../01-game-design/03-economia.md).
 
 ## `M-IDENTITY` — Identidade / rebranding
 

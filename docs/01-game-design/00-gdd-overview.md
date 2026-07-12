@@ -256,7 +256,7 @@ Temporada inicia → Campeonatos montados → Clubes treinam e contratam
 
 O core é desenhado como um **simulador de ecossistema** baseado em Entidades → Componentes → Efeitos → Eventos, com memória — detalhado em [`../02-tecnico/07-arquitetura-do-core-ecs.md`](../02-tecnico/07-arquitetura-do-core-ecs.md). O modelo de dados canônico e as regras/fórmulas executáveis vivem em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md) e [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
-> **Pendência:** fórmulas iniciais e regras de balanceamento numérico ainda dependem de calibração (ver pendências nos docs técnicos).
+> **Nota:** os coeficientes/pesos numéricos foram consolidados como recomendações a ratificar no catálogo técnico — ver [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (F1–F21) e a Série R (R-15..R-24, R-41..R-49). Calibração final via lote de simulação (R-34/R-88).
 
 ## 25. Regras Transversais de Consistência
 

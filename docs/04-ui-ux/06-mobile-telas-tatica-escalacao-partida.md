@@ -20,10 +20,10 @@ A aba **Jogo**: preparar (escalação, tática, plano de jogo, dossiê, pré-jog
 
 - **Objetivo:** montar titulares, banco e funções.
 - **Layout:** `FormationPitch` (campo 2D) no topo + banco + validações embaixo.
-- **Componentes e dados:** **titulares** e **banco/reservas**; posição **e função** por `PlayerSlot` (meia armador/box-to-box/atacante, volante marcador/construtor, lateral ofensivo/defensivo, ponta aberto/invertido, centroavante pivô/profundidade); **capitão** e líderes; **cobrador de bola parada**; **goleiro reserva** (obrigatório); indicadores por jogador (condição, moral, cartões pendurados); `PositionFit`/`RoleFit`/`FormationFamiliarity`; **entrosamento/sinergias** (`PairSynergy`, `SectorChemistry`, `TeamBalance`); substituições restantes.
+- **Componentes e dados:** **titulares** e **banco/reservas**; posição **e função** por `PlayerSlot` (meia armador/box-to-box/atacante, volante marcador/construtor, lateral ofensivo/defensivo, ponta aberto/invertido, centroavante pivô/profundidade); **capitão** e líderes; **goleiro reserva** (obrigatório); sub-painel **"Bola parada"** com designação de cobradores **por tipo** (pênalti / falta / escanteio E-D / lateral) e rotinas [`05 §17, §18`]; indicadores por jogador (condição, moral, cartões pendurados); `PositionFit`/`RoleFit`/`FormationFamiliarity`; **entrosamento/sinergias** (`PairSynergy`, `SectorChemistry`, `TeamBalance`); substituições restantes.
 - **Ações:** arrastar para posição; trocar titular↔banco; designar capitão/cobrador; auto-escalar (sugestão da comissão); salvar (valida elegibilidade).
 - **Estados:** **bloqueios de elegibilidade** (suspenso, não inscrito, contrato inativo, transferido, limite de estrangeiros, categoria inválida, sem GK) impedem salvar com motivo; aviso de jogador fora de posição (risco de erro); tenta escalação automática antes de W.O.
-- **Referências:** [`05-motor §7, §11, §15, §17`](../01-game-design/05-motor-de-partida.md); [`06-temporada §15.2`](../01-game-design/06-temporada-e-competicoes.md).
+- **Referências:** [`05-motor §7, §11, §15, §17, §18`](../01-game-design/05-motor-de-partida.md); [`06-temporada §15.2`](../01-game-design/06-temporada-e-competicoes.md).
 
 ## `M-TACTICS` — Tática
 
@@ -49,18 +49,18 @@ A aba **Jogo**: preparar (escalação, tática, plano de jogo, dossiê, pré-jog
 ## `M-SCOUT-OPP` — Dossiê do adversário
 
 - **Objetivo:** entrar em campo sabendo o que a comissão conseguiu ler.
-- **Componentes e dados:** informação **estimada** (não exata), com precisão conforme nível da comissão: forças/fraquezas por setor, estilo provável, jogadores-chave, e **leitura do árbitro** (rigor, caseirismo, tolerância a contato, propensão a pênalti). Ex.: "o time está cansando" (baixa) → "seu lateral esquerdo perdeu velocidade…" (alta).
+- **Componentes e dados:** informação **estimada** (não exata), com precisão conforme nível da comissão: forças/fraquezas por setor, estilo provável, jogadores-chave, e **leitura do árbitro** (rigor, caseirismo, tolerância a contato, propensão a pênalti). Ex.: "o time está cansando" (baixa) → "seu lateral esquerdo perdeu velocidade…" (alta). Seção **"Como te leem"** — a **reputação tática do próprio usuário** (estilo percebido pelo adversário e como ele provavelmente se preparou) [`05 §14`].
 - **Ações:** salvar leitura; ajustar tática com base nela.
 - **Estados:** confiança explícita; áreas sem dado ("não foi possível ler").
-- **Referências:** [`05-motor §12, §13, §18`](../01-game-design/05-motor-de-partida.md).
+- **Referências:** [`05-motor §12, §13, §14, §18`](../01-game-design/05-motor-de-partida.md).
 
 ## `M-PREMATCH` — Pré-jogo / contexto
 
 - **Objetivo:** confirmar o contexto e a preparação antes do apito.
-- **Componentes e dados:** clima (normal/calor/frio/chuva/vento/extremo) e efeito; gramado/dimensão; torcida e **mando de campo** (moderado, explicável); arbitragem; importância/momento da temporada; parâmetros da competição (nº de substituições, prorrogação, pênaltis, VAR, desempate); estado médico/logística/viagem; treino específico.
+- **Componentes e dados:** clima (normal/calor/frio/chuva/vento/extremo) e efeito; gramado/dimensão; torcida e **mando de campo** (moderado, explicável); arbitragem; importância/momento da temporada, incluindo flag **"importância: amistoso/pré-temporada"** (baixo risco: testar tática/jovens, sem punição de moral/torcida) [`05 §10`; `06 §1`]; parâmetros da competição (nº de substituições, prorrogação, pênaltis, VAR, desempate); estado médico/logística/viagem; treino específico.
 - **Ações:** ajustar escalação/tática/plano; confirmar preparação.
 - **Estados:** alerta de elegibilidade; clima extremo pode indicar risco de adiamento (raro).
-- **Referências:** [`05-motor §2, §10, §12, §17`](../01-game-design/05-motor-de-partida.md); [`08-estadio §9, §11, §12`](../01-game-design/08-estadio-regiao-e-clima.md).
+- **Referências:** [`05-motor §2, §10, §12, §17`](../01-game-design/05-motor-de-partida.md); [`06-temporada §1`](../01-game-design/06-temporada-e-competicoes.md); [`08-estadio §9, §11, §12`](../01-game-design/08-estadio-regiao-e-clima.md).
 
 ## `M-LIVE` — Partida ao vivo
 
@@ -72,13 +72,14 @@ A aba **Jogo**: preparar (escalação, tática, plano de jogo, dossiê, pré-jog
   - **Lateral:** momentum, posse, pressão, alertas ativos.
   - **Inferior:** **ações rápidas** (zona do polegar).
   - **Modal:** pontos de decisão no momento certo (`M-DECISION-POINT`).
-- **Componentes e dados:** placar/minuto; **feed de eventos** (`MATCH_TICK`, `MATCH_EVENT`, `DECISION_POINT_CREATED/RESOLVED`, `TACTIC_CHANGED`, `SUBSTITUTION_MADE`, `MOMENTUM_CHANGED`, `MATCH_FINISHED`); **momentum**, **posse**, **pressão**; **fadiga por setor** (`SectorState`); controle de zonas; **sugestões da comissão** (qualidade 1–5); substituições disponíveis; **explicabilidade** de cada evento ("sofreu gol após ataques pela esquerda, lateral cansado sem cobertura").
+- **Componentes e dados:** placar/minuto; **feed de eventos** (`MATCH_TICK`, `MATCH_EVENT`, `DECISION_POINT_CREATED/RESOLVED`, `TACTIC_CHANGED`, `SUBSTITUTION_MADE`, `MOMENTUM_CHANGED`, `MATCH_FINISHED`); **momentum**, **posse**, **pressão**; chip de **"leitura do jogo"** (tipos emergentes: truncado, aberto, físico, nervoso, domínio estéril…) [`05 §9`]; **fadiga por setor** (`SectorState`); controle de zonas; **sugestões da comissão** (qualidade 1–5); substituições disponíveis; **explicabilidade** de cada evento ("sofreu gol após ataques pela esquerda, lateral cansado sem cobertura").
   - **Modo compacto** (placar/eventos/decisões) e **modo detalhado** (zonas, momentum, xG, fadiga, padrões, trade-offs) via `SegmentedControl`.
-- **Ações rápidas (botões com submenu `BottomSheet`):** `Recuar`, `Pressionar` (leve/alta/máxima/pressionar a saída), `Atacar`, `Controlar`, `Substituir` (sugestões **contextuais**: "substituir camisa 8, cansado"; "colocar atacante para buscar gol"), `Marcar forte`, `Contra-atacar`, `Poupar`; **mudar formação/tática**. Cada opção vira um **command** validado pelo servidor (janela pode expirar → `MATCH_COMMAND_WINDOW_CLOSED`).
+- **Ações rápidas (botões com submenu `BottomSheet`):** `Recuar`, `Pressionar` (leve/alta/máxima/pressionar a saída), `Atacar`, `Controlar`, `Substituir` (sugestões **contextuais**: "substituir camisa 8, cansado"; "colocar atacante para buscar gol"), `Marcar forte`, `Contra-atacar`, `Poupar`; **mudar formação/tática**. Na **fase reta final / últimos 10 min**, ações **"Segurar resultado"** / **"Ganhar tempo (cera)"** com aviso de risco [`05 §17`]. Cada opção vira um **command** validado pelo servidor (janela pode expirar → `MATCH_COMMAND_WINDOW_CLOSED`).
 - **Feedback pós-ação:** a tela mede e mostra o efeito ("recuou a linha aos 68'; posse caiu de 51%→43%, menos bolas nas costas, mais cruzamentos"). Ações repetidas perdem efeito (anti-exploit).
-- **Estados:** **desconexão** → ao voltar, resumo estruturado do período offline (minuto que saiu/atual, placar, eventos, ações da IA, alertas, sugestão atual); **delegado à IA** (offline) mostra as decisões que a IA tomou; partida terminou desconectado → estado oficial ao retornar.
+- **Modo prorrogação:** fase adicional com fadiga acentuada e substituição extra, encadeando `M-PENALTIES` quando o regulamento exige [`05 §17`].
+- **Estados:** **desconexão** → ao voltar, resumo estruturado do período offline (minuto que saiu/atual, placar, eventos, ações da IA, alertas, sugestão atual); **delegado à IA** (offline) mostra as decisões que a IA tomou; partida terminou desconectado → estado oficial ao retornar; estado persistente **"time com 10"** / jogador limitado em campo / **goleiro de linha** [`05 §17`].
 - **Tempo real/notificações:** stream `matchSequence` com `sequence`/`eventId` (dedup); reconexão via `lastKnownSequence`.
-- **Referências:** [doc 08 — tela de partida ao vivo](../02-tecnico/08-frontend-cliente-e-tempo-real.md); [`05-motor §4, §9, §11, §13, §15`](../01-game-design/05-motor-de-partida.md).
+- **Referências:** [doc 08 — tela de partida ao vivo](../02-tecnico/08-frontend-cliente-e-tempo-real.md); [`05-motor §4, §9, §11, §13, §15, §17`](../01-game-design/05-motor-de-partida.md).
 
 ## `M-DECISION-POINT` — Ponto de decisão em partida
 

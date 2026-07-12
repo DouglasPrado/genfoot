@@ -1100,7 +1100,7 @@ interface MatchPatternMemory {
 
 > **Recomendação (a ratificar — R-17):** o **tamanho da janela** de memória (nº de ticks/eventos retidos), o decaimento por antiguidade e o **gatilho de detecção** de padrão repetido (ex.: `occurrences ≥ 4` na janela → contra-ajuste da IA, `MAT-017`) são valores de balanceamento, alinhados à janela de eventos recentes de R-17.
 
-> **Pendência:** Especificar os tipos auxiliares referenciados (`CompetitionPhaseDefinition`, `TieBreaker`, `MovementRule`, `TeamSnapshot`, `Tactics`, `MatchContext`, `Score`, `MatchEvent`, `PlayerPerformance`, `PhysicalImpact`, `TacticalReport`) no Domain Kernel (fora do escopo deste catálogo).
+> **Nota de implementação:** os tipos auxiliares (`CompetitionPhaseDefinition`, `TieBreaker`, `MovementRule`, `TeamSnapshot`, `Tactics`, `MatchContext`, `Score`, `MatchEvent`, `PlayerPerformance`, `PhysicalImpact`, etc.) serão definidos no **Domain Kernel** (código), derivados do schema canônico e destas fórmulas — não é pendência de design.
 
 ---
 

@@ -13,10 +13,10 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 - **Objetivo:** dar sinais claros da saúde financeira (traduz o modelo econômico em indicadores).
 - **Como se chega:** aba Clube; Home; MF-13.
 - **Layout:** cartões de indicadores + faixa de saúde + atalhos.
-- **Componentes e dados** (tela financeira do [doc 10, §7.1](../01-game-design/10-experiencia-e-telas.md) + `ClubEconomy`): **caixa atual**, **receita mensal**, **despesa mensal**, **resultado mensal**, **folha salarial** (vs. teto), **orçamento de transferências**, **dívida**, **saúde financeira** (índice 0–100 em 6 faixas: Excelente/Estável/Atenção/Pressão/Crise/Colapso), **pressão da diretoria**, **meta financeira**, força de patrocínio.
+- **Componentes e dados** (tela financeira do [doc 10, §7.1](../01-game-design/10-experiencia-e-telas.md) + `ClubEconomy`): **caixa atual**, **receita mensal**, **despesa mensal**, **resultado mensal**, **folha salarial** (vs. teto), **orçamento de transferências**, **dívida**, **saúde financeira** (índice 0–100 em 6 faixas: Excelente/Estável/Atenção/Pressão/Crise/Colapso), **pressão da diretoria**, **meta financeira**, força de patrocínio; painel de **composição da receita** por fonte (TV, patrocínio, sócios, bilheteria, comercial/produtos, premiação, extraordinárias), com a linha de **direitos de TV** dependente de liga/divisão [`03 §4.1, §5.1, §7.2`].
 - **Ações:** → `M-ACCOUNTING`, `M-BUDGET`, `M-COMMERCIAL`, `M-MATCHDAY-REVENUE`, `M-DEBT`.
 - **Estados:** faixa de saúde colorida; alerta crítico de projeção → `M-DECISIONS`/[MF-16](02-mobile-fluxos.md#mf-16--crise-financeira).
-- **Referências:** [`03-economia §3.1, §6`](../01-game-design/03-economia.md); [`10-experiencia §7.1`](../01-game-design/10-experiencia-e-telas.md).
+- **Referências:** [`03-economia §3.1, §4.1, §5.1, §6, §7.2`](../01-game-design/03-economia.md); [`10-experiencia §7.1`](../01-game-design/10-experiencia-e-telas.md).
 
 ## `M-ACCOUNTING` — Contabilidade
 
@@ -37,8 +37,8 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 ## `M-COMMERCIAL` — Comercial / patrocínios
 
 - **Objetivo:** gerir receita comercial.
-- **Componentes e dados:** patrocinadores e ativos negociáveis (uniforme, placas/mídia do estádio, **naming rights**, conteúdo digital, patrocínio de treino/base, camarotes, experiências, campanhas); contrato comercial (valor fixo, bônus, metas, **exclusividade**, direitos, obrigações, penalidades, renovação); **entregas obrigatórias** (exibir marca, campanha, espaço, conteúdo, evento, hospitalidade); produtos/estoque/sazonalidade; reação de patrocinadores à imagem pública.
-- **Ações:** vender/negociar ativos; cumprir entregas; gerir produtos.
+- **Componentes e dados:** patrocinadores e ativos negociáveis (uniforme, placas/mídia do estádio, **naming rights**, conteúdo digital, patrocínio de treino/base, camarotes, experiências, campanhas); contrato comercial (valor fixo, bônus, metas, **exclusividade**, direitos, obrigações, penalidades, renovação); **entregas obrigatórias** (exibir marca, campanha, espaço, conteúdo, evento, hospitalidade); produtos/estoque/sazonalidade; **hospitalidade** como operação (capacidade/conversão/custo) distinta da bilheteria [`03 §9.8`]; reação de patrocinadores à imagem pública.
+- **Ações:** vender/negociar ativos; cumprir entregas; gerir produtos; abrir **sócio-torcedor** (`M-MEMBERSHIP`) e **merchandising** (`M-PRODUCTS`) [`03 §9.6, §9.9`].
 - **Estados:** descumprimento de entrega reduz pagamento/renovação; bloqueio de exclusividade sobreposta.
 - **Referências:** [`03-economia §9.6–9.10`](../01-game-design/03-economia.md); [`11-torcida §17`](../01-game-design/11-torcida-imprensa-e-narrativa.md).
 
@@ -63,10 +63,10 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 - **Objetivo:** ver e evoluir a estrutura física do clube.
 - **Como se chega:** aba Clube; MF-14.
 - **Layout:** árvore por ramos (Administração, Futebol, Saúde, Base, Marca, Infraestrutura) com cards por departamento.
-- **Componentes e dados:** por departamento, o **card canônico** ([doc 04, §7](../01-game-design/04-estrutura-do-clube-e-staff.md)): **nível atual (1–10)** com faixa nomeada (Amador→Elite), custo de melhoria, tempo de melhoria, custo mensal, benefícios, requisitos, impacto. Departamentos: diretoria, comissão técnica, preparação física, equipe médica, olheiros, comunicação, base, CT, estádio, análise (+ jurídico/financeiro/fisioterapia/marketing etc. — [pendência de granularidade](../01-game-design/04-estrutura-do-clube-e-staff.md)). **Estilo do clube** derivado (Formador/Comprador/Competitivo/Popular). **Nível geral** do clube.
+- **Componentes e dados:** por departamento, o **card canônico** ([doc 04, §7](../01-game-design/04-estrutura-do-clube-e-staff.md)): **nível atual (1–10)** com faixa nomeada (Amador→Elite), custo de melhoria, tempo de melhoria, custo mensal, benefícios, requisitos, impacto. Departamentos: diretoria, comissão técnica, preparação física, equipe médica, **psicologia** (área de investimento distinta [`03 §9.3`]), olheiros, comunicação, base, CT, estádio, análise (+ jurídico/financeiro/fisioterapia/marketing etc. — [pendência de granularidade](../01-game-design/04-estrutura-do-clube-e-staff.md)). **Marca** como ativo que cresce [`03 §9.10`]. **Estilo do clube** derivado (Formador/Comprador/Competitivo/Popular). **Nível geral** do clube. Visão comparativa de **ROI por área**.
 - **Ações:** abrir departamento (`M-DEPARTMENT`); escolher onde investir (define estilo).
 - **Estados:** departamento "em obra/implantação" (contagem de dias); requisitos não atendidos bloqueiam upgrade.
-- **Referências:** [`04-estrutura §2, §3, §7, §8`](../01-game-design/04-estrutura-do-clube-e-staff.md).
+- **Referências:** [`04-estrutura §2, §3, §7, §8`](../01-game-design/04-estrutura-do-clube-e-staff.md); [`03-economia §9.3, §9.10`](../01-game-design/03-economia.md).
 
 ## `M-DEPARTMENT` — Departamento (detalhe / upgrade)
 

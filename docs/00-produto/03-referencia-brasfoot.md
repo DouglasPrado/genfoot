@@ -372,7 +372,7 @@ Tabelas de banco previstas:
 
 Sugestão técnica levantada: Next.js 15, NestJS ou AdonisJS, PostgreSQL, Prisma e Redis/BullMQ para simulações longas — com o match engine em pacote separado (`packages/match-engine`) para permitir teste isolado.
 
-> **Pendência:** confirmar a stack e a organização canônicas nos documentos de arquitetura; o brainstorming ofereceu opções (NestJS **ou** AdonisJS) sem decisão final.
+> **Resolvido (Série R — R-77):** stack canônica definida — **NestJS + TypeScript** (ver [`../02-tecnico/00-arquitetura-geral.md`](../02-tecnico/00-arquitetura-geral.md), [modelo de dados](../02-tecnico/02-modelo-de-dados.md), [motor de partida](../01-game-design/05-motor-de-partida.md)). AdonisJS descartado.
 
 ---
 
