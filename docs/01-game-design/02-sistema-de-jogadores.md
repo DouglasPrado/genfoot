@@ -12,24 +12,24 @@ Este documento consolida o modelo conceitual do jogador: a fórmula de identidad
 
 ## Sumário
 
-1. [Fórmula conceitual do jogador](#1-formula-conceitual-do-jogador)
-2. [Atributo, estado e traço](#2-atributo-estado-e-traco)
-3. [Geração de jogadores](#3-geracao-de-jogadores)
+1. [Fórmula conceitual do jogador](#1-fórmula-conceitual-do-jogador)
+2. [Atributo, estado e traço](#2-atributo-estado-e-traço)
+3. [Geração de jogadores](#3-geração-de-jogadores)
 4. [Talento e potencial em camadas](#4-talento-e-potencial-em-camadas)
-5. [Curvas de evolução por idade](#5-curvas-de-evolucao-por-idade)
-6. [Treino e direção da evolução](#6-treino-e-direcao-da-evolucao)
-7. [Marca de formação do clube (DevelopmentSignature)](#7-marca-de-formacao-do-clube-developmentsignature)
-8. [Histórico de desenvolvimento (PlayerDevelopmentHistory)](#8-historico-de-desenvolvimento-playerdevelopmenthistory)
+5. [Curvas de evolução por idade](#5-curvas-de-evolução-por-idade)
+6. [Treino e direção da evolução](#6-treino-e-direção-da-evolução)
+7. [Marca de formação do clube (DevelopmentSignature)](#7-marca-de-formação-do-clube-developmentsignature)
+8. [Histórico de desenvolvimento (PlayerDevelopmentHistory)](#8-histórico-de-desenvolvimento-playerdevelopmenthistory)
 9. [Eventos de carreira](#9-eventos-de-carreira)
-10. [Mudança de posição e perfil](#10-mudanca-de-posicao-e-perfil)
-11. [Reputação do clube formador](#11-reputacao-do-clube-formador)
+10. [Mudança de posição e perfil](#10-mudança-de-posição-e-perfil)
+11. [Reputação do clube formador](#11-reputação-do-clube-formador)
 12. [Impacto no valor de mercado](#12-impacto-no-valor-de-mercado)
-13. [Memória do jogador e memória do clube](#13-memoria-do-jogador-e-memoria-do-clube)
-14. [Personalidade e decisões fora de campo](#14-personalidade-e-decisoes-fora-de-campo)
+13. [Memória do jogador e memória do clube](#13-memória-do-jogador-e-memória-do-clube)
+14. [Personalidade e decisões fora de campo](#14-personalidade-e-decisões-fora-de-campo)
 15. [Elenco como grupo social](#15-elenco-como-grupo-social)
-16. [Medicina, saúde e recuperação](#16-medicina-saude-e-recuperacao)
-17. [Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores](#17-ciclo-de-vida-do-jogador-aposentadoria-funcionario-e-protecao-de-menores)
-18. [Subsistemas complementares e recomendações a ratificar](#18-subsistemas-complementares-e-recomendacoes-a-ratificar)
+16. [Medicina, saúde e recuperação](#16-medicina-saúde-e-recuperação)
+17. [Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores](#17-ciclo-de-vida-do-jogador-aposentadoria-funcionário-e-proteção-de-menores)
+18. [Subsistemas complementares e recomendações a ratificar](#18-subsistemas-complementares-e-recomendações-a-ratificar)
 
 ---
 

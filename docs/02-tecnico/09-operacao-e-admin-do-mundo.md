@@ -10,14 +10,14 @@ O princípio que atravessa todas as seções é único: **a administração corr
 
 ## Sumário
 
-- [1. Princípio operacional](#1-principio-operacional)
+- [1. Princípio operacional](#1-princípio-operacional)
 - [2. Painel administrativo do mundo](#2-painel-administrativo-do-mundo)
-- [3. Verificações de saúde periódicas](#3-verificacoes-de-saude-periodicas)
-- [4. Correções administrativas](#4-correcoes-administrativas)
-- [5. Permissões administrativas em níveis](#5-permissoes-administrativas-em-niveis)
-- [6. Testes de equilíbrio em grande volume](#6-testes-de-equilibrio-em-grande-volume)
-- [7. IA generativa: fronteira de decisão](#7-ia-generativa-fronteira-de-decisao)
-- [8. Pendências consolidadas](#8-pendencias-consolidadas)
+- [3. Verificações de saúde periódicas](#3-verificações-de-saúde-periódicas)
+- [4. Correções administrativas](#4-correções-administrativas)
+- [5. Permissões administrativas em níveis](#5-permissões-administrativas-em-níveis)
+- [6. Testes de equilíbrio em grande volume](#6-testes-de-equilíbrio-em-grande-volume)
+- [7. IA generativa: fronteira de decisão](#7-ia-generativa-fronteira-de-decisão)
+- [8. Pendências consolidadas](#8-pendências-consolidadas)
 - [9. Documentos relacionados](#9-documentos-relacionados)
 
 ---
@@ -29,7 +29,7 @@ O mundo do Grinta precisa permanecer **consistente, auditável e recuperável**.
 Desse princípio derivam três posturas que valem para todo este documento:
 
 - **Correção sobre o futuro, não sobre o passado.** Ajustes de balanceamento (econômico, demográfico, competitivo) devem atuar sobre gerações e regras futuras, evitando alterar retroativamente jogadores e resultados legítimos.
-- **Rastreabilidade total.** Toda ação administrativa é registrada com estado anterior, motivo e responsável (ver [§4](#4-correcoes-administrativas)), sobre a auditoria imutável descrita na plataforma técnica.
+- **Rastreabilidade total.** Toda ação administrativa é registrada com estado anterior, motivo e responsável (ver [§4](#4-correções-administrativas)), sobre a auditoria imutável descrita na plataforma técnica.
 - **Autoridade do servidor.** O painel e as ferramentas de operação leem e corrigem o estado do mundo, mas as regras oficiais permanecem executadas pelo backend autoritativo.
 
 > **Nota:** a distinção entre **saúde técnica** (jobs, filas, latência, integridade de dados) e **saúde de mundo** (economia, demografia, equilíbrio competitivo) é deliberada. A primeira é da plataforma; a segunda é o objeto deste documento.
@@ -54,7 +54,7 @@ O painel administrativo é a superfície de gestão que permite à operação **
 | 10 | **Falhas de processamento** | Erros em jobs de simulação, economia e fechamento | [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) |
 | 11 | **Integridade das inscrições e tabelas** | Consistência de inscrições, chaveamentos e classificações | [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md) |
 
-O painel é **primariamente de visão e diagnóstico do mundo**. Ele consolida sinais que orientam decisões de balanceamento (via geração/regras futuras) e de correção pontual (via [§4](#4-correcoes-administrativas)).
+O painel é **primariamente de visão e diagnóstico do mundo**. Ele consolida sinais que orientam decisões de balanceamento (via geração/regras futuras) e de correção pontual (via [§4](#4-correções-administrativas)).
 
 > **Delimitação com a plataforma:** métricas de infraestrutura (latência, saturação de filas, DLQ, estado de deploy, *feature flags*, *kill switches*) **não** são reespecificadas aqui — vivem em [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) (§7 a §9). O painel de mundo pode **exibir** um resumo desses sinais, mas a definição canônica é técnica.
 
@@ -150,7 +150,7 @@ O jogo precisa ser **testado em grande volume** (simulações massivas de mundos
 - **Manipulações e abusos** — se explorações conhecidas emergem sob escala.
 - **Encerramento de temporadas** — se a virada de ciclo processa corretamente em massa.
 
-Estes testes alimentam a postura de correção **sobre o futuro** (ver [§3](#3-verificacoes-de-saude-periodicas)): desvios observados em simulação orientam ajustes de parâmetros de geração e regras antes de afetarem mundos vivos.
+Estes testes alimentam a postura de correção **sobre o futuro** (ver [§3](#3-verificações-de-saúde-periódicas)): desvios observados em simulação orientam ajustes de parâmetros de geração e regras antes de afetarem mundos vivos.
 
 > **Delimitação:** a infraestrutura de execução desses testes (ambientes, *harness* de simulação, testes como parte da arquitetura) está em [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) (§12). O comportamento dos clubes controlados pelo jogo é especificado em [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md).
 
@@ -176,9 +176,9 @@ Além das pendências pontuais indicadas por seção, permanecem abertos (fonte:
 
 - **Procedimentos de atendimento e recurso** — fluxo formal de suporte e contestação de decisões.
 - **Prazos de revisão** — SLAs para análise de casos e recursos.
-- **Níveis finais de permissão** — mapeamento definitivo papel↔ação (ver [§5](#5-permissoes-administrativas-em-niveis)).
+- **Níveis finais de permissão** — mapeamento definitivo papel↔ação (ver [§5](#5-permissões-administrativas-em-níveis)).
 - **Política de manutenção de mundo** — janelas, comunicação e impacto de manutenções.
-- **Comunicação ao usuário após correções** — o que e como notificar (ver [§4](#4-correcoes-administrativas)).
+- **Comunicação ao usuário após correções** — o que e como notificar (ver [§4](#4-correções-administrativas)).
 - **Critérios de arquivamento de mundo inativo** — quando e como aposentar um mundo.
 
 ---

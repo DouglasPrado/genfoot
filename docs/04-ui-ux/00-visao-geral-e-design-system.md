@@ -67,7 +67,7 @@ Bibliotecas compartilhadas com o que já foi decidido no doc 08 (reaproveitadas 
 
 ## 3. Design tokens
 
-> **Recomendação (a ratificar — R-98):** os valores concretos abaixo (hex, tamanhos, pesos, raios, sombras) são uma **1ª passada** para destravar a implementação do design system. **Não são canônicos.** Serão ajustados quando a identidade de marca "Grinta" fechar ([`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)) — em especial `color.primary`, que é o candidato a **cor de marca provisória**. O *mapa semântico* (§3.1) e a escala 4-pt já eram convenção da área e permanecem; o que R-98 acrescenta são os **valores**. Meta de acessibilidade: todos os pares texto/fundo aqui satisfazem **WCAG AA** (≥ 4.5:1 texto normal, ≥ 3:1 texto grande e componentes de UI) — ver §3.2. Registrar na Série R do ADR ([`../99-decisoes/registro-de-decisoes.md`](../99-decisoes/registro-de-decisoes.md)) na próxima passada.
+> **Recomendação (a ratificar — R-98):** os valores concretos abaixo (hex, tamanhos, pesos, raios, sombras) são uma **1ª passada** para destravar a implementação do design system. **Não são canônicos.** Serão ajustados quando a identidade de marca "Grinta" fechar ([`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)) — em especial `color.primary`, que é o candidato a **cor de marca provisória**. O *mapa semântico* (§3.1) e a escala 4-pt já eram convenção da área e permanecem; o que R-98 acrescenta são os **valores**. Meta de acessibilidade: todos os pares texto/fundo aqui satisfazem **WCAG AA** (≥ 4.5:1 texto normal, ≥ 3:1 texto grande e componentes de UI) — ver §3.2. Registrado na Série R (R-98/R-99) do ADR ([`../99-decisoes/registro-de-decisoes.md`](../99-decisoes/registro-de-decisoes.md)).
 
 Tokens definidos uma vez em `/packages/ui` (web) e espelhados em `/packages/ui-native` (RN). Cada token resolve por **tema** (claro/escuro). Nomes semânticos — nenhuma tela referencia hex direto.
 
@@ -98,8 +98,8 @@ Deriva do **código de cores de decisão** do doc 08 (partida, decisões, notifi
 | `color.surfaceAlt` | `#EEF2F6` | `#1E2732` | Superfície elevada (sheet, linha ativa, input) |
 | `color.border` | `#DCE3EB` | `#2A3542` | Hairline, divisórias |
 | `color.borderStrong` | `#C2CCD6` | `#3A4757` | Borda de input, contorno de foco base |
-| `color.text` | `#0F172A` | `#F1F5F9` | Texto primário (AA: 16:1 light / 17.5:1 dark) |
-| `color.textMuted` | `#556575` | `#94A3B8` | Texto secundário/rótulos (AA: 6.0:1 / 7.5:1) |
+| `color.text` | `#0F172A` | `#F1F5F9` | Texto primário (AA: 16:1 light / 15.8:1 dark) |
+| `color.textMuted` | `#556575` | `#94A3B8` | Texto secundário/rótulos (AA: 6.0:1 / 6.75:1) |
 | `color.textInverse` | `#FFFFFF` | `#0B0F14` | Texto sobre preenchimento colorido |
 
 **Semânticos** (base para ícone/texto/preenchimento) + **subtle** (fundo de chip/banner):
@@ -190,6 +190,8 @@ Componentes reutilizados em toda a área (nomeados aqui para as telas referencia
 ### 4.2 Especificações dos componentes-chave
 
 > **Recomendação (a ratificar — R-99):** variantes, estados e props abaixo são a **1ª passada** de contrato de API dos 10 componentes mais usados. Complementam (não substituem) o inventário. Ajustáveis na implementação de `/packages/ui`/`/packages/ui-native`. Tokens referenciados vêm de §3 (R-98). Os demais componentes do inventário ficam como **inventário** até serem demandados por uma tela.
+>
+> Os **wireframes de baixa fidelidade** das telas densas (arranjo espacial destes componentes em `M-HOME`, `M-LIVE`, `M-SEASON-CLOSE`, `M-STRUCTURE`, `M-SQUAD`, `M-NEGOTIATION`) estão em [`14-wireframes-telas-densas.md`](14-wireframes-telas-densas.md).
 
 Convenções: todo componente herda os **estados globais** de [§5](#5-estados-globais-de-tela) quando exibe dado do servidor; todo controle acionável respeita **toque ≥ 44 pt** (§3.6) e o par **cor+ícone+texto** (§7). Props marcadas `*` são obrigatórias.
 
@@ -305,6 +307,7 @@ O app abre um **WebSocket** com o `realtime-gateway` e entra nas salas do **usu�
 - Ao **reconectar**, envia `lastKnownSequence` e aplica **eventos perdidos**, **snapshot** ou **ressincronização completa** conforme a resposta.
 - Trata o WebSocket como **acelerador**, nunca como verdade: em divergência, revalida via API (TanStack Query `invalidate`).
 - Usa eventos para: **partida ao vivo** (feed `matchSequence`), **notificações**, **atualização de negociação**, **mudança de tabela**, **eventos do mundo** e **estado de jobs** relevantes.
+- Mantém no `Header` o *chrome* persistente do mundo — `WorldClock` (data/fuso do mundo, §4.2) e **`RoundStatus`** (estado da rodada: **aberta** / **bloqueada** após o *lock* da escalação / **simulando** em lote / **publicada**) — alimentado pelo `worldSequence`. O *lock* recusa commands de escalação com `MATCH_COMMAND_WINDOW_CLOSED` (§8) e é sinalizado proativamente **antes** do bloqueio; em manutenção, o `Header` entra em `readOnly` (`WORLD_READ_ONLY`, §5).
 
 Push nativo (APNs/FCM via Expo Notifications) espelha as **notificações estratégicas** quando o app está fechado; o toque abre a tela/decisão correspondente (deep link).
 

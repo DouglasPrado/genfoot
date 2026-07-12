@@ -14,6 +14,8 @@ Esta Parte é a **referência rápida** do Grinta. Ela não introduz sistemas no
 
 ## 40. Regras gerais
 
+> **MATERIAL DE CONSULTA:** Este capítulo é referência rápida. Diferente dos capítulos das Partes anteriores, ele **não usa as camadas Resumo / Regras completas / Estratégia** — lista direto as regras fixas do mundo, para consulta pontual. A explicação completa de cada tema está na Parte correspondente.
+
 Estas são as regras fixas que enquadram a convivência no mundo persistente. Elas valem **igualmente para você, para os outros usuários e para os clubes controlados pela inteligência** — a diferença está na qualidade das decisões, não na permissão de ignorar orçamento, contrato ou regulamento.
 
 ### Elenco e inscrições
@@ -76,6 +78,8 @@ O mundo é protegido por uma camada de integridade que age **sem punir o jogador
 
 ## 41. Glossário
 
+> **MATERIAL DE CONSULTA:** Este capítulo é referência rápida. Como glossário, ele **não usa as camadas Resumo / Regras completas / Estratégia** — traz definições diretas dos termos, para consulta pontual. O tema completo por trás de cada termo está na Parte correspondente.
+
 Definições em linguagem de jogador dos termos que aparecem ao longo do guia e da interface.
 
 - **Atributo** — Uma capacidade individual do jogador (por exemplo, finalização, velocidade, marcação, visão de jogo). Os atributos descrevem **o que o jogador sabe fazer** e se agrupam em três eixos: técnico, físico e mental. O goleiro tem capacidades próprias. Você vê os atributos por sinais e faixas, não como planilha exata.
@@ -109,6 +113,8 @@ Definições em linguagem de jogador dos termos que aparecem ao longo do guia e 
 ---
 
 ## 42. Perguntas frequentes
+
+> **MATERIAL DE CONSULTA:** Este capítulo é referência rápida. Como lista de perguntas frequentes, ele **não usa as camadas Resumo / Regras completas / Estratégia** — reúne respostas diretas, com remissão às Partes que explicam cada tema em detalhe.
 
 **Posso ser demitido?**
 Não. Você **não pode ser demitido do próprio clube**. Mesmo em uma crise esportiva ou financeira, o comando permanece com você. A diretoria pode cobrar, reduzir sua autonomia ou abrir um plano de recuperação com metas e restrições, mas nunca remove você do clube — ela espera que **você** conduza a recuperação.

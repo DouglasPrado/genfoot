@@ -125,7 +125,7 @@ Panorama dos blocos de design conforme registrado no chat de escopo.
 
 | Bloco | Escopo previsto |
 |-------|-----------------|
-| Onboarding e entrada tardia | Criar clube, assumir clube existente, mostrar riscos, divisão de expansão, entrada em temporada avançada e proteção contra escolhas quebradas |
+| Onboarding e entrada tardia | Criar clube, assumir clube existente, mostrar riscos, Liga Inicial, entrada em temporada avançada e proteção contra escolhas quebradas |
 | Relatórios e explicabilidade | Pós-jogo, financeiro, elenco, base, mercado, comissão, risco, fim de temporada e explicação de decisões da IA |
 | Admin e operação do mundo | Painel admin, health checks, jobs, filas, auditoria, correções, reprocessamento seguro e SimulationLab |
 | Monetização sem pay-to-win | Cosméticos, slots, relatórios premium, passe cosmético, conveniência permitida e limites rígidos |
@@ -194,7 +194,7 @@ A fonte marca explicitamente os seguintes pontos como **já resolvidos** — reg
 | **4.2.8 Ritmo numérico final do mundo** (27.8) | Tempo oficial, persistência e prazos definidos; valores exatos de duração de dia, semana, temporada, partidas e janelas a calibrar em testes de equilíbrio |
 | **4.2.9 Quantidades iniciais de conteúdo** (27.9) | Modelo completo de clubes, jogadores, funcionários, competições e divisões definido; quantidades iniciais por mundo a calcular por capacidade, ritmo e testes econômicos |
 
-> **Ação externa pendente / Resolvido:** o nome **Grinta** segue como nome de trabalho até **verificação jurídica de marca** (ação de mundo real, não de spec — ver [`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)). O **papel do usuário** foi ratificado como **Gestor+Técnico** ([R-01](#61-r-01--papel-do-usuário)); o rótulo exato na interface é detalhe de UI a definir no design.
+> **Ação externa pendente / Resolvido:** o nome **Grinta** foi **escolhido** como marca do projeto; a **adoção definitiva** pende de **verificação jurídica de marca** (INPI/domínios) — ação de mundo real, não de spec — ver [`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)). O **papel do usuário** foi ratificado como **Gestor+Técnico** ([R-01](#r-01--papel-do-usuário-gestor--técnico--ratificada)); o rótulo exato na interface é detalhe de UI a definir no design.
 
 #### 4.2.10 Contradições consolidadas (27.10)
 
@@ -298,6 +298,8 @@ Fonte: [`../01-game-design/05-motor-de-partida.md`](../01-game-design/05-motor-d
 - **R-33 — Curva de adaptação a mudanças táticas:** 0–2 min desorganização / 3–6 encaixe / 7+ efeito completo; encurta com inteligência tática, entrosamento e comunicação da comissão.
 - **R-34 — Suíte de calibração:** ~10.000 partidas/cenário com critérios de aceite (distribuição de placar realista, consistência entre ligas, ausência de bola de neve). Fonte de calibração de F1–F21.
 
+> **Nota de numeração:** R-35..R-40 ficam **reservados** (não utilizados) — a numeração salta de R-34 para R-41.
+
 ### Economia — coeficientes e alvos (R-41..R-49) · RECOMENDADAS (a ratificar)
 
 Fonte: [`../01-game-design/03-economia.md`](../01-game-design/03-economia.md). Calibração final via lote de simulações econômicas.
@@ -339,9 +341,9 @@ Fonte: [`../02-tecnico/`](../02-tecnico/). Resolve **P0.2** (paradigma do core) 
 - **R-87** comunicação pós-correção (in-app antes→depois quando afeta estado percebido) + 6 níveis de papéis cumulativos com segregação de funções.
 - **R-88** metodologia dos testes de equilíbrio (≥1.000 mundos × ≥10 temporadas, seeds fixas, bandas de aceitação + gate de promoção).
 
-> **Reconciliação de caixa inicial:** R-43 é a fonte única do valor (**R$ 5.000.000 = `500000000` amountMinor**). R-51 e as referências textuais a "R$ 1.000.000" em `01-mundo` e `09-anti-abuso` ficam superadas — alinhamento textual pendente (ver BACKLOG P1).
+> **Reconciliação de caixa inicial:** R-43 é a fonte única do valor (**R$ 5.000.000 = `500000000` amountMinor**). R-51 e as referências textuais em `01-mundo`, `04-estrutura` e `09-anti-abuso` **já foram atualizadas** para R$ 5.000.000; a antiga referência de R$ 1.000.000 aparece apenas como nota de "superada".
 
-### Pendências finais diversas (R-89..R-96) · RECOMENDADAS (a ratificar)
+### Pendências finais diversas (R-89..R-97) · RECOMENDADAS (a ratificar)
 
 Fonte: resolução das pendências pequenas restantes (estádio, experiência, monetização, fluxos, frontend, UI).
 
@@ -357,4 +359,4 @@ Fonte: [`../04-ui-ux/00-visao-geral-e-design-system.md`](../04-ui-ux/00-visao-ge
 - **R-99** specs de API dos 10 componentes-chave (Button, Card, Header, TabBar, Input, Badge, Sheet, ListRow, StatTile, Toast) + wireframes das 6 telas densas (M-HOME, M-LIVE, M-SEASON-CLOSE, M-STRUCTURE, M-SQUAD, M-NEGOTIATION).
 - **R-100** construir o site do guia (template Astro navegável, §5 do guia) e encaixar os 42 capítulos já redigidos — tarefa de engenharia/build.
 
-> **Estado da Série R:** R-01 RATIFICADA; R-02..R-100 RECOMENDADAS (a ratificar). São a fila de decisões/valores que aguardam o martelo do dono do produto — nenhuma foi carimbada como canônica em silêncio. São a fila de decisões/valores que aguardam o martelo do dono do produto. Nenhuma foi carimbada como canônica em silêncio. Entradas R-97+ seriam acrescentadas se novas `[DECISÃO]`/`[TUNING]` surgirem.
+> **Estado da Série R:** R-01 RATIFICADA; R-02..R-100 RECOMENDADAS (a ratificar). São a fila de decisões/valores que aguardam o martelo do dono do produto — nenhuma foi carimbada como canônica em silêncio. Entradas R-101+ seriam acrescentadas se novas `[DECISÃO]`/`[TUNING]` surgirem.

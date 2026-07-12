@@ -11,12 +11,12 @@ Como regra de mundo, o **clube não pode impedir uma convocação oficial**, sal
 ## Sumário
 
 1. [Nacionalidade e limites de estrangeiros](#1-nacionalidade-e-limites-de-estrangeiros)
-2. [Convocações integradas ao calendário](#2-convocacoes-integradas-ao-calendario)
-3. [Autoridade da convocação e recomendação médica](#3-autoridade-da-convocacao-e-recomendacao-medica)
-4. [Controle das seleções: IA e expansão para usuários](#4-controle-das-selecoes-ia-e-expansao-para-usuarios)
+2. [Convocações integradas ao calendário](#2-convocações-integradas-ao-calendário)
+3. [Autoridade da convocação e recomendação médica](#3-autoridade-da-convocação-e-recomendação-médica)
+4. [Controle das seleções: IA e expansão para usuários](#4-controle-das-seleções-ia-e-expansão-para-usuários)
 5. [Conflito de datas e prioridade por regulamento](#5-conflito-de-datas-e-prioridade-por-regulamento)
-6. [Lesão em convocação e compensação parcial](#6-lesao-em-convocacao-e-compensacao-parcial)
-7. [Seleções de base e competições internacionais (expansão)](#7-selecoes-de-base-e-competicoes-internacionais-expansao)
+6. [Lesão em convocação e compensação parcial](#6-lesão-em-convocação-e-compensação-parcial)
+7. [Seleções de base e competições internacionais (expansão)](#7-seleções-de-base-e-competições-internacionais-expansão)
 
 ---
 
@@ -36,11 +36,11 @@ A **estrutura de dados de nacionalidade** (especificada aqui) adota um modelo si
 PlayerNationality {
   primaryNationality         // nacionalidade esportiva principal — elegibilidade default de seleção; conta para foreignPlayerLimit
   secondaryNationality?      // 0 ou 1 nacionalidade adicional (dupla nacionalidade ou naturalização)
-  eligibility: "primary" | "secondary" | "locked"  // por qual seleção o jogador está apto/comprometido
+  eligibility: "primary" | "secondary" | "locked_to_primary" | "locked_to_secondary"  // por qual seleção o jogador está apto/comprometido; os estados locked_* deixam explícito a QUAL nacionalidade ele ficou amarrado
 }
 ```
 
-Regra de elegibilidade: um jogador com `secondaryNationality` pode ser convocado por **qualquer uma** das duas seleções enquanto `eligibility` não estiver `locked`; ao atuar em **jogo oficial** (não amistoso) por uma seleção, `eligibility` trava naquela nacionalidade (modelo de "amarração"). Para **limites de estrangeiros**, o jogador conta como **local** quando `primaryNationality` **ou** `secondaryNationality` corresponde à nacionalidade do mundo/competição; caso contrário conta como estrangeiro. **Naturalização** = mudança de `primaryNationality`/`secondaryNationality` disparada pela regra de tempo de permanência do mundo. Efeitos de adaptação e valorização em [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md).
+Regra de elegibilidade: um jogador com `secondaryNationality` pode ser convocado por **qualquer uma** das duas seleções enquanto `eligibility` não estiver travada (`locked_to_primary` ou `locked_to_secondary`); ao atuar em **jogo oficial** (não amistoso) por uma seleção, `eligibility` passa a `locked_to_primary` ou `locked_to_secondary` conforme a nacionalidade escolhida (modelo de "amarração"), deixando explícito por qual das duas o jogador ficou comprometido. Para **limites de estrangeiros**, o jogador conta como **local** quando `primaryNationality` **ou** `secondaryNationality` corresponde à nacionalidade do mundo/competição; caso contrário conta como estrangeiro. **Naturalização** = mudança de `primaryNationality`/`secondaryNationality` disparada pela regra de tempo de permanência do mundo. Efeitos de adaptação e valorização em [`./02-sistema-de-jogadores.md`](./02-sistema-de-jogadores.md).
 
 > **Recomendação (a ratificar — R-63):** as **regras numéricas dos limites de estrangeiros** por mundo e competição são o mesmo valor de balanceamento de **R-63**, definido em [`./06-temporada-e-competicoes.md`](./06-temporada-e-competicoes.md) §15.2 (proposta: 5 estrangeiros por partida na elite, mais restritivo nas divisões inferiores). Calibração final em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 

@@ -9,23 +9,23 @@ Este documento descreve a filosofia, as etapas, a resolução de lances, os sist
 ## Sumário
 
 1. [Filosofia do motor](#1-filosofia-do-motor)
-2. [As cinco etapas e as entradas/saídas da partida](#2-as-cinco-etapas-e-as-entradassaidas-da-partida)
-3. [Atributos coletivos dinâmicos](#3-atributos-coletivos-dinamicos)
-4. [Simulação por zonas e por blocos de tempo](#4-simulacao-por-zonas-e-por-blocos-de-tempo)
+2. [As cinco etapas e as entradas/saídas da partida](#2-as-cinco-etapas-e-as-entradassaídas-da-partida)
+3. [Atributos coletivos dinâmicos](#3-atributos-coletivos-dinâmicos)
+4. [Simulação por zonas e por blocos de tempo](#4-simulação-por-zonas-e-por-blocos-de-tempo)
 5. [Posse perigosa (threat) vs posse de bola](#5-posse-perigosa-threat-vs-posse-de-bola)
-6. [Resolução de ataque em 9 passos](#6-resolucao-de-ataque-em-9-passos)
+6. [Resolução de ataque em 9 passos](#6-resolução-de-ataque-em-9-passos)
 7. [Microduelos individuais](#7-microduelos-individuais)
 8. [Aleatoriedade controlada em 3 camadas](#8-aleatoriedade-controlada-em-3-camadas)
-9. [Momentum, moral e o psicológico mutável](#9-momentum-moral-e-o-psicologico-mutavel)
+9. [Momentum, moral e o psicológico mutável](#9-momentum-moral-e-o-psicológico-mutável)
 10. [Contexto: torcida, estrutura, clima, gramado e arbitragem](#10-contexto-torcida-estrutura-clima-gramado-e-arbitragem)
-11. [Ações táticas e substituições com custo e cooldown](#11-acoes-taticas-e-substituicoes-com-custo-e-cooldown)
+11. [Ações táticas e substituições com custo e cooldown](#11-ações-táticas-e-substituições-com-custo-e-cooldown)
 12. [Sistema online vs offline](#12-sistema-online-vs-offline)
-13. [Comissão técnica como gate de qualidade](#13-comissao-tecnica-como-gate-de-qualidade)
-14. [Reputação tática do usuário (cross-match)](#14-reputacao-tatica-do-usuario-cross-match)
+13. [Comissão técnica como gate de qualidade](#13-comissão-técnica-como-gate-de-qualidade)
+14. [Reputação tática do usuário (cross-match)](#14-reputação-tática-do-usuário-cross-match)
 15. [Arquitetura conceitual do engine](#15-arquitetura-conceitual-do-engine)
-16. [Pós-jogo e consequências](#16-pos-jogo-e-consequencias)
-17. [Fases finais e situações críticas](#17-fases-finais-e-situacoes-criticas)
-18. [Pontos críticos a resolver](#18-pontos-criticos-a-resolver)
+16. [Pós-jogo e consequências](#16-pós-jogo-e-consequências)
+17. [Fases finais e situações críticas](#17-fases-finais-e-situações-críticas)
+18. [Pontos críticos a resolver](#18-pontos-críticos-a-resolver)
 
 ---
 
@@ -38,7 +38,7 @@ Quatro princípios orientam toda a simulação:
 - **Posse perigosa (threat), não só posse de bola.** Ter a bola não é criar perigo. O motor separa posse de posse ofensiva efetiva, permitindo que um time com menos posse vença por jogar melhor em transição.
 - **O placar emerge dos eventos.** Nunca se define "força 80 vs força 70 → provável 2×1". O motor gera volume, chances, qualidade das chances, finalizações, defesas, erros, cartões, lesões, substituições e mudanças emocionais — e o placar surge disso.
 
-A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 18](#18-pontos-criticos-a-resolver)).
+A regra de ouro do produto: **resultado é consequência, história é o produto.** O usuário nunca deve sentir que perdeu "porque o sistema quis". Ele precisa conseguir explicar: perdi porque meu lateral estava cansado, porque subi demais a linha, porque meu time sentiu a pressão, porque o adversário explorou meu lado fraco. Essa **explicabilidade** é o que torna o simulador viciante — e por isso o motor precisa registrar causalidade (ver [seção 18](#18-pontos-críticos-a-resolver)).
 
 ## 2. As cinco etapas e as entradas/saídas da partida
 
@@ -81,10 +81,10 @@ O fluxo lógico completo do funcionamento ideal:
 A etapa de **pré-jogo** não é só carregar escalação: é toda a preparação que antecede o apito. Ela alimenta o estado inicial físico, emocional e tático e a leitura da comissão técnica.
 
 - **Dossiê da partida.** A comissão reúne um dossiê do confronto: adversário, forma recente, provável escalação, padrões táticos, pontos fortes, fragilidades, situação física do elenco, clima, gramado, viagem, importância e regulamento.
-- **Conhecimento imperfeito do adversário.** O jogo **não revela automaticamente a escalação real** do adversário. O conhecimento depende de observação, análise, partidas públicas, funcionários e tempo de preparação — a comissão **estima**, não entrega a verdade (coerente com o "adversário invisível" da [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)).
+- **Conhecimento imperfeito do adversário.** O jogo **não revela automaticamente a escalação real** do adversário. O conhecimento depende de observação, análise, partidas públicas, funcionários e tempo de preparação — a comissão **estima**, não entrega a verdade (coerente com o "adversário invisível" da [seção 13](#13-comissão-técnica-como-gate-de-qualidade)).
 - **Estado do elenco pré-jogo.** Antes da partida, a comissão apresenta a lista de disponíveis, em dúvida, restritos, suspensos, fatigados, sem ritmo e inscritos.
 - **Viagem e logística.** A preparação considera distância, horário, hospedagem, transporte, descanso, clima e adaptação. **Economizar em logística pode aumentar a fadiga e reduzir a preparação** — não é um custo neutro.
-- **Reunião pré-jogo.** O usuário pode definir mensagem, expectativa, abordagem emocional, prioridades e capitão. O efeito depende do contexto, da credibilidade e do perfil do grupo (conecta-se às ações emocionais da [seção 11](#11-acoes-taticas-e-substituicoes-com-custo-e-cooldown)).
+- **Reunião pré-jogo.** O usuário pode definir mensagem, expectativa, abordagem emocional, prioridades e capitão. O efeito depende do contexto, da credibilidade e do perfil do grupo (conecta-se às ações emocionais da [seção 11](#11-ações-táticas-e-substituições-com-custo-e-cooldown)).
 
 Há ainda o **treino específico** da semana (preparar-se para a pressão adversária, defesa de bola parada, ataque a um setor, adaptação a gramado/clima, simulação de cenários), cujo sistema completo é detalhado em outro escopo. A escalação é confirmada dentro do prazo; se o usuário estiver ausente, a política definida e a comissão preparam uma escalação válida.
 
@@ -125,7 +125,7 @@ Consequência: um jogador bom em um time bagunçado rende menos, e um jogador me
 
 Dentro de cada bloco, o motor calcula quem controla mais o jogo, quem cria mais, quem erra mais, quem cansa mais, quem se expõe mais e quem tem maior risco emocional, de lesão ou de cartão.
 
-**Granularidade variável (ver também [seção 18](#18-pontos-criticos-a-resolver)):**
+**Granularidade variável (ver também [seção 18](#18-pontos-críticos-a-resolver)):**
 
 | Tipo de partida | Nível de simulação |
 | --- | --- |
@@ -148,7 +148,7 @@ Um erro comum seria "time mais forte = mais posse = mais gols", o que tornaria o
 - Qualidade da defesa
 - Qualidade do goleiro
 
-Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 18](#18-pontos-criticos-a-resolver)).
+Exemplo: o Time A tem 62% de posse, 12 finalizações e 2 chances claras; o Time B tem 38% de posse, 7 finalizações e 4 chances claras — e o Time B pode vencer por jogar melhor em transição. Isso abre espaço para estilos diferentes (posse, contra-ataque, pressão alta, jogo direto, defesa baixa, bola parada, ataque pelos lados, controle do meio), cada um com aptidão de execução própria (ver [seção 18](#18-pontos-críticos-a-resolver)).
 
 ## 6. Resolução de ataque em 9 passos
 
@@ -230,7 +230,7 @@ A aleatoriedade respeita o contexto: azar deve ser explicado, nunca gratuito.
 - **Aumentam moral:** gol marcado, defesa difícil do goleiro, torcida apoiando, boa sequência de ataques, adversário expulso, virada no placar.
 - **Reduzem moral:** gol sofrido, erro individual, pênalti perdido, cartão vermelho, pressão da torcida, sequência de derrotas, jogador vaiado.
 
-Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 18](#18-pontos-criticos-a-resolver)).
+Um time jovem que sofre gol cedo fora de casa, com controle emocional baixo, passa a errar mais passes, reduz agressividade ofensiva e aumenta o risco de cartão; um time experiente reage melhor. Os efeitos do gol sofrido **não** devem ser iguais para todos: resiliência, liderança do capitão e experiência funcionam como amortecedores contra o efeito bola de neve (ver [seção 18](#18-pontos-críticos-a-resolver)).
 
 **Curvas não-lineares e efeitos de contexto.** Fadiga e moral não escalam de forma linear:
 
@@ -249,7 +249,7 @@ Nem todo jogo deve ter a mesma dinâmica. O motor reconhece tipos de partida —
 
 **Torcida.** Influencia moral do mandante, pressão sobre a arbitragem, nervosismo do adversário, reação após gols sofridos e narrativas pós-jogo. Também pode jogar contra: time grande em má fase que começa mal é vaiado, os jogadores sentem pressão e o erro técnico aumenta. Como os clubes crescem no jogo, a torcida evolui junto (pequena: impacto menor, mais tolerante; grande: gera receita, pressão e narrativa).
 
-**Estrutura do clube** influencia a partida de forma **indireta**, nunca como "bônus mágico": equipe médica (risco/recuperação de lesão), comissão técnica (leitura e ajustes — ver [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)), psicologia/comunicação (estabilidade emocional) e diretoria (coerência do elenco e ambiente).
+**Estrutura do clube** influencia a partida de forma **indireta**, nunca como "bônus mágico": equipe médica (risco/recuperação de lesão), comissão técnica (leitura e ajustes — ver [seção 13](#13-comissão-técnica-como-gate-de-qualidade)), psicologia/comunicação (estabilidade emocional) e diretoria (coerência do elenco e ambiente).
 
 **Clima, gramado e arbitragem** dão vida ao jogo:
 
@@ -320,7 +320,7 @@ Quando o usuário volta online no meio de uma partida em andamento, ele não é 
 
 Exemplo funcional: "Você voltou aos 64 minutos. Enquanto esteve offline, seu volante recebeu amarelo, o adversário aumentou a pressão e sua comissão reduziu a agressividade dele. O jogo está empatado, seu lateral esquerdo está cansado e o adversário domina o meio."
 
-A qualidade e a antecipação desse resumo dependem da comissão técnica (ver [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)).
+A qualidade e a antecipação desse resumo dependem da comissão técnica (ver [seção 13](#13-comissão-técnica-como-gate-de-qualidade)).
 
 ### Plano de jogo pré-configurado
 
@@ -339,7 +339,7 @@ O usuário escolhe **quanto** o auxiliar pode decidir sozinho. Os níveis são n
 
 Além do nível, há a **postura** do auxiliar, que pode depender do perfil do técnico contratado: **conservador** protege o resultado e evita risco; **agressivo** busca a vitória e aceita exposição; **equilibrado** faz ajustes moderados.
 
-Mas a qualidade sempre depende da comissão (ver [seção 13](#13-comissao-tecnica-como-gate-de-qualidade)): comissão nível 1 com autonomia alta pode tomar decisões ruins; comissão nível 5 com autonomia alta age como um auxiliar confiável.
+Mas a qualidade sempre depende da comissão (ver [seção 13](#13-comissão-técnica-como-gate-de-qualidade)): comissão nível 1 com autonomia alta pode tomar decisões ruins; comissão nível 5 com autonomia alta age como um auxiliar confiável.
 
 ### Priorização de decisões concorrentes
 
@@ -444,7 +444,7 @@ Com o tempo, o usuário desenvolve uma **reputação tática**: um estilo perceb
 
 Adversários se preparam contra **padrões recorrentes** do usuário ao longo de várias partidas. Se o usuário sempre pressiona alto, um adversário pode preparar bolas longas nas costas da linha; se sempre recua após abrir vantagem, pode antecipar isso e chegar ao jogo disposto a aumentar a pressão e os cruzamentos. Isso impede que uma estratégia seja dominante para sempre.
 
-Este mecanismo é **distinto do contra-ajuste intra-partida** (ver [seção 12](#12-sistema-online-vs-offline) e o contra-ajuste de IA adversária na [seção 18](#18-pontos-criticos-a-resolver)): o contra-ajuste reage a padrões repetidos **dentro do mesmo jogo** (o usuário ataca 15 minutos pelo mesmo lado e a comissão adversária dobra a marcação); a reputação tática atua **de uma partida para outra**, fazendo o adversário já entrar em campo preparado contra o estilo histórico do usuário.
+Este mecanismo é **distinto do contra-ajuste intra-partida** (ver [seção 12](#12-sistema-online-vs-offline) e o contra-ajuste de IA adversária na [seção 18](#18-pontos-críticos-a-resolver)): o contra-ajuste reage a padrões repetidos **dentro do mesmo jogo** (o usuário ataca 15 minutos pelo mesmo lado e a comissão adversária dobra a marcação); a reputação tática atua **de uma partida para outra**, fazendo o adversário já entrar em campo preparado contra o estilo histórico do usuário.
 
 ## 15. Arquitetura conceitual do engine
 
@@ -599,7 +599,7 @@ Os itens abaixo consolidam o "Veredito": a base é forte e as brechas de execuç
 
 > **Recomendação (a ratificar — R-33):** **tempo de adaptação para mudanças táticas** em três fases — **0–2 min de desorganização** (efeito parcial e risco de erro elevado), **3–6 min de encaixe** (efeito crescente) e **7+ min de efeito completo**. A duração de cada fase encurta com inteligência tática, entrosamento, `FormationFamiliarity` e comunicação da comissão, e alonga com `TacticalConfusion` acumulada. Racional: uma troca (ex.: 4-3-3 → 3-5-2 aos 70') não pode render 100% no mesmo minuto, senão a troca vira bônus instantâneo. Os multiplicadores por fase são calibrados no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (`F4`/`F20`, série `R-18`).
 
-- **Limite de mudanças táticas (`TacticalConfusion`).** Como comandos táticos não têm limite natural (ao contrário das substituições), o abuso é contido por um estado de instabilidade `TacticalConfusion`, alimentado por mudanças recentes + complexidade da mudança + baixa comunicação da comissão + baixa inteligência tática do elenco + pressão do jogo. Seus efeitos são queda temporária de entrosamento, erro de posicionamento e prolongamento da fase de desorganização de R-33 (tempo de adaptação, nesta seção) — coerente com a estabilidade tática da [seção 11](#11-acoes-taticas-e-substituicoes-com-custo-e-cooldown). A fórmula e os coeficientes ficam no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (`MAT-008`, `F4`/`R-18`).
+- **Limite de mudanças táticas (`TacticalConfusion`).** Como comandos táticos não têm limite natural (ao contrário das substituições), o abuso é contido por um estado de instabilidade `TacticalConfusion`, alimentado por mudanças recentes + complexidade da mudança + baixa comunicação da comissão + baixa inteligência tática do elenco + pressão do jogo. Seus efeitos são queda temporária de entrosamento, erro de posicionamento e prolongamento da fase de desorganização de R-33 (tempo de adaptação, nesta seção) — coerente com a estabilidade tática da [seção 11](#11-ações-táticas-e-substituições-com-custo-e-cooldown). A fórmula e os coeficientes ficam no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (`MAT-008`, `F4`/`R-18`).
 
 - **Separar comando de execução (`StyleExecutionScore`).** O comando percorre uma cadeia — dado → compreendido → executado → resultado em campo — e um time cansado e indisciplinado executa mal "marcar forte". A `StyleExecutionScore` mede a **aptidão do elenco para cada estilo** (pressão alta, controle de posse, contra-ataque, defesa baixa, jogo direto, bola parada), pois cada um exige atributos diferentes; um estilo mal-executado entrega só parte do efeito pretendido e eleva o erro. Conecta-se a `PositionFit`/`RoleFit`/`FormationFamiliarity` ([seção 7](#7-microduelos-individuais)) e à aptidão de execução citada na [seção 5](#5-posse-perigosa-threat-vs-posse-de-bola). Coeficientes no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (`MAT-020`, séries F/R).
 
@@ -618,14 +618,14 @@ Os itens abaixo consolidam o "Veredito": a base é forte e as brechas de execuç
 
 - **Registrar causalidade dos eventos.** Cada evento guarda não só o que aconteceu, mas o **motivo** — causa primária, secundária e terciária, ação anterior e alerta anterior —, sustentando a explicabilidade que é a regra de ouro do produto ([seção 1](#1-filosofia-do-motor)), a imprensa, a avaliação da comissão e a percepção de justiça. É registrado pela `EventTimeline` ([seção 15](#15-arquitetura-conceitual-do-engine)) e já catalogado como regra `MAT-019` no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
-- **IA adversária que reage (contra-ajuste intra-partida).** NPC e IA offline reagem a padrões repetidos **dentro do jogo** conforme a própria comissão, cada um com nível de leitura, estilo do técnico, coragem e conservadorismo próprios (se o usuário ataca 15 min pelo mesmo lado, uma comissão adversária forte dobra a marcação, substitui ou explora o espaço deixado). Isso impede estratégia dominante e é distinto da reputação tática entre partidas ([seção 14](#14-reputacao-tatica-do-usuario-cross-match)). Alimenta-se da `MatchPatternMemory`; o detalhamento do comportamento fica em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md).
+- **IA adversária que reage (contra-ajuste intra-partida).** NPC e IA offline reagem a padrões repetidos **dentro do jogo** conforme a própria comissão, cada um com nível de leitura, estilo do técnico, coragem e conservadorismo próprios (se o usuário ataca 15 min pelo mesmo lado, uma comissão adversária forte dobra a marcação, substitui ou explora o espaço deixado). Isso impede estratégia dominante e é distinto da reputação tática entre partidas ([seção 14](#14-reputação-tática-do-usuário-cross-match)). Alimenta-se da `MatchPatternMemory`; o detalhamento do comportamento fica em [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md).
 
-- **Diferentes níveis de simulação para performance.** Partidas simultâneas usam a granularidade variável já definida na [seção 4](#4-simulacao-por-zonas-e-por-blocos-de-tempo) — online em ticks, offline por blocos, NPC×NPC resumida —, sempre com a regra de que o resultado precisa parecer gerado pelo mesmo universo. O **servidor autoritativo** e a persistência estão especificados na [seção 12 (Persistência, snapshot e seed)](#12-sistema-online-vs-offline); a compatibilidade de jogadores e a especialização de bola parada seguem os mesmos atributos coletivos e microduelos das seções [3](#3-atributos-coletivos-dinamicos) e [7](#7-microduelos-individuais). (Jogadores fora de posição, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo estão especificados na [seção 17](#17-fases-finais-e-situacoes-criticas).)
+- **Diferentes níveis de simulação para performance.** Partidas simultâneas usam a granularidade variável já definida na [seção 4](#4-simulação-por-zonas-e-por-blocos-de-tempo) — online em ticks, offline por blocos, NPC×NPC resumida —, sempre com a regra de que o resultado precisa parecer gerado pelo mesmo universo. O **servidor autoritativo** e a persistência estão especificados na [seção 12 (Persistência, snapshot e seed)](#12-sistema-online-vs-offline); a compatibilidade de jogadores e a especialização de bola parada seguem os mesmos atributos coletivos e microduelos das seções [3](#3-atributos-coletivos-dinâmicos) e [7](#7-microduelos-individuais). (Jogadores fora de posição, prorrogação/pênaltis, tempo de acréscimo e comportamento de fim de jogo estão especificados na [seção 17](#17-fases-finais-e-situações-críticas).)
 
 > **Recomendação (a ratificar — R-34):** **suíte de calibração estatística** de ~10.000 partidas por cenário — equilibradas, favorito×azarão, com chuva, pressão alta, comissão nível 1 vs 5, online e offline — validando **critérios de aceite**: distribuição de placar realista (média de gols e frequência de 0×0/goleadas dentro de faixas do futebol real), consistência entre ligas de níveis diferentes e ausência de bola de neve exagerada (um gol cedo não deve prever o resultado além de um limiar). Racional: sem lote estatístico com metas explícitas, os coeficientes `F1`–`F21` não têm como ser calibrados nem auditados. É a fonte de calibração final já citada no [catálogo §2.4](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (série `R-15`–`R-24`).
 
 - **Seed/snapshot para auditoria e reprodutibilidade.** O determinismo por seed (`matchSeed`/`tickSeed`/`eventSeed`), os snapshots em pontos-chave, o rollback por queda de worker e o versionamento do motor (`simulationVersion`/`tuningVersion`/`rulesVersion`) estão especificados na [seção 12 (Persistência, snapshot e seed)](#12-sistema-online-vs-offline), garantindo que qualquer partida possa ser reproduzida e auditada — inclusive para afastar acusação de "roubo". A política de versionamento de ruleset é a recomendação `R-24`/`R-30` no [catálogo](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
-- **Sugestões que expiram quando o contexto muda.** Toda `SuggestedAction` carrega `validUntilMinute`, `conditions` e `invalidatedBy`, sendo recalculada ou descartada quando o jogador-alvo é substituído, o placar muda, um jogador necessário sai, a formação adversária muda ou o clima/contexto se altera — conforme já especificado na [seção 13 (Sugestões com trade-off e prazo de validade)](#13-comissao-tecnica-como-gate-de-qualidade).
+- **Sugestões que expiram quando o contexto muda.** Toda `SuggestedAction` carrega `validUntilMinute`, `conditions` e `invalidatedBy`, sendo recalculada ou descartada quando o jogador-alvo é substituído, o placar muda, um jogador necessário sai, a formação adversária muda ou o clima/contexto se altera — conforme já especificado na [seção 13 (Sugestões com trade-off e prazo de validade)](#13-comissão-técnica-como-gate-de-qualidade).
 
 Itens adicionais levantados na discussão e a incorporar na especificação técnica: balanceamento coletivo, arbitragem detalhada, importância do jogo e estado do campeonato, risco de lesão agravada, modelo de confiança da informação, ritmo narrativo, scouting pré-jogo, integração com o treino semanal, reputação tática do usuário e ocultação de complexidade para jogadores iniciantes.

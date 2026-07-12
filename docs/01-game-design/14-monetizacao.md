@@ -11,10 +11,10 @@ Para as regras de integridade competitiva, punições e detecção de vantagem i
 ## Sumário
 
 - [1. Regra geral](#1-regra-geral)
-- [2. Conteúdos permitidos](#2-conteudos-permitidos)
-- [3. Conteúdos proibidos](#3-conteudos-proibidos)
-- [4. Cosméticos e identidade](#4-cosmeticos-e-identidade)
-- [5. Pendências em aberto](#5-pendencias-em-aberto)
+- [2. Conteúdos permitidos](#2-conteúdos-permitidos)
+- [3. Conteúdos proibidos](#3-conteúdos-proibidos)
+- [4. Cosméticos e identidade](#4-cosméticos-e-identidade)
+- [5. Pendências em aberto](#5-pendências-em-aberto)
 
 ## 1. Regra geral
 
@@ -71,4 +71,4 @@ Essa fronteira é o que mantém o passe de temporada e todos os itens de coleç�
 
 > **Recomendação (a ratificar — R-93):** conteúdo do passe de temporada cosmético — recompensas puramente estéticas (temas de UI, itens comemorativos, personalização de estádio sem efeito esportivo); nada altera resultado/economia/potencial.
 
-> **Resolvido (Série R — R-75):** relatórios premium **não existem** — todos os relatórios são gratuitos e a qualidade da comissão é o único diferenciador (no-pay-to-win). Vender informação de scouting/dado oculto cruzaria a linha e fica proibido.
+> **Recomendação (a ratificar — R-75):** relatórios premium **não existem** — todos os relatórios são gratuitos e a qualidade da comissão é o único diferenciador (no-pay-to-win). Vender informação de scouting/dado oculto cruzaria a linha e fica proibido.

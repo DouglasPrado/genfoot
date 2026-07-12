@@ -106,7 +106,7 @@ Telas de autenticação, entrada no mundo, escolha/criação de clube, revisão 
 ## `M-CONTROL-ACTIVATE` — Ativação de controle / pré-temporada
 
 - **Objetivo:** assumir o comando na data válida.
-- **Componentes e dados:** data de ativação; para clube novo: entrada na divisão de expansão + **pré-temporada**; para assumido: mantém estado integral.
+- **Componentes e dados:** data de ativação; para clube novo: entrada na Liga Inicial + **pré-temporada**; para assumido: mantém estado integral.
 - **Ações:** **Ativar controle** → command `ActivateClubControl` → `M-ONBOARD-REVIEW`.
 - **Estados:** contagem até a data válida; *loading*.
 - **Referências:** [`15-fluxos §1 passo 7`](../01-game-design/15-fluxos-completos.md); [`09-anti-abuso §2.5`](../01-game-design/09-anti-abuso-e-onboarding.md).

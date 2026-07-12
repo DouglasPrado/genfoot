@@ -170,7 +170,7 @@ A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lac
 - **Ações:** abrir escalação/tática antes do lock (`M-LINEUP`/`M-TACTICS`); ver calendário (`M-CALENDAR`).
 - **Estados:** **rodada bloqueada** (comandos de escalação recusados — `MATCH_COMMAND_WINDOW_CLOSED`) sinalizada proativamente **antes** do bloqueio; mundo em manutenção/`WORLD_READ_ONLY`; relógio local do aparelho não altera prazos (servidor é a verdade).
 - **Tempo real/notificações:** aviso proativo "escalação fecha em X"; "rodada simulada".
-- **Referências:** [`03-multiplayer-e-mundos §1, §4, §5`](../02-tecnico/03-multiplayer-e-mundos.md); [doc 08](../02-tecnico/08-frontend-cliente-e-tempo-real.md); [design system §5, §7, §9](00-visao-geral-e-design-system.md). > **A incorporar em doc 00 §9:** componentes `WorldClock` e `RoundStatus` como *chrome* persistente do `Header`.
+- **Referências:** [`03-multiplayer-e-mundos §1, §4, §5`](../02-tecnico/03-multiplayer-e-mundos.md); [doc 08](../02-tecnico/08-frontend-cliente-e-tempo-real.md); [design system §5, §7, §9](00-visao-geral-e-design-system.md) (`WorldClock`/`RoundStatus` incorporados no §9).
 
 ### `M-FRIENDLIES` — Amistosos / gestão de pré-temporada
 - **Objetivo:** montar a pré-temporada — agendar amistosos e turnês para testar tática/jovens sem punição.
@@ -191,20 +191,27 @@ A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lac
 ## D. Adendos — 2ª passada
 
 ### Mundo, sessão e rodada
-- **`Header` / design system §9:** componente `WorldClock` (data/fuso do mundo) sempre visível e `RoundStatus` (estado da rodada) [`03-mp §1, §4`].
-- **`M-HOME`:** faixa de status com **cronômetro da próxima simulação** e progresso da temporada; **banner de manutenção agendada** ("mundo entra em manutenção às 20h") e **recepção de comunicados do operador** (categoria de notificação "comunicado do mundo") [`03-mp §1`; `04-plataforma §11`; design system §5].
+> Dobrado em [00-visao-geral-e-design-system.md §9](00-visao-geral-e-design-system.md#9-tempo-real-na-ótica-da-ui) — `Header` (chrome persistente `WorldClock` + `RoundStatus`, estado da rodada).
+
+> Dobrado em [04-mobile-telas-central-home-decisoes.md](04-mobile-telas-central-home-decisoes.md) — `M-HOME` (faixa de status: cronômetro da próxima simulação + progresso; banner de manutenção agendada; comunicado do mundo).
+
 - **`M-NOTIFS` / design system §5:** categoria **"comunicado do mundo"** (broadcast do admin) e aviso proativo de manutenção com contagem regressiva.
 - **`M-CONTROL-ACTIVATE` / `M-CLUB-PREVIEW`:** ao entrar em **temporada avançada**, situar na rodada assíncrona ("assume na rodada 15 de 38; próxima simulação em 2 dias; janela de escalação fecha em X; a IA já tem escalação-fallback") [`03-mp §2`].
 - **`M-SETTINGS` / `M-ACCOUNT`:** *toggle* de **privacidade de presença** (mostrar/ocultar online e visto-por-último); tratamento de **sessão concorrente** em múltiplos dispositivos ("sessão iniciada em outro aparelho") [`03-mp §3`; design system §5].
 - **`M-WORLD-STRUCTURE` / `M-FEED`:** evento de **transição de liga por nível estrutural** (Liga Inicial→Acesso→Intermediária→Principal→Elite) e **criação/renumeração dinâmica de divisões** quando entram mais usuários [`03-mp §7`]. > **Pendência:** limiares de expansão e interação dos dois eixos (fonte em aberto).
 
 ### Temporada, competição e seleções
-- **`M-WORLD-STRUCTURE` / `M-BOARD`:** **teto da divisão** (folha, overall médio, estrangeiros, reputação, estrutura) vs. o clube, e estado **"acima do teto → obrigado a subir"** [`06 §13.1`].
+> Dobrado em [09-mobile-telas-financas-estrutura-estadio.md](09-mobile-telas-financas-estrutura-estadio.md) — `M-BOARD` (teto da divisão vs. clube → "acima do teto → obrigado a subir").
+
 - **`M-LICENSING`:** aba/seção **"Licença competitiva"** separada do estádio — checklist por padrão mínimo (segurança, financeiro, elenco, médica, base, atrasos, conformidade), **plano de adequação com prazo/marcos**, escada de sanção (plano→restrições→multas→impedimento/rebaixamento administrativo), e estado **"venceu no campo mas acesso/rebaixamento pendente de licença"** ecoado em `M-COMPETITION`/`M-SEASON-CLOSE` [`06 §15.1, §14.1`].
 - **`M-CALENDAR` / `M-CLAUSES` / `M-SQUAD`:** **marcos contratuais** na timeline (expiração, gatilho por desempenho, janela de opção — cada vínculo vira no seu marco) e roll-up "situação contratual do elenco" [`06 §14.5`].
-- **`M-HOME` (fase pré-temporada) / `MF-04`:** superfície do **briefing de nova temporada** (`SeasonOpeningContext`: expectativas do clube/torcida, situação financeira, jogadores-chave, necessidades de mercado, promoções da base, riscos) na entrada da temporada, não só no fim do wizard [`06 §11, §13.2`].
-- **`M-BOARD`:** sinalizar **objetivos calibrados por estágio** do clube (novo revela jovens/reduz idade; médio briga por acesso; grande ganha título) [`06 §13.2`].
-- **`M-NATIONAL`:** **fluxo de dispensa por recomendação médica** com estados (solicitada → em avaliação → reconhecida/negada → arbitragem clube×seleção), origem em `M-MEDICAL-CASE`; **grade prospectiva de rotação por datas FIFA** (quem está fora em cada janela + **projeção de prontidão no retorno** — viagem/clima/minutos), espelhada em `M-CALENDAR` [`12 §3, §5`].
+
+> Dobrado em [04-mobile-telas-central-home-decisoes.md](04-mobile-telas-central-home-decisoes.md) — `M-HOME` (briefing de nova temporada / `SeasonOpeningContext` na entrada da temporada).
+
+> Dobrado em [09-mobile-telas-financas-estrutura-estadio.md](09-mobile-telas-financas-estrutura-estadio.md) — `M-BOARD` (objetivos calibrados por estágio do clube).
+
+> Dobrado em [10-mobile-telas-competicoes-calendario-selecoes.md](10-mobile-telas-competicoes-calendario-selecoes.md) — `M-NATIONAL` (dispensa médica solicitada→arbitragem; grade de rotação por datas FIFA + projeção de prontidão).
+
 - **`M-AWARDS` / `M-PLAYER`:** roll-up **"prêmios do meu elenco"** e **efeito psicológico** do prêmio no jogador (confiança↑ + pressão↑) no bloco de estados [`06 §7, §14.3`].
 - **`M-PLAYER`:** **elegibilidade de seleção** (por qual seleção pode ser convocado; dupla nacionalidade/naturalização) [`12 §1`]. > **Pendência:** estrutura de dados de nacionalidade (fonte em aberto).
 

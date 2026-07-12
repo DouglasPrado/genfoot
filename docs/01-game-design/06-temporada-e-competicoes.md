@@ -13,18 +13,18 @@ Este documento define a temporada e suas fases, os campeonatos como entidades in
 1. [A temporada como ciclo principal](#1-a-temporada-como-ciclo-principal)
 2. [Campeonatos como entidades independentes](#2-campeonatos-como-entidades-independentes)
 3. [Modelo em 3 camadas](#3-modelo-em-3-camadas)
-4. [Calendário da temporada](#4-calendario-da-temporada)
+4. [Calendário da temporada](#4-calendário-da-temporada)
 5. [Impacto dos campeonatos no jogador](#5-impacto-dos-campeonatos-no-jogador)
 6. [Fim de temporada: o motor de virada (checklist de ~20 passos)](#6-fim-de-temporada-o-motor-de-virada-checklist-de-20-passos)
-7. [Sistema de premiações](#7-sistema-de-premiacoes)
-8. [Histórico permanente](#8-historico-permanente)
-9. [Promoção, rebaixamento e reputação dos clubes](#9-promocao-rebaixamento-e-reputacao-dos-clubes)
+7. [Sistema de premiações](#7-sistema-de-premiações)
+8. [Histórico permanente](#8-histórico-permanente)
+9. [Promoção, rebaixamento e reputação dos clubes](#9-promoção-rebaixamento-e-reputação-dos-clubes)
 10. [Aposentadorias e reaproveitamento de personagens](#10-aposentadorias-e-reaproveitamento-de-personagens)
 11. [Nova temporada: objetivos e narrativa](#11-nova-temporada-objetivos-e-narrativa)
-12. [Exemplos práticos](#12-exemplos-praticos)
-13. [Equilíbrio competitivo para clubes novos](#13-equilibrio-competitivo-para-clubes-novos)
-14. [Homologação e transição entre temporadas](#14-homologacao-e-transicao-entre-temporadas)
-15. [Licenciamento e inscrição de jogadores](#15-licenciamento-e-inscricao-de-jogadores)
+12. [Exemplos práticos](#12-exemplos-práticos)
+13. [Equilíbrio competitivo para clubes novos](#13-equilíbrio-competitivo-para-clubes-novos)
+14. [Homologação e transição entre temporadas](#14-homologação-e-transição-entre-temporadas)
+15. [Licenciamento e inscrição de jogadores](#15-licenciamento-e-inscrição-de-jogadores)
 
 ---
 
@@ -702,7 +702,7 @@ Uma competição só é **homologada** quando um conjunto de condições está s
 - critérios de desempate calculados;
 - classificação consistente.
 
-A posição esportiva final (inclusive **acessos e rebaixamentos**) pode ainda depender de **licença, recursos e decisões administrativas** antes da confirmação — ver [seção 15](#15-licenciamento-e-inscricao-de-jogadores) e o encerramento esportivo da [seção 6](#6-fim-de-temporada-o-motor-de-virada-checklist-de-20-passos). A temporada só é concluída depois de todas as competições relevantes estarem homologadas.
+A posição esportiva final (inclusive **acessos e rebaixamentos**) pode ainda depender de **licença, recursos e decisões administrativas** antes da confirmação — ver [seção 15](#15-licenciamento-e-inscrição-de-jogadores) e o encerramento esportivo da [seção 6](#6-fim-de-temporada-o-motor-de-virada-checklist-de-20-passos). A temporada só é concluída depois de todas as competições relevantes estarem homologadas.
 
 ### 14.2 Título provisório vs. oficial
 
@@ -720,13 +720,13 @@ Essa separação entre **fato provisório** e **fato oficial** é o que permite 
 
 ### 14.3 Prêmios individuais da temporada
 
-Além dos prêmios de campeonato já catalogados na [seção 7](#7-sistema-de-premiacoes), o fechamento da temporada consolida distinções em nível de temporada. O conjunto de referência inclui: **campeão e vice, artilheiro, líder de assistências, melhor jogador, melhor goleiro, melhor jovem, melhor técnico, seleção da temporada e fair play**.
+Além dos prêmios de campeonato já catalogados na [seção 7](#7-sistema-de-premiações), o fechamento da temporada consolida distinções em nível de temporada. O conjunto de referência inclui: **campeão e vice, artilheiro, líder de assistências, melhor jogador, melhor goleiro, melhor jovem, melhor técnico, seleção da temporada e fair play**.
 
 - Prêmios **objetivos** (artilheiro, líder de assistências) seguem contagem direta.
 - Prêmios **subjetivos** (melhor jogador, melhor jovem, seleção da temporada) têm critérios próprios de eleição.
 - O **fair play** e a **seleção da temporada** são distinções de temporada que complementam — sem substituir — os prêmios por campeonato da seção 7.
 
-Os critérios de eleição destes prêmios de temporada seguem o mesmo modelo objetivo/subjetivo proposto para os prêmios de campeonato em **R-61** ([seção 7](#7-sistema-de-premiacoes)), aplicado agora à temporada inteira: **melhor jovem** = maior `AwardScore` entre elegíveis por idade; **seleção da temporada** = maior `AwardScore` por posição; **fair play** = prêmio objetivo pelo menor índice disciplinar (cartões ponderados) do clube/jogador na temporada. A magnitude do efeito em reputação/mercado também segue R-61, com **peso de temporada ligeiramente acima** do prêmio equivalente de um único campeonato.
+Os critérios de eleição destes prêmios de temporada seguem o mesmo modelo objetivo/subjetivo proposto para os prêmios de campeonato em **R-61** ([seção 7](#7-sistema-de-premiações)), aplicado agora à temporada inteira: **melhor jovem** = maior `AwardScore` entre elegíveis por idade; **seleção da temporada** = maior `AwardScore` por posição; **fair play** = prêmio objetivo pelo menor índice disciplinar (cartões ponderados) do clube/jogador na temporada. A magnitude do efeito em reputação/mercado também segue R-61, com **peso de temporada ligeiramente acima** do prêmio equivalente de um único campeonato.
 
 ### 14.4 Premiações financeiras
 

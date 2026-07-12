@@ -2,6 +2,8 @@
 
 > **Status:** Consolidado — fonte única da verdade do modelo de dados (schema canônico reconciliado) · **Fontes fundidas:** chats/entidades-do-banco-de-dados-inicial.md (visão de domínio e módulos, seções 1–5) + chats/ux-do-jogo.md (detalhamento granular por domínio, seção 6) · **Revisão:** 2026-07-11
 
+> **⚙️ Schema executável:** o **schema Prisma executável canônico** vive em [`../../prisma/schema.prisma`](../../prisma/schema.prisma) — validado com `prisma validate` (Prisma 6.x). **Este documento é a referência de domínio comentada**, não o artefato compilável. Os blocos ` ```prisma ` aqui são **snippets ilustrativos** (as seções 1–5 usam uma forma essencial/introdutória; a seção 6 é um **inventário de campos** granular, propositalmente em pseudo-código). Em qualquer divergência de **sintaxe**, `prisma/schema.prisma` prevalece; para o **domínio** detalhado (invariantes, decisões, os ~250 models granulares), prevalece este documento. O `schema.prisma` cobre um núcleo coerente (~51 models) — não o inventário completo da §6.
+
 Este documento é o **modelo de dados canônico** do **Grinta** — um manager de futebol online (estilo Brasfoot), com mundo persistente, clubes que crescem ao longo das temporadas e jogadores únicos gerados com biografia e personalidade. É a **fonte única da verdade** para o schema: em caso de divergência com outros documentos, este prevalece.
 
 Duas iterações históricas do modelo (a visão de domínio das seções 1–5 e o detalhamento granular do então "Bloco 26", hoje a seção 6) foram **fundidas num único schema canônico**. As decisões de reconciliação — UUIDv7 como PK, dinheiro em `BigInt amountMinor` + `currencyId`, `gameWorldId` como chave de partição, FK composta `(gameWorldId, id)`, `Person` separado de `Player`, e a divisão de status de partida (runtime/resultado/homologação) — já estão aplicadas ao longo do texto e não constituem mais pendência.
@@ -91,6 +93,8 @@ Principais enums do domínio (valores fiéis ao schema-fonte):
 ## 3. Models por domínio
 
 São ~60 models. Abaixo os campos-chave e relações principais, agrupados por área.
+
+> **Snippets ilustrativos (forma essencial).** Os blocos ` ```prisma ` desta seção mostram a estrutura essencial de cada model já com os tipos canônicos, mas **não substituem** [`../../prisma/schema.prisma`](../../prisma/schema.prisma) (o schema executável e validado). Cada model aparece **uma única vez** como declaração `model X {}` — nas §1–5 (forma introdutória); a §6 detalha a forma granular do mesmo domínio como **inventário de campos**, sem re-declarar `model`. Comentários `// relações: ...` no fim de um bloco listam relações modeladas no arquivo real.
 
 ### 3.1 Mundo e Usuário
 
@@ -191,8 +195,12 @@ model EconomySnapshot {
   gameWorldId String @db.Uuid
   seasonId    String? @db.Uuid
   currencyId  String  @db.Uuid          // moeda dos agregados monetários abaixo
-  totalClubs Int; totalActiveClubs Int
-  totalPlayers Int; totalActivePlayers Int; totalRetiredPlayers Int; totalFreeAgents Int
+  totalClubs Int
+  totalActiveClubs Int
+  totalPlayers Int
+  totalActivePlayers Int
+  totalRetiredPlayers Int
+  totalFreeAgents Int
   totalCashInWorldMinor   BigInt        // dinheiro: unidade mínima
   averageClubCashMinor    BigInt
   averagePlayerValueMinor BigInt
@@ -210,12 +218,19 @@ model EconomySnapshot {
 model Club {
   id          String @id @default(uuid(7)) @db.Uuid
   gameWorldId String @db.Uuid
-  name String; shortName String; slug String
-  city String?; country String; foundedYear Int?
+  name String
+  shortName String
+  slug String
+  city String?
+  country String
+  foundedYear Int?
   controlType ClubControlType @default(AI)
   status      ClubStatus      @default(ACTIVE)
-  reputation Int @default(1); level Int @default(1)
-  fanBaseSize Int @default(0); boardPatience Int @default(50); pressureLevel Int @default(0)
+  reputation Int @default(1)
+  level Int @default(1)
+  fanBaseSize Int @default(0)
+  boardPatience Int @default(50)
+  pressureLevel Int @default(0)
   currencyId     String @db.Uuid           // moeda operacional do clube (FK Currency)
   cashMinor           BigInt               // dinheiro em unidade mínima
   wageBudgetMinor     BigInt
@@ -242,7 +257,8 @@ model ClubControl {
   worldParticipantId String @db.Uuid       // participante do mundo que controla o clube
   controlType       ClubControlType
   isActive          Boolean @default(true)
-  startsAtWorldTick BigInt; endsAtWorldTick BigInt?
+  startsAtWorldTick BigInt
+  endsAtWorldTick BigInt?
   version           Int @default(1)
   club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
   @@index([gameWorldId, clubId])
@@ -255,7 +271,9 @@ model ClubDepartment {
   clubId      String @db.Uuid
   currencyId  String @db.Uuid
   type   DepartmentType
-  level  Int @default(1); maxLevel Int @default(5); qualityScore Int @default(10)
+  level  Int @default(1)
+  maxLevel Int @default(5)
+  qualityScore Int @default(10)
   maintenanceCostPerSeasonMinor BigInt
   upgradeCostMinor              BigInt
   effectJson Json?
@@ -273,8 +291,12 @@ model ClubDepartment {
 model Person {                          // dados pessoais/biografia (§6.3.4)
   id          String @id @default(uuid(7)) @db.Uuid
   gameWorldId String @db.Uuid
-  firstName String; lastName String; knownName String?
-  nationality String; birthDate DateTime; ageVirtual Int
+  firstName String
+  lastName String
+  knownName String?
+  nationality String
+  birthDate DateTime
+  ageVirtual Int
   gender Gender @default(MALE)
   status PlayerStatus @default(ACTIVE)   // ver PersonStatus/PlayerCareerStatus no detalhamento (§6.2)
   createdAt DateTime @default(now())
@@ -294,7 +316,8 @@ model Player {                          // papel esportivo/atributos (§6.3.4)
   primaryPosition   PlayerPosition
   secondaryPosition PlayerPosition?
   dominantFoot      DominantFoot
-  heightCm Int?; weightKg Int?
+  heightCm Int?
+  weightKg Int?
   status PlayerStatus @default(ACTIVE)
   generationSource        PlayerGenerationSource
   generatedAtSeasonNumber Int?
@@ -304,11 +327,17 @@ model Player {                          // papel esportivo/atributos (§6.3.4)
   marketValueMinor    BigInt            // dinheiro em unidade mínima
   wageExpectationMinor BigInt
   // estado dinâmico
-  morale Int @default(50); confidence Int @default(50); happiness Int @default(50)
-  fatigue Int @default(0); matchSharpness Int @default(50)
+  morale Int @default(50)
+  confidence Int @default(50)
+  happiness Int @default(50)
+  fatigue Int @default(0)
+  matchSharpness Int @default(50)
   // traços persistentes
-  injuryProneness Int @default(50); consistency Int @default(50)
-  ambition Int @default(50); loyalty Int @default(50); professionalism Int @default(50)
+  injuryProneness Int @default(50)
+  consistency Int @default(50)
+  ambition Int @default(50)
+  loyalty Int @default(50)
+  professionalism Int @default(50)
   version Int @default(1)
   person Person @relation(fields: [personId], references: [id])
   // relações 1:1: attributes, development
@@ -326,16 +355,42 @@ model PlayerAttributes {
   id String @id @default(uuid(7)) @db.Uuid
   playerId String @unique
   // técnicos
-  finishing Int; longShots Int; heading Int; passing Int; crossing Int
-  dribbling Int; firstTouch Int; technique Int; tackling Int; marking Int; positioning Int
+  finishing Int
+  longShots Int
+  heading Int
+  passing Int
+  crossing Int
+  dribbling Int
+  firstTouch Int
+  technique Int
+  tackling Int
+  marking Int
+  positioning Int
   // físicos
-  acceleration Int; pace Int; stamina Int; strength Int; agility Int; balance Int; jumping Int
+  acceleration Int
+  pace Int
+  stamina Int
+  strength Int
+  agility Int
+  balance Int
+  jumping Int
   // mentais
-  bravery Int; aggression Int; composure Int; decisions Int; concentration Int
-  leadership Int; teamwork Int; workRate Int; determination Int; flair Int
+  bravery Int
+  aggression Int
+  composure Int
+  decisions Int
+  concentration Int
+  leadership Int
+  teamwork Int
+  workRate Int
+  determination Int
+  flair Int
   // goleiro (nullable — só GKs)
-  goalkeeperReflexes Int?; goalkeeperHandling Int?; goalkeeperPositioning Int?
-  goalkeeperKicking Int?; goalkeeperOneOnOne Int?
+  goalkeeperReflexes Int?
+  goalkeeperHandling Int?
+  goalkeeperPositioning Int?
+  goalkeeperKicking Int?
+  goalkeeperOneOnOne Int?
 }
 
 model PlayerBackground {
@@ -346,7 +401,9 @@ model PlayerBackground {
   violenceExposure      Int @default(0)
   educationLevel        Int @default(50)
   earlyFootballAccess   Int @default(50)
-  fatherPresenceScore Int?; motherPresenceScore Int?; guardianStory String?
+  fatherPresenceScore Int?
+  motherPresenceScore Int?
+  guardianStory String?
   lifeStorySummary   String?
   generatedTraitJson Json?   // traços derivados da história de vida
 }
@@ -354,9 +411,16 @@ model PlayerBackground {
 model PlayerPersonality {
   id String @id @default(uuid(7)) @db.Uuid
   playerId String @unique
-  grit Int; emotionalStability Int; discipline Int; ego Int
-  pressureHandling Int; adaptability Int; socialInfluence Int; mediaHandling Int
-  offFieldRisk Int; lifestyleBalance Int
+  grit Int
+  emotionalStability Int
+  discipline Int
+  ego Int
+  pressureHandling Int
+  adaptability Int
+  socialInfluence Int
+  mediaHandling Int
+  offFieldRisk Int
+  lifestyleBalance Int
   hiddenTraits Json?   // traços ocultos, revelados por scouting
 }
 
@@ -366,7 +430,9 @@ model PlayerDevelopment {
   technicalGrowthRate Decimal @db.Decimal(6, 4)
   physicalGrowthRate  Decimal @db.Decimal(6, 4)
   mentalGrowthRate    Decimal @db.Decimal(6, 4)
-  peakAgeStart Int; peakAgeEnd Int; declineRate Decimal @db.Decimal(6, 4)
+  peakAgeStart Int
+  peakAgeEnd Int
+  declineRate Decimal @db.Decimal(6, 4)
   trainingResponse Int
   injuryImpactAccumulated Int @default(0)
   lastDevelopmentAt DateTime?
@@ -374,9 +440,13 @@ model PlayerDevelopment {
 
 model PlayerClubHistory {
   id String @id @default(uuid(7)) @db.Uuid
-  playerId String; clubId String
-  joinedAtSeason Int; leftAtSeason Int?
-  appearances Int @default(0); goals Int @default(0); assists Int @default(0)
+  playerId String
+  clubId String
+  joinedAtSeason Int
+  leftAtSeason Int?
+  appearances Int @default(0)
+  goals Int @default(0)
+  assists Int @default(0)
   reason String?
 }
 
@@ -387,7 +457,8 @@ model PlayerContract {
   clubId      String @db.Uuid
   currencyId  String @db.Uuid
   status ContractStatus @default(ACTIVE)
-  startSeason Int; endSeason Int
+  startSeason Int
+  endSeason Int
   salaryPerSeasonMinor BigInt            // dinheiro em unidade mínima
   signingBonusMinor    BigInt @default(0)
   releaseClauseMinor   BigInt?
@@ -412,10 +483,16 @@ model StaffMember {
   personId    String @db.Uuid           // reusa Person: ex-jogador vira staff sem duplicar identidade
   role        StaffRole
   qualityTier StaffQualityTier
-  abilityScore Int; potentialScore Int; reputation Int @default(1)
-  tacticalKnowledge Int @default(50); youthDevelopment Int @default(50)
-  medicalKnowledge Int @default(50); negotiation Int @default(50)
-  communication Int @default(50); discipline Int @default(50); dataAnalysis Int @default(50)
+  abilityScore Int
+  potentialScore Int
+  reputation Int @default(1)
+  tacticalKnowledge Int @default(50)
+  youthDevelopment Int @default(50)
+  medicalKnowledge Int @default(50)
+  negotiation Int @default(50)
+  communication Int @default(50)
+  discipline Int @default(50)
+  dataAnalysis Int @default(50)
   version Int @default(1)
   person   Person @relation(fields: [personId], references: [id])
   contracts StaffContract[]
@@ -431,7 +508,8 @@ model StaffContract {
   clubId      String @db.Uuid
   currencyId  String @db.Uuid
   status ContractStatus @default(ACTIVE)
-  startSeason Int; endSeason Int
+  startSeason Int
+  endSeason Int
   salaryPerSeasonMinor BigInt            // dinheiro em unidade mínima
   version Int @default(1)
   @@index([gameWorldId, clubId])
@@ -442,37 +520,52 @@ model TrainingPlan {
   gameWorldId String @db.Uuid
   clubId      String @db.Uuid
   seasonId    String @db.Uuid
-  name String; focus TrainingFocus; intensity Int
-  tacticalStyleJson Json?; createdByStaffId String? @db.Uuid
-  startsAt DateTime; endsAt DateTime?
+  name String
+  focus TrainingFocus
+  intensity Int
+  tacticalStyleJson Json?
+  createdByStaffId String? @db.Uuid
+  startsAt DateTime
+  endsAt DateTime?
   entries TrainingPlayerEntry[]
   @@index([gameWorldId, clubId])
 }
 
 model TrainingPlayerEntry {
   id String @id @default(uuid(7)) @db.Uuid
-  trainingPlanId String; playerId String
-  focus TrainingFocus; workload Int
+  trainingPlanId String
+  playerId String
+  focus TrainingFocus
+  workload Int
   technicalGain Decimal @db.Decimal(8, 4) @default(0)
   physicalGain  Decimal @db.Decimal(8, 4) @default(0)
   mentalGain    Decimal @db.Decimal(8, 4) @default(0)
-  fatigueGain Int @default(0); injuryRiskGain Int @default(0)
+  fatigueGain Int @default(0)
+  injuryRiskGain Int @default(0)
 }
 
 model PlayerInjury {
   id String @id @default(uuid(7)) @db.Uuid
   playerId String
-  severity InjurySeverity; name String; description String?
-  occurredAt DateTime; expectedReturnAt DateTime?; recoveredAt DateTime?
-  causedByMatchId String?; causedByTrainingPlanId String?
+  severity InjurySeverity
+  name String
+  description String?
+  occurredAt DateTime
+  expectedReturnAt DateTime?
+  recoveredAt DateTime?
+  causedByMatchId String?
+  causedByTrainingPlanId String?
   medicalDepartmentLevelAtTime Int?   // registra qualidade médica no momento
 }
 
 model PlayerSuspension {
   id String @id @default(uuid(7)) @db.Uuid
   playerId String
-  reason String; matchesRemaining Int; competitionSeasonId String?
-  startsAt DateTime; endsAt DateTime?
+  reason String
+  matchesRemaining Int
+  competitionSeasonId String?
+  startsAt DateTime
+  endsAt DateTime?
 }
 ```
 
@@ -490,9 +583,11 @@ model ScoutReport {
   estimatedCurrentAbility Int
   estimatedPotentialAbility Int
   estimatedMarketValueMinor BigInt        // dinheiro em unidade mínima
-  personalityNotes String?; backgroundNotes String?
+  personalityNotes String?
+  backgroundNotes String?
   recommendationScore Int
-  discoveredAt DateTime @default(now()); expiresAt DateTime?
+  discoveredAt DateTime @default(now())
+  expiresAt DateTime?
   @@index([gameWorldId, clubId])
 }
 
@@ -505,7 +600,8 @@ model TransferListing {
   status TransferStatus @default(LISTED)
   type   TransferType
   askingPriceMinor BigInt                 // dinheiro em unidade mínima
-  listedAt DateTime @default(now()); expiresAt DateTime?
+  listedAt DateTime @default(now())
+  expiresAt DateTime?
   reason String?
   offers TransferOffer[]
   @@index([gameWorldId, clubId])
@@ -524,8 +620,11 @@ model TransferOffer {
   transferFeeMinor BigInt                  // dinheiro em unidade mínima
   salaryOfferMinor BigInt
   contractSeasons Int
-  bonusJson Json?; clausesJson Json?
-  playerInterestScore Int?; sellingClubInterestScore Int?; buyingClubNeedScore Int?
+  bonusJson Json?
+  clausesJson Json?
+  playerInterestScore Int?
+  sellingClubInterestScore Int?
+  buyingClubNeedScore Int?
   // relações nomeadas: buyingClub / sellingClub -> Club
   @@index([gameWorldId, playerId])
   // Detalhamento canônico (transferência como processo: TransferCase + versões de oferta,
@@ -544,7 +643,8 @@ model FinancialTransaction {
   type FinanceTransactionType
   description String?
   amountMinor BigInt                       // dinheiro em unidade mínima (proibido Float/Decimal)
-  seasonNumber Int?; occurredAt DateTime @default(now())
+  seasonNumber Int?
+  occurredAt DateTime @default(now())
   metadata Json?
   @@index([gameWorldId, clubId])
   // Visão introdutória do lançamento financeiro. Modelo canônico de contabilidade
@@ -579,7 +679,9 @@ model Competition {
   name String
   type   CompetitionType
   format CompetitionFormat
-  country String?; tier Int?; reputation Int @default(1)
+  country String?
+  tier Int?
+  reputation Int @default(1)
   seasons CompetitionSeason[]
   @@unique([gameWorldId, id])
   @@index([gameWorldId])
@@ -589,26 +691,37 @@ model Competition {
 
 model CompetitionSeason {
   id String @id @default(uuid(7)) @db.Uuid
-  competitionId String; seasonId String
-  name String; status SeasonStatus @default(PLANNED)
-  startsAt DateTime; endsAt DateTime?
-  prizeJson Json?; rulesJson Json?   // regras flexíveis por competição
-  clubs CompetitionClub[]; stages CompetitionStage[]; matches Match[]
+  competitionId String
+  seasonId String
+  name String
+  status SeasonStatus @default(PLANNED)
+  startsAt DateTime
+  endsAt DateTime?
+  prizeJson Json?
+  rulesJson Json?  // regras flexíveis por competição
+  clubs CompetitionClub[]
+  stages CompetitionStage[]
+  matches Match[]
   @@unique([competitionId, seasonId])
 }
 
 model CompetitionClub {
   id String @id @default(uuid(7)) @db.Uuid
-  competitionSeasonId String; clubId String
-  seed Int?; groupName String?
+  competitionSeasonId String
+  clubId String
+  seed Int?
+  groupName String?
   @@unique([competitionSeasonId, clubId])
 }
 
 model CompetitionStage {
   id String @id @default(uuid(7)) @db.Uuid
   competitionSeasonId String
-  name String; order Int; format CompetitionFormat
-  startsAt DateTime?; endsAt DateTime?
+  name String
+  order Int
+  format CompetitionFormat
+  startsAt DateTime?
+  endsAt DateTime?
   matches Match[]
 }
 ```
@@ -636,12 +749,16 @@ model Match {
   stageId     String? @db.Uuid
   homeClubId  String @db.Uuid
   awayClubId  String @db.Uuid
-  seasonNumber Int; roundNumber Int?
-  scheduledAt DateTime; startedAt DateTime?; finishedAt DateTime?
+  seasonNumber Int
+  roundNumber Int?
+  scheduledAt DateTime
+  startedAt DateTime?
+  finishedAt DateTime?
   runtimeStatus     MatchRuntimeStatus @default(SCHEDULED)  // ciclo de vida (máquina de estados)
   resultStatus      MatchResultStatus  @default(PENDING)    // desfecho (NORMAL/WALKOVER/CANCELLED/ABANDONED)
   homologationStatus HomologationStatus @default(PENDING)   // confirmação oficial
-  homeGoals Int @default(0); awayGoals Int @default(0)
+  homeGoals Int @default(0)
+  awayGoals Int @default(0)
   homeExpectedGoals Decimal? @db.Decimal(8, 4)  // xG: não-monetário (Decimal justificado)
   awayExpectedGoals Decimal? @db.Decimal(8, 4)
   simulationSeed String?           // seed do resultado (replay determinístico)
@@ -669,65 +786,97 @@ model MatchSimulation {
 model MatchSimulationTick {
   id String @id @default(uuid(7)) @db.Uuid
   simulationId String
-  minute Int; second Int?
-  homeMomentum Decimal @db.Decimal(8, 4); awayMomentum Decimal @db.Decimal(8, 4)
-  homeThreat Decimal @db.Decimal(8, 4);   awayThreat Decimal @db.Decimal(8, 4)
-  homeFatigueAvg Decimal @db.Decimal(8, 4); awayFatigueAvg Decimal @db.Decimal(8, 4)
+  minute Int
+  second Int?
+  homeMomentum Decimal @db.Decimal(8, 4)
+  awayMomentum Decimal @db.Decimal(8, 4)
+  homeThreat Decimal @db.Decimal(8, 4)
+  awayThreat Decimal @db.Decimal(8, 4)
+  homeFatigueAvg Decimal @db.Decimal(8, 4)
+  awayFatigueAvg Decimal @db.Decimal(8, 4)
   data Json?
 }
 
 model MatchTeamState {
   id String @id @default(uuid(7)) @db.Uuid
-  matchId String; clubId String
+  matchId String
+  clubId String
   controlSource MatchControlSource   // USER_ONLINE / USER_OFFLINE_AI / FULL_AI / SYSTEM
   mentality TacticalMentality @default(BALANCED)
   pressing PressingIntensity @default(MEDIUM)
   marking  MarkingStyle @default(ZONAL)
   tempo    TempoStyle @default(NORMAL)
   formation String
-  lineHeight Int @default(50); defensiveWidth Int @default(50); attackingWidth Int @default(50)
+  lineHeight Int @default(50)
+  defensiveWidth Int @default(50)
+  attackingWidth Int @default(50)
   riskLevel Int @default(50)
-  morale Int @default(50); fatigueAvg Int @default(0); tacticalCohesion Int @default(50)
+  morale Int @default(50)
+  fatigueAvg Int @default(0)
+  tacticalCohesion Int @default(50)
   currentInstructions Json?
   @@unique([matchId, clubId])
 }
 
 model MatchLineup {
   id String @id @default(uuid(7)) @db.Uuid
-  matchId String; clubId String
-  formation String; isInitial Boolean @default(true)
+  matchId String
+  clubId String
+  formation String
+  isInitial Boolean @default(true)
   players MatchLineupPlayer[]
 }
 
 model MatchLineupPlayer {
   id String @id @default(uuid(7)) @db.Uuid
-  lineupId String; playerId String
-  position PlayerPosition; shirtNumber Int?; isStarter Boolean @default(true)
-  enteredMinute Int?; leftMinute Int?
-  tacticalRole String?; individualInstructionJson Json?
+  lineupId String
+  playerId String
+  position PlayerPosition
+  shirtNumber Int?
+  isStarter Boolean @default(true)
+  enteredMinute Int?
+  leftMinute Int?
+  tacticalRole String?
+  individualInstructionJson Json?
 }
 
 model MatchEvent {
   id String @id @default(uuid(7)) @db.Uuid
   matchId String
-  clubId String?; playerId String?; relatedPlayerId String?
+  clubId String?
+  playerId String?
+  relatedPlayerId String?
   type MatchEventType
-  minute Int; second Int?
-  description String; importance Int @default(1)
-  x Decimal? @db.Decimal(8, 4); y Decimal? @db.Decimal(8, 4)  // coordenada no campo
+  minute Int
+  second Int?
+  description String
+  importance Int @default(1)
+  x Decimal? @db.Decimal(8, 4)
+  y Decimal? @db.Decimal(8, 4)  // coordenada no campo
   data Json?
 }
 
 model PlayerMatchStats {
   id String @id @default(uuid(7)) @db.Uuid
-  matchId String; playerId String
+  matchId String
+  playerId String
   minutesPlayed Int @default(0)
-  goals Int; assists Int; shots Int; shotsOnTarget Int
-  passesAttempted Int; passesCompleted Int
-  tackles Int; interceptions Int; foulsCommitted Int; yellowCards Int; redCards Int
-  saves Int; goalsConceded Int
+  goals Int
+  assists Int
+  shots Int
+  shotsOnTarget Int
+  passesAttempted Int
+  passesCompleted Int
+  tackles Int
+  interceptions Int
+  foulsCommitted Int
+  yellowCards Int
+  redCards Int
+  saves Int
+  goalsConceded Int
   rating Decimal @db.Decimal(4, 2) @default(6.00)
-  fatigueStart Int; fatigueEnd Int
+  fatigueStart Int
+  fatigueEnd Int
   moraleImpact Int @default(0)
   @@unique([matchId, playerId])
 }
@@ -738,22 +887,31 @@ Pontos de decisão (interação do usuário durante a partida):
 ```prisma
 model MatchDecisionPoint {
   id String @id @default(uuid(7)) @db.Uuid
-  matchId String; clubId String
-  type DecisionPointType; minute Int
-  title String; description String
+  matchId String
+  clubId String
+  type DecisionPointType
+  minute Int
+  title String
+  description String
   urgency RecommendationImpact
   createdByStaffQuality Int?
-  resolved Boolean @default(false); resolvedAt DateTime?
-  chosenActionId String?; data Json?
+  resolved Boolean @default(false)
+  resolvedAt DateTime?
+  chosenActionId String?
+  data Json?
   recommendations MatchActionRecommendation[]
 }
 
 model MatchActionRecommendation {
   id String @id @default(uuid(7)) @db.Uuid
   decisionPointId String
-  title String; description String
-  impact RecommendationImpact; confidence Int
-  tacticalChangeJson Json?; substitutionJson Json?; riskJson Json?
+  title String
+  description String
+  impact RecommendationImpact
+  confidence Int
+  tacticalChangeJson Json?
+  substitutionJson Json?
+  riskJson Json?
   generatedByStaffRole StaffRole?      // origem da recomendação (qualidade da comissão)
   generatedByStaffQuality Int?
 }
@@ -765,10 +923,13 @@ model MatchActionRecommendation {
 model ClubAIProfile {
   id String @id @default(uuid(7)) @db.Uuid
   clubId String @unique
-  aggressiveness Int @default(50); patience Int @default(50)
-  youthPreference Int @default(50); transferRisk Int @default(50)
+  aggressiveness Int @default(50)
+  patience Int @default(50)
+  youthPreference Int @default(50)
+  transferRisk Int @default(50)
   financialDiscipline Int @default(50)
-  tacticalFlexibility Int @default(50); substitutionTiming Int @default(50)
+  tacticalFlexibility Int @default(50)
+  substitutionTiming Int @default(50)
   injuryRiskTolerance Int @default(50)
   offlineDecisionLevel Int @default(1)   // profundidade de decisão quando usuário está offline
   strategyJson Json?
@@ -778,9 +939,12 @@ model ClubAIProfile {
 model AIDecision {
   id String @id @default(uuid(7)) @db.Uuid
   clubAIProfileId String
-  context String; decisionType String
-  inputJson Json; outputJson Json          // rastreabilidade completa da decisão
-  confidence Int?; impactScore Int?
+  context String
+  decisionType String
+  inputJson Json
+  outputJson Json  // rastreabilidade completa da decisão
+  confidence Int?
+  impactScore Int?
 }
 ```
 
@@ -789,10 +953,17 @@ model AIDecision {
 ```prisma
 model ClubSeasonStats {
   id String @id @default(uuid(7)) @db.Uuid
-  clubId String; seasonId String
-  matchesPlayed Int; wins Int; draws Int; losses Int
-  goalsFor Int; goalsAgainst Int; points Int
-  finalPosition Int?; titlesWon Int @default(0)
+  clubId String
+  seasonId String
+  matchesPlayed Int
+  wins Int
+  draws Int
+  losses Int
+  goalsFor Int
+  goalsAgainst Int
+  points Int
+  finalPosition Int?
+  titlesWon Int @default(0)
   averageAttendance Int @default(0)
   fanMood MoodLevel @default(NEUTRAL)
   @@unique([clubId, seasonId])
@@ -800,9 +971,16 @@ model ClubSeasonStats {
 
 model PlayerSeasonStats {
   id String @id @default(uuid(7)) @db.Uuid
-  playerId String; seasonId String; clubId String?
-  appearances Int; starts Int; minutesPlayed Int
-  goals Int; assists Int; yellowCards Int; redCards Int
+  playerId String
+  seasonId String
+  clubId String?
+  appearances Int
+  starts Int
+  minutesPlayed Int
+  goals Int
+  assists Int
+  yellowCards Int
+  redCards Int
   averageRating Decimal @db.Decimal(4, 2) @default(0)
   injuriesCount Int @default(0)
   @@unique([playerId, seasonId])
@@ -810,10 +988,13 @@ model PlayerSeasonStats {
 
 model FanSentiment {
   id String @id @default(uuid(7)) @db.Uuid
-  clubId String; seasonNumber Int?
+  clubId String
+  seasonNumber Int?
   mood MoodLevel @default(NEUTRAL)
-  pressure Int @default(0); satisfaction Int @default(50)
-  reason String?; data Json?
+  pressure Int @default(0)
+  satisfaction Int @default(50)
+  reason String?
+  data Json?
 }
 
 model Narrative {
@@ -822,9 +1003,12 @@ model Narrative {
   clubId      String? @db.Uuid
   playerId    String? @db.Uuid
   type NarrativeType
-  title String; description String
-  intensity Int @default(1); isActive Boolean @default(true)
-  startsAt DateTime @default(now()); endsAt DateTime?
+  title String
+  description String
+  intensity Int @default(1)
+  isActive Boolean @default(true)
+  startsAt DateTime @default(now())
+  endsAt DateTime?
   effectsJson Json?    // efeitos aplicados (moral, pressão, valor etc.)
   @@index([gameWorldId])
 }
@@ -835,10 +1019,13 @@ model Notification {
   userId      String? @db.Uuid
   clubId      String? @db.Uuid
   type NotificationType
-  title String; message String
-  isRead Boolean @default(false); priority Int @default(1)
+  title String
+  message String
+  isRead Boolean @default(false)
+  priority Int @default(1)
   payload Json?
-  createdAt DateTime @default(now()); readAt DateTime?
+  createdAt DateTime @default(now())
+  readAt DateTime?
   @@index([gameWorldId])
 }
 ```
@@ -853,8 +1040,12 @@ model GameAuditLog {
   gameWorldId String? @db.Uuid
   userId      String? @db.Uuid
   clubId      String? @db.Uuid
-  action String; entity String; entityId String? @db.Uuid
-  beforeJson Json?; afterJson Json?; metadata Json?
+  action String
+  entity String
+  entityId String? @db.Uuid
+  beforeJson Json?
+  afterJson Json?
+  metadata Json?
   createdAt DateTime @default(now())
   @@index([gameWorldId])
   // Referência genérica (entity/entityId) permitida por ser auditoria; ver §6.3.11 (AuditEvent
@@ -864,7 +1055,8 @@ model GameAuditLog {
 model GameRuleConfig {
   id          String @id @default(uuid(7)) @db.Uuid
   gameWorldId String @db.Uuid
-  key String; value Json
+  key String
+  value Json
   @@unique([gameWorldId, key])
   // Forma canônica de regras versionadas: RuleSet/RuleDefinition/RuleValue/RuleSetVersion (§6.1).
 }
@@ -1002,13 +1194,15 @@ Enums **estáveis** propostos, agrupados por domínio. (Muitas taxonomias aberta
 
 Conjunto canônico de entidades por domínio, com campos-chave e constraints. Nomes de model em PascalCase; muitas entidades existem em variantes por período/versão/snapshot. Todas seguem as convenções da §1 e da §6.1 (UUIDv7, `gameWorldId`, `BigInt amountMinor` + `currencyId`, `version`).
 
+> **Blocos desta seção = inventário de campos (pseudo-código).** Os blocos de código da §6.3 são ` ```text ` deliberadamente: listam **campos** de cada entidade granular como pseudo-código (campos separados por vírgula, alguns em comentários), **não** são Prisma compilável e **não** re-declaram os models já apresentados nas §1–5. O schema **executável** e validado — com o núcleo de ~51 models já traduzidos para Prisma real (tipos, `@relation`, FKs compostas `(gameWorldId, id)`, índices) — vive em [`../../prisma/schema.prisma`](../../prisma/schema.prisma). A escrita campo-a-campo em Prisma dos demais ~250 models granulares aqui inventariados é trabalho de implementação, guiado pelas regras da §6.1 e pelas Decisões 19.7/19.8.
+
 #### 6.3.1 Plataforma (globais, sem `gameWorldId`) — §41–43
 
 - **Conta e identidade:** `UserAccount`, `UserProfile`, `UserCredential`, `UserSession`, `UserRefreshToken`, `UserDevice`, `UserSecurityFactor`, `UserRecoveryCode`, `UserSecurityEvent`, `UserAccountRestriction`.
 - **Preferências:** `UserGlobalPreference`, `UserLocalePreference`, `UserAccessibilityPreference`, `UserPrivacyPreference`.
 - **Relações com mundos:** `WorldParticipant`, `WorldInvitation`, `WorldMembershipRestriction`, `WorldObserverAccess`.
 
-```prisma
+```text
 model UserAccount {
   id                    // status, primaryEmailNormalized, emailVerifiedAt,
   // authenticationVersion, lastLoginAt, anonymizedAt, createdAt, updatedAt, version
@@ -1028,18 +1222,17 @@ model WorldParticipant {
 - **Temporada:** `Season`, `SeasonPhase`, `SeasonTransition`, `SeasonTransitionCheckpoint`, `SeasonSnapshot`, `ClubSeasonParticipation`, `ClubSeasonReview`, `ClubSeasonObjectiveResult` — constraint `unique(gameWorldId, seasonNumber)`.
 - **Geografia (própria do mundo, não localidades reais externas):** `WorldRegion`, `WorldSubregion`, `WorldCity`, `WorldVenueLocation`, `RegionalEconomicProfile`, `RegionalPlayerPopulation`, `RegionalSupporterMarket`.
 
-```prisma
-model GameWorld {
-  id, publicCode, name, status, operationalState, currentSeasonId,
+Inventário de campos (pseudo-código; **não** re-declara os models — a declaração executável está em [`../../prisma/schema.prisma`](../../prisma/schema.prisma)):
+
+```text
+GameWorld → id, publicCode, name, status, operationalState, currentSeasonId,
   currentRuleSetVersionId, currentWorldTick, rhythmProfile, regionProfile,
   createdAt, startedAt, archivedAt, version
-}
+  (forma granular do GameWorld já declarado em §3.1 / prisma/schema.prisma)
 
-model WorldClock {
-  gameWorldId, status, currentWorldTick, lastProcessedWorldTick,
+WorldClock → gameWorldId, status, currentWorldTick, lastProcessedWorldTick,
   nextProcessingWorldTick, leaseOwner, leaseExpiresAt, heartbeatAt, version
-  // Constraint parcial: um único WorldClock ACTIVE por gameWorldId
-}
+  (Constraint parcial: um único WorldClock ACTIVE por gameWorldId)
 ```
 
 #### 6.3.3 Clube e governança — §49–54
@@ -1048,25 +1241,25 @@ model WorldClock {
 - **Governança:** `ClubGovernance`, `ClubOwnership`, `ClubOwner`, `ClubBoard`, `ClubBoardMember`, `ClubBoardMandate`, `ClubAuthorityProfile`, `ClubAuthorityGrant`, `ClubAuthorityRestriction`, `ClubAutonomyPeriod`, `BoardDecision`, `BoardApprovalRequest`, `ClubObjective`, `ClubObjectiveEvaluation`, `ClubPolicy`, `ClubStrategy`.
 - **Departamentos e responsabilidades (separados):** `ClubDepartment`, `DepartmentCapability`, `DepartmentOperationalSnapshot`, `ClubPosition`, `ClubPositionAssignment`, `ClubResponsibility`, `ClubResponsibilityAssignment`, `ClubDelegationPolicy`, `ClubWorkQueue`, `ClubWorkItem`.
 
-```prisma
-model Club {
-  id, gameWorldId, publicCode, status, originType, foundedAtWorldTick,
+Inventário de campos (pseudo-código; **não** re-declara os models — declaração executável em [`../../prisma/schema.prisma`](../../prisma/schema.prisma) / §3.2):
+
+```text
+Club → id, gameWorldId, publicCode, status, originType, foundedAtWorldTick,
   currentIdentityPeriodId, currentControlId, currentGovernanceId, homeCityId,
   createdAt, version
-  // NÃO armazena diretamente: nome/escudo/estádio/controlador histórico (ficam em períodos)
-}
+  (na forma granular NÃO armazena diretamente nome/escudo/estádio/controlador
+   histórico — ficam em períodos; ver Club em §3.2 / prisma/schema.prisma)
 
-model ClubIdentityPeriod {
-  clubId, officialName, shortName, nickname, slug, primaryColor, secondaryColor,
-  badgeFileId, startsAtWorldTick, endsAtWorldTick, changeReason, decisionId, status, version
-  // Constraint: sem sobreposição de períodos oficiais do mesmo clube
-}
+ClubIdentityPeriod → clubId, officialName, shortName, nickname, slug, primaryColor,
+  secondaryColor, badgeFileId, startsAtWorldTick, endsAtWorldTick, changeReason,
+  decisionId, status, version
+  (Constraint: sem sobreposição de períodos oficiais do mesmo clube)
 
-model ClubControl { // controle atual ou histórico
-  clubId, worldParticipantId, status, controlType, startsAtWorldTick, endsAtWorldTick,
-  competitiveControlStartsAtWorldTick, authorityProfileId, activationProcessId, version
-  // Constraints: um único controle ativo por clube; um único clube ativo por participante no mesmo mundo
-}
+ClubControl (controle atual ou histórico) → clubId, worldParticipantId, status,
+  controlType, startsAtWorldTick, endsAtWorldTick, competitiveControlStartsAtWorldTick,
+  authorityProfileId, activationProcessId, version
+  (Constraints: um único controle ativo por clube; um único clube ativo por
+   participante no mesmo mundo; forma granular do ClubControl de §3.2 / prisma/schema.prisma)
 ```
 
 #### 6.3.4 Pessoa e jogador (separados) — §55–66
@@ -1078,31 +1271,33 @@ model ClubControl { // controle atual ou histórico
 - **Estado físico/mental:** `PlayerPhysicalState`, `PlayerMentalState`, `PlayerFatigueSnapshot`, `PlayerMoraleSnapshot`, `PlayerConditionEvent` (estado atual atualizável; snapshots preservam histórico).
 - **Conhecimento do clube sobre o jogador (não fica no `Player`):** `ClubPlayerKnowledge`, `ClubPlayerKnowledgeSource`, `ScoutingReport`, `MedicalKnowledge`, `ContractKnowledge`, `RelationshipKnowledge` — cada clube tem conhecimento parcial; relatórios antigos não são atualizados retroativamente.
 
-```prisma
-model Person {
-  id, gameWorldId, status, birthWorldDate, deathWorldDate,
+Inventário de campos (pseudo-código; **não** re-declara os models — declaração executável em [`../../prisma/schema.prisma`](../../prisma/schema.prisma) / §3.3):
+
+```text
+Person → id, gameWorldId, status, birthWorldDate, deathWorldDate,
   currentNamePeriodId, primaryNationalityId, publicProfileId, privateProfileId, createdAt, version
-}
-model PersonNamePeriod { // nome atual nunca é sobrescrito
-  personId, fullName, commonName, shirtName, startsAtWorldTick, endsAtWorldTick, reason
-}
-model Player {
-  id, gameWorldId, personId, careerStatus, primaryPositionCode,
+  (forma granular do Person de §3.3 / prisma/schema.prisma)
+
+PersonNamePeriod → personId, fullName, commonName, shirtName,
+  startsAtWorldTick, endsAtWorldTick, reason
+  (nome atual nunca é sobrescrito)
+
+Player → id, gameWorldId, personId, careerStatus, primaryPositionCode,
   currentEmploymentClubId, currentSportingClubId, currentSquadId,
   professionalDebutAtWorldTick, retiredAtWorldTick, version
-  // Constraint: unique(gameWorldId, personId)
-  // currentEmploymentClubId (contrato/origem) ≠ currentSportingClubId (autorizado a atuar); em empréstimo divergem
-}
-model PlayerAbilityProfile { // snapshot versionado usado pelo motor
-  playerId, schemaVersion, technicalProfile Json, mentalProfile Json, physicalProfile Json,
-  goalkeepingProfile Json, profileHash, effectiveFromWorldTick, effectiveUntilWorldTick, version
-}
-// PlayerHiddenProfile: potencial, consistência, ambição, tendência a lesão, traços privados —
-// acesso restrito ao motor/processos autorizados, nunca diretamente ao usuário.
-model PlayerCareerPeriod { // passagem por clube
-  playerId, clubId, movementType, employmentContractId, loanAgreementId,
-  startsAtWorldTick, endsAtWorldTick, status, exitReason, version
-}
+  (Constraint: unique(gameWorldId, personId); currentEmploymentClubId (contrato/origem)
+   ≠ currentSportingClubId (autorizado a atuar) — em empréstimo divergem; forma granular
+   do Player de §3.3 / prisma/schema.prisma)
+
+PlayerAbilityProfile (snapshot versionado usado pelo motor) → playerId, schemaVersion,
+  technicalProfile Json, mentalProfile Json, physicalProfile Json, goalkeepingProfile Json,
+  profileHash, effectiveFromWorldTick, effectiveUntilWorldTick, version
+
+PlayerHiddenProfile → potencial, consistência, ambição, tendência a lesão, traços privados
+  (acesso restrito ao motor/processos autorizados, nunca diretamente ao usuário)
+
+PlayerCareerPeriod (passagem por clube) → playerId, clubId, movementType,
+  employmentContractId, loanAgreementId, startsAtWorldTick, endsAtWorldTick, status, exitReason, version
 ```
 
 #### 6.3.5 Elenco, contrato e registro (entidades diferentes) — §67–74
@@ -1112,14 +1307,19 @@ model PlayerCareerPeriod { // passagem por clube
 - **Negociação:** `ContractNegotiation`, `ContractNegotiationParty`, `ContractProposal`, `ContractProposalTerm`, `ContractNegotiationMessage`, `ContractNegotiationDeadline` — proposta aceita permanece registrada e ligada ao contrato resultante.
 - **Registro competitivo (independente do contrato):** `CompetitionRegistration`, `CompetitionRegistrationPlayer`, `CompetitionRegistrationChange`, `PlayerEligibilityDecision`, `PlayerRegistrationRestriction`, `ShirtNumberAssignment`.
 
-```prisma
-model PlayerContract {
-  id, gameWorldId, playerId, clubId, status, contractType, signedAtWorldTick,
+Inventário de campos (pseudo-código; **não** re-declara os models — declaração executável em [`../../prisma/schema.prisma`](../../prisma/schema.prisma) / §3.3):
+
+```text
+PlayerContract → id, gameWorldId, playerId, clubId, status, contractType, signedAtWorldTick,
   startsAtWorldTick, endsAtWorldTick, baseCurrencyId, currentSalaryPeriodId, negotiationId, version
-  // Constraint central: nenhum jogador com dois contratos principais de emprego incompatíveis e sobrepostos
-}
-model PlayerContractSalaryPeriod { contractId, amountMinor, paymentFrequency, startsAtWorldTick, endsAtWorldTick, reason }
-model PlayerContractBonus { contractId, bonusTypeCode, amountMinor, triggerDefinition Json, maximumOccurrences, status }
+  (Constraint central: nenhum jogador com dois contratos principais de emprego incompatíveis
+   e sobrepostos; forma granular do PlayerContract de §3.3 / prisma/schema.prisma)
+
+PlayerContractSalaryPeriod → contractId, amountMinor, paymentFrequency,
+  startsAtWorldTick, endsAtWorldTick, reason
+
+PlayerContractBonus → contractId, bonusTypeCode, amountMinor, triggerDefinition Json,
+  maximumOccurrences, status
 ```
 
 #### 6.3.6 Funcionários, treino, táticas e medicina — §75–87
@@ -1137,22 +1337,21 @@ model PlayerContractBonus { contractId, bonusTypeCode, amountMinor, triggerDefin
 - **Classificação:** `CompetitionStanding`, `CompetitionStandingEntry`, `CompetitionStandingSnapshot`, `CompetitionStandingAdjustment`, `CompetitionTiebreakResult` — punições não entram silenciosamente nos pontos; existe `CompetitionStandingAdjustment`.
 - **Homologação:** `CompetitionHomologation`, `CompetitionFinalStanding`, `CompetitiveMovement`, `CompetitiveAppeal`, `CompetitionAdministrativeDecision`.
 
-```prisma
-model MatchTeam {
-  matchId, clubId, side, scoreOfficial, scoreOnField, lineupId, tacticalPlanId, version
-  // Constraints: unique(matchId, clubId); unique(matchId, side)
-}
-model MatchEvent {
-  matchId, sequence, simulationTime, kind, clubId, playerId, secondaryPlayerId,
+Inventário de campos (pseudo-código; **não** re-declara os models — declaração executável em [`../../prisma/schema.prisma`](../../prisma/schema.prisma) / §3.8):
+
+```text
+MatchTeam → matchId, clubId, side, scoreOfficial, scoreOnField, lineupId, tacticalPlanId, version
+  (Constraints: unique(matchId, clubId); unique(matchId, side))
+
+MatchEvent → matchId, sequence, simulationTime, kind, clubId, playerId, secondaryPlayerId,
   payload, engineVersion, status, createdAt
-  // Constraint: unique(matchId, sequence)
-}
-model MatchCommand { // idempotente
-  commandId, matchId, clubId, origin, type, status, expectedMatchVersion,
+  (Constraint: unique(matchId, sequence); forma granular do MatchEvent de §3.8 / prisma/schema.prisma)
+
+MatchCommand (idempotente) → commandId, matchId, clubId, origin, type, status, expectedMatchVersion,
   submittedAtReal, receivedAtReal, effectiveSimulationTime, payload, resultPayload, version
-  // Constraint: unique(commandId)
-}
-// Estatísticas separadas e versionadas: MatchPlayerStatistic, MatchTeamStatistic, MatchStatisticCorrection
+  (Constraint: unique(commandId))
+
+Estatísticas separadas e versionadas: MatchPlayerStatistic, MatchTeamStatistic, MatchStatisticCorrection
 ```
 
 #### 6.3.8 Mercado, transferências e empréstimos — §103–109
@@ -1161,7 +1360,7 @@ model MatchCommand { // idempotente
 - **Transferência (processo, não troca de `clubId`):** `TransferCase`, `TransferCaseParty`, `TransferInquiry`, `TransferOffer`, `TransferOfferVersion`, `TransferOfferTerm`, `TransferCounterOffer`, `TransferAgreement`, `TransferAgreementTerm`, `TransferPaymentSchedule`, `TransferInstallment`, `TransferBonus`, `TransferSellOnClause`, `TransferBuyBackClause`, `TransferMatchingRight`, `TransferMedicalProcess`, `TransferRegistrationProcess`, `TransferCompletion`, `TransferCancellation`.
 - **Empréstimos (preservam contrato/clube de origem):** `PlayerLoanAgreement`, `PlayerLoanSalaryShare`, `PlayerLoanUsagePromise`, `PlayerLoanPurchaseClause`, `PlayerLoanRecallClause`, `PlayerLoanRestriction`, `PlayerLoanReturn`.
 
-```prisma
+```text
 model TransferCase { // processo inteiro
   playerId, buyingClubId, sellingClubId, status, transferType, openedAtWorldTick,
   currentOfferId, agreementId, deadlineAtWorldTick, version
@@ -1183,7 +1382,7 @@ Razão de partidas dobradas: `FinancialAccount`, `FinancialAccountGroup`, `Finan
 - **Saldo derivado do razão**; `FinancialAccountBalanceSnapshot` é cache recalculável/versionado/conciliado — sem campo de saldo editável isolado. Lançamento passa por `DRAFT → POSTING → POSTED → REVERSED`; só `POSTED` afeta saldo. Lançamento publicado não é editado — reversão cria novo `FinancialJournalEntry` com `reversalOfJournalEntryId`.
 - **Orçamento ≠ caixa** (autorização/planejamento). `FinancialReservation` (`clubId`, `budgetLineId`, `purposeType/Id`, `amountMinor`, `status`, `expiresAtWorldTick`, `consumedAmountMinor`, `releasedAmountMinor`, `version`) — constraint `consumido + liberado <= reservado`.
 
-```prisma
+```text
 model FinancialAccount { clubId, accountCode, accountType, normalSide, currencyId, status, parentAccountId, version }
 // FinancialJournalEntry = transação lógica; FinancialJournalLine = débitos/créditos
 // Constraint: soma dos débitos = soma dos créditos por journalEntry e moeda
@@ -1212,7 +1411,7 @@ model FinancialJournalLine {
 - **Administração/operações:** `AdminOperator`, `AdminRole`, `AdminPermission`, `AdminRolePermission`, `AdminOperatorRole`, `AdminTemporaryAccess`, `AdminSession`, `AdminConflictDeclaration`, `BreakGlassAccess`, `AdministrativeOperation`, `AdministrativeApproval`, `AdministrativeCorrection`, `OperationalIncident`(+`TimelineEvent`/`CorrectiveAction`), `AdministrativeJob`, `Backup`, `RestoreOperation`, `MaintenanceWindow`, `Deployment`, `DatabaseMigration`, `FeatureFlag`, `SupportTicket`(+`Message`), `SupportAccessSession`, `AuditEvent` (sem cascade delete; cadeia de hash de integridade).
 - **Eventing:** `DomainEvent`, `OutboxEvent`, `InboxEvent`, `ScheduledTask`(+`Attempt`), `ProcessManager`(+`Step`), `Lease`, `ProjectionState`, `ProjectionRebuild`, `DeadLetterMessage`, `IdempotencyRecord`, `CommandExecution`.
 
-```prisma
+```text
 model CommandExecution {
   commandId, idempotencyKey, actorId, gameWorldId, commandType, status,
   aggregateId, resultPayload, errorCode, createdAt, completedAt

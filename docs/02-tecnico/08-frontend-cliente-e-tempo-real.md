@@ -9,14 +9,14 @@ A partir de **2026-07-11** o Grinta tem **dois clientes**: o **app do jogador** 
 ## Sumário
 
 - [Stack de frontend](#stack-de-frontend)
-- [Gestão de estado no cliente](#gestao-de-estado-no-cliente)
-- [Estratégia mobile e clientes](#estrategia-mobile-e-clientes)
+- [Gestão de estado no cliente](#gestão-de-estado-no-cliente)
+- [Estratégia mobile e clientes](#estratégia-mobile-e-clientes)
 - [API e contratos](#api-e-contratos)
 - [Tempo real (realtime-gateway)](#tempo-real-realtime-gateway)
-- [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)
+- [Recuperação, idempotência e cenários de falha](#recuperação-idempotência-e-cenários-de-falha)
 - [Tela de partida ao vivo](#tela-de-partida-ao-vivo)
-- [Critérios de aceite](#criterios-de-aceite)
-- [Pendências consolidadas](#pendencias-consolidadas)
+- [Critérios de aceite](#critérios-de-aceite)
+- [Pendências consolidadas](#pendências-consolidadas)
 - [Documentos relacionados](#documentos-relacionados)
 
 ---
@@ -209,7 +209,7 @@ O handshake do WebSocket **não** reutiliza credenciais longas. A conexão é ab
 - **Handshake com credencial curta.** O cliente obtém um token efêmero e o apresenta na abertura da conexão; o `realtime-gateway` **valida a credencial antes de admitir o socket**.
 - **Autorização no gateway.** A validação ocorre no gateway (nunca no cliente), combinando usuário, sessão, mundo, clube e visibilidade aplicável. Autenticar **não** implica autorizar: cada **assinatura** de sala (usuário/clube/mundo/partida) é autorizada **separadamente**.
 - **Vínculo à sessão HTTP autenticada.** A sessão do socket é vinculada à sessão HTTP autenticada; se essa sessão for revogada ou expirar, o socket perde autorização.
-- **Reconexão revalida.** Toda reconexão exige **nova validação** da credencial, além da recuperação de sequência (ver [Recuperação, idempotência e cenários de falha](#recuperacao-idempotencia-e-cenarios-de-falha)).
+- **Reconexão revalida.** Toda reconexão exige **nova validação** da credencial, além da recuperação de sequência (ver [Recuperação, idempotência e cenários de falha](#recuperação-idempotência-e-cenários-de-falha)).
 
 > **Recomendação (a ratificar — R-95):** credencial efêmera de sessão — proposta: access token JWT curto (~15 min) + refresh token rotativo (endpoint `/auth/refresh`), reautorização do WebSocket por assinatura do token, revogação por lista de sessões no servidor (logout/expiração fecham o socket).
 
@@ -413,7 +413,7 @@ Relativos a frontend, cliente e tempo real, o bloco é considerado correto quand
 
 ## Pendências consolidadas
 
-> **Resolvido (2026-07-11):** a tecnologia do app nativo do jogador — antes em aberto — foi decidida como **Expo / React Native** (Android+iOS), com o **admin** em Next.js. Ver [Estratégia mobile e clientes](#estrategia-mobile-e-clientes) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/). Não há pendências abertas de stack de cliente.
+> **Resolvido (2026-07-11):** a tecnologia do app nativo do jogador — antes em aberto — foi decidida como **Expo / React Native** (Android+iOS), com o **admin** em Next.js. Ver [Estratégia mobile e clientes](#estratégia-mobile-e-clientes) e o desenho de telas em [`../04-ui-ux/`](../04-ui-ux/). Não há pendências abertas de stack de cliente.
 
 ---
 

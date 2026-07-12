@@ -291,7 +291,7 @@ A viagem longa é um fator estratégico e um calendário ruim amplifica seus efe
 
 **Divisões inferiores podem ser mais regionalizadas** (Decisão 1872): menor custo, mais rivalidade, mais identidade e melhor entrada de clubes novos; divisões maiores podem ter viagens mais longas.
 
-**O calendário pode reduzir viagens em divisões baixas** (Decisão 1873), especialmente para divisão de expansão, regionais, base e clubes pequenos, ajudando na sustentabilidade.
+**O calendário pode reduzir viagens em divisões baixas** (Decisão 1873), especialmente para Liga Inicial, regionais, base e clubes pequenos, ajudando na sustentabilidade.
 
 > Nota de ligação: fadiga de viagem e sua influência no desempenho em campo entram no cálculo da partida em [`./05-motor-de-partida.md`](./05-motor-de-partida.md).
 
@@ -364,6 +364,15 @@ A viagem longa é um fator estratégico e um calendário ruim amplifica seus efe
 
 ## 14. Pendências
 
-> **Recomendação (a ratificar — R-90):** valores concretos de estádio/região (capacidade por divisão, deterioração, custo de manutenção, bônus de mando, elasticidade preço×ocupação, custo/fadiga por distância) como calibração inicial; ajuste fino no lote de simulação.
+> **Recomendação (a ratificar — R-90):** proposta de 1ª passada (mesma natureza de R-41..R-49 em [`./03-economia.md`](./03-economia.md)) para os valores concretos de estádio; calibração final no lote de simulação.
+>
+> - **Capacidade por divisão (faixas):** Liga Inicial **3.000–12.000**; divisões intermediárias **12.000–35.000**; Elite **35.000–70.000** (topo excepcional até ~80.000). Coerente com "todos nascem pequenos" ([`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) §3): o estádio inicial fica na base da faixa da Liga Inicial.
+> - **Deterioração sem manutenção:** a condição estrutural (0–100) cai **~10%/temporada** (faixa 8–12%) quando a manutenção é negligenciada; a manutenção mínima paga neutraliza a maior parte, deixando deterioração residual **~2%/temporada**. Clima adverso e excesso de jogos aceleram em +1–3 p.p.
+> - **Custo de manutenção:** despesa recorrente ≈ **R$ 10 por assento de capacidade · mês** (faixa R$ 8–15), escalada pela condição-alvo — ~R$ 100 mil/mês para um estádio de 10.000 lugares. Negligenciar empurra o custo de recuperação posterior para **3–5×** a manutenção evitada.
+> - **Bônus de mando (em pontos, escala 0–100):** bônus base **+5** (faixa **+3 a +8**) aplicado aos fatores de moral/pressão/intensidade do mandante, **escalado pela ocupação** (Decisão 1828): estádio vazio → ~**+1**; lotação plena → até **+8**. Somam rivalidade/torcida organizada (**até +2**); campo neutro e clima extremo reduzem. Nunca garante vitória (Decisão 1827).
+> - **Elasticidade preço×ocupação:** reutiliza o `fatorPreço` de [`./03-economia.md`](./03-economia.md) §5.2 (R-41): `fatorPreço = clamp(1.4 − 0.5·(preço/preçoRef), 0.15, 1.0)` — a cada +1.0 em `preço/preçoRef`, a ocupação esperada cai ~0.5×, com piso 0.15 e teto 1.0; `preçoRef` por divisão/setor vem de R-89. Reaproveitar a fórmula evita divergência com a bilheteria da economia.
+> - **Custo/fadiga por faixa de distância:** **curta** (<150 km, derby regional) → custo baixo, fadiga ~0–1 pt de energia; **média** (150–600 km) → custo médio, fadiga ~2–4 pts; **longa** (600–1.500 km) → custo alto, fadiga ~5–8 pts e recuperação afetada; **muito longa** (>1.500 km) → fadiga ~8–12 pts, exige rotação. Boa logística/gestão reduz ~30–50% (Decisão 1840); sequência de jogos fora acumula (Decisão 1841). Fadiga expressa na escala 0–100 de energia do jogador.
+>
+> Todos os números acima são **recomendação inicial (a ratificar)**; a calibração final ocorre no lote de simulação.
 
 > **Nota (reconciliação):** as Decisões 1867–1873 (região, custo de vida, adaptação, mudança de cidade, clube novo, balanceamento regional, regionalização do calendário) são compartilhadas com economia e jogadores; os números vivem nas recomendações de economia (R-41..R-49) e no catálogo técnico, sem duplicação aqui.

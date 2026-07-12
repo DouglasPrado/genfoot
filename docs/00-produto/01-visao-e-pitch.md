@@ -10,7 +10,7 @@ O **Grinta** é um manager de futebol online que resgata a simplicidade viciante
 - [Pitch curto (30 segundos)](#pitch-curto-30-segundos)
 - [Pitch longo](#pitch-longo)
 - [Pilares e diferenciais](#pilares-e-diferenciais)
-- [Público-alvo](#publico-alvo)
+- [Público-alvo](#público-alvo)
 - [Frase-gancho](#frase-gancho)
 
 ## Posicionamento

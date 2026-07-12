@@ -14,17 +14,17 @@ Para a implementação técnica de auditoria, segurança e operações (server a
   - [1.1 Filosofia e escopo](#11-filosofia-e-escopo)
   - [1.2 Risk score global](#12-risk-score-global)
   - [1.3 Multi-conta e contas relacionadas](#13-multi-conta-e-contas-relacionadas)
-  - [1.4 Clube satélite](#14-clube-satelite)
+  - [1.4 Clube satélite](#14-clube-satélite)
   - [1.5 Mercado suspeito](#15-mercado-suspeito)
-  - [1.6 Manipulação esportiva](#16-manipulacao-esportiva)
+  - [1.6 Manipulação esportiva](#16-manipulação-esportiva)
   - [1.7 W.O. e abandono](#17-wo-e-abandono)
   - [1.8 Troca de clube](#18-troca-de-clube)
-  - [1.9 Explorações de sistema](#19-exploracoes-de-sistema)
-  - [1.10 Interações sociais futuras e parcerias oficiais](#110-interacoes-sociais-futuras-e-parcerias-oficiais)
-  - [1.11 Garantias técnicas de integridade](#111-garantias-tecnicas-de-integridade)
-  - [1.12 Punições e sanções](#112-punicoes-e-sancoes)
-  - [1.13 Admin, revisão e recurso](#113-admin-revisao-e-recurso)
-  - [1.14 Auditoria, transparência e privacidade](#114-auditoria-transparencia-e-privacidade)
+  - [1.9 Explorações de sistema](#19-explorações-de-sistema)
+  - [1.10 Interações sociais futuras e parcerias oficiais](#110-interações-sociais-futuras-e-parcerias-oficiais)
+  - [1.11 Garantias técnicas de integridade](#111-garantias-técnicas-de-integridade)
+  - [1.12 Punições e sanções](#112-punições-e-sanções)
+  - [1.13 Admin, revisão e recurso](#113-admin-revisão-e-recurso)
+  - [1.14 Auditoria, transparência e privacidade](#114-auditoria-transparência-e-privacidade)
   - [1.15 Escopo fechado](#115-escopo-fechado)
 - [2. Onboarding e entrada tardia](#2-onboarding-e-entrada-tardia)
 
@@ -227,7 +227,7 @@ Grinta poderá, no futuro, oferecer **interações sociais competitivas** entre 
 - **transparência** — as condições ficam visíveis e rastreáveis;
 - **proibição entre contas relacionadas abusivas** — a parceria não pode virar disfarce de multi-conta ou de clube satélite.
 
-A diferença entre uma parceria legítima e um clube satélite (ver [§1.4](#14-clube-satelite)) é justamente esse conjunto de limites: a parceria oficial existe à luz do anti-abuso, enquanto o satélite opera para burlá-lo. Enquanto essas mecânicas não forem implementadas, valem como **direção de design** — os detalhes operacionais (parâmetros, fluxos e telas) ainda serão fechados em revisão futura.
+A diferença entre uma parceria legítima e um clube satélite (ver [§1.4](#14-clube-satélite)) é justamente esse conjunto de limites: a parceria oficial existe à luz do anti-abuso, enquanto o satélite opera para burlá-lo. Enquanto essas mecânicas não forem implementadas, valem como **direção de design** — os detalhes operacionais (parâmetros, fluxos e telas) ainda serão fechados em revisão futura.
 
 ### 1.11 Garantias técnicas de integridade
 
@@ -377,5 +377,7 @@ Como o mundo é organizado em **ligas/salas independentes**, cada uma com seu pr
 - **Liga nova** — liga zerada, todos os clubes pequenos e equilibrados (o começo mais justo).
 - **Liga em andamento** — assume um clube disponível em uma liga já existente (com os cuidados de [2.1](#21-criar-clube-novo-ou-assumir-existente) e o [Programa de Clube Novo](#28-programa-de-clube-novo-catch-up-estrutural) quando aplicável).
 - **Liga temática / especial** — ligas com regras próprias: acelerada, de veteranos, econômica difícil, com draft inicial, hardcore, casual, etc. Dão flexibilidade para diferentes perfis de jogador e eventos, sem alterar o core.
+
+> **Nota (Liga Inicial × Liga nova):** os dois termos operam em níveis diferentes e não se contradizem — **Liga Inicial** é a **divisão-base** (por nível estrutural) **dentro** de um mundo/liga já existente (ao criar um clube numa liga existente, ele cai na Liga Inicial dela, como em [R-52](#23-entrada-em-temporada-avançada)), enquanto **Liga nova** (Decisão 3) é um **mundo/sala zerado** do início (ao escolher "liga nova", o usuário entra num mundo novo, que também parte do zero com sua própria Liga Inicial).
 
 > **Recomendação (a ratificar — [R-55](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** **fechar a Decisão 3 na opção C** — o usuário escolhe entre **liga nova**, **liga em andamento** e **liga temática/especial**. Regra-mestra das temáticas: são **variações de configuração** (`CompetitionRuleSet`/`worldConfig`) e **nunca** alteram o core — server authoritative, antiabuso, caixa fixo idêntico (R-51) e justiça inicial valem sempre. Regras mínimas de 1ª passada por tipo: **Acelerada** — tempo virtual comprimido (temporada mais curta, evolução e contratos mais rápidos); **Veteranos** — elenco inicial mais velho, foco em resultado imediato, menos formação; **Econômica difícil** — caixa corrente e receitas mais apertados, sem alterar o caixa **de largada** entre clubes (só o ambiente); **Draft inicial** — elenco montado por seleção ordenada em vez de gerado; **Hardcore** — consequências agravadas (crise e rebaixamento mais duros), IA de mercado mais rígida; **Casual** — pressão e punições suavizadas, ritmo mais lento. Cada temática declara explicitamente **o que muda** e passa igualmente pelo antiabuso. Racional: ratifica a recomendação C já registrada e dá contorno mínimo para implementar sem fragmentar o core do jogo.

@@ -18,6 +18,8 @@ No Grinta você não monta uma escalação e espera o resultado. Você conduz um
 
 ## 35. Ciclo principal
 
+**Resumo.** O Grinta é conduzido por um ciclo de gestão que nunca para — analisar, planejar, preparar, competir, reagir, avaliar, investir e evoluir —, repetido a cada rodada, a cada temporada e ao longo de várias temporadas. Não se trata de montar a escalação e esperar o resultado: cada volta do ciclo alimenta a próxima e deixa o clube diferente. Este capítulo apresenta o ciclo e as três velocidades — curto, médio e longo prazo — que os capítulos seguintes detalham.
+
 O Grinta gira em torno de um ciclo contínuo. Ele não tem começo nem fim: cada volta alimenta a próxima. Enquanto muitos simuladores resumem a experiência a "escalar e assistir", aqui o gestor acompanha o clube o tempo todo, em oito estágios que se repetem a cada rodada, a cada semana e a cada temporada:
 
 `Analisar → Planejar → Preparar → Competir → Reagir → Avaliar → Investir → Evoluir`
@@ -41,11 +43,15 @@ O ciclo tem três velocidades sobrepostas. A cada **rodada** você percorre a ve
 
 > **COMO O JOGO AVALIA:** A ordem em que a Central prioriza o que exige sua atenção não é aleatória nem cronológica. O jogo pondera vários fatores ao mesmo tempo — quanto tempo resta até um prazo, a gravidade do que está em jogo, se a decisão pode ser desfeita depois, o impacto esportivo e financeiro, a chance de o cenário se concretizar e o quanto a informação disponível é confiável. Você vê o resultado dessa priorização (o que está no topo da lista), não os pesos por trás dela.
 
+### Estratégia
+
+Trate o ciclo como um hábito, não como uma tarefa. O erro mais comum é reduzir o jogo a "escalar e competir", pulando o **Analisar** e o **Avaliar** — justamente as etapas que transformam resultado em aprendizado e evitam repetir o mesmo erro. Ajuste a profundidade ao tempo que você tem: em dias corridos, uma volta rápida (ler o adversário, preparar, deixar o plano rodando) já mantém o clube saudável; quando puder, feche o ciclo por inteiro e use o que aprendeu para decidir onde investir. E lembre-se de que as três velocidades convivem — uma decisão de curto prazo tomada sem olhar o médio e o longo prazo costuma cobrar caro adiante.
+
 ---
 
 ## 36. Curto prazo
 
-O curto prazo é o horizonte da **próxima partida** e dos próximos dias. É o ritmo em que a maioria das suas decisões acontece e onde o descuido cobra mais rápido. Aqui entram: escalação, treino da semana, recuperação física, moral do grupo, suspensões, o caixa imediato e qualquer decisão marcada como urgente.
+**Resumo.** O curto prazo é o horizonte da **próxima partida** e dos próximos dias. É o ritmo em que a maioria das suas decisões acontece e onde o descuido cobra mais rápido. Aqui entram: escalação, treino da semana, recuperação física, moral do grupo, suspensões, o caixa imediato e qualquer decisão marcada como urgente.
 
 ### O que exige atenção agora
 
@@ -79,11 +85,15 @@ Você não precisa estar online em toda rodada. Pode deixar um **plano automáti
 
 > **REGRA:** Quando você está offline, a partida continua e a inteligência do clube assume as decisões essenciais — substituir um lesionado ou um jogador sem condição, reorganizar após uma expulsão, evitar uma lesão grave — respeitando as configurações e o planejamento que você deixou. Ela cuida do essencial, sem a profundidade de um gestor acompanhando ao vivo.
 
+### Estratégia
+
+No curto prazo, disciplina vale mais do que talento pontual. Faça a rotação **antes** que o desgaste apareça, não depois: um titular exausto rende menos e se lesiona mais, e um reserva descansado pode ser a escolha certa para a partida de hoje. Antecipe o previsível — pendurados, prazos do dia, contratos vencendo — para não deixar a decisão nas mãos da ação padrão quando o prazo virar. E use as automações a seu favor: deixe o rotineiro sob regras claras e reserve a sua atenção para o que a Central marca como crítico. Quem só reage jogo a jogo chega à sequência dura sem banco e sem margem.
+
 ---
 
 ## 37. Médio prazo
 
-O médio prazo é o horizonte da **temporada**: a sequência de jogos até o fim do campeonato, os objetivos combinados com a diretoria, a janela de transferências, os contratos que vão vencer e a evolução do elenco e dos departamentos. É onde as decisões de curto prazo somam ou se contradizem.
+**Resumo.** O médio prazo é o horizonte da **temporada**: a sequência de jogos até o fim do campeonato, os objetivos combinados com a diretoria, a janela de transferências, os contratos que vão vencer e a evolução do elenco e dos departamentos. É onde as decisões de curto prazo somam ou se contradizem.
 
 ### Objetivos e sequência de jogos
 
@@ -114,11 +124,15 @@ A temporada tem um **ciclo financeiro** recorrente: receitas entram, folha e obr
 
 > **COMO O JOGO AVALIA:** O valor de um jogador, o interesse de outros clubes, a chance de uma renovação e a projeção de caixa combinam muitos fatores — qualidade, idade, potencial, contrato, salário, momento da carreira, oferta e demanda do mundo, situação financeira. O jogo traduz tudo isso em indicadores legíveis (valor estimado, risco de saída, probabilidade de renovação, saúde financeira), não em fórmulas ou números crus.
 
+### Estratégia
+
+O médio prazo é onde a gestão se antecipa à crise. Planeje renovações e vendas com antecedência, para nunca chegar à janela com vários contratos importantes vencendo ao mesmo tempo e o poder de negociação zerado. Leia a **sequência** de jogos, não a partida isolada: decidir onde poupar e onde forçar é o que sustenta o objetivo da temporada. Invista em estrutura e comissão técnica não só pelo campo, mas pela informação — decisões melhores nascem de leituras melhores. E proteja o equilíbrio financeiro: é ele que preserva a sua liberdade de decidir quando a próxima oportunidade (ou o próximo problema) aparecer.
+
 ---
 
 ## 38. Longo prazo
 
-O longo prazo é o horizonte de **várias temporadas**: a identidade do clube, o estilo de jogo, a reputação, a infraestrutura, a base, a capacidade econômica, o histórico e o legado. É o que separa um clube que vence uma temporada de um clube que se torna uma potência ao longo do tempo.
+**Resumo.** O longo prazo é o horizonte de **várias temporadas**: a identidade do clube, o estilo de jogo, a reputação, a infraestrutura, a base, a capacidade econômica, o histórico e o legado. É o que separa um clube que vence uma temporada de um clube que se torna uma potência ao longo do tempo.
 
 ### O mundo não reinicia
 
@@ -145,11 +159,15 @@ Os jogadores envelhecem, oscilam e se aposentam; novos entram no mundo. O clube 
 
 > **COMO O JOGO AVALIA:** O ranking de clubes e de gestores e a reputação **representam trajetória e reconhecimento — não conferem bônus oculto de força**. Estar bem ranqueado descreve o que você conquistou; não dá vantagem mecânica secreta sobre os adversários. O crescimento do clube deriva de estrutura, elenco, finanças e resultados, todos construídos de forma visível ao longo do tempo.
 
+### Estratégia
+
+Pense o clube como um projeto de várias temporadas, não de uma. As vantagens mais fortes do jogo — identidade, reputação, base, estrutura, capacidade econômica — só se constroem com decisões coerentes repetidas ao longo do tempo, e nenhuma delas se compra com um golpe de sorte. Administre a renovação de gerações antes que o elenco envelheça em bloco: venda no momento certo, promova da base e equilibre experientes e jovens. E não confunda estar bem ranqueado com estar forte — o ranking descreve a sua trajetória, não concede vantagem escondida; a força real vem do que você construiu de forma visível.
+
 ---
 
 ## 39. Caminhos estratégicos
 
-Não existe uma fórmula única de sucesso no Grinta. Existem **caminhos**, cada um com vantagens, custos e riscos próprios. A maioria dos clubes combina vários e ajusta a mistura conforme o momento. Esta seção descreve os principais para ajudar você a escolher conscientemente — não para revelar qual "vence sempre", porque nenhum vence sempre.
+**Resumo.** Não existe uma fórmula única de sucesso no Grinta. Existem **caminhos**, cada um com vantagens, custos e riscos próprios. A maioria dos clubes combina vários e ajusta a mistura conforme o momento. Esta seção descreve os principais para ajudar você a escolher conscientemente — não para revelar qual "vence sempre", porque nenhum vence sempre.
 
 > **REGRA:** Nenhum caminho é proibido e nenhum é garantido. O resultado de uma estratégia depende de como ela se encaixa no seu contexto — elenco, caixa, estrutura, divisão, calendário e o mundo à sua volta. A mesma escolha pode ser brilhante para um clube e desastrosa para outro.
 
@@ -197,3 +215,7 @@ Não existe uma fórmula única de sucesso no Grinta. Existem **caminhos**, cada
 > **ATENÇÃO:** Misturar caminhos incompatíveis ao mesmo tempo costuma sair caro. Expansão agressiva com caixa apertado, ou desempenho imediato sem profundidade de elenco, cria contradições que o jogo cobra — em crise financeira, desgaste ou queda de rendimento. Escolher uma direção clara vale mais do que perseguir todas.
 
 > **COMO O JOGO AVALIA:** O resultado de uma partida ou de uma temporada **não é a simples soma das forças** nem um sorteio por qualidade. Ele emerge da interação entre tática, formação, funções, condição física e emocional, entrosamento, qualidade coletiva, contexto e eventos. Por isso um caminho estratégico não tem um "número de eficiência" que você possa otimizar: ele tem consequências que dependem de tudo à volta. O jogo entrega os sinais e as recomendações — a leitura estratégica é sua.
+
+### Estratégia
+
+Escolha uma direção clara em vez de perseguir todas ao mesmo tempo. Cada caminho tem um custo, e misturar os incompatíveis — expansão agressiva com caixa apertado, desempenho imediato sem profundidade de elenco — cria contradições que o jogo cobra em crise, desgaste ou queda. Combine caminhos que se reforçam (formação com estabilidade, estrutura com construção gradual) e trate-os como fases de um mesmo projeto: o que faz sentido para um clube pequeno brigando por acesso não é o que faz sentido para um clube maduro brigando por título. Acima de tudo, encaixe a estratégia no seu contexto — elenco, caixa, estrutura, divisão, calendário e o mundo à volta —, porque é o contexto, e não o caminho em si, que decide se a aposta dá certo.

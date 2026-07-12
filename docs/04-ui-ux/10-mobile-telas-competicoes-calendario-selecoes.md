@@ -79,8 +79,8 @@ Telas de competições (tabela, chaveamento, regulamento, artilharia), calendár
 
 - **Objetivo:** gerir o impacto das convocações no clube.
 - **Como se chega:** data de seleção; notificação de convocação; MF-21.
-- **Componentes e dados:** jogadores convocados; **período de ausência** (inclui viagem); **fadiga** que retorna; **moral** (sobe/cai); **valorização/exposição** internacional; risco de retorno lesionado; conflito de datas (prioridade por regulamento); **recomendação médica** como única exceção; compensação parcial (quando a regra do mundo prevê).
-- **Ações:** planejar rotação (`M-LINEUP`/`M-GAMEPLAN`); solicitar recomendação médica reconhecida.
+- **Componentes e dados:** jogadores convocados; **período de ausência** (inclui viagem); **fadiga** que retorna; **moral** (sobe/cai); **valorização/exposição** internacional; risco de retorno lesionado; conflito de datas (prioridade por regulamento); **recomendação médica** como única exceção — **fluxo de dispensa** com estados (solicitada → em avaliação → reconhecida/negada → **arbitragem clube×seleção**), com origem em `M-MEDICAL-CASE`; **grade prospectiva de rotação por datas FIFA** (quem fica fora em cada janela + **projeção de prontidão no retorno** — viagem/clima/minutos), espelhada em `M-CALENDAR`; compensação parcial (quando a regra do mundo prevê).
+- **Ações:** planejar rotação (`M-LINEUP`/`M-GAMEPLAN`); solicitar/acompanhar dispensa por recomendação médica (até a arbitragem).
 - **Estados:** clube **não pode impedir** convocação oficial; retorno pode não vir pronto.
 - **Referências:** [`12-selecoes §2, §3, §5, §6`](../01-game-design/12-selecoes-e-calendario-internacional.md). > **Pendência:** controle de seleção por usuário de reputação alta (expansão futura), curvas de fadiga e modelo de compensação.
 

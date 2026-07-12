@@ -44,7 +44,8 @@ As decisões estão registradas no formato ADR e mantêm seus identificadores or
 Princípios:
 
 - **Separação por domínio:** cada domínio de negócio (ex.: `players`, `clubs`, `contracts`, `finance`, `matches`, `competitions`, `identity`, `worlds`, `messaging`, `notifications`, `audit`, `operations`, `projections`) reside em um schema PostgreSQL próprio.
-- **Nomes físicos em snake_case:** tabelas e colunas usam snake_case (ex.: `player_contracts`, `world_id`, `scheduled_game_at`).
+- **Nomes físicos em snake_case:** tabelas e colunas usam snake_case (ex.: `player_contracts`, `game_world_id`, `scheduled_game_at`).
+- **Convenção canônica da chave de partição por mundo (E8):** a coluna é sempre **`game_world_id`** no banco (snake_case) e o campo correspondente é **`gameWorldId`** no Prisma/TS, mapeado explicitamente com `@map("game_world_id")`. Esta é a forma única em todo o projeto — não se usa `world_id` nem `worldId` como nome canônico. A regra vale para toda tabela world-scoped e para a chave composta `(game_world_id, id)` (ver Decisão 19.8).
 - **Ownership único por tabela:** cada tabela pertence a um único domínio. Schemas separam ownership, mas não transformam cada domínio em um banco independente.
 - **Mapeamento explícito no Prisma:** cada model declara `@@schema(...)`, `@@map(...)` para o nome físico e `@map(...)` por coluna. Recursos não expressáveis pelo Prisma serão implementados por migration SQL personalizada.
 
@@ -54,7 +55,7 @@ O concreto (lista de models e enums por schema) vive em [`./02-modelo-de-dados.m
 
 ## Decisão 19.8 — Foreign keys, isolamento por mundo e relações entre domínios
 
-**Decisão 19.8:** relações oficiais no mesmo banco usarão FKs fortes, com escopo composto por `world_id`, `ON DELETE RESTRICT` por padrão e referências lógicas apenas quando projeções, histórico ou separação física justificarem.
+**Decisão 19.8:** relações oficiais no mesmo banco usarão FKs fortes, com escopo composto por `game_world_id`, `ON DELETE RESTRICT` por padrão e referências lógicas apenas quando projeções, histórico ou separação física justificarem.
 
 ### O problema
 
@@ -62,7 +63,7 @@ O uso de UUIDv7 garante unicidade global, mas **não** garante que duas entidade
 
 | Campo | Mundo |
 |-------|-------|
-| `contract.world_id` | World A |
+| `contract.game_world_id` | World A |
 | `contract.player_id` | jogador do World B |
 | `contract.club_id` | clube do World A |
 
@@ -76,55 +77,55 @@ O banco também precisa estar preparado para: múltiplos mundos na mesma instân
 |-------|-----------|----------|
 | **A** | Não usar FKs; a aplicação valida todas as relações. | Rejeitada — a aplicação não é a única escritora ao longo da vida do sistema (migrations, backfills, ferramentas administrativas, recuperação). Risco de órfãos e relações entre mundos. |
 | **B** | FKs simples por ID em todas as relações. | Insuficiente — garante existência, mas a relação ainda poderia atravessar mundos; cascatas poderiam cruzar domínios. |
-| **C** | FKs fortes no mesmo banco, com chaves compostas por `world_id`, RESTRICT por padrão e referências lógicas apenas para projeções, histórico ou limites físicos. | **Escolhida.** |
+| **C** | FKs fortes no mesmo banco, com chaves compostas por `game_world_id`, RESTRICT por padrão e referências lógicas apenas para projeções, histórico ou limites físicos. | **Escolhida.** |
 
 Regra central: **usar a proteção mais forte disponível na unidade física atual**, preservando adapters e boundaries que permitam substituir a FK por contrato quando a separação física realmente ocorrer.
 
 ### Chave primária global e chave de escopo
 
-Entidades continuam usando UUIDv7 como chave primária. O par `(world_id, id)` é disponibilizado como **chave candidata** para relações que precisam comprovar o escopo:
+Entidades continuam usando UUIDv7 como chave primária. O par `(game_world_id, id)` é disponibilizado como **chave candidata** para relações que precisam comprovar o escopo:
 
 ```sql
 CREATE TABLE players.players (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  world_id UUID NOT NULL,
+  game_world_id UUID NOT NULL,
   -- outros campos
-  CONSTRAINT uq_players_world_id_id
-    UNIQUE (world_id, id)
+  CONSTRAINT uq_players_game_world_id_id
+    UNIQUE (game_world_id, id)
 );
 ```
 
 - `id` → identidade global.
-- `world_id + id` → identidade validada dentro do escopo do mundo.
+- `game_world_id + id` → identidade validada dentro do escopo do mundo.
 
 A constraint composta **não** substitui a chave primária.
 
 ### Foreign key composta por mundo
 
-Relações world-scoped usam FK composta `(world_id, entity_id)`, rejeitando referências que atravessem mundos mesmo que a entidade exista:
+Relações world-scoped usam FK composta `(game_world_id, entity_id)`, rejeitando referências que atravessem mundos mesmo que a entidade exista:
 
 ```sql
 CREATE TABLE contracts.player_contracts (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  world_id UUID NOT NULL,
+  game_world_id UUID NOT NULL,
   player_id UUID NOT NULL,
   club_id UUID NOT NULL,
 
   CONSTRAINT fk_player_contracts_player_world
-    FOREIGN KEY (world_id, player_id)
-    REFERENCES players.players (world_id, id)
+    FOREIGN KEY (game_world_id, player_id)
+    REFERENCES players.players (game_world_id, id)
     ON DELETE RESTRICT,
 
   CONSTRAINT fk_player_contracts_club_world
-    FOREIGN KEY (world_id, club_id)
-    REFERENCES clubs.clubs (world_id, id)
+    FOREIGN KEY (game_world_id, club_id)
+    REFERENCES clubs.clubs (game_world_id, id)
     ON DELETE RESTRICT
 );
 ```
 
-**Ordem padronizada das chaves compostas:** sempre `(world_id, entity_id)`, nunca alternando com `(entity_id, world_id)`. Isso torna migrations previsíveis, índices reutilizáveis e joins consistentes.
+**Ordem padronizada das chaves compostas:** sempre `(game_world_id, entity_id)`, nunca alternando com `(entity_id, game_world_id)`. Isso torna migrations previsíveis, índices reutilizáveis e joins consistentes.
 
-`world_id` não será uma FK decorativa. Toda tabela world-scoped precisa responder: a entidade pertence a um mundo? A relação com o mundo está protegida? As referências relacionadas validam o mesmo `world_id`? O índice começa por `world_id`? O registro pode ser migrado junto com o mundo? Não se aceita apenas `world_id UUID NOT NULL` sem proteção sobre as demais relações.
+`game_world_id` não será uma FK decorativa. Toda tabela world-scoped precisa responder: a entidade pertence a um mundo? A relação com o mundo está protegida? As referências relacionadas validam o mesmo `game_world_id`? O índice começa por `game_world_id`? O registro pode ser migrado junto com o mundo? Não se aceita apenas `game_world_id UUID NOT NULL` sem proteção sobre as demais relações.
 
 ### Entidades globais e FKs simples
 
@@ -139,16 +140,16 @@ Uma participação em mundo combina os dois conceitos:
 ```sql
 CREATE TABLE identity.world_memberships (
   id UUID PRIMARY KEY DEFAULT uuidv7(),
-  world_id UUID NOT NULL,
+  game_world_id UUID NOT NULL,
   user_id UUID NOT NULL,
   status VARCHAR(32) NOT NULL,
 
   CONSTRAINT fk_world_memberships_world
-    FOREIGN KEY (world_id) REFERENCES worlds.worlds(id) ON DELETE RESTRICT,
+    FOREIGN KEY (game_world_id) REFERENCES worlds.worlds(id) ON DELETE RESTRICT,
   CONSTRAINT fk_world_memberships_user
     FOREIGN KEY (user_id) REFERENCES identity.users(id) ON DELETE RESTRICT,
   CONSTRAINT uq_world_memberships_world_user
-    UNIQUE (world_id, user_id)
+    UNIQUE (game_world_id, user_id)
 );
 ```
 
@@ -162,8 +163,8 @@ CREATE TABLE identity.world_memberships (
 
 ### Relações 1:1 e N:N
 
-- **1:1** garantida por FK única, ex.: `UNIQUE (world_id, match_id)` em `matches.match_results` — não dependeremos apenas da aplicação para impedir dois resultados oficiais ativos.
-- **N:N** usa chave composta como PK, ex.: `PRIMARY KEY (world_id, competition_edition_id, club_id)` em `competitions.participants`, com FKs compostas para cada lado.
+- **1:1** garantida por FK única, ex.: `UNIQUE (game_world_id, match_id)` em `matches.match_results` — não dependeremos apenas da aplicação para impedir dois resultados oficiais ativos.
+- **N:N** usa chave composta como PK, ex.: `PRIMARY KEY (game_world_id, competition_edition_id, club_id)` em `competitions.participants`, com FKs compostas para cada lado.
 - **Chaves naturais** continuam protegidas por UNIQUE de negócio — UUID não substitui unicidade de negócio. Não se cria UUID para permitir duplicatas que o domínio considera impossíveis.
 - **Relações polimórficas** (`resource_type` + `resource_id`) não têm FK genérica: `resource_type` é enum/código controlado, o schema do evento é versionado, a aplicação valida o recurso na criação. Não se cria uma tabela universal `entities` só para permitir a FK.
 
@@ -177,7 +178,7 @@ Uma referência pode ser lógica quando estiver em uma destas categorias:
 - **Projeção reconstruível** — read models armazenam IDs para navegação sem bloquear rebuilds.
 - **Referência polimórfica controlada** — não usa FK tradicional para várias tabelas.
 
-**Projeções não terão FKs fortes por padrão** (são derivadas, descartáveis, reconstruíveis, eventualmente consistentes). Podem conter `world_id`, `club_id`, `player_id`, `source_version` sem que todas sejam FKs físicas. Podem ter constraints locais (PK, CHECK) que garantem estrutura local sem impedir rebuild. A consistência é garantida pelo Projection Worker e por verificadores.
+**Projeções não terão FKs fortes por padrão** (são derivadas, descartáveis, reconstruíveis, eventualmente consistentes). Podem conter `game_world_id`, `club_id`, `player_id`, `source_version` sem que todas sejam FKs físicas. Podem ter constraints locais (PK, CHECK) que garantem estrutura local sem impedir rebuild. A consistência é garantida pelo Projection Worker e por verificadores.
 
 **Eventos e Outbox:** o event store histórico ou arquivo de auditoria pode usar referências lógicas (o evento é imutável, pode ser importado/arquivado, precisa preservar a referência original). A Outbox pode ter FK para o agregado enquanto ainda estiver operacional.
 
@@ -197,7 +198,7 @@ Algumas invariantes não são FKs mas dependem de relações (ex.: um jogador n�
 
 ```sql
 EXCLUDE USING gist (
-  world_id WITH =,
+  game_world_id WITH =,
   player_id WITH =,
   contract_period WITH &&
 ) WHERE (status = 'ACTIVE');
@@ -222,10 +223,10 @@ O PostgreSQL cria índice para PRIMARY KEY e UNIQUE, mas **não** cria índice a
 
 ```sql
 CREATE INDEX idx_player_contracts_world_player
-ON contracts.player_contracts (world_id, player_id);
+ON contracts.player_contracts (game_world_id, player_id);
 ```
 
-A ordem `(world_id, player_id)` favorece consulta por mundo e jogador, migração por mundo, purge por escopo e futura partição por mundo/shard. Não se criam todos os índices possíveis sem análise, mas FKs importantes têm suporte físico planejado.
+A ordem `(game_world_id, player_id)` favorece consulta por mundo e jogador, migração por mundo, purge por escopo e futura partição por mundo/shard. Não se criam todos os índices possíveis sem análise, mas FKs importantes têm suporte físico planejado.
 
 ### Migração de FK em 6 passos
 
@@ -235,8 +236,8 @@ Em tabelas grandes, a criação imediata gera validação pesada. Adiciona-se a 
 -- Passo 2
 ALTER TABLE contracts.player_contracts
 ADD CONSTRAINT fk_player_contracts_player_world
-FOREIGN KEY (world_id, player_id)
-REFERENCES players.players (world_id, id)
+FOREIGN KEY (game_world_id, player_id)
+REFERENCES players.players (game_world_id, id)
 NOT VALID;
 
 -- Passo 6
@@ -259,34 +260,34 @@ A constraint não permanecerá `NOT VALID` indefinidamente sem plano registrado.
 
 **Imports** seguem um manifesto de dependências (World → Clubs/Players → Contracts → Competitions → Matches → Finance → históricos/projeções). Constraints adiáveis são ativadas apenas dentro da transação de importação. Não se desabilitam globalmente todas as FKs presumindo dados corretos. Após o import: constraints validadas, contagens reconciliadas, checksums comparados, relações sem destino relatadas, projeções reconstruídas.
 
-**Shards:** enquanto os mundos estiverem no mesmo banco, FKs físicas completas. Quando um mundo for movido para um shard, um World Registry central conhece o shard atual; o banco do shard contém todas as tabelas world-scoped daquele mundo; entidades mantêm os mesmos UUIDs; as FKs compostas por `world_id` continuam válidas dentro do shard. Entre banco central e shard não existe FK física — usam-se contratos versionados, caches controlados, replicação de referências, verificadores e reconciliação. Não se projeta o banco atual como se já estivesse distribuído: a migration para shard incluirá a mudança explícita de garantias.
+**Shards:** enquanto os mundos estiverem no mesmo banco, FKs físicas completas. Quando um mundo for movido para um shard, um World Registry central conhece o shard atual; o banco do shard contém todas as tabelas world-scoped daquele mundo; entidades mantêm os mesmos UUIDs; as FKs compostas por `game_world_id` continuam válidas dentro do shard. Entre banco central e shard não existe FK física — usam-se contratos versionados, caches controlados, replicação de referências, verificadores e reconciliação. Não se projeta o banco atual como se já estivesse distribuído: a migration para shard incluirá a mudança explícita de garantias.
 
 ### Prisma e relações compostas
 
 ```prisma
 model Player {
   id      String @id @db.Uuid
-  worldId String @map("world_id") @db.Uuid
+  gameWorldId String @map("game_world_id") @db.Uuid
   contracts PlayerContract[]
 
-  @@unique([worldId, id], map: "uq_players_world_id_id")
+  @@unique([gameWorldId, id], map: "uq_players_game_world_id_id")
   @@map("players")
   @@schema("players")
 }
 
 model PlayerContract {
   id       String @id @db.Uuid
-  worldId  String @map("world_id") @db.Uuid
+  gameWorldId  String @map("game_world_id") @db.Uuid
   playerId String @map("player_id") @db.Uuid
 
   player Player @relation(
-    fields: [worldId, playerId],
-    references: [worldId, id],
+    fields: [gameWorldId, playerId],
+    references: [gameWorldId, id],
     onDelete: Restrict,
     map: "fk_player_contracts_player_world"
   )
 
-  @@index([worldId, playerId], map: "idx_player_contracts_world_player")
+  @@index([gameWorldId, playerId], map: "idx_player_contracts_world_player")
   @@map("player_contracts")
   @@schema("contracts")
 }
@@ -304,11 +305,11 @@ Regra central: **todo índice deve corresponder a uma invariante, query, ordena�
 
 ### Access patterns e ordem de colunas
 
-Antes de criar uma tabela importante, registra-se um catálogo de access patterns (filtros, ordenação, locks) que alimenta índices, testes, query repositories, monitoramento e revisão de migrations. Consultas internas de um mundo geralmente começam por `world_id`:
+Antes de criar uma tabela importante, registra-se um catálogo de access patterns (filtros, ordenação, locks) que alimenta índices, testes, query repositories, monitoramento e revisão de migrations. Consultas internas de um mundo geralmente começam por `game_world_id`:
 
 ```sql
 CREATE INDEX idx_matches_world_scheduled_game_at
-ON matches.matches (world_id, scheduled_game_at, id);
+ON matches.matches (game_world_id, scheduled_game_at, id);
 ```
 
 A ordem das colunas reflete igualdades frequentes, escopo obrigatório, faixas, ordenação e desempates — não uma listagem de colunas "aparentemente relevantes".
@@ -321,7 +322,7 @@ A ordem das colunas reflete igualdades frequentes, escopo obrigatório, faixas, 
 |------|-----|
 | **B-tree** (padrão) | Igualdade, ordenação, intervalos, paginação, uniques, FKs, claims. |
 | **Parcial** | Subconjuntos operacionais pequenos (Outbox pendente `WHERE published_at IS NULL`; sessões ativas; notificações não lidas). |
-| **Único parcial** | Unicidades condicionais (ex.: um vínculo principal ativo por jogador: `UNIQUE (world_id, player_id) WHERE status = 'ACTIVE'`). |
+| **Único parcial** | Unicidades condicionais (ex.: um vínculo principal ativo por jogador: `UNIQUE (game_world_id, player_id) WHERE status = 'ACTIVE'`). |
 | **INCLUDE** (cobertura) | Poucas colunas adicionais frequentes, apenas após validar o plano. |
 | **Expressão** | Transformação estável frequente (ex.: `lower(normalized_name)`); prefere-se coluna normalizada persistida quando há regra de domínio. |
 | **GIN** | Arrays pequenos, JSONB documental, full-text interno limitado — só com consultas reais compatíveis. Busca pública fica no Meilisearch. |
@@ -357,7 +358,7 @@ Queries críticas têm fixtures de volume representativo, orçamento (`p95Budget
 
 ### Estatísticas e manutenção física
 
-- **Estatísticas do planejador:** colunas com distribuição incomum (`world_id`, status muito desbalanceados, tipos de evento, categorias operacionais, shard assignment) podem receber `ALTER COLUMN ... SET STATISTICS` maior; correlações fortes entre colunas (`world_id + status`, `competition_id + stage_id`, `provider + delivery_status`) podem usar **estatísticas estendidas multicoluna**. Sempre após análise de plano real, nunca elevado globalmente.
+- **Estatísticas do planejador:** colunas com distribuição incomum (`game_world_id`, status muito desbalanceados, tipos de evento, categorias operacionais, shard assignment) podem receber `ALTER COLUMN ... SET STATISTICS` maior; correlações fortes entre colunas (`game_world_id + status`, `competition_id + stage_id`, `provider + delivery_status`) podem usar **estatísticas estendidas multicoluna**. Sempre após análise de plano real, nunca elevado globalmente.
 - **Criação de índices em produção:** em tabelas grandes, criação sem bloqueio prolongado das escritas, com estimativa de tamanho/duração, controle de CPU/I/O/WAL, verificação de validade, associação à constraint quando aplicável e monitoramento de réplicas/latência. Operações que não podem ocorrer dentro de transação são etapas explícitas do migration runner.
 - **Bloat, reindexação e `fillfactor`:** monitoram-se tamanho de tabela/índices, tuplas mortas, page splits, autovacuum e crescimento de WAL. Reindexação é orientada por diagnóstico, não cron cego. `fillfactor` pode ser ajustado em tabelas/índices com updates frequentes (estado atual de partida, projeções, Process Managers, status de deliveries); append-only geralmente não precisa. Não há `fillfactor` global.
 
@@ -365,13 +366,13 @@ Queries críticas têm fixtures de volume representativo, orçamento (`p95Budget
 
 Considerado apenas com motivadores comprovados (retenção por período, tabela muito grande, vacuum difícil, queries limitadas por período/escopo, remoção em blocos, migração por unidades). **Não** por uma tabela "poder crescer".
 
-- **Não haverá uma partição por mundo** — geraria milhares de partições e não equivale a sharding físico. O isolamento continua por `world_id`; quando necessário, o mundo inteiro é movido para outro banco/shard.
+- **Não haverá uma partição por mundo** — geraria milhares de partições e não equivale a sharding físico. O isolamento continua por `game_world_id`; quando necessário, o mundo inteiro é movido para outro banco/shard.
 - **Particionamento temporal real** (`occurred_at`) é a primeira opção para dados técnicos append-only, permitindo retenção por `DROP PARTITION`. Tempo lógico (`occurred_game_at`) permanece indexado quando necessário para consultas de jogo, mas não governa a retenção física (mundos avançam em velocidades diferentes).
 - **Fortes candidatas:** `matches.match_events`, `messaging.outbox_messages`, `messaging.inbox_messages`, `notifications.deliveries`, `audit.security_events`, `operations.job_execution_summaries`, entre outras.
 - **Não particionar prematuramente:** entidades centrais (`players.players`, `clubs.clubs`, `contracts.player_contracts`, `worlds.worlds`, `identity.users`). O **ledger financeiro** exige análise específica antes de qualquer particionamento, sem romper a atomicidade da transação financeira.
 - Partições futuras criadas antecipadamente; particionamento não substitui índices locais; UUIDv7 permanece a identidade global (a data da partição não vira parte conceitual da identidade). Quando uma constraint única física exigir a chave de partição, usa-se `PRIMARY KEY (partition_key, id)` preservando `id` como identidade global de domínio.
 - **Partição default** somente com política clara (alertar, reclassificar, esvaziar) — nunca deixando dados esquecidos.
-- **Subparticionamento** (ex.: `match_events` RANGE por mês real + HASH por `world_id`/`match_id`) apenas em volume realmente elevado e após medições — aumenta objetos, complexidade de migrations e risco de partições ausentes; não é implementado inicialmente.
+- **Subparticionamento** (ex.: `match_events` RANGE por mês real + HASH por `game_world_id`/`match_id`) apenas em volume realmente elevado e após medições — aumenta objetos, complexidade de migrations e risco de partições ausentes; não é implementado inicialmente.
 - **Dados quentes e frios:** partições recentes no banco principal com índices completos; antigas com índices reduzidos ou storage de arquivo; histórico muito antigo exportado para R2 quando a categoria permitir. Registros oficiais não são removidos só por serem antigos — a política de retenção define o destino.
 
 ---
@@ -411,6 +412,8 @@ WHERE id = $2 AND version = $3;
 - **0 linhas** → versão mudou ou entidade não existe. O repository distingue entidade inexistente, conflito de concorrência e estado já alterado.
 
 Conflito otimista **nunca** é sobrescrito silenciosamente removendo a condição de versão. Na divergência: recarregar estado, reavaliar intenção, decidir se pode repetir, retornar conflito quando a intenção deixou de ser válida. **Retry automático** só quando a operação é idempotente, a intenção ainda é válida após recarregar, não há efeitos externos executados, o número de tentativas é limitado e há jitter quando necessário.
+
+> **Nota (errorCodes):** na fronteira da API, o conflito otimista é reportado como `AGGREGATE_VERSION_CONFLICT` (envelope comum; a resposta traz `currentVersion` para o cliente recarregar e reenviar). `CONTRACT_VERSION_CONFLICT` é o **alias específico** desse mesmo conflito para o agregado `PlayerContract` — mesma semântica, nome dedicado ao domínio de contratos; não é um erro distinto. O catálogo canônico de errorCodes vive em [`./10-catalogo-de-commands.md`](./10-catalogo-de-commands.md).
 
 ### Locks
 
@@ -526,9 +529,9 @@ Complementam as decisões acima com as convenções de modelagem aplicadas a tod
 
 ### Identificadores e campos padrão
 
-- **Identidade:** UUIDv7 (unicidade distribuída, ordenação temporal aproximada, geração fora do banco, migração entre clusters). Ver Decisão 19.8 para a chave de escopo `(world_id, id)`.
+- **Identidade:** UUIDv7 (unicidade distribuída, ordenação temporal aproximada, geração fora do banco, migração entre clusters). Ver Decisão 19.8 para a chave de escopo `(game_world_id, id)`.
 - **Identificadores públicos:** quando necessário, uma entidade combina UUID interno + código público curto + nome legível + slug **não autoritativo**.
-- **Campos padrão** (quando aplicável): `id`, `world_id` (`gameWorldId`), `created_at`, `updated_at`, `version`, `deleted_at`.
+- **Campos padrão** (quando aplicável): `id`, `game_world_id` (`gameWorldId`), `created_at`, `updated_at`, `version`, `deleted_at`.
 - **Concorrência otimista** via `version` — ver Decisão 19.10.
 - **Exclusão lógica** (`deleted_at`) apenas quando houver necessidade de recuperação, auditoria, retenção ou histórico. Nem toda tabela usa soft delete automaticamente.
 
@@ -630,7 +633,7 @@ O Redis serve cache, sessões temporárias, rate limiting, presença, adapter de
 
 Prazos oficiais **sempre** são persistidos no PostgreSQL — timers em memória seriam perdidos em restart, deployment, falha, migração ou escalonamento.
 
-- **Tarefas agendadas** (`scheduled_task_id`, `world_id`, `task_type`, `due_at_world`, `due_at_real`, `status`, `payload`, `priority`, `attempt_count`, `lease_owner`, `lease_expires_at`, `last_failure`). Workers reivindicam lotes vencidos com `FOR UPDATE SKIP LOCKED` (ver Decisão 19.9).
+- **Tarefas agendadas** (`scheduled_task_id`, `game_world_id`, `task_type`, `due_at_world`, `due_at_real`, `status`, `payload`, `priority`, `attempt_count`, `lease_owner`, `lease_expires_at`, `last_failure`). Workers reivindicam lotes vencidos com `FOR UPDATE SKIP LOCKED` (ver Decisão 19.9).
 - **Relógio do mundo** (`world_clock_id`, `current_world_time`, `status`, `processing_lease`, `last_processed_at`, `next_scheduled_at`, `version`). O avanço segue: adquire lease → verifica estado → executa etapa → registra checkpoint → publica eventos → atualiza relógio → libera lease. Apenas o detentor do lease avança o mundo; um mundo atrasado processa as etapas pendentes em ordem, com carga limitada, sem pular etapas obrigatórias.
 - **Runtime de partida:** o estado em andamento (`match_runtime_id`, `status`, `current_simulation_time`, `last_event_sequence`, `active_worker_lease`, `checkpoint_reference`, `heartbeat_at`) é separado do resultado oficial final. Cada partida tem um único actor lógico; checkpoints periódicos (após gol, cartão relevante, substituição, intervalo, fim, desligamento) permitem que outro worker assuma um lease expirado, carregue o último checkpoint e continue sem duplicar efeitos. A conclusão persiste atomicamente resultado, eventos, estatísticas, estados de jogador, suspensões, consequências e Outbox, passando de `FINISHED_PENDING_VALIDATION` a `OFFICIAL`. A finalização com resultado oficial único está detalhada na Decisão 19.10.
 
@@ -691,7 +694,7 @@ O estado da saga é persistido (`process_manager_id`, `process_type`, `subject_t
 | ADR | Tema | Resolução |
 |-----|------|-----------|
 | **19.7** | Schemas por domínio | Schemas PostgreSQL separados por domínio; snake_case; ownership único por tabela; mapeamento explícito no Prisma. |
-| **19.8** | Foreign keys e isolamento por mundo | FKs fortes no mesmo banco, escopo composto por `world_id`, `ON DELETE RESTRICT` por padrão, referências lógicas apenas para projeções/histórico/limites físicos (Opção C). |
+| **19.8** | Foreign keys e isolamento por mundo | FKs fortes no mesmo banco, escopo composto por `game_world_id`, `ON DELETE RESTRICT` por padrão, referências lógicas apenas para projeções/histórico/limites físicos (Opção C). |
 | **19.9** | Índices, paginação e particionamento | Índices orientados por access patterns, paginação por cursor, particionamento só com volume/retenção/manutenção comprovados (Opção C). |
 | **19.10** | Transações e concorrência | Estratégia híbrida: READ COMMITTED padrão, optimistic concurrency, row/advisory locks, SERIALIZABLE seletivo, SKIP LOCKED, Process Managers (Opção C). |
 

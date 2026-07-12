@@ -8,14 +8,14 @@ O coração é matemático, sistêmico, determinístico e balanceável. A camada
 
 ## Sumário
 
-- [1. Princípios](#1-principios)
+- [1. Princípios](#1-princípios)
 - [2. Hierarquia de IAs por camada](#2-hierarquia-de-ias-por-camada)
-- [3. Módulos de IA](#3-modulos-de-ia)
-- [4. Padrão núcleo de decisão (Decision Engine)](#4-padrao-nucleo-de-decisao-decision-engine)
+- [3. Módulos de IA](#3-módulos-de-ia)
+- [4. Padrão núcleo de decisão (Decision Engine)](#4-padrão-núcleo-de-decisão-decision-engine)
 - [5. Os 4 tipos de IA combinados](#5-os-4-tipos-de-ia-combinados)
 - [6. Sistema de personalidade da IA](#6-sistema-de-personalidade-da-ia)
 - [7. IA online vs offline](#7-ia-online-vs-offline)
-- [8. Anti-padrões e diretrizes de balanceamento](#8-anti-padroes-e-diretrizes-de-balanceamento)
+- [8. Anti-padrões e diretrizes de balanceamento](#8-anti-padrões-e-diretrizes-de-balanceamento)
 - [9. Ordem de desenvolvimento da IA](#9-ordem-de-desenvolvimento-da-ia)
 
 ---
@@ -151,19 +151,19 @@ type ManagerStyle = {
 };
 ```
 
-### 2.6. IA da partida ao vivo (loop de 9 passos)
+### 2.6. IA da partida ao vivo (participação no tick loop)
 
-A simulação roda por ciclos (ticks). Cada tick representa um minuto (ou fatia menor, ex.: 15 s simulados). A cada minuto simulado, o motor executa os **9 passos**:
+A simulação roda por ciclos (ticks). Cada tick representa um minuto (ou fatia menor, ex.: 15 s simulados). O **tick loop canônico do engine tem 11 passos, definidos em [`./05-motor-de-partida.md`](./05-motor-de-partida.md) §15 (fonte canônica)** — este documento **não mantém contagem própria**. A IA participa dos **passos de decisão/leitura** do loop; a cada minuto simulado ela lê e alimenta os seguintes aspectos (subconjunto de decisão do loop do motor):
 
-1. **Energia** — atualiza a energia/fadiga dos jogadores.
-2. **Domínio territorial** — calcula domínio de campo.
-3. **Posse** — calcula posse provável.
-4. **Duelos** — resolve duelos individuais.
-5. **Chances** — calcula criação de chances.
-6. **Risco defensivo** — calcula vulnerabilidade defensiva.
-7. **Eventos especiais** — gera eventos possíveis.
-8. **Moral/pressão** — atualiza moral e pressão das equipes.
-9. **Decisão de relevância** — decide se algo relevante aconteceu (e se um ponto de decisão deve abrir).
+- **Energia** — lê a energia/fadiga dos jogadores.
+- **Domínio territorial** — lê o domínio de campo.
+- **Posse** — lê a posse provável.
+- **Duelos** — considera os duelos individuais resolvidos.
+- **Chances** — lê a criação de chances.
+- **Risco defensivo** — lê a vulnerabilidade defensiva.
+- **Eventos especiais** — reage aos eventos possíveis gerados.
+- **Moral/pressão** — lê a moral e a pressão das equipes.
+- **Decisão de relevância** — decide se algo relevante aconteceu (e se um ponto de decisão deve abrir).
 
 Para jogos **online**, o motor pode pausar em **pontos de decisão**, que surgem quando o motor detecta mudança real na dinâmica — nunca de forma aleatória. Para jogos **offline**, o `ManagerAI` decide no lugar do usuário.
 

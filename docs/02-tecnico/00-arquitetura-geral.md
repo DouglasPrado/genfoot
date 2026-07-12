@@ -137,7 +137,7 @@ Com determinismo garantido, a mesma entrada produz sempre o mesmo resultado, o q
 - evitar divergência entre servidores;
 - investigar suspeitas de manipulação.
 
-Cada mundo carrega sua própria `seed`, e praticamente todas as tabelas referenciam um `worldId`, viabilizando múltiplos mundos, simulação paralela e reinício de universo sem afetar outros jogos.
+Cada mundo carrega sua própria `seed`, e praticamente todas as tabelas referenciam a chave de partição do mundo — **`game_world_id`** no banco (snake_case) e **`gameWorldId`** no Prisma/TS (forma canônica; ver `./01-arquitetura-de-dados.md`) —, viabilizando múltiplos mundos, simulação paralela e reinício de universo sem afetar outros jogos.
 
 ### 4.2 Event sourcing híbrido (estado atual + histórico de eventos)
 
@@ -252,7 +252,7 @@ Todos os **processos de servidor** compartilham o mesmo código-base e pacotes, 
 | `async-worker` | Processamento de eventos, projeções, conciliações, rebuilds, mercado, histórico e jobs administrativos. |
 | `notification-worker` | Notificações derivadas, agrupamentos, digests, push, e-mail e retentativas. |
 
-Componentes de infraestrutura: `postgres`, `redis`, `rabbitmq`, `otel-collector`, `prometheus`, `grafana`, `loki`, `tempo`; armazenamento externo em Cloudflare R2.
+Componentes de infraestrutura (fundação): `postgres`, `redis` (cache + broker/filas BullMQ, ver R-78), `otel-collector`, `prometheus`, `grafana`, `loki`, `tempo`; armazenamento externo em Cloudflare R2. Um broker de mensageria dedicado (`rabbitmq` ou `nats`) entra apenas na evolução (fase 2+, ver seção 10), não na fundação.
 
 **Replicação futura:** `api`, `realtime-gateway`, `simulation-worker`, `async-worker` e `notification-worker` podem ter N réplicas. O `world-scheduler` é coordenado por **leases**, de modo que apenas um processo avance um dado mundo por vez.
 
@@ -264,26 +264,26 @@ A infraestrutura inicial é projetada para caber em uma única instância operac
 
 ### EasyPanel, rede e serviços
 
-- Cada processo é um serviço Docker no EasyPanel (`football-admin`, `football-api`, `football-realtime`, `football-world-scheduler`, `football-simulation-worker`, `football-async-worker`, `football-notification-worker`, além de `football-postgres`, `football-redis`, `football-rabbitmq` e os serviços de observabilidade).
-- **Rede privada:** PostgreSQL, Redis e RabbitMQ **não** são expostos à internet. Publicáveis apenas `admin`, `api` e `realtime-gateway`.
+- Cada processo é um serviço Docker no EasyPanel (`football-admin`, `football-api`, `football-realtime`, `football-world-scheduler`, `football-simulation-worker`, `football-async-worker`, `football-notification-worker`, além de `football-postgres`, `football-redis` — que na fundação acumula cache e broker/filas BullMQ (R-78) — e os serviços de observabilidade). Um serviço `football-rabbitmq` (ou `football-nats`) só é adicionado na evolução (fase 2+, ver seção 10).
+- **Rede privada:** PostgreSQL e Redis (e, quando introduzido, o broker de mensageria dedicado) **não** são expostos à internet. Publicáveis apenas `admin`, `api` e `realtime-gateway`.
 - **TLS/HTTPS** obrigatório no acesso público, com terminação no proxy do EasyPanel. Cloudflare pode fornecer DNS, proxy, CDN, proteção básica e cache de arquivos públicos.
-- **Volumes persistentes** para PostgreSQL, RabbitMQ, Redis, Grafana e (conforme retenção) Loki/Prometheus.
+- **Volumes persistentes** para PostgreSQL, Redis, Grafana e (conforme retenção) Loki/Prometheus; o broker dedicado (RabbitMQ/NATS) ganha volume próprio quando introduzido (fase 2+).
 
 ### Saúde e degradação controlada
 
 - Cada serviço expõe `/health/live` e `/health/ready`. A `api` só fica *ready* com configuração válida, PostgreSQL acessível e migrações compatíveis.
-- **Falha do RabbitMQ:** a API continua aceitando commands cuja transação e Outbox sejam gravadas — o evento é publicado depois.
+- **Falha do broker de mensageria** (Redis/BullMQ na fundação; RabbitMQ/NATS na evolução): a API continua aceitando commands cuja transação e Outbox sejam gravadas — o evento é publicado depois.
 - **Falha do Redis:** apenas degradação (perda de cache, reconstrução de presença); dados oficiais preservados.
 - **Falha do R2:** uploads/downloads indisponíveis, mas partidas, contratos e finanças continuam.
 
 ### Configuração e segredos
 
-- Variáveis de ambiente (`DATABASE_URL`, `REDIS_URL`, `RABBITMQ_URL`, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `JWT_PRIVATE_KEY`, …) são **validadas na inicialização**; configuração inválida impede o boot em vez de operar parcialmente.
+- Variáveis de ambiente (`DATABASE_URL`, `REDIS_URL` — que na fundação também endereça o broker/filas BullMQ —, `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `JWT_PRIVATE_KEY`, …) são **validadas na inicialização**; configuração inválida impede o boot em vez de operar parcialmente. `RABBITMQ_URL` (ou `NATS_URL`) passa a ser exigida apenas quando o broker dedicado for introduzido (fase 2+).
 - Segredos ficam como secrets/variáveis protegidas do EasyPanel — nunca no repositório, na imagem, em logs ou em arquivos públicos.
 
 ### Ambientes e CI/CD
 
-- Ambientes: `development` (Docker Compose com versões equivalentes de Postgres/Redis/RabbitMQ e R2 simulado), `test`, `staging` (reproduz topologia/variáveis/migrações/filas/observabilidade, sem segredos ou dados reais) e `production` (apenas artefatos aprovados e imutáveis).
+- Ambientes: `development` (Docker Compose com versões equivalentes de Postgres/Redis e R2 simulado; o broker dedicado é adicionado ao Compose quando introduzido na fase 2+), `test`, `staging` (reproduz topologia/variáveis/migrações/filas/observabilidade, sem segredos ou dados reais) e `production` (apenas artefatos aprovados e imutáveis).
 - **Imagens Docker** imutáveis, com tag de versão, commit, data de build e checksum, publicadas no **GitHub Container Registry (GHCR)**. Pode-se usar uma imagem backend comum com diferentes comandos de inicialização.
 - **Pipeline (GitHub Actions):** deps → format → lint → typecheck → testes → gerar cliente Prisma → validar migrações → build → imagens → GHCR → deploy no EasyPanel → verificações pós-deploy. Fluxo de branches `main` + `feature/*` + `fix/*`; produção derivada de `main`/tags. Releases têm versão, changelog, migrações, compatibilidade, feature flags e plano de rollback.
 

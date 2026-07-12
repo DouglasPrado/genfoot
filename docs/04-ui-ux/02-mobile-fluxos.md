@@ -105,7 +105,7 @@ Este documento descreve **todos os fluxos** do app do jogador (Expo), ponta a po
 3. Ramo **assumir** → **`M-CLUB-PICK`** (lista de clubes disponíveis) · Ramo **criar** → **`M-CLUB-CREATE`** + **`M-REGION-PICK`** (região/cidade que definem torcida, rivais, clima, base, custos).
 4. **`M-CLUB-PREVIEW`** — estado inicial: divisão, elenco, estrutura, **dívidas e políticas herdadas**, torcida, riscos.
 5. **`M-SLOT-RESERVE`** — **aporte inicial fixo** (igualdade competitiva, sem vantagem por dinheiro real) e **reserva de vaga** por prazo curto. Command `ReserveClubSlot`.
-6. **`M-CONTROL-ACTIVATE`** — controle ativado na data válida: clube novo entra em divisão de expansão + pré-temporada; clube assumido mantém todo o estado. Command `ActivateClubControl`.
+6. **`M-CONTROL-ACTIVATE`** — controle ativado na data válida: clube novo entra em Liga Inicial + pré-temporada; clube assumido mantém todo o estado. Command `ActivateClubControl`.
 7. **`M-ONBOARD-REVIEW`** — revisão inicial: **autoridade**, **objetivos da diretoria**, orçamento, elenco, plano automático (política offline) e **pendências herdadas** que exigem ação imediata. Banner do **Programa de Clube Novo** quando aplicável.
 8. Finaliza na **`M-HOME`**, com a Central de decisões já populada pelas pendências herdadas.
 

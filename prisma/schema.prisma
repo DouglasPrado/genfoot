@@ -1,0 +1,1589 @@
+// =============================================================================
+// Grinta — Schema Prisma Canônico (EXECUTÁVEL / validado)
+// -----------------------------------------------------------------------------
+// Este é o schema executável e validado (`prisma validate`). A referência de
+// domínio comentada, com os ~250 models granulares e as decisões de modelagem,
+// vive em `docs/02-tecnico/02-modelo-de-dados.md`. Em caso de divergência de
+// SINTAXE, este arquivo prevalece; para o DOMÍNIO detalhado, consulte o doc.
+//
+// Convenções canônicas aplicadas (ver §1 do doc 02 e Decisões 19.7/19.8):
+//  - PK: String @id @default(uuid(7)) @db.Uuid  (UUIDv7)
+//  - Dinheiro: BigInt em unidade mínima (`amountMinor`/`*Minor`) + `currencyId`
+//    String @db.Uuid. Proibido Float/Decimal para dinheiro. `Decimal` fica
+//    restrito a grandezas não-monetárias fracionárias (taxas, xG, momentum...).
+//  - `currencyId` referencia a futura entidade `Currency` (catálogo); mantido
+//    como UUID escalar neste núcleo para não inflar as relações.
+//  - Multi-mundo: `gameWorldId String @db.Uuid` nas entidades de topo, indexado.
+//  - FK composta por mundo (Decisão 19.8): pais centrais declaram
+//    `@@unique([gameWorldId, id])` e os filhos críticos referenciam
+//    `references: [gameWorldId, id]`. A unicidade global do UUID não é
+//    considerada proteção suficiente contra vínculos entre mundos.
+//  - `Person` separado de `Player` (Player.personId): a mesma pessoa reusa
+//    `Person` ao mudar de papel (ex.: jogador que vira staff).
+//  - Concorrência otimista: `version Int @default(1)` nas entidades mutáveis.
+//
+// Núcleo coerente (~51 models). NÃO é o inventário completo dos ~250 granulares
+// da §6 do doc — é o subconjunto executável que cobre identidade, mundo, clube,
+// pessoa/jogador, staff/treino, elenco, scouting/mercado, finanças, competição,
+// partida/simulação, narrativa, notificação, automação e auditoria.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  PLAYER
+  MODERATOR
+  ADMIN
+}
+
+enum UserAccountStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  ANONYMIZED
+}
+
+enum WorldStatus {
+  CREATING
+  ACTIVE
+  PAUSED
+  FINISHED
+  ARCHIVED
+}
+
+enum ClubControlType {
+  USER
+  AI
+}
+
+enum ClubStatus {
+  ACTIVE
+  INACTIVE
+  BANKRUPT
+  BOT_RESERVED
+}
+
+enum SeasonStatus {
+  PLANNED
+  ACTIVE
+  FINISHED
+  ARCHIVED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum DominantFoot {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+enum PlayerStatus {
+  ACTIVE
+  RETIRED
+  FREE_AGENT
+  INJURED
+  SUSPENDED
+}
+
+enum PlayerGenerationSource {
+  INITIAL_WORLD
+  SCOUT_FOUND
+  YOUTH_ACADEMY
+  REGEN_AFTER_RETIREMENT
+  MARKET_BALANCE
+}
+
+enum PlayerPosition {
+  GK
+  CB
+  LB
+  RB
+  LWB
+  RWB
+  CDM
+  CM
+  CAM
+  LM
+  RM
+  LW
+  RW
+  ST
+  CF
+}
+
+enum StaffRole {
+  HEAD_COACH
+  ASSISTANT_COACH
+  FITNESS_COACH
+  GOALKEEPER_COACH
+  SCOUT
+  DOCTOR
+  PHYSIOTHERAPIST
+  PSYCHOLOGIST
+  DIRECTOR
+  NEGOTIATOR
+  COMMUNICATION_MANAGER
+  YOUTH_COORDINATOR
+}
+
+enum StaffQualityTier {
+  VERY_LOW
+  LOW
+  MEDIUM
+  HIGH
+  ELITE
+}
+
+enum DepartmentType {
+  MEDICAL
+  TRAINING
+  YOUTH_ACADEMY
+  SCOUTING
+  COMMUNICATION
+  BOARD
+  FINANCE
+  INFRASTRUCTURE
+  STADIUM
+  DATA_ANALYSIS
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+  RENEWED
+  TRANSFERRED
+}
+
+enum TransferStatus {
+  LISTED
+  NEGOTIATING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+}
+
+enum TransferType {
+  PERMANENT
+  LOAN
+  FREE_AGENT
+  CONTRACT_END
+}
+
+// Cláusula de compra em empréstimos (§6.2/§6.3.8).
+enum LoanPurchaseClauseType {
+  NONE
+  OPTION_TO_BUY
+  OBLIGATION_TO_BUY
+  BUY_BACK
+}
+
+enum CompetitionType {
+  LEAGUE
+  CUP
+  SUPER_CUP
+  INTERNATIONAL_CUP
+  FRIENDLY
+}
+
+enum CompetitionFormat {
+  ROUND_ROBIN
+  DOUBLE_ROUND_ROBIN
+  KNOCKOUT
+  GROUPS_AND_KNOCKOUT
+  SWISS
+}
+
+// Status de partida desmembrado em 3 responsabilidades distintas (§2 canônico).
+enum MatchRuntimeStatus {
+  SCHEDULED
+  PRE_MATCH
+  LIVE
+  PAUSED_FOR_DECISION
+  FINISHED
+  PROCESSED
+}
+
+enum MatchResultStatus {
+  PENDING
+  NORMAL
+  WALKOVER
+  CANCELLED
+  ABANDONED
+}
+
+enum HomologationStatus {
+  PENDING
+  PROVISIONAL
+  HOMOLOGATED
+  UNDER_APPEAL
+  OVERTURNED
+}
+
+enum MatchEventType {
+  GOAL
+  OWN_GOAL
+  ASSIST
+  YELLOW_CARD
+  RED_CARD
+  INJURY
+  SUBSTITUTION
+  TACTICAL_CHANGE
+  PENALTY_AWARDED
+  PENALTY_MISSED
+  PENALTY_SCORED
+  FREE_KICK
+  SHOT
+  SHOT_ON_TARGET
+  SAVE
+  FOUL
+  OFFSIDE
+  VAR_CHECK
+  MOMENTUM_SHIFT
+  FATIGUE_ALERT
+  AI_DECISION
+}
+
+enum TacticalMentality {
+  VERY_DEFENSIVE
+  DEFENSIVE
+  BALANCED
+  OFFENSIVE
+  VERY_OFFENSIVE
+}
+
+enum PressingIntensity {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+enum MarkingStyle {
+  ZONAL
+  MAN_TO_MAN
+  MIXED
+}
+
+enum TempoStyle {
+  SLOW
+  NORMAL
+  FAST
+  DIRECT
+}
+
+enum MatchControlSource {
+  USER_ONLINE
+  USER_OFFLINE_AI
+  FULL_AI
+  SYSTEM
+}
+
+enum DecisionPointType {
+  INJURY
+  RED_CARD
+  FATIGUE
+  BAD_PERFORMANCE
+  LOSING_GAME
+  WINNING_GAME
+  TACTICAL_OPPORTUNITY
+  OPPONENT_WEAKNESS
+  PLAYER_RISK
+  FINAL_PRESSURE
+}
+
+enum RecommendationImpact {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum NotificationType {
+  MATCH_EVENT
+  MATCH_DECISION_POINT
+  TRANSFER_OFFER
+  CONTRACT_ALERT
+  INJURY_ALERT
+  FINANCE_ALERT
+  FAN_REACTION
+  BOARD_MESSAGE
+  COMPETITION_UPDATE
+  SCOUT_REPORT
+  TRAINING_REPORT
+}
+
+enum FinanceTransactionType {
+  TICKET_REVENUE
+  SPONSORSHIP
+  PLAYER_SALE
+  PLAYER_PURCHASE
+  WAGE_PAYMENT
+  STAFF_WAGE_PAYMENT
+  STADIUM_COST
+  STRUCTURE_UPGRADE
+  PRIZE_MONEY
+  TAX
+  MAINTENANCE
+  LOAN_PAYMENT
+  OTHER_INCOME
+  OTHER_EXPENSE
+}
+
+enum NarrativeType {
+  FAN_PRESSURE
+  MEDIA_RUMOR
+  PLAYER_UNHAPPY
+  BOARD_PRESSURE
+  DERBY_HYPE
+  TITLE_RACE
+  RELEGATION_RISK
+  TRANSFER_SPECULATION
+  COMEBACK_STORY
+}
+
+enum MoodLevel {
+  VERY_LOW
+  LOW
+  NEUTRAL
+  HIGH
+  VERY_HIGH
+}
+
+enum InjurySeverity {
+  MINOR
+  LIGHT
+  MODERATE
+  SERIOUS
+  CRITICAL
+}
+
+enum TrainingFocus {
+  PHYSICAL
+  TECHNICAL
+  TACTICAL
+  MENTAL
+  DEFENSIVE
+  OFFENSIVE
+  SET_PIECES
+  RECOVERY
+  INDIVIDUAL_ROLE
+}
+
+// Elenco e registro (§6.2 §31). Enums que faltavam no doc.
+enum SquadType {
+  SENIOR
+  RESERVE
+  YOUTH
+  NATIONAL
+}
+
+enum SquadCategory {
+  FIRST_TEAM
+  RESERVE
+  YOUTH_ACADEMY
+  LOAN
+  TRIAL
+}
+
+enum YouthAgeCategory {
+  U15
+  U17
+  U20
+  U23
+}
+
+// Notificação e automação (§6.2 §39). Enums que faltavam no doc.
+enum AutomationLevel {
+  MANUAL
+  ASSISTED
+  SEMI_AUTOMATED
+  FULLY_AUTOMATED
+}
+
+enum AutomationRuleStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  DISABLED
+  ARCHIVED
+}
+
+// =============================================================================
+// PLATAFORMA (globais, sem gameWorldId) — §3.1 / §6.3.1
+// =============================================================================
+
+/// Conta global do usuário. NÃO controla clube diretamente — o controle ocorre
+/// por `ClubControl` dentro de um mundo. Forma canônica granular: UserAccount.
+model UserAccount {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  status      UserAccountStatus @default(ACTIVE)
+  name        String
+  email       String            @unique // e-mail normalizado: 1 conta por e-mail
+  role        UserRole          @default(PLAYER)
+  avatarUrl   String?
+  lastLoginAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  version     Int               @default(1)
+
+  sessions            UserSession[]
+  worldParticipations WorldParticipant[]
+  notifications       Notification[]
+}
+
+model UserSession {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  userId      String   @db.Uuid
+  gameWorldId String?  @db.Uuid
+  isOnline    Boolean  @default(false) // habilita interação na partida ao vivo
+  lastSeenAt  DateTime @default(now())
+  device      String?
+  ipAddress   String?
+
+  user  UserAccount @relation(fields: [userId], references: [id])
+  world GameWorld?  @relation(fields: [gameWorldId], references: [id])
+
+  @@index([userId])
+  @@index([gameWorldId])
+}
+
+/// Vínculo usuário <-> mundo (§6.3.1). Substitui a antiga visão `ClubUser`.
+model WorldParticipant {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  gameWorldId String    @db.Uuid
+  userId      String    @db.Uuid
+  status      String    @default("ACTIVE")
+  joinedAt    DateTime  @default(now())
+  leftAt      DateTime?
+  version     Int       @default(1)
+
+  gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id])
+  user         UserAccount   @relation(fields: [userId], references: [id])
+  clubControls ClubControl[]
+
+  @@unique([gameWorldId, userId]) // 1 participação por usuário/mundo
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId])
+}
+
+// =============================================================================
+// MUNDO E TEMPORADA — §3.1 / §6.3.2
+// =============================================================================
+
+/// Raiz de partição do mundo: seu `id` é o valor de `gameWorldId` dos filhos.
+model GameWorld {
+  id                      String      @id @default(uuid(7)) @db.Uuid
+  name                    String
+  status                  WorldStatus @default(CREATING)
+  currentSeasonId         String?     @db.Uuid
+  currentRuleSetVersionId String?     @db.Uuid // versão de ruleset vigente
+  currentDate             DateTime // data virtual do mundo
+  timezone                String      @default("America/Sao_Paulo")
+  maxClubs                Int
+  initialClubCashMinor    BigInt // caixa inicial em unidade mínima
+  currencyId              String      @db.Uuid // moeda-base do mundo (FK Currency)
+  createdAt               DateTime    @default(now())
+  version                 Int         @default(1)
+
+  seasons           Season[]
+  clubs             Club[]
+  persons           Person[]
+  players           Player[]
+  staffMembers      StaffMember[]
+  competitions      Competition[]
+  worldParticipants WorldParticipant[]
+  sessions          UserSession[]
+  economyConfig     GameEconomyConfig?
+  economySnapshots  EconomySnapshot[]
+  narratives        Narrative[]
+  notifications     Notification[]
+  auditLogs         GameAuditLog[]
+  ruleConfigs       GameRuleConfig[]
+}
+
+model GameEconomyConfig {
+  id                        String  @id @default(uuid(7)) @db.Uuid
+  gameWorldId               String  @unique @db.Uuid
+  basePlayerPriceMultiplier Decimal @db.Decimal(8, 4) // não-monetário: multiplicador
+  baseWageMultiplier        Decimal @db.Decimal(8, 4)
+  clubCountWeight           Decimal @db.Decimal(8, 4)
+  activePlayerCountWeight   Decimal @db.Decimal(8, 4)
+  retiredPlayerCountWeight  Decimal @db.Decimal(8, 4)
+  freeAgentCountWeight      Decimal @db.Decimal(8, 4)
+  moneySupplyWeight         Decimal @db.Decimal(8, 4)
+  minGeneratedPlayerAge     Int
+  maxGeneratedPlayerAge     Int
+  targetPlayersPerClub      Int
+  targetFreeAgentRatio      Decimal @db.Decimal(5, 4)
+  inflationRatePerSeason    Decimal @default(0) @db.Decimal(6, 4)
+
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+}
+
+model EconomySnapshot {
+  id                      String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId             String   @db.Uuid
+  seasonId                String?  @db.Uuid
+  currencyId              String   @db.Uuid
+  totalClubs              Int
+  totalActiveClubs        Int
+  totalPlayers            Int
+  totalActivePlayers      Int
+  totalRetiredPlayers     Int
+  totalFreeAgents         Int
+  totalCashInWorldMinor   BigInt // dinheiro: unidade mínima
+  averageClubCashMinor    BigInt
+  averagePlayerValueMinor BigInt
+  averageWageMinor        BigInt
+  marketInflationIndex    Decimal  @db.Decimal(10, 4) // índices: não-monetários
+  playerScarcityIndex     Decimal  @db.Decimal(10, 4)
+  balanceScore            Decimal  @db.Decimal(10, 4)
+  capturedAt              DateTime @default(now())
+
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+
+  @@index([gameWorldId])
+}
+
+model Season {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  gameWorldId String       @db.Uuid
+  number      Int
+  name        String
+  status      SeasonStatus @default(PLANNED)
+  startsAt    DateTime
+  endsAt      DateTime?
+  version     Int          @default(1)
+
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+
+  @@unique([gameWorldId, number])
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId])
+}
+
+// =============================================================================
+// CLUBE — §3.2 / §6.3.3
+// =============================================================================
+
+model Club {
+  id                  String          @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String          @db.Uuid
+  name                String
+  shortName           String
+  slug                String
+  city                String?
+  country             String
+  foundedYear         Int?
+  controlType         ClubControlType @default(AI)
+  status              ClubStatus      @default(ACTIVE)
+  reputation          Int             @default(1)
+  level               Int             @default(1)
+  fanBaseSize         Int             @default(0)
+  boardPatience       Int             @default(50)
+  pressureLevel       Int             @default(0)
+  currencyId          String          @db.Uuid // moeda operacional do clube (FK Currency)
+  cashMinor           BigInt // dinheiro em unidade mínima
+  wageBudgetMinor     BigInt
+  transferBudgetMinor BigInt
+  version             Int             @default(1)
+
+  gameWorld        GameWorld              @relation(fields: [gameWorldId], references: [id])
+  controls         ClubControl[]
+  departments      ClubDepartment[]
+  aiProfile        ClubAIProfile?
+  players          Player[]
+  playerContracts  PlayerContract[]
+  staffContracts   StaffContract[]
+  trainingPlans    TrainingPlan[]
+  squads           Squad[]
+  scoutReports     ScoutReport[]
+  transferListings TransferListing[]
+  finances         FinancialTransaction[]
+  financeSnapshots ClubFinanceSnapshot[]
+  automationRules  AutomationRule[]
+  seasonStats      ClubSeasonStats[]
+  homeMatches      Match[]                @relation("HomeClubMatches")
+  awayMatches      Match[]                @relation("AwayClubMatches")
+  offersBuying     Offer[]                @relation("BuyingClubOffers")
+  offersSelling    Offer[]                @relation("SellingClubOffers")
+
+  @@unique([gameWorldId, slug])
+  @@unique([gameWorldId, id]) // par de referência para FKs compostas por mundo
+  @@index([gameWorldId])
+}
+
+/// Controle atual ou histórico do clube por um participante do mundo.
+/// Invariante (índice único parcial em migration SQL): 1 controle ACTIVE por clube.
+model ClubControl {
+  id                 String          @id @default(uuid(7)) @db.Uuid
+  gameWorldId        String          @db.Uuid
+  clubId             String          @db.Uuid
+  worldParticipantId String          @db.Uuid
+  controlType        ClubControlType
+  isActive           Boolean         @default(true)
+  startsAtWorldTick  BigInt
+  endsAtWorldTick    BigInt?
+  version            Int             @default(1)
+
+  club             Club             @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  worldParticipant WorldParticipant @relation(fields: [worldParticipantId], references: [id])
+
+  @@index([gameWorldId, clubId])
+  @@index([worldParticipantId])
+}
+
+model ClubDepartment {
+  id                            String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId                   String         @db.Uuid
+  clubId                        String         @db.Uuid
+  currencyId                    String         @db.Uuid
+  type                          DepartmentType
+  level                         Int            @default(1)
+  maxLevel                      Int            @default(5)
+  qualityScore                  Int            @default(10)
+  maintenanceCostPerSeasonMinor BigInt
+  upgradeCostMinor              BigInt
+  effectJson                    Json?
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([clubId, type])
+  @@index([gameWorldId, clubId])
+}
+
+model ClubAIProfile {
+  id                   String @id @default(uuid(7)) @db.Uuid
+  clubId               String @unique @db.Uuid
+  aggressiveness       Int    @default(50)
+  patience             Int    @default(50)
+  youthPreference      Int    @default(50)
+  transferRisk         Int    @default(50)
+  financialDiscipline  Int    @default(50)
+  tacticalFlexibility  Int    @default(50)
+  substitutionTiming   Int    @default(50)
+  injuryRiskTolerance  Int    @default(50)
+  offlineDecisionLevel Int    @default(1)
+  strategyJson         Json?
+
+  club Club @relation(fields: [clubId], references: [id])
+}
+
+// =============================================================================
+// PESSOA E JOGADOR (separados — canônico) — §3.3 / §6.3.4
+// =============================================================================
+
+/// Dados pessoais/biográficos de qualquer indivíduo único do mundo.
+model Person {
+  id          String       @id @default(uuid(7)) @db.Uuid
+  gameWorldId String       @db.Uuid
+  firstName   String
+  lastName    String
+  knownName   String?
+  nationality String
+  birthDate   DateTime
+  ageVirtual  Int
+  gender      Gender       @default(MALE)
+  status      PlayerStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  version     Int          @default(1)
+
+  gameWorld   GameWorld    @relation(fields: [gameWorldId], references: [id])
+  player      Player?
+  staffMember StaffMember?
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId])
+}
+
+/// Papel esportivo/atributos. `personId` é obrigatório e único por mundo —
+/// a mesma pessoa reusa `Person` ao mudar de papel.
+model Player {
+  id                      String                 @id @default(uuid(7)) @db.Uuid
+  gameWorldId             String                 @db.Uuid
+  personId                String                 @unique @db.Uuid
+  clubId                  String?                @db.Uuid
+  primaryPosition         PlayerPosition
+  secondaryPosition       PlayerPosition?
+  dominantFoot            DominantFoot
+  heightCm                Int?
+  weightKg                Int?
+  status                  PlayerStatus           @default(ACTIVE)
+  generationSource        PlayerGenerationSource
+  generatedAtSeasonNumber Int?
+  currentAbility          Int
+  potentialAbility        Int
+  currencyId              String                 @db.Uuid
+  marketValueMinor        BigInt // dinheiro em unidade mínima
+  wageExpectationMinor    BigInt
+  // estado dinâmico
+  morale                  Int                    @default(50)
+  confidence              Int                    @default(50)
+  happiness               Int                    @default(50)
+  fatigue                 Int                    @default(0)
+  matchSharpness          Int                    @default(50)
+  // traços persistentes
+  injuryProneness         Int                    @default(50)
+  consistency             Int                    @default(50)
+  ambition                Int                    @default(50)
+  loyalty                 Int                    @default(50)
+  professionalism         Int                    @default(50)
+  version                 Int                    @default(1)
+
+  gameWorld          GameWorld             @relation(fields: [gameWorldId], references: [id])
+  person             Person                @relation(fields: [personId], references: [id])
+  club               Club?                 @relation(fields: [clubId], references: [id])
+  attributes         PlayerAttributes?
+  background         PlayerBackground?
+  personality        PlayerPersonality?
+  development        PlayerDevelopment?
+  contracts          PlayerContract[]
+  injuries           PlayerInjury[]
+  scoutReports       ScoutReport[]
+  transferListings   TransferListing[]
+  offers             Offer[]
+  squadMemberships   SquadMembership[]
+  seasonStats        PlayerSeasonStats[]
+  matchStats         PlayerMatchStats[]
+  lineupPlayers      MatchLineupPlayer[]
+  trainingEntries    TrainingPlayerEntry[]
+  matchEvents        MatchEvent[]          @relation("EventPlayer")
+  relatedMatchEvents MatchEvent[]          @relation("EventRelatedPlayer")
+
+  @@unique([gameWorldId, personId])
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+model PlayerAttributes {
+  id                    String @id @default(uuid(7)) @db.Uuid
+  playerId              String @unique @db.Uuid
+  // técnicos
+  finishing             Int
+  longShots             Int
+  heading               Int
+  passing               Int
+  crossing              Int
+  dribbling             Int
+  firstTouch            Int
+  technique             Int
+  tackling              Int
+  marking               Int
+  positioning           Int
+  // físicos
+  acceleration          Int
+  pace                  Int
+  stamina               Int
+  strength              Int
+  agility               Int
+  balance               Int
+  jumping               Int
+  // mentais
+  bravery               Int
+  aggression            Int
+  composure             Int
+  decisions             Int
+  concentration         Int
+  leadership            Int
+  teamwork              Int
+  workRate              Int
+  determination         Int
+  flair                 Int
+  // goleiro (nullable — só GKs)
+  goalkeeperReflexes    Int?
+  goalkeeperHandling    Int?
+  goalkeeperPositioning Int?
+  goalkeeperKicking     Int?
+  goalkeeperOneOnOne    Int?
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model PlayerBackground {
+  id                    String  @id @default(uuid(7)) @db.Uuid
+  playerId              String  @unique @db.Uuid
+  childhoodPovertyLevel Int     @default(0)
+  familyStability       Int     @default(50)
+  violenceExposure      Int     @default(0)
+  educationLevel        Int     @default(50)
+  earlyFootballAccess   Int     @default(50)
+  fatherPresenceScore   Int?
+  motherPresenceScore   Int?
+  guardianStory         String?
+  lifeStorySummary      String?
+  generatedTraitJson    Json? // traços derivados da história de vida
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model PlayerPersonality {
+  id                 String @id @default(uuid(7)) @db.Uuid
+  playerId           String @unique @db.Uuid
+  grit               Int
+  emotionalStability Int
+  discipline         Int
+  ego                Int
+  pressureHandling   Int
+  adaptability       Int
+  socialInfluence    Int
+  mediaHandling      Int
+  offFieldRisk       Int
+  lifestyleBalance   Int
+  hiddenTraits       Json? // traços ocultos, revelados por scouting
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model PlayerDevelopment {
+  id                      String    @id @default(uuid(7)) @db.Uuid
+  playerId                String    @unique @db.Uuid
+  technicalGrowthRate     Decimal   @db.Decimal(6, 4)
+  physicalGrowthRate      Decimal   @db.Decimal(6, 4)
+  mentalGrowthRate        Decimal   @db.Decimal(6, 4)
+  peakAgeStart            Int
+  peakAgeEnd              Int
+  declineRate             Decimal   @db.Decimal(6, 4)
+  trainingResponse        Int
+  injuryImpactAccumulated Int       @default(0)
+  lastDevelopmentAt       DateTime?
+
+  player Player @relation(fields: [playerId], references: [id])
+}
+
+model PlayerContract {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId          String         @db.Uuid
+  playerId             String         @db.Uuid
+  clubId               String         @db.Uuid
+  currencyId           String         @db.Uuid
+  status               ContractStatus @default(ACTIVE)
+  startSeason          Int
+  endSeason            Int
+  salaryPerSeasonMinor BigInt // dinheiro em unidade mínima
+  signingBonusMinor    BigInt         @default(0)
+  releaseClauseMinor   BigInt?
+  moralePromiseJson    Json?
+  roleInSquad          String?
+  version              Int            @default(1)
+
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+  club   Club   @relation(fields: [clubId], references: [id])
+
+  @@index([gameWorldId, playerId])
+  @@index([clubId])
+}
+
+model PlayerInjury {
+  id                           String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId                  String         @db.Uuid
+  playerId                     String         @db.Uuid
+  severity                     InjurySeverity
+  name                         String
+  description                  String?
+  occurredAt                   DateTime
+  expectedReturnAt             DateTime?
+  recoveredAt                  DateTime?
+  causedByMatchId              String?        @db.Uuid
+  causedByTrainingPlanId       String?        @db.Uuid
+  medicalDepartmentLevelAtTime Int?
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@index([gameWorldId, playerId])
+}
+
+// =============================================================================
+// COMISSÃO TÉCNICA, TREINO E ELENCO — §3.4 / §6.3.5 / §6.3.6
+// =============================================================================
+
+model StaffMember {
+  id                String           @id @default(uuid(7)) @db.Uuid
+  gameWorldId       String           @db.Uuid
+  personId          String           @unique @db.Uuid
+  role              StaffRole
+  qualityTier       StaffQualityTier
+  abilityScore      Int
+  potentialScore    Int
+  reputation        Int              @default(1)
+  tacticalKnowledge Int              @default(50)
+  youthDevelopment  Int              @default(50)
+  medicalKnowledge  Int              @default(50)
+  negotiation       Int              @default(50)
+  communication     Int              @default(50)
+  discipline        Int              @default(50)
+  dataAnalysis      Int              @default(50)
+  version           Int              @default(1)
+
+  gameWorld GameWorld       @relation(fields: [gameWorldId], references: [id])
+  person    Person          @relation(fields: [personId], references: [id])
+  contracts StaffContract[]
+
+  @@unique([gameWorldId, personId])
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId])
+}
+
+model StaffContract {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId          String         @db.Uuid
+  staffId              String         @db.Uuid
+  clubId               String         @db.Uuid
+  currencyId           String         @db.Uuid
+  status               ContractStatus @default(ACTIVE)
+  startSeason          Int
+  endSeason            Int
+  salaryPerSeasonMinor BigInt // dinheiro em unidade mínima
+  version              Int            @default(1)
+
+  staff StaffMember @relation(fields: [gameWorldId, staffId], references: [gameWorldId, id])
+  club  Club        @relation(fields: [clubId], references: [id])
+
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId, staffId])
+}
+
+model TrainingPlan {
+  id                String        @id @default(uuid(7)) @db.Uuid
+  gameWorldId       String        @db.Uuid
+  clubId            String        @db.Uuid
+  seasonId          String        @db.Uuid
+  name              String
+  focus             TrainingFocus
+  intensity         Int
+  tacticalStyleJson Json?
+  createdByStaffId  String?       @db.Uuid
+  startsAt          DateTime
+  endsAt            DateTime?
+
+  club    Club                  @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  entries TrainingPlayerEntry[]
+
+  @@index([gameWorldId, clubId])
+}
+
+model TrainingPlayerEntry {
+  id             String        @id @default(uuid(7)) @db.Uuid
+  trainingPlanId String        @db.Uuid
+  playerId       String        @db.Uuid
+  focus          TrainingFocus
+  workload       Int
+  technicalGain  Decimal       @default(0) @db.Decimal(8, 4)
+  physicalGain   Decimal       @default(0) @db.Decimal(8, 4)
+  mentalGain     Decimal       @default(0) @db.Decimal(8, 4)
+  fatigueGain    Int           @default(0)
+  injuryRiskGain Int           @default(0)
+
+  plan   TrainingPlan @relation(fields: [trainingPlanId], references: [id])
+  player Player       @relation(fields: [playerId], references: [id])
+
+  @@index([trainingPlanId])
+  @@index([playerId])
+}
+
+/// Presença operacional no elenco — NÃO substitui contrato/registro/empréstimo.
+model Squad {
+  id               String            @id @default(uuid(7)) @db.Uuid
+  gameWorldId      String            @db.Uuid
+  clubId           String            @db.Uuid
+  name             String
+  type             SquadType         @default(SENIOR)
+  category         SquadCategory     @default(FIRST_TEAM)
+  youthAgeCategory YouthAgeCategory?
+  seasonNumber     Int
+  version          Int               @default(1)
+
+  club        Club              @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  memberships SquadMembership[]
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+model SquadMembership {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  squadId     String    @db.Uuid
+  playerId    String    @db.Uuid
+  role        String?
+  shirtNumber Int?
+  isActive    Boolean   @default(true)
+  startsAt    DateTime  @default(now())
+  endsAt      DateTime?
+
+  squad  Squad  @relation(fields: [squadId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([squadId, playerId])
+  @@index([playerId])
+}
+
+// =============================================================================
+// SCOUTING E MERCADO — §3.5 / §6.3.8
+// =============================================================================
+
+model ScoutReport {
+  id                        String    @id @default(uuid(7)) @db.Uuid
+  gameWorldId               String    @db.Uuid
+  clubId                    String    @db.Uuid
+  playerId                  String    @db.Uuid
+  scoutStaffId              String?   @db.Uuid
+  currencyId                String    @db.Uuid
+  accuracy                  Int
+  estimatedCurrentAbility   Int
+  estimatedPotentialAbility Int
+  estimatedMarketValueMinor BigInt // dinheiro em unidade mínima
+  personalityNotes          String?
+  backgroundNotes           String?
+  recommendationScore       Int
+  discoveredAt              DateTime  @default(now())
+  expiresAt                 DateTime?
+
+  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@index([gameWorldId, clubId])
+  @@index([playerId])
+}
+
+model TransferListing {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId      String         @db.Uuid
+  clubId           String         @db.Uuid
+  playerId         String         @db.Uuid
+  currencyId       String         @db.Uuid
+  status           TransferStatus @default(LISTED)
+  type             TransferType
+  askingPriceMinor BigInt // dinheiro em unidade mínima
+  listedAt         DateTime       @default(now())
+  expiresAt        DateTime?
+  reason           String?
+
+  club   Club    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  player Player  @relation(fields: [playerId], references: [id])
+  offers Offer[]
+
+  @@index([gameWorldId, clubId])
+  @@index([playerId])
+}
+
+/// Oferta de transferência (TransferOffer). Detalhamento canônico como processo
+/// (TransferCase + versões de oferta, parcelas, cláusulas) em §6.3.8 do doc.
+model Offer {
+  id                       String                  @id @default(uuid(7)) @db.Uuid
+  gameWorldId              String                  @db.Uuid
+  listingId                String?                 @db.Uuid
+  playerId                 String                  @db.Uuid
+  buyingClubId             String                  @db.Uuid
+  sellingClubId            String?                 @db.Uuid
+  currencyId               String                  @db.Uuid
+  status                   TransferStatus          @default(NEGOTIATING)
+  type                     TransferType
+  transferFeeMinor         BigInt // dinheiro em unidade mínima
+  salaryOfferMinor         BigInt
+  contractSeasons          Int
+  loanPurchaseClauseType   LoanPurchaseClauseType? @default(NONE)
+  bonusJson                Json?
+  clausesJson              Json?
+  playerInterestScore      Int?
+  sellingClubInterestScore Int?
+  buyingClubNeedScore      Int?
+
+  listing     TransferListing? @relation(fields: [listingId], references: [id])
+  player      Player           @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+  buyingClub  Club             @relation("BuyingClubOffers", fields: [buyingClubId], references: [id])
+  sellingClub Club?            @relation("SellingClubOffers", fields: [sellingClubId], references: [id])
+
+  @@index([gameWorldId, playerId])
+  @@index([buyingClubId])
+  @@index([listingId])
+}
+
+// =============================================================================
+// FINANCEIRO — §3.6 / §6.3.9
+// =============================================================================
+
+/// Visão introdutória do lançamento financeiro. Modelo canônico de contabilidade
+/// (partidas dobradas: FinancialJournalEntry/Line, débitos = créditos) em §6.3.9.
+model FinancialTransaction {
+  id           String                 @id @default(uuid(7)) @db.Uuid
+  gameWorldId  String                 @db.Uuid
+  clubId       String                 @db.Uuid
+  currencyId   String                 @db.Uuid
+  type         FinanceTransactionType
+  description  String?
+  amountMinor  BigInt // dinheiro em unidade mínima (proibido Float/Decimal)
+  seasonNumber Int?
+  occurredAt   DateTime               @default(now())
+  metadata     Json?
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@index([gameWorldId, clubId])
+}
+
+model ClubFinanceSnapshot {
+  id                    String @id @default(uuid(7)) @db.Uuid
+  gameWorldId           String @db.Uuid
+  clubId                String @db.Uuid
+  seasonId              String @db.Uuid
+  currencyId            String @db.Uuid
+  cashMinor             BigInt // dinheiro em unidade mínima
+  revenueMinor          BigInt
+  expensesMinor         BigInt
+  wagesMinor            BigInt
+  transferSpentMinor    BigInt
+  transferReceivedMinor BigInt
+  debtMinor             BigInt @default(0)
+  profitMinor           BigInt
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([clubId, seasonId])
+  @@index([gameWorldId, clubId])
+}
+
+// =============================================================================
+// COMPETIÇÃO — §3.7 / §6.3.7
+// =============================================================================
+
+model Competition {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  gameWorldId String            @db.Uuid
+  name        String
+  type        CompetitionType
+  format      CompetitionFormat
+  country     String?
+  tier        Int?
+  reputation  Int               @default(1)
+
+  gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id])
+  seasons   CompetitionSeason[]
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId])
+}
+
+model CompetitionSeason {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  competitionId String       @db.Uuid
+  seasonId      String       @db.Uuid
+  name          String
+  status        SeasonStatus @default(PLANNED)
+  startsAt      DateTime
+  endsAt        DateTime?
+  prizeJson     Json?
+  rulesJson     Json? // regras flexíveis por competição
+
+  competition Competition        @relation(fields: [competitionId], references: [id])
+  clubs       CompetitionClub[]
+  stages      CompetitionStage[]
+  matches     Match[]
+
+  @@unique([competitionId, seasonId])
+}
+
+model CompetitionClub {
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  competitionSeasonId String  @db.Uuid
+  clubId              String  @db.Uuid
+  seed                Int?
+  groupName           String?
+
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+
+  @@unique([competitionSeasonId, clubId])
+}
+
+model CompetitionStage {
+  id                  String            @id @default(uuid(7)) @db.Uuid
+  competitionSeasonId String            @db.Uuid
+  name                String
+  order               Int
+  format              CompetitionFormat
+  startsAt            DateTime?
+  endsAt              DateTime?
+
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+  matches           Match[]
+
+  @@index([competitionSeasonId])
+}
+
+// =============================================================================
+// PARTIDA E SIMULAÇÃO — §3.8 / §6.3.7
+// =============================================================================
+
+model Match {
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String             @db.Uuid
+  competitionSeasonId String?            @db.Uuid
+  stageId             String?            @db.Uuid
+  homeClubId          String             @db.Uuid
+  awayClubId          String             @db.Uuid
+  seasonNumber        Int
+  roundNumber         Int?
+  scheduledAt         DateTime
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  runtimeStatus       MatchRuntimeStatus @default(SCHEDULED) // ciclo de vida
+  resultStatus        MatchResultStatus  @default(PENDING) // desfecho
+  homologationStatus  HomologationStatus @default(PENDING) // confirmação oficial
+  homeGoals           Int                @default(0)
+  awayGoals           Int                @default(0)
+  homeExpectedGoals   Decimal?           @db.Decimal(8, 4) // xG: não-monetário
+  awayExpectedGoals   Decimal?           @db.Decimal(8, 4)
+  simulationSeed      String? // replay determinístico
+  simulatedOffline    Boolean            @default(false) // + MatchControlSource
+  version             Int                @default(1)
+
+  competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id])
+  stage             CompetitionStage?    @relation(fields: [stageId], references: [id])
+  homeClub          Club                 @relation("HomeClubMatches", fields: [homeClubId], references: [id])
+  awayClub          Club                 @relation("AwayClubMatches", fields: [awayClubId], references: [id])
+  teamStates        MatchTeamState[]
+  lineups           MatchLineup[]
+  events            MatchEvent[]
+  playerStats       PlayerMatchStats[]
+  simulation        MatchSimulation?
+  decisionPoints    MatchDecisionPoint[]
+
+  @@index([gameWorldId])
+  @@index([competitionSeasonId])
+  @@index([homeClubId])
+  @@index([awayClubId])
+}
+
+model MatchSimulation {
+  id                   String @id @default(uuid(7)) @db.Uuid
+  gameWorldId          String @db.Uuid
+  matchId              String @unique @db.Uuid
+  engineVersion        String // versão do motor (compatibilidade de replay)
+  tickIntervalSeconds  Int
+  totalTicks           Int
+  homeStrengthSnapshot Json // fotografia da força ofensiva/defensiva
+  awayStrengthSnapshot Json
+  randomSeed           String // determinismo da simulação
+  balanceJson          Json?
+  finalMomentumJson    Json?
+
+  match Match                 @relation(fields: [matchId], references: [id])
+  ticks MatchSimulationTick[]
+}
+
+model MatchSimulationTick {
+  id             String  @id @default(uuid(7)) @db.Uuid
+  simulationId   String  @db.Uuid
+  minute         Int
+  second         Int?
+  homeMomentum   Decimal @db.Decimal(8, 4)
+  awayMomentum   Decimal @db.Decimal(8, 4)
+  homeThreat     Decimal @db.Decimal(8, 4)
+  awayThreat     Decimal @db.Decimal(8, 4)
+  homeFatigueAvg Decimal @db.Decimal(8, 4)
+  awayFatigueAvg Decimal @db.Decimal(8, 4)
+  data           Json?
+
+  simulation MatchSimulation @relation(fields: [simulationId], references: [id])
+
+  @@index([simulationId])
+}
+
+model MatchTeamState {
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  matchId             String             @db.Uuid
+  clubId              String             @db.Uuid
+  controlSource       MatchControlSource
+  mentality           TacticalMentality  @default(BALANCED)
+  pressing            PressingIntensity  @default(MEDIUM)
+  marking             MarkingStyle       @default(ZONAL)
+  tempo               TempoStyle         @default(NORMAL)
+  formation           String
+  lineHeight          Int                @default(50)
+  defensiveWidth      Int                @default(50)
+  attackingWidth      Int                @default(50)
+  riskLevel           Int                @default(50)
+  morale              Int                @default(50)
+  fatigueAvg          Int                @default(0)
+  tacticalCohesion    Int                @default(50)
+  currentInstructions Json?
+
+  match Match @relation(fields: [matchId], references: [id])
+
+  @@unique([matchId, clubId])
+}
+
+model MatchLineup {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  matchId   String  @db.Uuid
+  clubId    String  @db.Uuid
+  formation String
+  isInitial Boolean @default(true)
+
+  match   Match               @relation(fields: [matchId], references: [id])
+  players MatchLineupPlayer[]
+
+  @@index([matchId])
+}
+
+model MatchLineupPlayer {
+  id                        String         @id @default(uuid(7)) @db.Uuid
+  lineupId                  String         @db.Uuid
+  playerId                  String         @db.Uuid
+  position                  PlayerPosition
+  shirtNumber               Int?
+  isStarter                 Boolean        @default(true)
+  enteredMinute             Int?
+  leftMinute                Int?
+  tacticalRole              String?
+  individualInstructionJson Json?
+
+  lineup MatchLineup @relation(fields: [lineupId], references: [id])
+  player Player      @relation(fields: [playerId], references: [id])
+
+  @@index([lineupId])
+  @@index([playerId])
+}
+
+model MatchEvent {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  matchId         String         @db.Uuid
+  clubId          String?        @db.Uuid
+  playerId        String?        @db.Uuid
+  relatedPlayerId String?        @db.Uuid
+  type            MatchEventType
+  minute          Int
+  second          Int?
+  description     String
+  importance      Int            @default(1)
+  x               Decimal?       @db.Decimal(8, 4) // coordenada no campo
+  y               Decimal?       @db.Decimal(8, 4)
+  data            Json?
+
+  match         Match   @relation(fields: [matchId], references: [id])
+  player        Player? @relation("EventPlayer", fields: [playerId], references: [id])
+  relatedPlayer Player? @relation("EventRelatedPlayer", fields: [relatedPlayerId], references: [id])
+
+  @@index([matchId])
+  @@index([playerId])
+}
+
+model PlayerMatchStats {
+  id              String  @id @default(uuid(7)) @db.Uuid
+  matchId         String  @db.Uuid
+  playerId        String  @db.Uuid
+  minutesPlayed   Int     @default(0)
+  goals           Int
+  assists         Int
+  shots           Int
+  shotsOnTarget   Int
+  passesAttempted Int
+  passesCompleted Int
+  tackles         Int
+  interceptions   Int
+  foulsCommitted  Int
+  yellowCards     Int
+  redCards        Int
+  saves           Int
+  goalsConceded   Int
+  rating          Decimal @default(6.00) @db.Decimal(4, 2)
+  fatigueStart    Int
+  fatigueEnd      Int
+  moraleImpact    Int     @default(0)
+
+  match  Match  @relation(fields: [matchId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, playerId])
+}
+
+model MatchDecisionPoint {
+  id                    String               @id @default(uuid(7)) @db.Uuid
+  matchId               String               @db.Uuid
+  clubId                String               @db.Uuid
+  type                  DecisionPointType
+  minute                Int
+  title                 String
+  description           String
+  urgency               RecommendationImpact
+  createdByStaffQuality Int?
+  resolved              Boolean              @default(false)
+  resolvedAt            DateTime?
+  chosenActionId        String?              @db.Uuid
+  data                  Json?
+
+  match           Match                       @relation(fields: [matchId], references: [id])
+  recommendations MatchActionRecommendation[]
+
+  @@index([matchId])
+}
+
+model MatchActionRecommendation {
+  id                      String               @id @default(uuid(7)) @db.Uuid
+  decisionPointId         String               @db.Uuid
+  title                   String
+  description             String
+  impact                  RecommendationImpact
+  confidence              Int
+  tacticalChangeJson      Json?
+  substitutionJson        Json?
+  riskJson                Json?
+  generatedByStaffRole    StaffRole?
+  generatedByStaffQuality Int?
+
+  decisionPoint MatchDecisionPoint @relation(fields: [decisionPointId], references: [id])
+
+  @@index([decisionPointId])
+}
+
+// =============================================================================
+// ESTATÍSTICAS, NARRATIVA, NOTIFICAÇÃO, AUTOMAÇÃO E AUDITORIA — §3.9–3.11
+// =============================================================================
+
+model ClubSeasonStats {
+  id                String    @id @default(uuid(7)) @db.Uuid
+  clubId            String    @db.Uuid
+  seasonId          String    @db.Uuid
+  matchesPlayed     Int
+  wins              Int
+  draws             Int
+  losses            Int
+  goalsFor          Int
+  goalsAgainst      Int
+  points            Int
+  finalPosition     Int?
+  titlesWon         Int       @default(0)
+  averageAttendance Int       @default(0)
+  fanMood           MoodLevel @default(NEUTRAL)
+
+  club Club @relation(fields: [clubId], references: [id])
+
+  @@unique([clubId, seasonId])
+}
+
+model PlayerSeasonStats {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  playerId      String  @db.Uuid
+  seasonId      String  @db.Uuid
+  clubId        String? @db.Uuid
+  appearances   Int
+  starts        Int
+  minutesPlayed Int
+  goals         Int
+  assists       Int
+  yellowCards   Int
+  redCards      Int
+  averageRating Decimal @default(0) @db.Decimal(4, 2)
+  injuriesCount Int     @default(0)
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, seasonId])
+}
+
+model Narrative {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  gameWorldId String        @db.Uuid
+  clubId      String?       @db.Uuid
+  playerId    String?       @db.Uuid
+  type        NarrativeType
+  title       String
+  description String
+  intensity   Int           @default(1)
+  isActive    Boolean       @default(true)
+  startsAt    DateTime      @default(now())
+  endsAt      DateTime?
+  effectsJson Json? // efeitos aplicados (moral, pressão, valor etc.)
+
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+
+  @@index([gameWorldId])
+}
+
+model Notification {
+  id          String           @id @default(uuid(7)) @db.Uuid
+  gameWorldId String?          @db.Uuid
+  userId      String?          @db.Uuid
+  clubId      String?          @db.Uuid
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  priority    Int              @default(1)
+  payload     Json?
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?
+
+  gameWorld GameWorld?   @relation(fields: [gameWorldId], references: [id])
+  user      UserAccount? @relation(fields: [userId], references: [id])
+
+  @@index([gameWorldId])
+  @@index([userId])
+}
+
+/// Projeção transversal de auditoria — referência genérica (entity/entityId)
+/// permitida. Forma canônica com cadeia de hash de integridade: AuditEvent (§6.3.11).
+model GameAuditLog {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId String?  @db.Uuid
+  userId      String?  @db.Uuid
+  clubId      String?  @db.Uuid
+  action      String
+  entity      String
+  entityId    String?  @db.Uuid
+  beforeJson  Json?
+  afterJson   Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  gameWorld GameWorld? @relation(fields: [gameWorldId], references: [id])
+
+  @@index([gameWorldId])
+}
+
+/// Atalho chave-valor para parâmetros simples de balanceamento por mundo.
+/// Forma canônica de regras versionadas: RuleSet/RuleDefinition/RuleValue (§6.1).
+model GameRuleConfig {
+  id          String @id @default(uuid(7)) @db.Uuid
+  gameWorldId String @db.Uuid
+  key         String
+  value       Json
+
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+
+  @@unique([gameWorldId, key])
+}
+
+/// Regra de automação por clube (§6.3.11). Execução referencia sempre a versão.
+model AutomationRule {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  gameWorldId   String               @db.Uuid
+  clubId        String               @db.Uuid
+  name          String
+  level         AutomationLevel      @default(ASSISTED)
+  status        AutomationRuleStatus @default(DRAFT)
+  triggerJson   Json?
+  conditionJson Json?
+  actionJson    Json?
+  version       Int                  @default(1)
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@index([gameWorldId, clubId])
+}

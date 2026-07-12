@@ -634,13 +634,13 @@ Se não for gol: defesa do goleiro, chute para fora, bloqueio, escanteio ou rebo
 > rawScore = (finalizaçãoEfetiva − defesaEfetiva) + qualidadeDaChance + pressãoDefensiva
 > ```
 >
-> Exemplo da fonte: `(74 − 68) + 35 + (−8) = 33`. Em seguida a **normalização logística** (o que faltava), centrada em 50 (o "duelo justo") e ancorada para reproduzir os 33% do exemplo:
+> Exemplo da fonte: `(74 − 68) + 35 + (−8) = 33`. Em seguida a **normalização logística** (o que faltava), centrada em 50 (o "duelo justo") e ancorada para aproximar os 33% do exemplo (o valor exato sob `pMin`/`pMax` é ≈32,5%, ver abaixo):
 >
 > ```
 > p_gol = pMin + (pMax − pMin) · σ( k · (rawScore − 50) ),   k = 0.042
 > ```
 >
-> onde `finalizaçãoEfetiva`, `defesaEfetiva`, `qualidadeDaChance` ∈ 0–100 e `pressãoDefensiva` é o termo já assinado (ex.: −8). Com `k = 0.042`: `rawScore = 33 → σ(0.042·(−17)) = σ(−0.714) ≈ 0,329` (**≈33%**, bate com a fonte) e `rawScore = 50 → 50%`. Os limites `pMin = 0.005` e `pMax = 0.98` são o **chão/teto** da camada de aleatoriedade rara (frango/golaço improvável nunca zeram nem cravam o resultado). A resolução do lance sorteia `U ~ Uniforme(0,1)`: **gol** se `U < p_gol`; senão, o desfecho (defesa, trave/fora, bloqueio, escanteio, rebote) é sorteado entre os ramos restantes. O **xG** (F15) é a soma dos `p_gol` de cada finalização. `k` é o parâmetro de calibração-chave (quão fortemente a diferença de qualidade separa os desfechos) e sai do lote estatístico. Compartilha **R-20** com F10.
+> onde `finalizaçãoEfetiva`, `defesaEfetiva`, `qualidadeDaChance` ∈ 0–100 e `pressãoDefensiva` é o termo já assinado (ex.: −8). Os limites `pMin = 0.005` e `pMax = 0.98` são o **chão/teto** da camada de aleatoriedade rara (frango/golaço improvável nunca zeram nem cravam o resultado) e **comprimem levemente** a curva, deslocando `p_gol` para dentro desses extremos. Com `k = 0.042`, `pMin = 0.005` e `pMax = 0.98`: `rawScore = 50 → 0,005 + 0,975·σ(0) = 0,4925` (**≈49%** — o "duelo justo" fica logo abaixo de 50% por causa da compressão) e `rawScore = 33 → 0,005 + 0,975·σ(0.042·(−17)) = 0,005 + 0,975·σ(−0,714) ≈ 0,325` (**≈32,5%**, praticamente os 33% qualitativos da fonte). A resolução do lance sorteia `U ~ Uniforme(0,1)`: **gol** se `U < p_gol`; senão, o desfecho (defesa, trave/fora, bloqueio, escanteio, rebote) é sorteado entre os ramos restantes. O **xG** (F15) é a soma dos `p_gol` de cada finalização. `k` é o parâmetro de calibração-chave (quão fortemente a diferença de qualidade separa os desfechos) e sai do lote estatístico. Compartilha **R-20** com F10.
 
 ### F12. Chance de falta e de cartão
 

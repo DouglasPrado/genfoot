@@ -10,17 +10,19 @@ A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Cent
 
 - **Objetivo:** em um olhar, situar o clube e o próximo compromisso, e apontar o que exige ação.
 - **Como se chega:** raiz da aba Início; retorno de qualquer *deep link*; pós-onboarding.
-- **Layout:** cabeçalho do clube (fixo) → cartão "próximo compromisso" → faixa de urgências (Central) → cartões de indicadores → atalhos de ação → resumo antes/depois da rodada.
+- **Layout:** cabeçalho do clube (fixo) → **faixa de status do mundo** (próxima simulação / manutenção) → cartão "próximo compromisso" → faixa de urgências (Central) → cartões de indicadores → atalhos de ação → resumo antes/depois da rodada.
 - **Componentes e dados** (campos exatos do [doc 10, §2](../01-game-design/10-experiencia-e-telas.md)):
   - **Clube** (nome/escudo), **Próximo jogo** (data/hora do mundo), **Adversário**, **Competição**, **Status/posição**, **Objetivo**, **Moral do elenco**, **Pressão da torcida**, **Caixa**.
+  - **Faixa de status do mundo:** **cronômetro da próxima simulação** + **progresso da temporada** (ex.: "dia 12 de 45"); **banner de manutenção agendada** ("mundo entra em manutenção às 20h"); recepção de **comunicados do operador** (categoria de notificação "comunicado do mundo") [`03-mp §1`; `04-plataforma §11`; design system §5]. Alimenta-se do `RoundStatus`/`WorldClock` do `Header` (ver [design system §9](00-visao-geral-e-design-system.md#9-tempo-real-na-ótica-da-ui)).
+  - **Briefing de nova temporada** (na fase pré-temporada, [MF-04](02-mobile-fluxos.md#mf-04--início-de-temporada--pré-temporada)): `SeasonOpeningContext` — expectativas do clube/torcida, situação financeira, jogadores-chave, necessidades de mercado, promoções da base, riscos — na entrada da temporada, não só no fim do wizard [`06 §11, §13.2`].
   - **Faixa de urgências:** contador de decisões pendentes (abre `M-DECISIONS`), com a mais crítica em destaque.
   - **Contexto antes/depois da rodada** (`NarrativeCard`): ex. "enfrenta o líder amanhã 20h; seu atacante está cansado" / "venceu 2×1; jovem marcou o 1º gol como profissional".
   - Indicadores em `StatTile`/`Meter` (modo simples por padrão).
   - **Recomendações da IA fora do jogo** (assistente): alertas estratégicos de gestão — ex.: "elenco envelhecido", "cria poucas chances", "preparador fraco → risco +18%" —, com **precisão conforme o nível dos funcionários** [`07 §3.7`].
 - **Ações:** atalhos → `M-LINEUP`, `M-TACTICS`, `M-SCOUT-OPP`, `M-TRAINING`, `M-MARKET`, `M-CONVO`, `M-FEED`, `M-COMPETITION`, `M-CALENDAR` (as "ações disponíveis" do [doc 10, §3](../01-game-design/10-experiencia-e-telas.md)); tocar próximo jogo → `M-NEXTMATCH`.
 - **Estados:** *skeleton* dos cartões; dado *stale* enquanto revalida; offline com *badge*; partida em andamento mostra faixa "AO VIVO — abrir" (`M-LIVE`).
-- **Tempo real/notificações:** `clubSequence` atualiza indicadores; `worldSequence` atualiza tabela/posição; notificações críticas elevam a faixa de urgências.
-- **Referências:** [`10-experiencia §1–4`](../01-game-design/10-experiencia-e-telas.md); [`07-ia §3.7`](../01-game-design/07-inteligencia-artificial.md); [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão).
+- **Tempo real/notificações:** `clubSequence` atualiza indicadores; `worldSequence` atualiza tabela/posição, relógio do mundo e cronômetro da próxima simulação; broadcast do operador ("comunicado do mundo") e contagem regressiva de manutenção agendada; notificações críticas elevam a faixa de urgências.
+- **Referências:** [`10-experiencia §1–4`](../01-game-design/10-experiencia-e-telas.md); [`07-ia §3.7`](../01-game-design/07-inteligencia-artificial.md); [`03-multiplayer-e-mundos §1`](../02-tecnico/03-multiplayer-e-mundos.md); [`04-plataforma §11`](../02-tecnico/04-plataforma-seguranca-operacoes.md); [`06-temporada §11, §13.2`](../01-game-design/06-temporada-e-competicoes.md); [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão).
 
 ## `M-DECISIONS` — Central de decisões (caixa de decisões)
 

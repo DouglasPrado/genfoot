@@ -79,7 +79,7 @@ Agregado de fundo: **`WorldEntryProcess` / `ClubEntryReservation` / `ClubControl
 
 #### `ActivateClubControl` ✔ · Risco: alto · fluxos: MF-01
 - **Payload:** `{ reservationId: UUID, acceptInheritedState: boolean }` — confirma assumir o clube **com todo o estado herdado** (dívidas, contratos, promessas).
-- **Pré-condições:** reserva válida e **não expirada** do ator; data de ativação válida (clube novo entra em divisão de expansão + pré-temporada; clube assumido preserva estado); nenhum `ClubControl` ativo concorrente (índice único parcial "1 controle ativo por clube"); clube assumido "forte" pode exigir **auditoria de contexto** (resposta `ACCEPTED` + tarefa de revisão, não `COMPLETED` imediato).
+- **Pré-condições:** reserva válida e **não expirada** do ator; data de ativação válida (clube novo entra em Liga Inicial + pré-temporada; clube assumido preserva estado); nenhum `ClubControl` ativo concorrente (índice único parcial "1 controle ativo por clube"); clube assumido "forte" pode exigir **auditoria de contexto** (resposta `ACCEPTED` + tarefa de revisão, não `COMPLETED` imediato).
 - **errorCodes:** `CLUB_SLOT_RESERVATION_EXPIRED`, `CLUB_ALREADY_CONTROLLED`, `CONTROL_ACTIVATION_WINDOW_INVALID`, `TAKEOVER_REVIEW_REQUIRED`.
 - **Eventos:** `ClubControlActivated` (+ `ClubOnboardingStarted`); clube novo: `ClubCreated`.
 - **Idempotência/concorrência:** agregado `ClubControl`; `expectedVersion` da reserva. `commandId` repetido não cria segundo controle.

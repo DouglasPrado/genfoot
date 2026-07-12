@@ -50,22 +50,22 @@ Estes fluxos representam a **experiência orientada por contexto** que guia o pr
 
 ### 1. Criação e entrada em clube
 
-*Como um usuário entra no mundo persistente e assume o comando de um clube — seja assumindo um clube existente, seja criando um clube de expansão.* Consolida `escopo-definitivo-simulador.md §25.7` + `documento-definitivo-escopo.md §23.1`.
+*Como um usuário entra no mundo persistente e assume o comando de um clube — seja assumindo um clube existente, seja criando um clube novo (Liga Inicial).* Consolida `escopo-definitivo-simulador.md §25.7` + `documento-definitivo-escopo.md §23.1`.
 
 1. O usuário escolhe um **mundo** existente.
 2. O jogo **verifica elegibilidade e vagas** disponíveis.
-3. São apresentados os clubes disponíveis ou os **processos de expansão** — o usuário decide **criar um clube novo** ou **assumir um clube disponível**.
+3. São apresentados os clubes disponíveis ou o **Programa de Clube Novo** — o usuário decide **criar um clube novo** ou **assumir um clube disponível**.
 4. O usuário consulta o **estado inicial** do clube: divisão, elenco, estrutura, dívidas, torcida e riscos.
 5. O **aporte inicial** segue a regra de igualdade competitiva (sem vantagem por dinheiro real).
 6. Uma **vaga pode ser reservada** por prazo curto, garantindo a escolha enquanto o usuário decide.
 7. O **controle é ativado** na data válida:
-   - **Clube novo** entra na divisão de expansão e passa por pré-temporada.
+   - **Clube novo** entra na **Liga Inicial** (com o **Programa de Clube Novo**) e passa por pré-temporada.
    - **Clube assumido** mantém integralmente seu estado (elenco, contratos, dívidas e histórico).
 8. O usuário recebe a **revisão inicial**, sua **autoridade** e os **objetivos** definidos pela diretoria.
 9. São definidos **objetivos, orçamento, profissionais, elenco e plano automático** (política offline).
 10. **Pendências e políticas herdadas** do clube são apresentadas, para que o usuário saiba o que precisa de ação imediata.
 
-**Referências:** [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (mundo, clubes, expansão) · [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) (onboarding, igualdade de aporte) · [`./10-experiencia-e-telas.md`](./10-experiencia-e-telas.md) (revisão inicial e telas).
+**Referências:** [`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) (mundo, clubes, Liga Inicial) · [`./09-anti-abuso-e-onboarding.md`](./09-anti-abuso-e-onboarding.md) (onboarding, igualdade de aporte) · [`./10-experiencia-e-telas.md`](./10-experiencia-e-telas.md) (revisão inicial e telas).
 
 ---
 

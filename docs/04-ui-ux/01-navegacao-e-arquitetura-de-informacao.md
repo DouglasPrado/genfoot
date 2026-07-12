@@ -250,6 +250,8 @@ Todas as telas do app, com ID e documento de detalhe. IDs `M-*`.
 | `M-FRIENDLIES` | Amistosos / gestão de pré-temporada *(2ª passada)* |
 | `M-TUTORIAL` | Tutorial / tour guiado *(2ª passada)* |
 
+> **Wireframes.** As telas mais densas (`M-HOME`, `M-LIVE`, `M-SEASON-CLOSE`, `M-STRUCTURE`, `M-SQUAD`, `M-NEGOTIATION`) têm wireframes textuais de baixa fidelidade — arranjo espacial e fluxo de leitura em tela pequena — em [`14-wireframes-telas-densas.md`](14-wireframes-telas-densas.md).
+
 ## 5. Sitemap completo — admin
 
 Telas do admin (Next.js), IDs `A-*`. Detalhe em [doc 21](21-admin-telas.md).
