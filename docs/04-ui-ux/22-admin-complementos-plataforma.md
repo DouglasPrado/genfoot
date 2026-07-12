@@ -82,13 +82,8 @@ Este documento **fecha as lacunas** da auditoria do admin (doc 21) contra a plat
 
 ## B. Adendos a telas existentes
 
-- **`A-LOGIN`:** link para `A-IAM`; exibição de sessão elevada/temporária ativa.
-- **`A-WORLDS`:** controles de **ciclo de vida operacional** do mundo (transições `HEALTHY…ARCHIVED`, entrar/sair de `READ_ONLY`, arquivar) e sinal de backup `AT_RISK` → `A-BACKUPS` [`04-plataforma §9, §10`].
-- **`A-WORLD`:** no cartão de infra, **atalhos** para `A-OPS` (jobs/DLQ), `A-FLAGS` (kill switch) e `A-INCIDENTS`.
-- **`A-CORRECTIONS`:** estado **`AWAITING_APPROVAL`** (quatro olhos) para alto impacto; passo final de **comunicação ao usuário** via `A-BROADCAST` (o que/canal/detalhe — pendência de `09-op §4`) [`04-plataforma §4`].
-- **`A-QUEUES`:** inbox de **aprovação em quatro olhos** (2º revisor); (report de bug movido para `A-BUGS`).
-- **`A-MODERATION`:** aba **Bot/Automação** (Dec. 1916/1917/1945: frequência impossível, propostas em massa, scraping, timing robótico → rate limit, cooldown, **captcha**); estado de **cooldown/captcha** por conta.
-- **`A-SUPPORT`:** contrato de **impersonação** (`READ_ONLY_IMPERSONATION` padrão / `ASSISTED_IMPERSONATION`), `supportAccessSessionId` visível/temporário/aprovado, **notificação ao usuário**, **verificação de identidade** e **proibições** durante impersonação; máquina de estados do ticket (`OPEN…REOPENED/DUPLICATE/INVALID`) [`04-plataforma §6`].
-- **`A-AUDIT` / `A-MODERATION` / `A-SUPPORT`:** ação **"revelar dado sensível"** (e-mail/token/documento) com permissão + reautenticação + motivo + duração curta + auditoria; buscas por dado sensível são auditadas [`04-plataforma §5`].
+Os complementos que faltavam nas telas admin foram **dobrados no doc 21** — cada tela cita a fonte no próprio spec. Ficam abaixo os ponteiros de rastreabilidade.
 
-> **Nota de manutenção:** estes complementos podem ser dobrados no doc 21 numa próxima revisão. As **telas novas** da seção A entram no sitemap ([doc 01](01-navegacao-e-arquitetura-de-informacao.md)).
+> Dobrado em [21-admin-telas.md](21-admin-telas.md) — `A-LOGIN` (link `A-IAM` + sessão elevada/temporária), `A-WORLDS` (ciclo de vida operacional do mundo + sinal de backup `AT_RISK`→`A-BACKUPS`), `A-WORLD` (atalhos `A-OPS`/`A-FLAGS`/`A-INCIDENTS`), `A-CORRECTIONS` (estado `AWAITING_APPROVAL`/quatro olhos + comunicação via `A-BROADCAST`), `A-QUEUES` (inbox de aprovação em quatro olhos; bug → `A-BUGS`), `A-MODERATION` (aba Bot/Automação + estado cooldown/captcha), `A-SUPPORT` (contrato de impersonação + máquina de estados do ticket), `A-AUDIT`/`A-MODERATION`/`A-SUPPORT` (ação "revelar dado sensível").
+
+> As **telas novas** da seção A entram no sitemap ([doc 01](01-navegacao-e-arquitetura-de-informacao.md)).

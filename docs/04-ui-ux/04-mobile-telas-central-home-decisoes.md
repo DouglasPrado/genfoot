@@ -16,10 +16,11 @@ A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Cent
   - **Faixa de urgências:** contador de decisões pendentes (abre `M-DECISIONS`), com a mais crítica em destaque.
   - **Contexto antes/depois da rodada** (`NarrativeCard`): ex. "enfrenta o líder amanhã 20h; seu atacante está cansado" / "venceu 2×1; jovem marcou o 1º gol como profissional".
   - Indicadores em `StatTile`/`Meter` (modo simples por padrão).
+  - **Recomendações da IA fora do jogo** (assistente): alertas estratégicos de gestão — ex.: "elenco envelhecido", "cria poucas chances", "preparador fraco → risco +18%" —, com **precisão conforme o nível dos funcionários** [`07 §3.7`].
 - **Ações:** atalhos → `M-LINEUP`, `M-TACTICS`, `M-SCOUT-OPP`, `M-TRAINING`, `M-MARKET`, `M-CONVO`, `M-FEED`, `M-COMPETITION`, `M-CALENDAR` (as "ações disponíveis" do [doc 10, §3](../01-game-design/10-experiencia-e-telas.md)); tocar próximo jogo → `M-NEXTMATCH`.
 - **Estados:** *skeleton* dos cartões; dado *stale* enquanto revalida; offline com *badge*; partida em andamento mostra faixa "AO VIVO — abrir" (`M-LIVE`).
 - **Tempo real/notificações:** `clubSequence` atualiza indicadores; `worldSequence` atualiza tabela/posição; notificações críticas elevam a faixa de urgências.
-- **Referências:** [`10-experiencia §1–4`](../01-game-design/10-experiencia-e-telas.md); [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão).
+- **Referências:** [`10-experiencia §1–4`](../01-game-design/10-experiencia-e-telas.md); [`07-ia §3.7`](../01-game-design/07-inteligencia-artificial.md); [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão).
 
 ## `M-DECISIONS` — Central de decisões (caixa de decisões)
 
@@ -57,7 +58,7 @@ A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Cent
 - **Objetivo:** escolher o que a inteligência autorizada decide na ausência (política offline).
 - **Como se chega:** `M-HOME`/`M-SETTINGS`; `M-ONBOARD-REVIEW`.
 - **Layout:** lista de políticas por área + histórico de execução.
-- **Componentes e dados:** políticas por domínio — **escalação offline**, **substituições** (gatilhos), **mercado**, **treino**, **respostas de crise/imprensa**; nível de automação por política (sugerir / executar); **histórico de execução** (o que a IA fez e por quê — log auditável); indicação de que **ações de alto risco** não são totalmente delegáveis.
+- **Componentes e dados:** políticas por domínio — **escalação offline**, **substituições** (gatilhos), **mercado**, **treino**, **respostas de crise/imprensa**; nível de automação por política (sugerir / executar); **histórico de execução** (o que a IA fez e por quê — **log/explicação de decisões navegável** de `ai_decision_logs`, com o **trade-off** de cada decisão) [`07 §4.5`]; indicação de que **ações de alto risco** não são totalmente delegáveis.
 - **Ações:** ativar/desativar; editar → `M-AUTOMATION-EDIT`; ver histórico.
 - **Estados:** política desativada automaticamente na troca de controlador; conflito de precedência sinalizado.
 - **Referências:** [`10-experiencia §6`](../01-game-design/10-experiencia-e-telas.md); [`07-ia §7, §4.5`](../01-game-design/07-inteligencia-artificial.md).

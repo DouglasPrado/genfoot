@@ -133,47 +133,28 @@ Este documento **fecha as lacunas** encontradas na auditoria de completude das t
 
 ## B. Adendos a telas existentes
 
-Campos/ações que faltavam nas telas dos docs 03–12 (adicionar ao respectivo spec). Cada item cita a fonte.
+Os campos/ações que faltavam nas telas dos docs 03–12 foram **dobrados nos specs originais** — cada tela cita a fonte no próprio spec. Ficam abaixo os ponteiros de rastreabilidade da auditoria.
 
 ### Elenco, jogador, medicina (doc 05)
-- **`M-PLAYER` (Resumo):** **intensidade** de cada traço (além da visibilidade) [`02 §2`]; indicador de **adaptação/integração** de recém-chegado (clube/cidade/idioma/tática/grupo) [`02 §15`]; bloco **"Situação atual / crise"** com evento de carreira ativo e **ações de reversão** (via `M-CONVO`/`M-TRAINING-INDIV`) [`02 §9`]; ação **"Atribuir suporte"** (psicólogo, assistente social, mentor, coordenador de transição, gestor de carreira) ao profissional em risco emocional [`02 §14`]; aba/hook **"Fim de carreira"** (estados: considerada/anunciada/adiada/confirmada/imposta médica) com opção de **oferecer cargo** a ídolo que se aposenta (transição jogador→funcionário) [`02 §17`].
-- **`M-PLAYER-DEV`:** bloco **"Inclinações naturais"** (aprende técnica/físico/tática rápido ou devagar; responde a pressão/crítica; corpo frágil/explosão) e `baseLearningRate` [`02 §4, §6`].
-- **`M-SQUAD`:** enumerar critérios de **filtro/ordenação** (posição, traço, potencial, papel, status de contrato/mercado, risco de saída, prontidão) e **indicador de insatisfação** consolidado [`02 §15`].
-- **`M-MEDICAL-CASE`:** ação **"Comunicação pública da lesão"** com visualização das **4 camadas** de confidencialidade (diagnóstico real / comissão / público / outros clubes) [`02 §16`]; variante **lesão em empréstimo** (quem trata, quem paga, onde reabilita, info à origem, retorno) [`02 §16`]; campo de **seguro do atleta** (cobertura/prêmio) [`03 §13, §17.3`].
-- **`M-TRAINING` / `M-TRAINING-INDIV`:** eixo/plano de **treino de goleiros** (e arquétipos GK) [`02 §6, §10, §18`].
+> Dobrado em [05-mobile-telas-elenco-jogador-treino-medicina.md](05-mobile-telas-elenco-jogador-treino-medicina.md) — `M-PLAYER` (intensidade de traço, adaptação/integração, bloco "Situação atual / crise", "Atribuir suporte", aba "Fim de carreira"/oferecer cargo), `M-PLAYER-DEV` ("Inclinações naturais" + `baseLearningRate`), `M-SQUAD` (critérios de filtro/ordenação + indicador de insatisfação), `M-MEDICAL-CASE` ("Comunicação pública da lesão"/4 camadas, lesão em empréstimo, seguro do atleta), `M-TRAINING`/`M-TRAINING-INDIV` (treino de goleiros/arquétipos GK).
 
 ### Base (doc 08)
-- **`M-ACADEMY`:** **reputação formadora específica** por posição/perfil ("forma laterais", "revela goleiros", "recupera promessas") em vez de genérica [`02 §11`].
-- **`M-YOUTH-PLAYER`:** bloco **"Proteção do menor"** (alojamento, educação, limites de carga, movimentação) além da confidencialidade [`02 §17`].
-- **`M-LOAN`:** **comparação de destinos** (nível da liga, minutos, posição de uso, pressão, técnico, estrutura médica, estilo, distância, visibilidade) e **projeção de retorno** (melhor/igual/pior) [`02 §18`].
+> Dobrado em [08-mobile-telas-base-e-formacao.md](08-mobile-telas-base-e-formacao.md) — `M-ACADEMY` (reputação formadora específica), `M-YOUTH-PLAYER` (bloco "Proteção do menor"); e em [07-mobile-telas-mercado-transferencias-contratos.md](07-mobile-telas-mercado-transferencias-contratos.md) — `M-LOAN` (comparação de destinos + projeção de retorno).
 
 ### Partida (doc 06)
-- **`M-LINEUP`:** sub-painel **"Bola parada"** com designação de cobradores **por tipo** (pênalti / falta / escanteio E-D / lateral) e rotinas [`05 §17, §18`].
-- **`M-LIVE`:** chip de **"leitura do jogo"** (tipos emergentes: truncado, aberto, físico, nervoso, domínio estéril…) [`05 §9`]; **fase reta final / últimos 10 min** com ações **"Segurar resultado" / "Ganhar tempo (cera)"** com aviso de risco [`05 §17`]; **modo prorrogação** (fase, fadiga acentuada, substituição extra) encadeando `M-PENALTIES` [`05 §17`]; estado persistente **"time com 10" / jogador limitado em campo / goleiro de linha** [`05 §17`].
-- **`M-PREMATCH`:** flag **"importância: amistoso/pré-temporada"** (baixo risco: testar tática/jovens, sem punição de moral/torcida) [`05 §10`; `06 §1`].
-- **`M-SCOUT-OPP`:** seção **"Como te leem"** — a **reputação tática do próprio usuário** (estilo percebido pelo adversário e como ele provavelmente se preparou) [`05 §14`].
+> Dobrado em [06-mobile-telas-tatica-escalacao-partida.md](06-mobile-telas-tatica-escalacao-partida.md) — `M-LINEUP` (sub-painel "Bola parada" por tipo), `M-LIVE` (chip "leitura do jogo", fase reta final/"Segurar resultado"/"Ganhar tempo", modo prorrogação, estado "time com 10"/goleiro de linha), `M-PREMATCH` (flag "importância: amistoso/pré-temporada"), `M-SCOUT-OPP` (seção "Como te leem").
 
 ### Mercado, contratos (doc 07)
-- **`M-NEGOTIATION`:** inserir estado **"Exame médico"** entre *Aceita* e *Formalização*, com 5 desfechos (aprovar / aprovar com risco / avaliação adicional / reprovar / alterar termos) [`03 §17.3`]; **extrato de negociações passadas** com desfecho financeiro.
-- **`M-CONTRACT`:** campo de **seguro** e criação de **cláusulas condicionais** que passam a ser acompanhadas em `M-CLAUSES` [`03 §17`].
-- **`M-SCOUTING`:** **lista de observação como pipeline** (prioridade/motivo/responsável/próxima ação/prazo), comparação de **relatórios contraditórios** e **envelhecimento/data** do relatório [`03 §16.5–16.7`].
-- **`M-PLAYER`/`PlayerRow`:** badge de **elegibilidade** ("contratado / ainda não inscrito/apto") [`03 §17.5`].
+> Dobrado em [07-mobile-telas-mercado-transferencias-contratos.md](07-mobile-telas-mercado-transferencias-contratos.md) — `M-NEGOTIATION` (estado "Exame médico"/5 desfechos + extrato de negociações), `M-CONTRACT` (seguro + cláusulas condicionais → `M-CLAUSES`), `M-SCOUTING` (lista de observação como pipeline, relatórios contraditórios, envelhecimento); e em [05-mobile-telas-elenco-jogador-treino-medicina.md](05-mobile-telas-elenco-jogador-treino-medicina.md) — badge de elegibilidade em `M-PLAYER`/`PlayerRow`.
 
 ### Finanças, estrutura (doc 09)
-- **`M-FINANCE`:** painel de **composição da receita** por fonte (TV, patrocínio, sócios, bilheteria, comercial/produtos, premiação, extraordinárias), com a linha de **direitos de TV** dependente de liga/divisão [`03 §4.1, §5.1, §7.2`].
-- **`M-COMMERCIAL`:** entradas para **`M-MEMBERSHIP`** (sócio-torcedor) e **`M-PRODUCTS`** (merchandising); **hospitalidade** como operação (capacidade/conversão/custo) distinta da bilheteria [`03 §9.6, §9.8, §9.9`].
-- **`M-STRUCTURE`/`M-CLUB-PROFILE`:** índice de **Tamanho Real do Clube** (0–100, pequeno→gigante) e **marca** como ativo que cresce [`03 §14.3, §9.10`]; **psicologia** como área de investimento distinta [`03 §9.3`]; visão comparativa de **ROI por área**.
+> Dobrado em [09-mobile-telas-financas-estrutura-estadio.md](09-mobile-telas-financas-estrutura-estadio.md) — `M-FINANCE` (composição da receita + direitos de TV por divisão), `M-COMMERCIAL` (entradas `M-MEMBERSHIP`/`M-PRODUCTS` + hospitalidade), `M-STRUCTURE` (marca, psicologia, ROI por área); e em [12-mobile-telas-perfil-config-loja.md](12-mobile-telas-perfil-config-loja.md) — `M-CLUB-PROFILE` (índice Tamanho Real do Clube).
 
 ### Competições, temporada (doc 10)
-- **`M-COMPETITION`:** **sorteio/chaveamento ao vivo** (evento); ligações para `M-CLUB-VIEW` dos adversários da competição.
-- **`M-SEASON-CLOSE`/`M-AWARDS`:** **contestação de resultado** pelo usuário antes da homologação (título provisório vs. oficial) [`06 §14.2`].
+> Dobrado em [10-mobile-telas-competicoes-calendario-selecoes.md](10-mobile-telas-competicoes-calendario-selecoes.md) — `M-COMPETITION` (sorteio/chaveamento ao vivo + ligações `M-CLUB-VIEW`), `M-SEASON-CLOSE`/`M-AWARDS` (contestação de resultado antes da homologação).
 
 ### Central/IA (doc 04, 11)
-- **`M-AUTOMATIONS`:** **log/explicação de decisões da IA** (`ai_decision_logs`) navegável, com o trade-off de cada decisão [`07 §4.5`].
-- **`M-HOME`/`M-FEED`:** **recomendações da IA fora do jogo** (assistente: "elenco envelhecido", "cria poucas chances", "preparador fraco → risco +18%") com precisão conforme nível de funcionários [`07 §3.7`].
-- **`M-CONVO`/`M-FANS`:** **despedida de ídolo** como fluxo conduzido (reduz desgaste da torcida) [`11 §7`].
-
-> **Nota de manutenção:** estes adendos podem ser dobrados nos specs originais (docs 05–11) numa próxima revisão; aqui ficam consolidados para rastreabilidade da auditoria. As **telas novas** da seção A já entram no sitemap ([doc 01](01-navegacao-e-arquitetura-de-informacao.md)).
+> Dobrado em [04-mobile-telas-central-home-decisoes.md](04-mobile-telas-central-home-decisoes.md) — `M-AUTOMATIONS` (log/explicação navegável de `ai_decision_logs` + trade-off), `M-HOME` (recomendações da IA fora do jogo); e em [11-mobile-telas-comunicacao-torcida-moral.md](11-mobile-telas-comunicacao-torcida-moral.md) — `M-CONVO`/`M-FANS` (despedida de ídolo como fluxo conduzido).
 
 ---
 

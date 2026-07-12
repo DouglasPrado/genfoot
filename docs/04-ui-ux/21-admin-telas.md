@@ -11,18 +11,18 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 ## `A-LOGIN` — Login / RBAC / reautenticação
 
 - **Objetivo:** autenticar o operador e carregar papel/permissões.
-- **Componentes e dados:** SSO; papel efetivo (Visualização/Suporte/Revisão/Correção/Punição/Reversão); sessões administrativas; **reautenticação** para ações críticas; segregação de funções.
-- **Ações:** entrar; reautenticar.
+- **Componentes e dados:** SSO; papel efetivo (Visualização/Suporte/Revisão/Correção/Punição/Reversão); sessões administrativas; **reautenticação** para ações críticas; segregação de funções; exibição de **sessão elevada/temporária ativa** (escopo e validade).
+- **Ações:** entrar; reautenticar; abrir `A-IAM` (operadores, papéis e sessões).
 - **Estados:** sem papel → acesso negado; sessão sensível expira mais rápido.
 - **Referências:** [`04-plataforma §2, §4`](../02-tecnico/04-plataforma-seguranca-operacoes.md); [`09-op §5`](../02-tecnico/09-operacao-e-admin-do-mundo.md).
 
 ## `A-WORLDS` — Seletor de mundo
 
 - **Objetivo:** escolher o mundo a operar (define o escopo).
-- **Componentes e dados:** lista de mundos (nome, temporada, nº de clubes/usuários, status: ativo/manutenção/arquivado, sinais de saúde resumidos).
-- **Ações:** abrir mundo (`A-WORLD`); (com permissão) política de manutenção/arquivamento.
+- **Componentes e dados:** lista de mundos (nome, temporada, nº de clubes/usuários, status: ativo/manutenção/arquivado, sinais de saúde resumidos); sinal de **backup `AT_RISK`** por mundo → `A-BACKUPS` [`04-plataforma §9, §10`].
+- **Ações:** abrir mundo (`A-WORLD`); (com permissão) controles de **ciclo de vida operacional** do mundo — transições `HEALTHY…ARCHIVED`, entrar/sair de `READ_ONLY`, arquivar [`04-plataforma §9`].
 - **Estados:** mundo em `WORLD_READ_ONLY` sinalizado.
-- **Referências:** [`03-multiplayer-e-mundos`](../02-tecnico/03-multiplayer-e-mundos.md); [`09-op §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md).
+- **Referências:** [`03-multiplayer-e-mundos`](../02-tecnico/03-multiplayer-e-mundos.md); [`09-op §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §9, §10`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
 ## `A-WORLD` — Painel do mundo
 
@@ -30,7 +30,7 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 - **Layout:** grade de 11 cartões monitorados + alertas ativos + resumo de saúde técnica.
 - **Componentes e dados** (11 itens, [doc 09-op §2](../02-tecnico/09-operacao-e-admin-do-mundo.md)): saúde da economia; população/distribuição de jogadores; competições/calendários; partidas pendentes; clubes em crise; transferências suspeitas; W.O.; punições; processos de fim de temporada; falhas de processamento; integridade de inscrições/tabelas. Cada cartão com indicador e *drill-down*.
 - **Ações:** abrir cada seção; filtrar alertas ativos vs. apenas visíveis.
-- **Estados:** cartão em alerta destacado; resumo de infra (latência/filas/DLQ) como espelho não canônico.
+- **Estados:** cartão em alerta destacado; resumo de infra (latência/filas/DLQ) como espelho não canônico, com **atalhos** para `A-OPS` (jobs/DLQ), `A-FLAGS` (kill switch) e `A-INCIDENTS`.
 - **Referências:** [`09-op §2`](../02-tecnico/09-operacao-e-admin-do-mundo.md). > **Pendência:** layout fino, granularidade de drill-down e limiares de alerta.
 
 ## `A-ECONOMY` — Saúde econômica e demografia
@@ -68,10 +68,10 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 ## `A-MODERATION` — Anti-abuso
 
 - **Objetivo:** central de detecção e análise de abuso.
-- **Layout:** abas — Risk score · Contas relacionadas · Mercado suspeito · Satélite/Farm · Manipulação esportiva.
-- **Componentes e dados:** **RiskAssessment** por ação sensível e faixa (baixo/moderado/alto/crítico/grave); **contas relacionadas** (graus fraca/moderada/forte/confirmada + sinais: dispositivo, IP, login, transferências, empréstimos favoráveis, sincronização); **mercado suspeito** (valor real, venda-abaixo/compra-acima, troca, cláusulas/parcelamento abusivos, manipulação de referência); **clube satélite/farm/assédio a jovens**; **manipulação esportiva** (derrota intencional, escalação sabotada, monitoramento de jogo decisivo entre relacionados).
-- **Ações:** marcar/reclassificar relação; enviar caso à fila (`A-QUEUES`); aplicar sanção (`A-WO-SANCTIONS`).
-- **Estados:** privacidade preservada por permissão; fórmula não exposta.
+- **Layout:** abas — Risk score · Contas relacionadas · Mercado suspeito · Satélite/Farm · Manipulação esportiva · **Bot/Automação**.
+- **Componentes e dados:** **RiskAssessment** por ação sensível e faixa (baixo/moderado/alto/crítico/grave); **contas relacionadas** (graus fraca/moderada/forte/confirmada + sinais: dispositivo, IP, login, transferências, empréstimos favoráveis, sincronização); **mercado suspeito** (valor real, venda-abaixo/compra-acima, troca, cláusulas/parcelamento abusivos, manipulação de referência); **clube satélite/farm/assédio a jovens**; **manipulação esportiva** (derrota intencional, escalação sabotada, monitoramento de jogo decisivo entre relacionados); **Bot/Automação** (Dec. 1916/1917/1945: frequência impossível, propostas em massa, scraping, timing robótico → rate limit, cooldown, **captcha**).
+- **Ações:** marcar/reclassificar relação; enviar caso à fila (`A-QUEUES`); aplicar sanção (`A-WO-SANCTIONS`); **revelar dado sensível** para investigação (ação auditada de `A-AUDIT`).
+- **Estados:** privacidade preservada por permissão; fórmula não exposta; **cooldown/captcha** por conta em atividade robótica.
 - **Referências:** [`09-anti-abuso §1.2–1.6`](../01-game-design/09-anti-abuso-e-onboarding.md).
 
 ## `A-WO-SANCTIONS` — W.O. e catálogo de punições
@@ -85,7 +85,7 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 ## `A-QUEUES` — Filas de revisão / recurso / quarentena / delay
 
 - **Objetivo:** processar casos que exigem julgamento humano.
-- **Componentes e dados:** **fila de revisão** (duvidosos marcados; falso positivo não é punido automaticamente); **fila de recurso** (contestação do usuário, decisão registrada); **quarentena de ação** (pendente: jogador não muda, dinheiro não move, prazo de revisão); **delay anti-fraude** (efetivação adiada em ações de risco).
+- **Componentes e dados:** **fila de revisão** (duvidosos marcados; falso positivo não é punido automaticamente); **fila de recurso** (contestação do usuário, decisão registrada); **quarentena de ação** (pendente: jogador não muda, dinheiro não move, prazo de revisão); **delay anti-fraude** (efetivação adiada em ações de risco); **inbox de aprovação em quatro olhos** (2º revisor para ações de alto impacto). (Report de bug e vulnerabilidades: `A-BUGS`.)
 - **Ações:** aprovar/rejeitar; liberar/converter em sanção; responder recurso.
 - **Estados:** SLA de revisão (pendente de plataforma); cada decisão auditada.
 - **Referências:** [`09-anti-abuso §1.13 (Dec. 1935–1939)`](../01-game-design/09-anti-abuso-e-onboarding.md).
@@ -93,26 +93,26 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 ## `A-CORRECTIONS` — Correções / reprocessamento / reversão
 
 - **Objetivo:** resolver falhas concretas de estado do mundo, de forma rastreável.
-- **Componentes e dados:** casos (partida interrompida, duplicidade, tabela incorreta, contrato errado, premiação duplicada, transferência fraudulenta, falha de encerramento); contrato técnico da correção (tipo, escopo, reversibilidade, ao vivo vs. pós-partida); **estado anterior + motivo + responsável** obrigatórios; reprocessamento seguro; **reversão** (máximo privilégio).
-- **Ações:** aplicar correção; reprocessar; reverter (reautenticação).
-- **Estados:** correção nunca apaga (append-only no audit); comunica usuário quando aplicável.
+- **Componentes e dados:** casos (partida interrompida, duplicidade, tabela incorreta, contrato errado, premiação duplicada, transferência fraudulenta, falha de encerramento); contrato técnico da correção (tipo, escopo, reversibilidade, ao vivo vs. pós-partida); **estado anterior + motivo + responsável** obrigatórios; reprocessamento seguro; **reversão** (máximo privilégio); estado **`AWAITING_APPROVAL`** (quatro olhos) para alto impacto [`04-plataforma §4`].
+- **Ações:** aplicar correção; reprocessar; reverter (reautenticação); passo final de **comunicação ao usuário** via `A-BROADCAST` (o que/canal/detalhe — pendência de [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md)).
+- **Estados:** correção nunca apaga (append-only no audit); comunica usuário quando aplicável; alto impacto aguarda 2º revisor (`AWAITING_APPROVAL`) antes de efetivar.
 - **Referências:** [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
 ## `A-AUDIT` — Audit log imutável
 
 - **Objetivo:** rastrear toda ação administrativa/sensível.
 - **Componentes e dados:** por evento — quem, quando, clube, entidade afetada, **valor anterior/novo**, contexto, IP/dispositivo (por permissão), risk score, justificativa automática, **versão da regra**; append-only; correção cria novo log referenciando o anterior.
-- **Ações:** buscar/filtrar; exportar; abrir entidade referenciada.
-- **Estados:** somente leitura; distinção auditoria (verdade) vs. narrativa (derivada).
+- **Ações:** buscar/filtrar; exportar; abrir entidade referenciada; ação **"revelar dado sensível"** (e-mail/token/documento) com **permissão + reautenticação + motivo + duração curta + auditoria** — usada por `A-MODERATION`/`A-SUPPORT` [`04-plataforma §5`].
+- **Estados:** somente leitura; distinção auditoria (verdade) vs. narrativa (derivada); **buscas por dado sensível são auditadas**.
 - **Referências:** [`09-anti-abuso (Dec. 1877, 1933, 1957)`](../01-game-design/09-anti-abuso-e-onboarding.md); [`04-plataforma §5`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
 ## `A-SUPPORT` — Suporte e recursos
 
 - **Objetivo:** atender usuários e conduzir recursos.
-- **Componentes e dados:** casos de suporte; recursos abertos (motivo geral ao usuário); histórico do usuário/clube (por permissão); procedimentos de atendimento.
-- **Ações:** responder; encaminhar à revisão (`A-QUEUES`); registrar decisão.
-- **Estados:** > **Pendência:** procedimentos de atendimento/recurso e prazos de revisão (fonte em aberto).
-- **Referências:** [`09-op §5, §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md).
+- **Componentes e dados:** casos de suporte; recursos abertos (motivo geral ao usuário); histórico do usuário/clube (por permissão); procedimentos de atendimento; **máquina de estados do ticket** (`OPEN…REOPENED/DUPLICATE/INVALID`); contrato de **impersonação** (`READ_ONLY_IMPERSONATION` padrão / `ASSISTED_IMPERSONATION`) com `supportAccessSessionId` visível/temporário/aprovado, **notificação ao usuário**, **verificação de identidade** e **proibições** durante impersonação [`04-plataforma §6`].
+- **Ações:** responder; encaminhar à revisão (`A-QUEUES`); registrar decisão; iniciar impersonação (contrato + aprovação); **revelar dado sensível** ao usuário (ação auditada de `A-AUDIT`).
+- **Estados:** impersonação sinalizada e temporária; > **Pendência:** procedimentos de atendimento/recurso e prazos de revisão (fonte em aberto).
+- **Referências:** [`09-op §5, §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
 ## `A-BALANCE` — Testes de equilíbrio / SimulationLab
 

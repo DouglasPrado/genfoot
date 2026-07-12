@@ -46,10 +46,10 @@ Telas de moral do elenco, torcida, rivalidades, imprensa/coletiva, conversas com
 
 - **Objetivo:** conversar/negociar 1:1 ([MF-18](02-mobile-fluxos.md#mf-18--conversa-com-atleta)).
 - **Layout:** cabeçalho do jogador + motivo + opções de resposta + consequência.
-- **Componentes e dados:** motivo (pedir aumento, reclamar de minutos, renovação, forçar saída, conflito, liderança); **perfil mental** do jogador (ambição, lealdade, ego, temperamento, resiliência); opções de resposta; consequência (moral, promessa, relação).
-- **Ações:** escolher resposta; abrir renovação (`M-CONTRACT`); registrar promessa (`M-PROMISES`).
+- **Componentes e dados:** motivo (pedir aumento, reclamar de minutos, renovação, forçar saída, conflito, liderança, **despedida de ídolo**); **perfil mental** do jogador (ambição, lealdade, ego, temperamento, resiliência); opções de resposta; consequência (moral, promessa, relação).
+- **Ações:** escolher resposta; abrir renovação (`M-CONTRACT`); registrar promessa (`M-PROMISES`); conduzir a **despedida de ídolo** como fluxo guiado (reduz o desgaste da torcida) — reflete em `M-FANS` [`11 §7`].
 - **Estados:** > **Pendência:** árvore fina de respostas e efeitos numéricos não especificados no GDD.
-- **Referências:** [`07-ia §3.4, §6`](../01-game-design/07-inteligencia-artificial.md).
+- **Referências:** [`07-ia §3.4, §6`](../01-game-design/07-inteligencia-artificial.md); [`11-torcida §7`](../01-game-design/11-torcida-imprensa-e-narrativa.md).
 
 ## `M-FEED` — Feed de eventos / narrativa
 

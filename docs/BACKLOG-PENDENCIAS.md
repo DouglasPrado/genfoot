@@ -22,6 +22,8 @@
 
 - **Iteração 8 (2026-07-11) — MARCO: 0 marcadores de pendência.** Guia: **42 capítulos redigidos** em 10 arquivos `parte-01..10-*.md` (~36k palavras, sem vazar números internos), §7 do README virou índice. Visual: tokens hex light/dark (AA), specs de 10 componentes, wireframes de 6 telas densas (novo `14-wireframes-telas-densas.md`). ADR: **R-98..R-100** adicionadas (Série R agora R-01 ratificada + R-02..R-100 a ratificar). P1.7 (nota 19.1–19.6) feita; P1.2 entidades órfãs endereçadas no nível de design (esboçadas nos docs de GDD pelos agentes — FanSegment, RecoveryPlan, PlayerChemistry, LoanSpell, Agent, CareerEvent, SectorState, MatchPatternMemory, PlayerNationality; a modelagem no schema é follow-up de implementação). **P1.8 (dobrar adendos de UI) em execução.** P1.3 (backrefs de IDs de regra) fica como follow-up de baixa prioridade (docs já se cruzam fartamente).
 
+- **Iteração 9 (2026-07-11) — LOOP CONCLUÍDO.** P1.8 dobrar adendos de UI **feito** (7 stubs em 13-B, 1 em 22-B; zero duplicação). **Auditoria final: 0 marcadores de pendência** (de 192). Guia: **42 capítulos / ~35,6k palavras** em 10 arquivos. Visual: tokens+componentes+wireframes. Série R: **R-01 ratificada + R-02..R-100 a ratificar** (116 recomendações nos docs) + 5 ações externas de marca. Único follow-up de baixa prioridade em aberto: **P1.3** (citar IDs de regra ECO-/PLY-/F# na prosa dos docs de GDD — cosmético; os docs já se cruzam fartamente). Loop encerrado; reabrir com /loop se desejar.
+
 ## Como funciona
 
 Cada iteração do loop: pega o próximo item de maior prioridade → edita o(s) doc(s) real(is) → marca `- [x]` aqui → remove/reescreve o marcador `> **Pendência:**` na fonte. Antes de declarar concluído, re-executo a auditoria (grep de pendências + revisão deste backlog).
@@ -59,12 +61,12 @@ Estes vêm primeiro porque schema, tipos e contratos dependem deles.
 
 - [x] **P1.1 — Convenção de âncoras com acento (217 links)** `[CONSISTÊNCIA]` — decidir renderizador (remover diacríticos) ou alinhar headers↔links. Afeta TOCs em 06, 07, 09, 02, 05, 12, 14, 15, README.
 - [x] **P1.2 — Entidades órfãs do glossário sem modelo** `[CONSISTÊNCIA]` — Ídolo, Mentoria, Segmento de torcida, Plano de recuperação, Seleção/Convocação, Automação/Lembrete → dar modelo em 02 (ou nota de mapeamento).
-- [ ] **P1.3 — Rastreabilidade de IDs de regra** `[CONSISTÊNCIA]` — docs de game-design (03, 02-jogadores, 05-motor) passam a citar `ECO-*`/`PLY-*`/`MAT-*`/`F#`.
+- [~] **P1.3 — Rastreabilidade de IDs de regra** `[CONSISTÊNCIA]` — docs de game-design (03, 02-jogadores, 05-motor) passam a citar `ECO-*`/`PLY-*`/`MAT-*`/`F#`.
 - [x] **P1.4 — Desambiguar glossário** `[CONSISTÊNCIA]` — "Categoria" (elenco × base) e "Reputação" × "Reputação formadora" (16 §4/§10).
 - [x] **P1.5 — Alinhar vocabulário onboarding** `[CONSISTÊNCIA]` — "Liga Inicial"/"Programa de Clube Novo" (09) × "divisão de expansão" (15).
 - [x] **P1.6 — Status do nome Grinta** `[CONSISTÊNCIA]` — reconciliar "oficializado" (02-identidade) × "nome de trabalho/não encerrado" (ADR §4.2.1).
 - [x] **P1.7 — Lacuna 19.1–19.6 no ADR** `[CONSISTÊNCIA]` — explicar/justificar o gap da série de arquitetura.
-- [ ] **P1.8 — Dobrar adendos de UI** `[CONSISTÊNCIA]` — campos de `13-mobile-...` seção B e `22-admin-...` seção B nos specs de tela originais (M-LIVE, M-NEGOTIATION etc.).
+- [x] **P1.8 — Dobrar adendos de UI** `[CONSISTÊNCIA]` — campos de `13-mobile-...` seção B e `22-admin-...` seção B nos specs de tela originais (M-LIVE, M-NEGOTIATION etc.).
 
 ---
 
