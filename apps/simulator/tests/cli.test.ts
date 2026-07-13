@@ -11,6 +11,25 @@ const directories: string[] = [];
 const createdOutputSchema = z.object({
   data: z.object({ world: z.object({ id: z.string(), status: z.string() }) }),
 });
+const genesisOutputSchema = z.object({
+  data: z.object({
+    created: z.boolean(),
+    summary: z.object({
+      clubCount: z.number(),
+      playerCount: z.number(),
+      fixtureCount: z.number(),
+    }),
+  }),
+});
+const mutationOutputSchema = z.object({
+  data: z.object({
+    world: z.object({
+      id: z.string(),
+      status: z.string(),
+      currentDate: z.string(),
+    }),
+  }),
+});
 const inspectedOutputSchema = z.object({ data: z.object({ id: z.string() }) });
 const errorOutputSchema = z.object({ error: z.object({ code: z.string() }) });
 
@@ -40,7 +59,7 @@ function capture(): Readonly<{
 }
 
 describe("simulator CLI", () => {
-  it("cria, inspeciona e bloqueia o avanço de um mundo ainda em CREATING", async () => {
+  it("executa criação, gênese, ativação e avanço do mundo", async () => {
     const directory = await mkdtemp(join(tmpdir(), "grinta-cli-"));
     directories.push(directory);
     const createdOutput = capture();
@@ -70,18 +89,70 @@ describe("simulator CLI", () => {
       ).data.id,
     ).toBe(worldId);
 
+    const prematureActivation = capture();
+    expect(
+      await runCli(["world:activate", "--world", worldId], {
+        dataDirectory: directory,
+        io: prematureActivation.io,
+      }),
+    ).toBe(4);
+    expect(
+      errorOutputSchema.parse(
+        JSON.parse(prematureActivation.stderr.join("")) as unknown,
+      ).error.code,
+    ).toBe("WORLD_GENESIS_NOT_FOUND");
+
+    const genesisOutput = capture();
+    expect(
+      await runCli(["world:genesis", "--world", worldId], {
+        dataDirectory: directory,
+        io: genesisOutput.io,
+      }),
+    ).toBe(0);
+    const genesis = genesisOutputSchema.parse(
+      JSON.parse(genesisOutput.stdout.join("")) as unknown,
+    );
+    expect(genesis.data).toMatchObject({
+      created: true,
+      summary: { clubCount: 16, playerCount: 368, fixtureCount: 240 },
+    });
+
+    const repeatedGenesisOutput = capture();
+    await runCli(["world:genesis", "--world", worldId], {
+      dataDirectory: directory,
+      io: repeatedGenesisOutput.io,
+    });
+    expect(
+      genesisOutputSchema.parse(
+        JSON.parse(repeatedGenesisOutput.stdout.join("")) as unknown,
+      ).data.created,
+    ).toBe(false);
+
+    const activationOutput = capture();
+    expect(
+      await runCli(["world:activate", "--world", worldId], {
+        dataDirectory: directory,
+        io: activationOutput.io,
+      }),
+    ).toBe(0);
+    expect(
+      mutationOutputSchema.parse(
+        JSON.parse(activationOutput.stdout.join("")) as unknown,
+      ).data.world.status,
+    ).toBe("ACTIVE");
+
     const advancedOutput = capture();
     const advancedCode = await runCli(
       ["day:simulate", "--world", worldId, "--days", "1"],
       { dataDirectory: directory, io: advancedOutput.io },
     );
 
-    expect(advancedCode).toBe(4);
+    expect(advancedCode).toBe(0);
     expect(
-      errorOutputSchema.parse(
-        JSON.parse(advancedOutput.stderr.join("")) as unknown,
-      ).error.code,
-    ).toBe("WORLD_NOT_ACTIVE");
+      mutationOutputSchema.parse(
+        JSON.parse(advancedOutput.stdout.join("")) as unknown,
+      ).data.world.currentDate,
+    ).toBe("2026-01-02");
   });
 
   it("rejeita data inválida com código de entrada", async () => {

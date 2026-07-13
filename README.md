@@ -32,12 +32,14 @@ Crie e inspecione um mundo local:
 ```bash
 pnpm simulator world:create --seed grinta-001 --start-date 2026-01-01
 pnpm simulator world:inspect --world <uuid-v7>
+pnpm simulator world:genesis --world <uuid-v7>
+pnpm simulator world:activate --world <uuid-v7>
 pnpm simulator day:simulate --world <uuid-v7> --days 1
 ```
 
 Os snapshots ficam em `.grinta/simulator/worlds`. Defina `GRINTA_SIMULATOR_DATA_DIR` para usar outro diretório.
 
-O mundo nasce em `CREATING`. Nesta fatia, o avanço pelo CLI é deliberadamente rejeitado com `WORLD_NOT_ACTIVE`: a ativação exige a futura gênese válida de 16 clubes, 16 elencos de 23 jogadores e calendário validado. O comportamento positivo do relógio já está implementado e testado no domínio.
+O mundo nasce em `CREATING`. A gênese gera deterministicamente 16 clubes, 368 pessoas/jogadores, 16 elencos de 23 atletas e uma Liga Inicial de 30 rodadas. Somente depois da validação integral desses dados o comando `world:activate` libera o avanço do relógio.
 
 ## Qualidade
 

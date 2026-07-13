@@ -1,6 +1,12 @@
 import { resolve } from "node:path";
 
-import { AdvanceWorldDays, CreateWorld, InspectWorld } from "@grinta/core";
+import {
+  ActivateProvisionedWorld,
+  AdvanceWorldDays,
+  CreateWorld,
+  GenerateWorldGenesis,
+  InspectWorld,
+} from "@grinta/core";
 import {
   DomainError,
   WorldDate,
@@ -109,6 +115,44 @@ export async function runCli(
     });
 
   program
+    .command("world:genesis")
+    .description("Gera clubes, pessoas, jogadores, elencos e calendário")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+
+      exitCode = writeResult(
+        io,
+        await new GenerateWorldGenesis(repository, repository).execute(
+          id.value,
+        ),
+      );
+    });
+
+  program
+    .command("world:activate")
+    .description("Ativa um mundo que possui gênese válida")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+
+      exitCode = writeResult(
+        io,
+        await new ActivateProvisionedWorld(repository, repository).execute(
+          id.value,
+        ),
+      );
+    });
+
+  program
     .command("day:simulate")
     .description("Avança dias de um mundo ACTIVE")
     .requiredOption("--world <uuid>")
@@ -183,6 +227,9 @@ function errorCode(code: string): number {
   if (code === "WORLD_NOT_FOUND") return 3;
   if (
     code === "WORLD_NOT_ACTIVE" ||
+    code === "WORLD_GENESIS_NOT_FOUND" ||
+    code === "WORLD_GENESIS_NOT_ALLOWED" ||
+    code === "WORLD_GENESIS_ALREADY_EXISTS" ||
     code === "AGGREGATE_VERSION_CONFLICT" ||
     code === "WORLD_ALREADY_EXISTS"
   ) {

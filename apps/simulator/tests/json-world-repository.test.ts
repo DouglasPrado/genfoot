@@ -2,7 +2,11 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { WorldStatus, type GameWorldSnapshot } from "@grinta/core";
+import {
+  WorldGenesisGenerator,
+  WorldStatus,
+  type GameWorldSnapshot,
+} from "@grinta/core";
 import { newGameWorldId, parseRulesetVersion } from "@grinta/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -10,7 +14,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(1) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(2) });
 
 afterEach(async () => {
   await Promise.all(
@@ -57,7 +61,39 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(1);
+    expect(file.schemaVersion).toBe(2);
+  });
+
+  it("persiste e recupera a gênese sem alterar o mundo", async () => {
+    const store = await repository();
+    const world = snapshot();
+    const genesis = new WorldGenesisGenerator().generate(world);
+    await store.value.save(world, null);
+
+    await store.value.saveGenesis(genesis, world.version);
+
+    expect(await store.value.findByWorldId(world.id)).toEqual(genesis);
+    expect(await store.value.findById(world.id)).toEqual(world);
+  });
+
+  it("lê snapshots v1 e os migra na próxima escrita", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await writeFile(
+      join(store.directory, `${world.id}.json`),
+      JSON.stringify({ schemaVersion: 1, world }),
+      "utf8",
+    );
+
+    expect(await store.value.findById(world.id)).toEqual(world);
+    expect(await store.value.findByWorldId(world.id)).toBeNull();
+    await store.value.save({ ...world, version: 2 }, 1);
+    const migrated = envelopeSchema.parse(
+      JSON.parse(
+        await readFile(join(store.directory, `${world.id}.json`), "utf8"),
+      ) as unknown,
+    );
+    expect(migrated.schemaVersion).toBe(2);
   });
 
   it("retorna null para mundo inexistente", async () => {
