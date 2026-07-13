@@ -1,15 +1,28 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 
 import {
   DominantFoot,
   PlayerPosition,
+  ScheduledTaskStatus,
+  SeasonLifecycleState,
+  SeasonStatus,
   WorldStatus,
   type GameWorldSnapshot,
   type WorldGenesisRepository,
   type WorldGenesisSnapshot,
   type WorldRepository,
+  type SchedulingRepository,
+  type WorldSchedulerSnapshot,
 } from "@grinta/core";
 import {
   DomainError,
@@ -120,6 +133,71 @@ const genesisSchema = z.object({
   ),
 });
 
+const schedulerSchema = z.object({
+  gameWorldId: identifierSchema,
+  config: z.object({
+    rulesetVersion: z.string(),
+    maxTaskAttempts: z.number().int().positive(),
+    clockLeaseDurationMs: z.number().int().positive(),
+  }),
+  seasons: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      number: z.number().int().positive(),
+      name: z.string().min(1),
+      startsOn: z.string(),
+      endsOn: z.string(),
+      lifecycleState: z.enum([
+        SeasonLifecycleState.PLANNING,
+        SeasonLifecycleState.REGISTRATION,
+        SeasonLifecycleState.IN_PROGRESS,
+        SeasonLifecycleState.FINALIZING,
+        SeasonLifecycleState.OFF_SEASON,
+        SeasonLifecycleState.COMPLETED,
+      ]),
+      status: z.enum([
+        SeasonStatus.PLANNED,
+        SeasonStatus.ACTIVE,
+        SeasonStatus.FINISHED,
+        SeasonStatus.ARCHIVED,
+      ]),
+      version: z.number().int().positive(),
+    }),
+  ),
+  tasks: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      type: z.string().min(1),
+      dueOn: z.string(),
+      priority: z.number().int(),
+      payload: z.record(z.unknown()),
+      idempotencyKey: z.string().min(1),
+      status: z.enum([
+        ScheduledTaskStatus.PENDING,
+        ScheduledTaskStatus.RUNNING,
+        ScheduledTaskStatus.COMPLETED,
+        ScheduledTaskStatus.FAILED,
+        ScheduledTaskStatus.CANCELLED,
+      ]),
+      attempts: z.number().int().nonnegative(),
+      maxAttempts: z.number().int().positive(),
+      fencingToken: z.number().int().positive().nullable(),
+      lastError: z.string().nullable(),
+      completedOn: z.string().nullable(),
+      version: z.number().int().positive(),
+    }),
+  ),
+  clock: z.object({
+    leaseOwnerId: z.string().nullable(),
+    leaseExpiresAtMs: z.number().int().nonnegative().nullable(),
+    fencingToken: z.number().int().nonnegative(),
+  }),
+  runtimeEpoch: z.number().int().nonnegative(),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -127,15 +205,22 @@ const persistedSnapshotSchema = z.union([
     world: worldSchema,
     genesis: genesisSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(3),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
   readonly world: GameWorldSnapshot;
   readonly genesis: WorldGenesisSnapshot | null;
+  readonly scheduler: WorldSchedulerSnapshot | null;
 }
 
 export class JsonWorldRepository
-  implements WorldRepository, WorldGenesisRepository
+  implements WorldRepository, WorldGenesisRepository, SchedulingRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -173,6 +258,7 @@ export class JsonWorldRepository
     await this.write(snapshot.id, {
       world: snapshot,
       genesis: current?.genesis ?? null,
+      scheduler: current?.scheduler ?? null,
     });
   }
 
@@ -198,7 +284,52 @@ export class JsonWorldRepository
       );
     }
 
-    await this.write(genesis.gameWorldId, { world: current.world, genesis });
+    await this.write(genesis.gameWorldId, {
+      world: current.world,
+      genesis,
+      scheduler: current.scheduler,
+    });
+  }
+
+  public async findSchedulingByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldSchedulerSnapshot | null> {
+    return (await this.load(id))?.scheduler ?? null;
+  }
+
+  public async saveScheduling(
+    scheduler: WorldSchedulerSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withSchedulingLock(scheduler.gameWorldId, async () => {
+      const current = await this.load(scheduler.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", {
+          gameWorldId: scheduler.gameWorldId,
+        });
+      }
+      if (expectedRevision === null && current.scheduler !== null) {
+        throw new DomainError(
+          "SCHEDULER_ALREADY_EXISTS",
+          "O scheduler deste mundo já existe.",
+        );
+      }
+      if (
+        expectedRevision !== null &&
+        current.scheduler?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "SCHEDULER_REVISION_CONFLICT",
+          "O scheduler foi alterado desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.scheduler?.revision ?? null,
+          },
+        );
+      }
+      await this.write(scheduler.gameWorldId, { ...current, scheduler });
+    });
   }
 
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
@@ -224,10 +355,15 @@ export class JsonWorldRepository
         rulesetVersion: parsedRuleset.value,
       };
       const genesis =
-        persisted.schemaVersion === 2 && persisted.genesis !== null
+        (persisted.schemaVersion === 2 || persisted.schemaVersion === 3) &&
+        persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
-      return { world, genesis };
+      const scheduler =
+        persisted.schemaVersion === 3 && persisted.scheduler !== null
+          ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
+          : null;
+      return { world, genesis, scheduler };
     } catch (error: unknown) {
       throw new DomainError(
         "SNAPSHOT_CORRUPTED",
@@ -247,7 +383,12 @@ export class JsonWorldRepository
     const destination = this.pathFor(id);
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
-      { schemaVersion: 2, world: envelope.world, genesis: envelope.genesis },
+      {
+        schemaVersion: 3,
+        world: envelope.world,
+        genesis: envelope.genesis,
+        scheduler: envelope.scheduler,
+      },
       null,
       2,
     )}\n`;
@@ -257,6 +398,37 @@ export class JsonWorldRepository
 
   private pathFor(id: GameWorldId): string {
     return join(this.baseDirectory, `${id}.json`);
+  }
+
+  private async withSchedulingLock<T>(
+    id: GameWorldId,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const lockPath = join(this.baseDirectory, `${id}.scheduler.lock`);
+    let handle;
+    try {
+      handle = await open(lockPath, "wx");
+    } catch (error: unknown) {
+      if (isNodeError(error) && error.code === "EEXIST") {
+        const lockStat = await stat(lockPath).catch(() => null);
+        if (lockStat !== null && Date.now() - lockStat.mtimeMs > 60_000) {
+          await unlink(lockPath).catch(() => undefined);
+          handle = await open(lockPath, "wx");
+        } else {
+          throw new DomainError(
+            "SCHEDULER_WRITE_LOCKED",
+            "Outra réplica está atualizando o scheduler.",
+            { id },
+          );
+        }
+      } else throw error;
+    }
+    try {
+      return await action();
+    } finally {
+      await handle.close();
+      await unlink(lockPath).catch(() => undefined);
+    }
   }
 }
 

@@ -35,11 +35,21 @@ pnpm simulator world:inspect --world <uuid-v7>
 pnpm simulator world:genesis --world <uuid-v7>
 pnpm simulator world:activate --world <uuid-v7>
 pnpm simulator day:simulate --world <uuid-v7> --days 1
+pnpm simulator scheduler:inspect --world <uuid-v7>
 ```
 
 Os snapshots ficam em `.grinta/simulator/worlds`. Defina `GRINTA_SIMULATOR_DATA_DIR` para usar outro diretório.
 
 O mundo nasce em `CREATING`. A gênese gera deterministicamente 16 clubes, 368 pessoas/jogadores, 16 elencos de 23 atletas e uma Liga Inicial de 30 rodadas. Somente depois da validação integral desses dados o comando `world:activate` libera o avanço do relógio.
+
+A ativação também inicializa a primeira temporada e sua agenda persistente. O avanço diário processa tarefas por data, prioridade e ID, com idempotência, retry limitado, checkpoints, lease e fencing token. Operações disponíveis:
+
+```bash
+pnpm simulator scheduler:run --world <uuid-v7>
+pnpm simulator scheduler:schedule --world <uuid-v7> --type <tipo> --due-on 2026-01-10 --idempotency-key <chave>
+pnpm simulator scheduler:retry --world <uuid-v7> --task <uuid-v7>
+pnpm simulator scheduler:cancel --world <uuid-v7> --task <uuid-v7>
+```
 
 ## Qualidade
 

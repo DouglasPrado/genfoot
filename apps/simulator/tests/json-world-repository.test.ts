@@ -14,7 +14,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(2) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(3) });
 
 afterEach(async () => {
   await Promise.all(
@@ -61,7 +61,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(2);
+    expect(file.schemaVersion).toBe(3);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -93,7 +93,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(3);
   });
 
   it("retorna null para mundo inexistente", async () => {

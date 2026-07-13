@@ -28,6 +28,18 @@ const mutationOutputSchema = z.object({
       status: z.string(),
       currentDate: z.string(),
     }),
+    processedTasks: z
+      .array(z.object({ type: z.string(), status: z.string() }))
+      .optional(),
+  }),
+});
+const schedulerOutputSchema = z.object({
+  data: z.object({
+    clock: z.object({ leaseOwnerId: z.string().nullable() }),
+    seasons: z.array(
+      z.object({ lifecycleState: z.string(), status: z.string() }),
+    ),
+    tasks: z.array(z.object({ status: z.string() })),
   }),
 });
 const inspectedOutputSchema = z.object({ data: z.object({ id: z.string() }) });
@@ -153,6 +165,42 @@ describe("simulator CLI", () => {
         JSON.parse(advancedOutput.stdout.join("")) as unknown,
       ).data.world.currentDate,
     ).toBe("2026-01-02");
+
+    const completedSeasonOutput = capture();
+    expect(
+      await runCli(["day:simulate", "--world", worldId, "--days", "89"], {
+        dataDirectory: directory,
+        io: completedSeasonOutput.io,
+      }),
+    ).toBe(0);
+    const completedSeason = mutationOutputSchema.parse(
+      JSON.parse(completedSeasonOutput.stdout.join("")) as unknown,
+    );
+    expect(completedSeason.data.world.currentDate).toBe("2026-04-01");
+    expect(completedSeason.data.processedTasks).toEqual([
+      { type: "season:check-start-end", status: "COMPLETED" },
+      { type: "season:check-start-end", status: "COMPLETED" },
+    ]);
+
+    const schedulerOutput = capture();
+    expect(
+      await runCli(["scheduler:inspect", "--world", worldId], {
+        dataDirectory: directory,
+        io: schedulerOutput.io,
+      }),
+    ).toBe(0);
+    const scheduler = schedulerOutputSchema.parse(
+      JSON.parse(schedulerOutput.stdout.join("")) as unknown,
+    );
+    expect(scheduler.data.clock.leaseOwnerId).toBeNull();
+    expect(scheduler.data.seasons[0]).toEqual({
+      lifecycleState: "FINALIZING",
+      status: "ACTIVE",
+    });
+    expect(scheduler.data.tasks.map(({ status }) => status)).toEqual([
+      "COMPLETED",
+      "COMPLETED",
+    ]);
   });
 
   it("rejeita data inválida com código de entrada", async () => {

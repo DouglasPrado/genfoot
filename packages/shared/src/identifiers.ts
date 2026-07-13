@@ -16,8 +16,12 @@ export type Brand<T, TBrand extends string> = T & {
 export type EntityId<TKind extends string> = Brand<string, `EntityId:${TKind}`>;
 export type GameWorldId = EntityId<"GameWorld">;
 
+export function newEntityId<TKind extends string>(): EntityId<TKind> {
+  return uuidv7() as EntityId<TKind>;
+}
+
 export function newGameWorldId(): GameWorldId {
-  return uuidv7() as GameWorldId;
+  return newEntityId<"GameWorld">();
 }
 
 export function parseGameWorldId(
