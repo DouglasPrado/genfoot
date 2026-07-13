@@ -1,6 +1,6 @@
 # Arquitetura Multiplayer e Mundos
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/campeonatos-fim-de-temporadas.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/campeonatos-fim-de-temporadas.md · **Revisão:** 2026-07-10
 
 Este documento consolida a arquitetura online do **Grinta**: como o jogo organiza mundos persistentes, distribui clubes entre humanos e IA, resolve o problema da assincronia entre jogadores por meio de rodadas com prazo, dimensiona divisões pela quantidade de usuários e opera o mercado de transferências online. O modelo-base é **online assíncrono**: ninguém precisa estar conectado ao mesmo tempo, e o campeonato avança sozinho em horários fixos.
 
@@ -41,30 +41,32 @@ GameWorld {
   name
   currentSeason
   currentDate
-  status: "preseason" | "running" | "season_end"
+  status: "preseason" | "running" | "season_end"   // esboço narrativo; enum persistido = WorldStatus
   speed
   clubs
   championships
 }
 ```
 
+> Os rótulos `preseason`/`running`/`season_end` acima são **narrativos**. Os estados **persistidos** canônicos são `WorldStatus` (mundo) e `SeasonStatus` (temporada) do [`../../prisma/schema.prisma`](../../prisma/schema.prisma) — ver o mapeamento das camadas de estado de temporada no [dicionário canônico §2.2](./11-dicionario-canonico.md) e em [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md) §1 (R-106).
+
 O mundo controla a **data corrente** e o ritmo (`speed`). O tempo é **acelerado**, não em tempo real: um mundo em que uma temporada durasse um ano real seria lento demais.
 
-O ritmo pode ser expresso de duas formas equivalentes:
+O Grinta separa **dois relógios**, e não confundi-los é o que resolve o calendário:
 
-- **Por razão de tempo** — `1 dia real = 1 semana no jogo`, deixando o calendário avançar de forma constante.
-- **Por duração de temporada** — `45 dias reais = 1 temporada inteira`, a recomendação padrão.
+- **Relógio real (wall-clock)** — o tempo do jogador. As rodadas rodam em horários fixos (ex.: 20h) e a temporada de referência dura **≈ 9 semanas reais (~63 dias)**. É este relógio que **limita a quantidade de rodadas** que cabem numa temporada.
+- **Relógio virtual (calendário do mundo)** — a `currentDate` do mundo, que avança **vários dias virtuais por dia real** e cobre um **ano-futebol virtual** (~10 meses). É neste relógio que vivem as datas do `SeasonCalendar` e onde **fadiga e descanso mínimo** são medidos.
 
-O campo `speed` do mundo materializa essa escolha. Exemplos:
+A aproximação histórica `1 dia real ≈ 1 semana no jogo` descreve a razão entre os dois relógios; o **valor canônico** é a duração real da temporada, fixada por `speed.seasonDays`. O campo `speed` do mundo materializa a escolha. Exemplos:
 
 ```
-speed: { seasonDays: 45 }        // 1 temporada = 45 dias reais (padrão)
-speed: { realDay: "1 week" }     // 1 dia real = 1 semana no jogo
-speed: { seasonDays: 30 }        // temporada mais curta e intensa
-speed: { seasonDays: 60 }        // temporada mais longa e pausada
+speed: { seasonDays: 63 }        // referência elite: 16 clubes, 30 rodadas (R-101)
+speed: { seasonDays: 45 }        // modo curto: mundos menores (≤ 12 clubes)
+speed: { seasonDays: 30 }        // temporada bem curta e intensa
+speed: { seasonDays: 90 }        // temporada longa e pausada
 ```
 
-As duas notações descrevem o mesmo mundo acelerado; a temporada de 45 dias continua sendo a referência inicial recomendada.
+> **Nota:** a antiga referência de 45 dias com 20 clubes / 38 rodadas **não fechava** (38 rodadas não cabem em ~26 slots de 45 dias). A referência canônica passa a ser **16 clubes → 30 rodadas em ~63 dias reais** (R-101, §7); a duração exata por tamanho de mundo é balanceamento (R-107). O calendário-âncora completo (blocos, cadência, descanso, adiamentos, datas FIFA) está em [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md) §4.
 
 ### Mundos por geração (eras temporais)
 
@@ -195,7 +197,7 @@ A solução para a assincronia é a **rodada com prazo**, um ciclo de quatro fas
 
 Exemplo de regra concreta: usuários têm até **19h59** para ajustar a escalação; às **20h** o sistema simula todos os jogos.
 
-O calendário precisa ser **fixo e previsível**. Ritmo recomendado para começar: 1 temporada = 45 dias reais, com rodadas principais em dias definidos da semana e o mercado aberto todos os dias, fechando antes dos jogos.
+O calendário precisa ser **fixo e previsível**. Ritmo de referência (R-101): 1 temporada ≈ **9 semanas reais (~63 dias)**, com **4 rodadas de liga + 1 data de copa por semana**, rodadas em dias definidos da semana e o mercado aberto todos os dias, fechando antes dos jogos. O calendário-âncora completo está em [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md) §4.
 
 Exemplo de semana:
 
@@ -267,12 +269,12 @@ Competition {
 
 ### Liga de pontos corridos
 
-Boa para campeonato nacional. Exemplo: 20 clubes, turno e returno (38 rodadas), 3 pontos por vitória e 1 por empate, 4 rebaixados, 6 classificados para o continental.
+Boa para campeonato nacional. O motor aceita qualquer `clubs` (rodadas = `2 × (clubs − 1)`), mas a **divisão de referência tem 16 clubes** (30 rodadas), por caber no calendário real (R-101, §7). Exemplo de referência: 16 clubes, turno e returno (30 rodadas), 3 pontos por vitória e 1 por empate, 4 rebaixados, 4 promovidos, 6 classificados para o continental.
 
 ```
 LeagueRules {
-  clubs: 20
-  rounds: 38
+  clubs: 16
+  rounds: 30            // 2 × (16 − 1)
   legs: 2
   relegationSlots: 4
   promotionSlots: 4
@@ -356,17 +358,17 @@ Isso cria objetivo para todos — não só para quem briga por título, mas tamb
 
 ### Divisões por nível estrutural do clube (ligas de desenvolvimento)
 
-O modelo hierárquico acima (Divisão 1, 2, 3…) organiza os clubes por **resultado esportivo** — sobe quem vence, cai quem perde. Isso não basta para um mundo persistente em que clubes antigos cresceram muito: se um clube recém-criado (estrutura nível 1, base nível 1, estádio nível 1, elenco inicial velho, reputação baixa) cair direto contra um gigante de temporadas anteriores (estrutura nível 7, base nível 8, torcida grande, caixa maior), o novato não tem chance real. Por isso o Grinta usa também um segundo eixo: **divisões/ligas por nível estrutural do clube**. Um clube novo entra numa camada compatível com seu nível de estrutura, e não contra o topo do mundo.
+O modelo hierárquico acima (Divisão 1, 2, 3…) organiza os clubes por **resultado esportivo** — sobe quem vence, cai quem perde. Isso não basta para um mundo persistente em que clubes antigos cresceram muito: se um clube recém-criado (estrutura nível 1, base nível 1, estádio nível 1, elenco inicial velho, reputação baixa) cair direto contra um gigante de temporadas anteriores (estrutura nível 5, base nível 5, torcida grande, caixa maior), o novato não tem chance real. Por isso o Grinta usa também um segundo eixo: **divisões/ligas por nível estrutural do clube**. Um clube novo entra numa camada compatível com seu nível de estrutura, e não contra o topo do mundo.
 
-As faixas seguem o nível estrutural (1 a 10) do clube:
+As faixas seguem o nível estrutural (1 a 5) do clube:
 
 | Nível estrutural | Liga |
 | --- | --- |
-| 1–2 | Liga Inicial |
-| 3–4 | Liga de Acesso |
-| 5–6 | Liga Intermediária |
-| 7–8 | Liga Principal |
-| 9–10 | Elite |
+| 1 | Liga Inicial |
+| 2 | Liga de Acesso |
+| 3 | Liga Intermediária |
+| 4 | Liga Principal |
+| 5 | Elite |
 
 Assim, um clube novo joga contra clubes parecidos: continua no **mesmo universo persistente**, mas compete numa **camada compatível**. Numa temporada global avançada (ex.: temporada 20), os clubes grandes disputam a Elite, os médios a Liga Principal / Intermediária e os novos a Liga Inicial — o que preserva o mérito dos antigos sem massacrar os que chegam.
 
@@ -374,32 +376,46 @@ O clube novo cresce **subindo de camada** (Liga Inicial → Liga de Acesso → L
 
 **Coexistência dos dois eixos.** As divisões por resultado (as Séries / Divisões 1, 2, 3…, com promoção e rebaixamento por desempenho) e as ligas por nível estrutural são **complementares, não substitutas**: a primeira organiza a disputa esportiva dentro de uma faixa; a segunda garante que o adversário de um clube tenha porte estrutural compatível. Ambas descrevem o mesmo mundo, por ângulos diferentes.
 
-> **Recomendação (a ratificar — R-83):** os dois eixos combinam-se como **moldura × disputa**: a **liga por nível estrutural** (Inicial → Acesso → Intermediária → Principal → Elite) é a **moldura** dentro da qual existem as **Séries por resultado** (1, 2, 3…), e não o contrário. Um clube compete nas Séries **da sua liga de nível**; promoção/rebaixamento por resultado o movem entre Séries **dentro da mesma liga de nível**. A mudança de **liga de nível** é um eixo separado, guiado pelo **nível estrutural do clube** (1–10, faixas da tabela acima), não pelo resultado esportivo — logo subir de Série e subir de nível estrutural são eventos **independentes**, podendo ocorrer na mesma temporada, mas por gatilhos distintos. **Limiares:** o clube muda de liga de nível ao **cruzar a faixa de nível estrutural** (ex.: atingir nível 3 promove da Liga Inicial para a de Acesso; recuar para nível 2 rebaixa de volta), avaliado na **virada de temporada**, com **histerese** (margem para evitar oscilação a cada temporada) a calibrar. Racional: preserva o mérito dos clubes antigos (nível estrutural) sem massacrar novatos e mantém a disputa esportiva viva dentro de cada faixa.
+> **Decisão ratificada — R-83:** os dois eixos combinam-se como **moldura × disputa**: a **liga por nível estrutural** (Inicial → Acesso → Intermediária → Principal → Elite) é a **moldura** dentro da qual existem as **Séries por resultado** (1, 2, 3…), e não o contrário. Um clube compete nas Séries **da sua liga de nível**; promoção/rebaixamento por resultado o movem entre Séries **dentro da mesma liga de nível**. A mudança de **liga de nível** é um eixo separado, guiado pelo **nível estrutural do clube** (1–5, faixas da tabela acima), não pelo resultado esportivo — logo subir de Série e subir de nível estrutural são eventos **independentes**, podendo ocorrer na mesma temporada, mas por gatilhos distintos. **Limiares:** o clube muda de liga de nível ao **cruzar a faixa de nível estrutural** (ex.: atingir nível 2 promove da Liga Inicial para a de Acesso; recuar para nível 1 rebaixa de volta), avaliado na **virada de temporada**, com **histerese** (margem para evitar oscilação a cada temporada) a calibrar. Racional: preserva o mérito dos clubes antigos (nível estrutural) sem massacrar novatos e mantém a disputa esportiva viva dentro de cada faixa.
 
 ### Modelo recomendado para começar
 
-- 1 mundo, 40 clubes, 2 divisões de 20 clubes.
-- Liga de pontos corridos (38 rodadas, 4 rebaixados / 4 promovidos).
-- Copa nacional em mata-mata (40 clubes, jogos às quintas).
+- 1 mundo, **32 clubes, 2 divisões de 16 clubes**.
+- Liga de pontos corridos (**30 rodadas** = `2 × (16 − 1)`, 4 rebaixados / 4 promovidos).
+- Copa nacional em mata-mata (32 clubes, ~7 datas às quintas).
 - Bots preenchendo as vagas sem dono.
-- Temporada de 45 dias, com rodadas 4 vezes por semana.
+- **Temporada de referência ≈ 9 semanas reais (~63 dias)**, com 4 rodadas de liga + 1 data de copa por semana.
+
+**Conta fechada (por que 16 e não 20 clubes):**
+
+| Passo | Cálculo | Resultado |
+| --- | --- | --- |
+| Rodadas de liga | `2 × (16 − 1)` | 30 |
+| Datas de copa (mata-mata, 32 clubes, semis ida-e-volta) | `32→16→8→4→2→final` | ~7 |
+| Cadência real | 4 liga + 1 copa por semana | 5 datas/semana |
+| Semanas de liga | `30 ÷ 4` | 7,5 semanas |
+| Total (pré-temporada + liga/copa + buffer + fim + entressafra) | 0,5 + 7,5 + 0,5 + ~0,5 semanas | **≈ 9 semanas (~63 dias)** |
+
+Com 20 clubes seriam **38 rodadas**, que **não cabem** nos ~26 slots de uma temporada de 45 dias a 4 rodadas/semana (bloqueador B-03). O modelo de 16 clubes fecha a liga em 7,5 semanas, deixa as quintas para a copa e um buffer para adiamentos e datas FIFA. Calendário-âncora completo (blocos, descanso, prioridades, adiamentos, datas FIFA) e a Recomendação **R-101**: [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md) §4.
+
+> **Decisão ratificada — R-107:** parametrizar a **duração real da temporada por tamanho de mundo**, mantendo 4 rodadas de liga/semana como cadência humana. Proposta de 1ª passada: **16 clubes → ~63 dias reais** (referência elite, R-101); **12 clubes → ~45–50 dias** (22 rodadas, "modo curto"); tamanhos intermediários interpolam por `dias ≈ (2·(clubs−1) ÷ 4)·7 + ~12 dias de overhead` (pré-temporada + buffer + fim + entressafra). Divisões acima de 16 clubes exigem `seasonDays` maior **ou** aceitam rodadas em dias adicionais — nunca as 38 rodadas em 45 dias. Racional: a divisão por resultado (Séries) e por nível estrutural (R-83) continua livre; o que R-107 fixa é o **acoplamento entre nº de clubes, cadência e `seasonDays`** para que a aritmética sempre feche; os valores por faixa são de balanceamento e ficam para [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 Expansões posteriores: Divisão C, competição continental, mundial, categorias de base, seleções e torneios privados.
 
 ### Exemplos de mundo dimensionado
 
-Para ilustrar como a composição escala, dois exemplos concretos de mundo:
+Para ilustrar como a composição escala, dois exemplos concretos de mundo (divisões de **16 clubes**, conforme R-101/R-107):
 
 **Exemplo A — Brasil Online 1 (temporada 2027), mundo grande em 4 divisões:**
 
 | Item | Valor |
 | --- | --- |
-| Clubes totais | 80 |
-| Humanos | 34 |
-| Bots | 46 |
-| Divisões | 4 (Séries A, B, C e D, com 20 clubes cada) |
+| Clubes totais | 64 |
+| Humanos | 28 |
+| Bots | 36 |
+| Divisões | 4 (Séries A, B, C e D, com 16 clubes cada) |
 | Competições | Liga Nacional, Copa Nacional, Supercopa, Copa Continental, torneios de base, amistosos |
-| Calendário | Segunda/Quarta/Sexta liga, Quinta copa, Domingo continental ou liga |
+| Calendário | Segunda/Quarta/Sexta/Domingo liga, Quinta copa/continental (~63 dias, R-101) |
 
 No fim da temporada: campeões definidos, rebaixados caem, promovidos sobem, usuários recebem avaliação, jogadores evoluem, contratos vencem, mercado abre, clubes bots podem ser assumidos e a nova temporada começa.
 
@@ -407,16 +423,17 @@ No fim da temporada: campeões definidos, rebaixados caem, promovidos sobem, usu
 
 | Item | Valor |
 | --- | --- |
-| Duração | 45 dias reais |
-| Clubes totais | 60 |
-| Humanos | 28 |
-| Bots | 32 |
+| Duração | ~63 dias reais (referência R-101) |
+| Clubes totais | 48 |
+| Humanos | 22 |
+| Bots | 26 |
+| Divisões | 3 (Séries A, B e C, com 16 clubes cada) |
 | Competições | Série A, Série B, Série C, Copa Nacional, Supercopa, Copa Sub-20 |
-| Calendário | Segunda/Quarta/Sexta liga, Quinta copa, Domingo liga ou final |
+| Calendário | Segunda/Quarta/Sexta/Domingo liga, Quinta copa, Domingo final |
 
 Ruleset resumido do Exemplo B: usuário confirma a escalação antes das 19h; jogos simulam às 20h; ausente usa a última escalação; 5 ausências seguidas liberam o clube; transferências entre usuários passam por validação; jogadores podem recusar propostas; e bots completam os clubes vazios. Esse já é um modelo muito bom para começar.
 
-> **Recomendação (a ratificar — R-84):** limiares de dimensionamento do mundo. **Nova divisão/Série:** criar quando a divisão-alvo ultrapassar sua lotação (ex.: 20 clubes) e houver **fila de humanos** suficiente para formar a próxima — proposta: abrir nova Série quando **≥ 60% das vagas humanas** da divisão vigente estiverem ocupadas e existirem **≥ 20 humanos aguardando**; caso contrário, novos entrantes preenchem vagas de bots existentes antes de fragmentar em nova divisão. **Conversão bot → humano:** um clube-bot vira vaga humana de forma **automática** quando (a) está elegível (não em crise terminal, dentro da faixa de nível estrutural do entrante) e (b) há humano compatível na fila; conversões sensíveis (clubes de topo, disputa por uma vaga) passam por **confirmação manual** do admin. Racional: crescer por preenchimento antes de fragmentar mantém as divisões cheias e competitivas. Compartilha **R-84** com a penalidade de ausência (§8). Calibrar faixas por tamanho de mundo.
+> **Decisão ratificada — R-84:** limiares de dimensionamento do mundo. **Nova divisão/Série:** criar quando a divisão-alvo ultrapassar sua lotação (ex.: 16 clubes, R-101) e houver **fila de humanos** suficiente para formar a próxima — proposta: abrir nova Série quando **≥ 60% das vagas humanas** da divisão vigente estiverem ocupadas e existirem **≥ 20 humanos aguardando**; caso contrário, novos entrantes preenchem vagas de bots existentes antes de fragmentar em nova divisão. **Conversão bot → humano:** um clube-bot vira vaga humana de forma **automática** quando (a) está elegível (não em crise terminal, dentro da faixa de nível estrutural do entrante) e (b) há humano compatível na fila; conversões sensíveis (clubes de topo, disputa por uma vaga) passam por **confirmação manual** do admin. Racional: crescer por preenchimento antes de fragmentar mantém as divisões cheias e competitivas. Compartilha **R-84** com a penalidade de ausência (§8). Calibrar faixas por tamanho de mundo.
 
 ---
 
@@ -448,7 +465,7 @@ Pontos-chave:
 - A liberação do clube após 5 ausências seguidas é o único momento em que o usuário perde o comando — e ainda assim é por ausência prolongada, não por resultado.
 - O usuário gerencia entre rodadas; ele não joga a partida manualmente. Definir tática, treinar, negociar, conversar com jogadores e planejar a próxima rodada são as atividades do dia a dia.
 
-> **Recomendação (a ratificar — R-84):** penalidade por não escalar **além** do fallback. Proposta: **sem penalidade competitiva** nas 1ª–2ª ausências (só usa a última escalação / IA valida); a partir da **3ª ausência seguida**, além do alerta, aplica-se uma **penalidade leve e não retroativa** — ex.: pequena queda de **moral/entrosamento** do elenco e/ou leve redutor de desempenho do time no fallback — **nunca** punição direta no placar nem dedução de pontos. A liberação do clube na 5ª ausência (acima) permanece o único evento de perda de comando. Racional: cria incentivo suave à presença sem transformar ausência em derrota automática, preservando o princípio "nunca demitido por desempenho". Compartilha **R-84** com os limiares de dimensionamento (§7). Calibrar magnitude e rodada de início.
+> **Decisão ratificada — R-84:** penalidade por não escalar **além** do fallback. Proposta: **sem penalidade competitiva** nas 1ª–2ª ausências (só usa a última escalação / IA valida); a partir da **3ª ausência seguida**, além do alerta, aplica-se uma **penalidade leve e não retroativa** — ex.: pequena queda de **moral/entrosamento** do elenco e/ou leve redutor de desempenho do time no fallback — **nunca** punição direta no placar nem dedução de pontos. A liberação do clube na 5ª ausência (acima) permanece o único evento de perda de comando. Racional: cria incentivo suave à presença sem transformar ausência em derrota automática, preservando o princípio "nunca demitido por desempenho". Compartilha **R-84** com os limiares de dimensionamento (§7). Calibrar magnitude e rodada de início.
 
 ---
 
@@ -532,7 +549,7 @@ O modelo recomendado para o Grinta reúne:
 - Online assíncrono, com mundos persistentes.
 - Clubes humanos + bots na mesma competição.
 - Rodadas automáticas em horários fixos.
-- Temporadas de 45 dias.
+- Divisões de 16 clubes (30 rodadas), temporada de referência ≈ 9 semanas reais (~63 dias) — R-101.
 - Campeonatos oficiais criados pelo sistema; torneios privados criados por usuários.
 - Mercado entre usuários com regras anti-abuso.
 - Jogadores únicos com vontade própria.

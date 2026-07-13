@@ -1,6 +1,6 @@
 # Relatórios, Notificações e Memória do Mundo
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/documento-definitivo-escopo.md (Seção 20) · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/documento-definitivo-escopo.md (Seção 20) · **Revisão:** 2026-07-10
 
 ## Resumo
 
@@ -10,7 +10,7 @@ O princípio que rege tudo é a **interface em camadas**: o usuário recebe prim
 
 A informação é sempre acompanhada de **explicabilidade funcional**: o Grinta diz por que algo aconteceu (uma proposta rejeitada, um jovem estagnado, uma torcida revoltada) sem revelar fórmulas, atributos ocultos ou dados privados de adversários. Sobre essa base assenta o **catálogo de relatórios** (partida, elenco, base, financeiro, mercado, profissionais e fim de temporada) e a **memória persistente do mundo**: a história do mundo (record book), a linha do tempo de cada clube e de cada jogador, e os rankings de reputação.
 
-Este documento reproduz fielmente o conteúdo da Seção 20 da fonte. As decisões que a fonte deixava abertas foram fechadas nesta passada de resolução — como estrutura/extração no próprio corpo ou como recomendação a ratificar (Série R), conforme o mapa em [§7](#7-pendências-consolidadas).
+Este documento reproduz fielmente o conteúdo da Seção 20 da fonte. As decisões que a fonte deixava abertas foram fechadas nesta passada de resolução — como estrutura/extração no próprio corpo ou como decisão ratificada (Série R), conforme o mapa em [§7](#7-pendências-consolidadas).
 
 ## Sumário
 
@@ -223,9 +223,9 @@ O fechamento anual reúne, em um único documento:
 
 **Gatilhos e linha-base (estrutura).** Cada relatório tem um gatilho definido: os de **partida** são gerados a cada jogo (prévia antes, acompanhamento durante, análise depois); **elenco, base, financeiro, mercado e profissionais** são atualizados no tique semanal do mundo e ficam consultáveis a qualquer momento como snapshot; o **fim de temporada** é gerado uma vez por temporada. Independentemente da qualidade da comissão, uma **linha-base é sempre visível** — resultado, saldo, contratos vencendo, lesões e próximos compromissos —, pois informação que exige decisão nunca depende de comissão boa (coerente com a interface em camadas, §1).
 
-> **Recomendação (a ratificar — [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** escalonar **detalhe, frequência e retenção** pela qualidade da comissão (escala de núcleo **1–5**, ver [`04-estrutura` R-10/R-12](./04-estrutura-do-clube-e-staff.md)): nível 1 → só resultado + resumo de uma linha; nível 3 → as quatro dimensões (resultado/desempenho/execução/contexto) resumidas; nível 5 → abertura completa das quatro dimensões + tendências + projeções + bandas de incerteza estreitas. **Retenção:** detalhe completo das últimas **3 temporadas**, sintetizado além disso; record book e linhas do tempo (§6) são permanentes. Racional: a comissão vira o eixo único de profundidade (sem duplicar sistemas), a linha-base garante que decidir nunca dependa de comissão, e a retenção limita custo sem perder a memória histórica.
+> **Decisão ratificada — [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** escalonar **detalhe, frequência e retenção** pela qualidade da comissão (escala de núcleo **1–5**, ver [`04-estrutura` R-10/R-12](./04-estrutura-do-clube-e-staff.md)): nível 1 → só resultado + resumo de uma linha; nível 3 → as quatro dimensões (resultado/desempenho/execução/contexto) resumidas; nível 5 → abertura completa das quatro dimensões + tendências + projeções + bandas de incerteza estreitas. **Retenção:** detalhe completo das últimas **3 temporadas**, sintetizado além disso; record book e linhas do tempo (§6) são permanentes. Racional: a comissão vira o eixo único de profundidade (sem duplicar sistemas), a linha-base garante que decidir nunca dependa de comissão, e a retenção limita custo sem perder a memória histórica.
 
-> **Recomendação (a ratificar — [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** **não** existir relatório ou estatística pago. Todos os relatórios são gratuitos e a **qualidade da comissão (conquistada no jogo)** é o único diferenciador de profundidade e precisão. O ponto sensível de [`14-monetizacao`](./14-monetizacao.md) (pendência de "relatórios premium") deve ser fechado na **mesma direção — não-pago**: qualquer formatação exclusiva paga tangencia a linha de "vantagem de scouting/informação" e contradiz tanto a interface em camadas (§1 — o que exige decisão sempre aparece de graça) quanto a regra de no-pay-to-win. A monetização fica restrita a cosméticos, slots e conveniências que **não tocam informação**. Racional: elimina o risco competitivo na raiz e resolve o conflito potencial entre este documento e [`14-monetizacao`](./14-monetizacao.md) sem deixar zona cinzenta.
+> **Decisão ratificada — [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** **não** existir relatório ou estatística pago. Todos os relatórios são gratuitos e a **qualidade da comissão (conquistada no jogo)** é o único diferenciador de profundidade e precisão. O ponto sensível de [`14-monetizacao`](./14-monetizacao.md) (pendência de "relatórios premium") deve ser fechado na **mesma direção — não-pago**: qualquer formatação exclusiva paga tangencia a linha de "vantagem de scouting/informação" e contradiz tanto a interface em camadas (§1 — o que exige decisão sempre aparece de graça) quanto a regra de no-pay-to-win. A monetização fica restrita a cosméticos, slots e conveniências que **não tocam informação**. Racional: elimina o risco competitivo na raiz e resolve o conflito potencial entre este documento e [`14-monetizacao`](./14-monetizacao.md) sem deixar zona cinzenta.
 
 ---
 
@@ -298,7 +298,7 @@ Princípio essencial: **o ranking representa reputação e trajetória, não um 
 
 ## 7. Pendências consolidadas
 
-Os itens que a fonte (Seção 25 do documento definitivo) deixava abertos foram resolvidos nesta passada — parte como **estrutura/extração** direto no corpo, parte como **recomendação a ratificar** (Série R). Nenhum permanece como pendência aberta:
+Os itens que a fonte (Seção 25 do documento definitivo) deixava abertos foram resolvidos nesta passada — parte como **estrutura/extração** direto no corpo, parte como **decisão ratificada** (Série R). Nenhum permanece como pendência aberta:
 
 | Tema | Resolução |
 | --- | --- |
@@ -310,7 +310,7 @@ Os itens que a fonte (Seção 25 do documento definitivo) deixava abertos foram 
 | Relatórios/estatísticas pagos | [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) — **não-pago**; fecha o conflito com [`14-monetizacao`](./14-monetizacao.md) |
 | Catálogo de recordes, desempate, escopos, correção, cerimônias | Estrutura, [§6.4](#64-rankings-e-reputações) |
 
-> **Nota:** [R-75](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) e [R-76](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11) são **recomendações a ratificar** — direção de trabalho até o martelo do dono do produto. As demais linhas foram fechadas por reconciliação/extração e não dependem de ratificação.
+> **Nota:** R-75 e R-76 são decisões ratificadas e normativas desde 2026-07-13. As demais linhas foram fechadas por reconciliação/extração.
 
 ---
 

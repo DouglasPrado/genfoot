@@ -1,10 +1,10 @@
 # Admin — Telas
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/03-economia.md, docs/01-game-design/06-temporada-e-competicoes.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/03-economia.md, docs/01-game-design/06-temporada-e-competicoes.md · **Revisão:** 2026-07-11
 
 Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente diagnóstico**; toda escrita exige **motivo obrigatório**, grava no **audit log imutável** e respeita o **RBAC**. Fluxos em [doc 20](20-admin-fluxos.md). Layout: sidebar + top bar (operador, mundo, busca). Template em [00 §Template](00-visao-geral-e-design-system.md#template-de-especificação-de-tela).
 
-> **Delimitação:** onde a definição canônica é técnica (matriz de permissões, contrato de correção, health checks de infra), esta tela **exibe** e **aponta** para [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md); não a reespecifica. Limiares/valores são pendências da fonte.
+> **Delimitação:** onde a definição canônica é técnica (matriz de permissões, contrato de correção, health checks de infra), esta tela apenas exibe o estado dos docs técnicos 04/18/19. Limiares são baseline versionada e sua promoção depende dos gates operacionais, não de decisão da UI.
 
 ---
 
@@ -31,7 +31,7 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 - **Componentes e dados** (11 itens, [doc 09-op §2](../02-tecnico/09-operacao-e-admin-do-mundo.md)): saúde da economia; população/distribuição de jogadores; competições/calendários; partidas pendentes; clubes em crise; transferências suspeitas; W.O.; punições; processos de fim de temporada; falhas de processamento; integridade de inscrições/tabelas. Cada cartão com indicador e *drill-down*.
 - **Ações:** abrir cada seção; filtrar alertas ativos vs. apenas visíveis.
 - **Estados:** cartão em alerta destacado; resumo de infra (latência/filas/DLQ) como espelho não canônico, com **atalhos** para `A-OPS` (jobs/DLQ), `A-FLAGS` (kill switch) e `A-INCIDENTS`.
-- **Referências:** [`09-op §2`](../02-tecnico/09-operacao-e-admin-do-mundo.md). > **Pendência:** layout fino, granularidade de drill-down e limiares de alerta.
+- **Referências:** [`09-op §2`](../02-tecnico/09-operacao-e-admin-do-mundo.md). **Fechado:** layout L-A02, drill-down R-86 e limiares R-125..R-137/R-168.
 
 ## `A-ECONOMY` — Saúde econômica e demografia
 
@@ -94,7 +94,7 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 
 - **Objetivo:** resolver falhas concretas de estado do mundo, de forma rastreável.
 - **Componentes e dados:** casos (partida interrompida, duplicidade, tabela incorreta, contrato errado, premiação duplicada, transferência fraudulenta, falha de encerramento); contrato técnico da correção (tipo, escopo, reversibilidade, ao vivo vs. pós-partida); **estado anterior + motivo + responsável** obrigatórios; reprocessamento seguro; **reversão** (máximo privilégio); estado **`AWAITING_APPROVAL`** (quatro olhos) para alto impacto [`04-plataforma §4`].
-- **Ações:** aplicar correção; reprocessar; reverter (reautenticação); passo final de **comunicação ao usuário** via `A-BROADCAST` (o que/canal/detalhe — pendência de [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md)).
+- **Ações:** aplicar correção; reprocessar; reverter (reautenticação); passo final de **comunicação ao usuário** via `A-BROADCAST`, seguindo audiência, SLA e trilha definidos em R-156/R-168.
 - **Estados:** correção nunca apaga (append-only no audit); comunica usuário quando aplicável; alto impacto aguarda 2º revisor (`AWAITING_APPROVAL`) antes de efetivar.
 - **Referências:** [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
@@ -111,7 +111,7 @@ Telas do **admin do mundo** (Next.js), IDs `A-*`. O admin é **primariamente dia
 - **Objetivo:** atender usuários e conduzir recursos.
 - **Componentes e dados:** casos de suporte; recursos abertos (motivo geral ao usuário); histórico do usuário/clube (por permissão); procedimentos de atendimento; **máquina de estados do ticket** (`OPEN…REOPENED/DUPLICATE/INVALID`); contrato de **impersonação** (`READ_ONLY_IMPERSONATION` padrão / `ASSISTED_IMPERSONATION`) com `supportAccessSessionId` visível/temporário/aprovado, **notificação ao usuário**, **verificação de identidade** e **proibições** durante impersonação [`04-plataforma §6`].
 - **Ações:** responder; encaminhar à revisão (`A-QUEUES`); registrar decisão; iniciar impersonação (contrato + aprovação); **revelar dado sensível** ao usuário (ação auditada de `A-AUDIT`).
-- **Estados:** impersonação sinalizada e temporária; > **Pendência:** procedimentos de atendimento/recurso e prazos de revisão (fonte em aberto).
+- **Estados:** impersonação sinalizada, auditada e limitada a 30 min; atendimento e recurso seguem R-168.
 - **Referências:** [`09-op §5, §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
 
 ## `A-BALANCE` — Testes de equilíbrio / SimulationLab

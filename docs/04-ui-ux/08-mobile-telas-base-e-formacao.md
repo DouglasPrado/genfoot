@@ -1,6 +1,6 @@
 # Mobile — Base e Formação
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
 
 Telas de categorias de base, captação, ficha do jovem, plano de carreira, mentoria e promoção ao profissional. Fluxo: [MF-11](02-mobile-fluxos.md#mf-11--jornada-de-um-jovem). Acessível pela aba **Elenco** (aba "Base") e por atalhos.
 

@@ -1,6 +1,6 @@
 # Navegação e Arquitetura de Informação
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/01-game-design/15-fluxos-completos.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/01-game-design/15-fluxos-completos.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md · **Revisão:** 2026-07-11
 
 Este documento define **como o usuário se move** pelo app do jogador (Expo) e pelo admin (Next.js), e traz o **sitemap completo** — o índice de todas as telas, com o ID e o documento onde cada uma é detalhada. É a "planta baixa" da interface; o detalhe tela-a-tela vive nos docs 03–12 (mobile) e 21 (admin).
 
@@ -288,4 +288,4 @@ Telas do admin (Next.js), IDs `A-*`. Detalhe em [doc 21](21-admin-telas.md).
 | `A-PRIVACY` | Privacidade e compliance (data-subject) | `/privacy` |
 | `A-BUGS` | Report de bug e vulnerabilidades | `/bugs` |
 
-> **Endereçado (Série R — R-86/R-87):** o layout fino, limiares de alerta e a matriz papel↔ação do admin foram especificados como recomendações a ratificar em [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md).
+> **Endereçado (Série R — R-86/R-87):** o layout fino, limiares de alerta e a matriz papel↔ação do admin foram especificados como decisões ratificadas em [`../02-tecnico/09-operacao-e-admin-do-mundo.md`](../02-tecnico/09-operacao-e-admin-do-mundo.md) e [`../02-tecnico/04-plataforma-seguranca-operacoes.md`](../02-tecnico/04-plataforma-seguranca-operacoes.md).

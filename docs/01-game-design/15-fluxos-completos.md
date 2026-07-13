@@ -1,6 +1,6 @@
 # Fluxos Completos do Jogo
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/escopo-definitivo-simulador.md (Seção 25), chats/documento-definitivo-escopo.md (Seção 23) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/escopo-definitivo-simulador.md (Seção 25), chats/documento-definitivo-escopo.md (Seção 23) · **Revisão:** 2026-07-11
 
 ## Resumo
 
@@ -358,4 +358,4 @@ Estes fluxos representam a **experiência orientada por contexto** que guia o pr
 
 ---
 
-> **Recomendação (a ratificar — R-94):** os ramos de exceção (recusas, disputas, recursos competitivos, timeouts de conexão em partida ao vivo, falhas parciais) serão detalhados num apêndice de fluxos de exceção como follow-up; caminho feliz e bordas principais já constam nos fluxos MF-* ([`../04-ui-ux/02-mobile-fluxos.md`](../04-ui-ux/02-mobile-fluxos.md)).
+> **Decisão ratificada — R-94:** os ramos de exceção (recusas, disputas, recursos competitivos, timeouts de conexão em partida ao vivo, falhas parciais) serão detalhados num apêndice de fluxos de exceção como follow-up; caminho feliz e bordas principais já constam nos fluxos MF-* ([`../04-ui-ux/02-mobile-fluxos.md`](../04-ui-ux/02-mobile-fluxos.md)).

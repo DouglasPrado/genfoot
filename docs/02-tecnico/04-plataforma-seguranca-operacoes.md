@@ -1,6 +1,6 @@
 # Plataforma, Segurança e Operações
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/ux-do-jogo.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/ux-do-jogo.md · **Revisão:** 2026-07-10
 
 Este documento consolida as decisões de **administração técnica, segurança, auditoria, operações do mundo, arquitetura de serviços e integridade do modelo de dados** do **Grinta**. A premissa que atravessa tudo é uma só:
 
@@ -104,7 +104,7 @@ A autenticação inicial é **própria da plataforma**, com possibilidade de pro
 
 A **autorização é sempre calculada no servidor** (nunca no cliente), combinando usuário, sessão, mundo, clube, função e autonomia. Isso decorre do princípio de que o servidor é autoritativo — ver [`./08-frontend-cliente-e-tempo-real.md`](./08-frontend-cliente-e-tempo-real.md) para o modelo de cliente não-autoritativo.
 
-> **Recomendação (a ratificar — R-85):** provedores de identidade externos. Proposta: manter o **login próprio (Argon2id)** como base e adicionar, quando houver demanda, **OAuth/OIDC com Google e Apple** primeiro (cobrem a maioria do público mobile e o *Sign in with Apple* é exigência de loja quando há outro login social no app), com a plataforma como **fonte de verdade da conta** (o provedor externo apenas autentica; papéis, permissões e vínculo com clube/mundo continuam calculados no servidor). Provedores corporativos/SAML ficam fora de escopo até haver necessidade B2B. Racional: cobre o essencial de conveniência sem multiplicar integrações nem enfraquecer o modelo de autorização server-side. Compartilha **R-85** com os parâmetros de drenagem (§11).
+> **Decisão ratificada — R-85:** provedores de identidade externos. Proposta: manter o **login próprio (Argon2id)** como base e adicionar, quando houver demanda, **OAuth/OIDC com Google e Apple** primeiro (cobrem a maioria do público mobile e o *Sign in with Apple* é exigência de loja quando há outro login social no app), com a plataforma como **fonte de verdade da conta** (o provedor externo apenas autentica; papéis, permissões e vínculo com clube/mundo continuam calculados no servidor). Provedores corporativos/SAML ficam fora de escopo até haver necessidade B2B. Racional: cobre o essencial de conveniência sem multiplicar integrações nem enfraquecer o modelo de autorização server-side. Compartilha **R-85** com os parâmetros de drenagem (§11).
 
 ---
 
@@ -338,7 +338,7 @@ Toda flag possui **responsável, motivo, escopo e prazo** (`reviewAt`, `expiresA
     - **Executores de partida antigos deixam de receber partidas novas e concluem as já iniciadas**; uma nova versão do executor recebe **apenas partidas novas** enquanto a versão anterior finaliza as em andamento.
     - Novas versões podem ser liberadas **progressivamente por mundos ou escopos controlados**; a reversão reutiliza artefatos anteriores, **sem recompilação**.
 
-> **Recomendação (a ratificar — R-85):** parâmetros de drenagem na troca de versão (1ª passada). **Drain de conexões de tempo real** com janela de **30 s** (orienta reconexão e ressincronização; após o prazo, força reconexão do cliente, que solicita retrato de estado); **partidas em andamento** concluídas pelo executor antigo com **teto de 10 min** antes de forçar **checkpoint + handoff** ao novo executor (a partida não reinicia); **processos de execução** param de puxar novas tarefas imediatamente e têm **até 60 s** para concluir/devolver a tarefa ativa antes do checkpoint. Racional: janelas curtas para não travar o deploy, com teto de partida alto o suficiente para a maioria terminar naturalmente. Compartilha **R-85** com os provedores de identidade (§3). Calibrar por telemetria de duração real de partida/handoff.
+> **Decisão ratificada — R-85:** parâmetros de drenagem na troca de versão (1ª passada). **Drain de conexões de tempo real** com janela de **30 s** (orienta reconexão e ressincronização; após o prazo, força reconexão do cliente, que solicita retrato de estado); **partidas em andamento** concluídas pelo executor antigo com **teto de 10 min** antes de forçar **checkpoint + handoff** ao novo executor (a partida não reinicia); **processos de execução** param de puxar novas tarefas imediatamente e têm **até 60 s** para concluir/devolver a tarefa ativa antes do checkpoint. Racional: janelas curtas para não travar o deploy, com teto de partida alto o suficiente para a maioria terminar naturalmente. Compartilha **R-85** com os provedores de identidade (§3). Calibrar por telemetria de duração real de partida/handoff.
 
 ### Manutenção
 

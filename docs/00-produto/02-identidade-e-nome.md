@@ -1,6 +1,6 @@
 # Identidade e Nome
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/nome-do-jogo.md, chats/descobrindo-nome.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/nome-do-jogo.md, chats/descobrindo-nome.md · **Revisão:** 2026-07-10
 
 O nome oficial do jogo é **Grinta**. Este documento fecha a discussão de naming que os chats deixaram em aberto (que oscilava entre "Riscatto ou Grinta"), registra o histórico dos candidatos avaliados com seus prós e contras, apresenta o racional da escolha de Grinta e consolida as diretrizes iniciais de marca. A adoção definitiva ainda depende de verificação jurídica de marca no INPI e de disponibilidade de domínios.
 

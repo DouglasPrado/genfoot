@@ -1,6 +1,6 @@
 # Inteligência Artificial (Decision Engine)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/como-podemos-desenvolver-jogo.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/como-podemos-desenvolver-jogo.md · **Revisão:** 2026-07-10
 
 A IA do **Grinta** não é "uma IA só", mas um ecossistema de agentes e sistemas de decisão em camadas, todos compartilhando o mesmo núcleo lógico. Cada parte do jogo (mundo, clube, diretoria, comissão, técnico adversário, partida ao vivo, mercado, jogadores, imprensa) tem inteligência própria, mas todas reduzem suas escolhas a um padrão comum: **Contexto + Perfil + Score + Probabilidade + Consequência**.
 
@@ -436,7 +436,7 @@ score =
 - disruptionRisk    * 10
 ```
 
-> **Nota (Série R — R-22):** os pesos de cada modificador do Decision Engine foram propostos como recomendação a ratificar junto ao [catálogo de fórmulas](../02-tecnico/05-catalogo-de-regras-e-formulas.md); calibração final no lote de simulação.
+> **Nota (Série R — R-22):** os pesos de cada modificador do Decision Engine foram propostos como decisão ratificada junto ao [catálogo de fórmulas](../02-tecnico/05-catalogo-de-regras-e-formulas.md); calibração final no lote de simulação.
 
 ### 4.5. Log de decisão (auditabilidade)
 

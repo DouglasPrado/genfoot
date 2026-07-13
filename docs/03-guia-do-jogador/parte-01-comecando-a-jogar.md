@@ -1,6 +1,6 @@
 # Parte I — Começando a jogar
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/00-gdd-overview.md`](../01-game-design/00-gdd-overview.md); [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md); [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md); [`../01-game-design/10-experiencia-e-telas.md`](../01-game-design/10-experiencia-e-telas.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/00-gdd-overview.md`](../01-game-design/00-gdd-overview.md); [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md); [`../01-game-design/09-anti-abuso-e-onboarding.md`](../01-game-design/09-anti-abuso-e-onboarding.md); [`../01-game-design/10-experiencia-e-telas.md`](../01-game-design/10-experiencia-e-telas.md) · **Revisão:** 2026-07-11
 
 Bem-vindo ao **Grinta**. Esta primeira Parte é o seu ponto de partida: explica o que é o jogo, o que você está tentando conquistar, como o seu clube nasce e o que fazer nas primeiras horas de gestão. Se você quer apenas entender o essencial e começar, leia os **Resumos** de cada capítulo. Se quer dominar as regras desde o início, siga também os blocos **Regras completas** e **Estratégia**.
 

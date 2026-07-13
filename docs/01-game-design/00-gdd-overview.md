@@ -1,6 +1,6 @@
 # GDD Overview — Grinta
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/organizacao-de-pensamentos.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/organizacao-de-pensamentos.md · **Revisão:** 2026-07-10
 
 Este documento é o mapa raiz do Game Design de **Grinta**, um manager de futebol online no espírito de jogos como Brasfoot, porém mais profundo, dinâmico e persistente. Ele amarra todos os sistemas do jogo em uma visão única e serve como ponto de entrada: cada bloco resume um sistema e aponta para o documento irmão onde o detalhe é aprofundado. É panorâmico por natureza — resume, não esgota.
 
@@ -256,7 +256,7 @@ Temporada inicia → Campeonatos montados → Clubes treinam e contratam
 
 O core é desenhado como um **simulador de ecossistema** baseado em Entidades → Componentes → Efeitos → Eventos, com memória — detalhado em [`../02-tecnico/07-arquitetura-do-core-ecs.md`](../02-tecnico/07-arquitetura-do-core-ecs.md). O modelo de dados canônico e as regras/fórmulas executáveis vivem em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md) e [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
-> **Nota:** os coeficientes/pesos numéricos foram consolidados como recomendações a ratificar no catálogo técnico — ver [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (F1–F21) e a Série R (R-15..R-24, R-41..R-49). Calibração final via lote de simulação (R-34/R-88).
+> **Nota:** os coeficientes/pesos numéricos foram consolidados como decisões ratificadas no catálogo técnico — ver [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md) (F1–F21) e a Série R (R-15..R-24, R-41..R-49). Calibração final via lote de simulação (R-34/R-88).
 
 ## 25. Regras Transversais de Consistência
 

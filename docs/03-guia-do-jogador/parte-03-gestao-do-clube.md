@@ -1,6 +1,6 @@
 # Parte III — Gestão do clube
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md), [`../01-game-design/03-economia.md`](../01-game-design/03-economia.md), [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md), [`../01-game-design/03-economia.md`](../01-game-design/03-economia.md), [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md) · **Revisão:** 2026-07-11
 
 No **Grinta** você não comanda apenas uma escalação: você constrói uma instituição de futebol que atravessa temporadas. Um clube é a soma de sua estrutura, de seus funcionários, de sua reputação, de suas finanças, do desempenho em campo e da capacidade de formar e contratar jogadores. Dois clubes podem ter o mesmo dinheiro em caixa e, ainda assim, evoluir de formas completamente diferentes — a diferença está em **onde cada gestor decide investir**.
 

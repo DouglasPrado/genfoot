@@ -1,6 +1,6 @@
 # Parte X — Referência
 
-> **Status:** Rascunho consolidado · **Fontes:** consolidação de todos os documentos de `../01-game-design/`, com destaque para `09-anti-abuso-e-onboarding.md` (Cap. 40), `13-relatorios-notificacoes-e-memoria.md` e `16-glossario-de-entidades.md` (Cap. 41) e `14-monetizacao.md` · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** consolidação de todos os documentos de `../01-game-design/`, com destaque para `09-anti-abuso-e-onboarding.md` (Cap. 40), `13-relatorios-notificacoes-e-memoria.md` e `16-glossario-de-entidades.md` (Cap. 41) e `14-monetizacao.md` · **Revisão:** 2026-07-11
 
 Esta Parte é a **referência rápida** do Grinta. Ela não introduz sistemas novos: reúne, em forma direta e consultável, as regras gerais que valem para todos, os termos que aparecem em todo o guia e as respostas às dúvidas mais frequentes. Use-a como consulta — a explicação completa de cada tema está nas Partes correspondentes.
 

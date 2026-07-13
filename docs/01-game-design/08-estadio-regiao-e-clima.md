@@ -1,6 +1,6 @@
 # Estádio, Região e Clima
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/decisao-escopo-do-jogo.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/decisao-escopo-do-jogo.md · **Revisão:** 2026-07-10
 
 O estádio no **Grinta** é tratado como um ativo com vida própria — esportivo, financeiro e emocional — e não como um mero número de capacidade. Este documento consolida as decisões sobre o estádio como entidade, sua economia (bilheteria, custos, preço de ingresso), qualidade estrutural e manutenção, upgrades por obras, licenciamento e interdição, gramado e dimensão do campo, o mecanismo de mando de campo e — a partir da seção 10 — a **região/localização do clube**, a **logística e viagens** e o **clima** e seu impacto em partida e gramado. As decisões de origem (IDs 1801–1873) são citadas ao lado de cada regra.
 
@@ -60,7 +60,7 @@ O estádio no **Grinta** é tratado como um ativo com vida própria — esportiv
 
 O estádio não é só uma capacidade agregada: ele é dividido em **setores** (def-simulador §7.4), cada um com **capacidade, preço de ingresso e ocupação próprios**. Isso permite políticas de preço por setor (arquibancada, cadeiras, camarotes, visitante) e influencia bilheteria, hospitalidade e atmosfera de forma diferenciada. O estádio ainda considera, além dos setores: **capacidade autorizada** (a licenciada pode ser menor que a física — ver §6), condição do gramado, segurança, acessos, hospitalidade, iluminação, vestiários, comunicação e operação em dias de partida.
 
-> **Recomendação (a ratificar — R-89):** setores-padrão do estádio, capacidades relativas e preço por setor — proposta de 1ª passada (ex.: Arquibancada/Cadeira/Camarote/Visitante com multiplicadores de preço 1.0/1.8/4.0/0.9), a calibrar.
+> **Decisão ratificada — R-89:** setores-padrão do estádio, capacidades relativas e preço por setor — proposta de 1ª passada (ex.: Arquibancada/Cadeira/Camarote/Visitante com multiplicadores de preço 1.0/1.8/4.0/0.9), a calibrar.
 
 ### Ocupação depende de demanda, preço e contexto
 
@@ -364,7 +364,7 @@ A viagem longa é um fator estratégico e um calendário ruim amplifica seus efe
 
 ## 14. Pendências
 
-> **Recomendação (a ratificar — R-90):** proposta de 1ª passada (mesma natureza de R-41..R-49 em [`./03-economia.md`](./03-economia.md)) para os valores concretos de estádio; calibração final no lote de simulação.
+> **Decisão ratificada — R-90:** proposta de 1ª passada (mesma natureza de R-41..R-49 em [`./03-economia.md`](./03-economia.md)) para os valores concretos de estádio; calibração final no lote de simulação.
 >
 > - **Capacidade por divisão (faixas):** Liga Inicial **3.000–12.000**; divisões intermediárias **12.000–35.000**; Elite **35.000–70.000** (topo excepcional até ~80.000). Coerente com "todos nascem pequenos" ([`./01-mundo-persistente-e-clubes.md`](./01-mundo-persistente-e-clubes.md) §3): o estádio inicial fica na base da faixa da Liga Inicial.
 > - **Deterioração sem manutenção:** a condição estrutural (0–100) cai **~10%/temporada** (faixa 8–12%) quando a manutenção é negligenciada; a manutenção mínima paga neutraliza a maior parte, deixando deterioração residual **~2%/temporada**. Clima adverso e excesso de jogos aceleram em +1–3 p.p.
@@ -373,6 +373,6 @@ A viagem longa é um fator estratégico e um calendário ruim amplifica seus efe
 > - **Elasticidade preço×ocupação:** reutiliza o `fatorPreço` de [`./03-economia.md`](./03-economia.md) §5.2 (R-41): `fatorPreço = clamp(1.4 − 0.5·(preço/preçoRef), 0.15, 1.0)` — a cada +1.0 em `preço/preçoRef`, a ocupação esperada cai ~0.5×, com piso 0.15 e teto 1.0; `preçoRef` por divisão/setor vem de R-89. Reaproveitar a fórmula evita divergência com a bilheteria da economia.
 > - **Custo/fadiga por faixa de distância:** **curta** (<150 km, derby regional) → custo baixo, fadiga ~0–1 pt de energia; **média** (150–600 km) → custo médio, fadiga ~2–4 pts; **longa** (600–1.500 km) → custo alto, fadiga ~5–8 pts e recuperação afetada; **muito longa** (>1.500 km) → fadiga ~8–12 pts, exige rotação. Boa logística/gestão reduz ~30–50% (Decisão 1840); sequência de jogos fora acumula (Decisão 1841). Fadiga expressa na escala 0–100 de energia do jogador.
 >
-> Todos os números acima são **recomendação inicial (a ratificar)**; a calibração final ocorre no lote de simulação.
+> Todos os números acima são **recomendação inicial (ratificada)**; a calibração final ocorre no lote de simulação.
 
 > **Nota (reconciliação):** as Decisões 1867–1873 (região, custo de vida, adaptação, mudança de cidade, clube novo, balanceamento regional, regionalização do calendário) são compartilhadas com economia e jogadores; os números vivem nas recomendações de economia (R-41..R-49) e no catálogo técnico, sem duplicação aqui.

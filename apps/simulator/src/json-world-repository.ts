@@ -12,15 +12,21 @@ import { join } from "node:path";
 
 import {
   DominantFoot,
+  SEASON_ROLLOVER_STEPS,
   PlayerPosition,
   PlayerAvailability,
   PlayerCareerStatus,
   PlayerGenerationSource,
   ScheduledTaskStatus,
+  SeasonRolloverPhase,
+  SeasonRolloverStatus,
+  SeasonRolloverStepStatus,
   SeasonLifecycleState,
   SeasonStatus,
   WorldStatus,
   type GameWorldSnapshot,
+  type ClubCommandReceipt,
+  type ClubPortfolioRepository,
   type WorldGenesisRepository,
   type WorldGenesisSnapshot,
   type WorldRepository,
@@ -28,6 +34,8 @@ import {
   type PlayerLifecycleRepository,
   type WorldPlayerLifecycleSnapshot,
   type WorldSchedulerSnapshot,
+  type WorldCommandReceipt,
+  type WorldClubPortfolioSnapshot,
 } from "@grinta/core";
 import {
   DomainError,
@@ -138,7 +146,49 @@ const genesisSchema = z.object({
   ),
 });
 
+const rolloverVerificationSchema = z.object({
+  standingsConsistent: z.boolean(),
+  ledgerBalanced: z.boolean(),
+  populationInBand: z.boolean(),
+  evidence: z.record(z.unknown()).optional(),
+});
+
+const seasonRolloverSchema = z.object({
+  id: z.string().min(1),
+  gameWorldId: identifierSchema,
+  seasonId: z.string().min(1),
+  nextSeason: z.object({
+    id: z.string().min(1),
+    number: z.number().int().positive(),
+    name: z.string().min(1),
+    startsOn: z.string(),
+    endsOn: z.string(),
+  }),
+  rulesetVersion: z.string(),
+  status: z.nativeEnum(SeasonRolloverStatus),
+  phase: z.nativeEnum(SeasonRolloverPhase),
+  currentStepIndex: z.number().int().min(0).max(20),
+  steps: z.array(
+    z.object({
+      stepId: z.enum(SEASON_ROLLOVER_STEPS),
+      status: z.nativeEnum(SeasonRolloverStepStatus),
+      attempts: z.number().int().nonnegative(),
+      fencingToken: z.number().int().positive().nullable(),
+      lastError: z.string().nullable(),
+      evidence: z.record(z.unknown()).nullable(),
+      completedAt: z.string().nullable(),
+    }),
+  ),
+  maxAttemptsPerStep: z.number().int().positive(),
+  leaseOwnerId: z.string().nullable(),
+  leaseExpiresAtMs: z.number().int().nonnegative().nullable(),
+  fencingToken: z.number().int().nonnegative(),
+  verification: rolloverVerificationSchema.nullable(),
+  revision: z.number().int().positive(),
+});
+
 const schedulerSchema = z.object({
+  schemaVersion: z.literal(2).optional().default(2),
   gameWorldId: identifierSchema,
   config: z.object({
     rulesetVersion: z.string(),
@@ -201,6 +251,40 @@ const schedulerSchema = z.object({
       version: z.number().int().positive(),
     }),
   ),
+  windows: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        type: z.enum(["TRANSFER", "REGISTRATION", "RENEWAL", "CUSTOM"]),
+        name: z.string().min(1),
+        opensOn: z.string(),
+        closesOn: z.string(),
+        rulesetVersion: z.string(),
+        configVersion: z.number().int().positive(),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional()
+    .default([]),
+  commandReceipts: z
+    .array(
+      z.object({
+        commandId: z.string().min(1),
+        idempotencyKey: z.string().min(1),
+        commandType: z.literal("AdvanceWorldDay"),
+        gameWorldId: identifierSchema,
+        expectedDate: z.string(),
+        resultDate: z.string(),
+        resultWorldVersion: z.number().int().positive(),
+        fencingToken: z.number().int().positive(),
+        rulesetVersion: z.string(),
+        processedTaskIds: z.array(z.string()),
+      }),
+    )
+    .optional()
+    .default([]),
+  rollovers: z.array(seasonRolloverSchema).optional().default([]),
   clock: z.object({
     leaseOwnerId: z.string().nullable(),
     leaseExpiresAtMs: z.number().int().nonnegative().nullable(),
@@ -313,6 +397,52 @@ const playerLifecycleSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const clubPortfolioSchema = z.object({
+  schemaVersion: z.literal(1),
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  clubs: z.array(
+    z
+      .object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        identity: z.object({
+          id: identifierSchema,
+          name: z.string().min(1),
+          shortCode: z.string().min(2),
+          effectiveFrom: z.string(),
+          effectiveThrough: z.string().nullable(),
+          rulesetVersion: z.string(),
+        }),
+        identityHistory: z.array(z.record(z.unknown())),
+        departments: z.array(z.record(z.unknown())),
+        stadium: z.record(z.unknown()),
+        ticketPolicies: z.array(z.record(z.unknown())),
+        commercialAgreements: z.array(z.record(z.unknown())),
+        boardDecisions: z.array(z.record(z.unknown())),
+        version: z.number().int().positive(),
+      })
+      .passthrough(),
+  ),
+  squads: z.array(
+    z
+      .object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        clubId: identifierSchema,
+        capacity: z.number().int().positive(),
+        memberships: z.array(z.record(z.unknown())),
+        version: z.number().int().positive(),
+      })
+      .passthrough(),
+  ),
+  projects: z.array(z.record(z.unknown())),
+  commandReceipts: z.array(z.record(z.unknown())),
+  events: z.array(z.record(z.unknown())),
+  processedMaintenanceDayKeys: z.array(z.string()),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -333,6 +463,21 @@ const persistedSnapshotSchema = z.union([
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(5),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+  }),
+  z.object({
+    schemaVersion: z.literal(6),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -340,6 +485,7 @@ interface LoadedEnvelope {
   readonly genesis: WorldGenesisSnapshot | null;
   readonly scheduler: WorldSchedulerSnapshot | null;
   readonly playerLifecycle: WorldPlayerLifecycleSnapshot | null;
+  readonly clubPortfolio: WorldClubPortfolioSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -347,7 +493,8 @@ export class JsonWorldRepository
     WorldRepository,
     WorldGenesisRepository,
     SchedulingRepository,
-    PlayerLifecycleRepository
+    PlayerLifecycleRepository,
+    ClubPortfolioRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -387,6 +534,7 @@ export class JsonWorldRepository
       genesis: current?.genesis ?? null,
       scheduler: current?.scheduler ?? null,
       playerLifecycle: current?.playerLifecycle ?? null,
+      clubPortfolio: current?.clubPortfolio ?? null,
     });
   }
 
@@ -417,6 +565,7 @@ export class JsonWorldRepository
       genesis,
       scheduler: current.scheduler,
       playerLifecycle: current.playerLifecycle,
+      clubPortfolio: current.clubPortfolio,
     });
   }
 
@@ -424,6 +573,17 @@ export class JsonWorldRepository
     id: GameWorldId,
   ): Promise<WorldSchedulerSnapshot | null> {
     return (await this.load(id))?.scheduler ?? null;
+  }
+
+  public async findSchedulingCommandReceipt(
+    id: GameWorldId,
+    idempotencyKey: string,
+  ): Promise<WorldCommandReceipt | null> {
+    return (
+      (await this.load(id))?.scheduler?.commandReceipts.find(
+        (receipt) => receipt.idempotencyKey === idempotencyKey,
+      ) ?? null
+    );
   }
 
   public async saveScheduling(
@@ -503,6 +663,59 @@ export class JsonWorldRepository
     });
   }
 
+  public async findClubPortfolioByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldClubPortfolioSnapshot | null> {
+    return (await this.load(id))?.clubPortfolio ?? null;
+  }
+
+  public async findClubCommandReceipt(
+    id: GameWorldId,
+    idempotencyKey: string,
+  ): Promise<ClubCommandReceipt | null> {
+    return (
+      (await this.load(id))?.clubPortfolio?.commandReceipts.find(
+        (receipt) => receipt.idempotencyKey === idempotencyKey,
+      ) ?? null
+    );
+  }
+
+  public async saveClubPortfolio(
+    clubPortfolio: WorldClubPortfolioSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(clubPortfolio.gameWorldId, "clubs", async () => {
+      const current = await this.load(clubPortfolio.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.clubPortfolio !== null) {
+        throw new DomainError(
+          "CLUB_PORTFOLIO_ALREADY_EXISTS",
+          "O portfólio de clubes já existe.",
+        );
+      }
+      if (
+        expectedRevision !== null &&
+        current.clubPortfolio?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "CLUB_PORTFOLIO_REVISION_CONFLICT",
+          "O portfólio de clubes foi alterado.",
+          {
+            expectedRevision,
+            actualRevision: current.clubPortfolio?.revision ?? null,
+          },
+        );
+      }
+      await this.write(clubPortfolio.gameWorldId, {
+        ...current,
+        clubPortfolio,
+      });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -528,20 +741,32 @@ export class JsonWorldRepository
       const genesis =
         (persisted.schemaVersion === 2 ||
           persisted.schemaVersion === 3 ||
-          persisted.schemaVersion === 4) &&
+          persisted.schemaVersion === 4 ||
+          persisted.schemaVersion === 5 ||
+          persisted.schemaVersion === 6) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
       const scheduler =
-        (persisted.schemaVersion === 3 || persisted.schemaVersion === 4) &&
+        (persisted.schemaVersion === 3 ||
+          persisted.schemaVersion === 4 ||
+          persisted.schemaVersion === 5 ||
+          persisted.schemaVersion === 6) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
       const playerLifecycle =
-        persisted.schemaVersion === 4 && persisted.playerLifecycle !== null
+        (persisted.schemaVersion === 4 ||
+          persisted.schemaVersion === 5 ||
+          persisted.schemaVersion === 6) &&
+        persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
-      return { world, genesis, scheduler, playerLifecycle };
+      const clubPortfolio =
+        persisted.schemaVersion === 6 && persisted.clubPortfolio !== null
+          ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
+          : null;
+      return { world, genesis, scheduler, playerLifecycle, clubPortfolio };
     } catch (error: unknown) {
       throw new DomainError(
         "SNAPSHOT_CORRUPTED",
@@ -562,11 +787,12 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 4,
+        schemaVersion: 6,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
         playerLifecycle: envelope.playerLifecycle,
+        clubPortfolio: envelope.clubPortfolio,
       },
       null,
       2,
@@ -583,7 +809,15 @@ export class JsonWorldRepository
     id: GameWorldId,
     action: () => Promise<T>,
   ): Promise<T> {
-    const lockPath = join(this.baseDirectory, `${id}.scheduler.lock`);
+    return this.withNamedLock(id, "scheduler", action);
+  }
+
+  private async withNamedLock<T>(
+    id: GameWorldId,
+    name: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const lockPath = join(this.baseDirectory, `${id}.${name}.lock`);
     let handle;
     try {
       handle = await open(lockPath, "wx");
@@ -595,8 +829,8 @@ export class JsonWorldRepository
           handle = await open(lockPath, "wx");
         } else {
           throw new DomainError(
-            "SCHEDULER_WRITE_LOCKED",
-            "Outra réplica está atualizando o scheduler.",
+            "WORLD_SECTION_WRITE_LOCKED",
+            "Outra réplica está atualizando esta seção do mundo.",
             { id },
           );
         }

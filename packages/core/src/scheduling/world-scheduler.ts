@@ -7,13 +7,19 @@ import {
 } from "@grinta/shared";
 
 import { Season } from "./season.js";
+import { SeasonRollover } from "./season-rollover.js";
+import type { SeasonRolloverSnapshot } from "./season-rollover-types.js";
 import {
   ScheduledTaskStatus,
   type ScheduledTaskSnapshot,
   type SeasonSnapshot,
+  type TemporalWindowSnapshot,
+  type TemporalWindowType,
+  type WorldCommandReceipt,
   type WorldSchedulerConfig,
   type WorldSchedulerSnapshot,
 } from "./scheduling-types.js";
+import { TemporalWindow } from "./time-window.js";
 
 export interface ScheduleTaskInput {
   readonly id: string;
@@ -48,10 +54,14 @@ export class WorldScheduler {
     }
     return succeed(
       new WorldScheduler({
+        schemaVersion: 2,
         gameWorldId,
         config,
         seasons: [],
         tasks: [],
+        windows: [],
+        commandReceipts: [],
+        rollovers: [],
         clock: {
           leaseOwnerId: null,
           leaseExpiresAtMs: null,
@@ -102,10 +112,14 @@ export class WorldScheduler {
     return succeed(
       new WorldScheduler({
         ...snapshot,
+        schemaVersion: 2,
         tasks: snapshot.tasks.map((task) => ({
           ...task,
           recurrence: task.recurrence ?? null,
         })),
+        windows: snapshot.windows ?? [],
+        commandReceipts: snapshot.commandReceipts ?? [],
+        rollovers: snapshot.rollovers ?? [],
       }),
     );
   }
@@ -137,6 +151,231 @@ export class WorldScheduler {
       revision: this.state.revision + 1,
     };
     return succeed(undefined);
+  }
+
+  public registerWindow(
+    snapshot: TemporalWindowSnapshot,
+  ): Result<TemporalWindowSnapshot, DomainError> {
+    if (snapshot.gameWorldId !== this.state.gameWorldId) {
+      return fail(
+        new DomainError(
+          "WORLD_SCOPE_MISMATCH",
+          "A janela pertence a outro mundo.",
+        ),
+      );
+    }
+    if (snapshot.rulesetVersion !== this.state.config.rulesetVersion) {
+      return fail(
+        new DomainError(
+          "RULESET_VERSION_MISMATCH",
+          "A janela pertence a outro ruleset.",
+        ),
+      );
+    }
+    const valid = TemporalWindow.create(snapshot);
+    if (!valid.ok) return valid;
+    const existing = this.state.windows.find(({ id }) => id === snapshot.id);
+    if (existing !== undefined) {
+      return sameValue(existing, snapshot)
+        ? succeed(existing)
+        : fail(
+            new DomainError(
+              "TEMPORAL_WINDOW_CONFLICT",
+              "O ID da janela já foi usado com outro conteúdo.",
+            ),
+          );
+    }
+    this.state = {
+      ...this.state,
+      windows: [...this.state.windows, snapshot],
+      revision: this.state.revision + 1,
+    };
+    return succeed(snapshot);
+  }
+
+  public openWindows(
+    on: WorldDate,
+    type?: TemporalWindowType,
+  ): readonly TemporalWindowSnapshot[] {
+    return this.state.windows.filter((snapshot) => {
+      if (type !== undefined && snapshot.type !== type) return false;
+      const loaded = TemporalWindow.create(snapshot);
+      return loaded.ok && loaded.value.isOpen(on);
+    });
+  }
+
+  public commandReceipt(idempotencyKey: string): WorldCommandReceipt | null {
+    return (
+      this.state.commandReceipts.find(
+        (receipt) => receipt.idempotencyKey === idempotencyKey,
+      ) ?? null
+    );
+  }
+
+  public startRollover(
+    input: Parameters<typeof SeasonRollover.create>[0],
+  ): Result<SeasonRolloverSnapshot, DomainError> {
+    if (input.gameWorldId !== this.state.gameWorldId) {
+      return fail(
+        new DomainError(
+          "WORLD_SCOPE_MISMATCH",
+          "O rollover pertence a outro mundo.",
+        ),
+      );
+    }
+    if (input.rulesetVersion !== this.state.config.rulesetVersion) {
+      return fail(
+        new DomainError(
+          "RULESET_VERSION_MISMATCH",
+          "O rollover pertence a outro ruleset.",
+        ),
+      );
+    }
+    const existing = this.state.rollovers.find(
+      ({ seasonId }) => seasonId === input.seasonId,
+    );
+    if (existing !== undefined) return succeed(existing);
+    const season = this.state.seasons.find(({ id }) => id === input.seasonId);
+    if (season === undefined) {
+      return fail(
+        new DomainError("SEASON_NOT_FOUND", "Temporada não encontrada."),
+      );
+    }
+    if (season.lifecycleState !== "FINALIZING") {
+      return fail(
+        new DomainError(
+          "SEASON_NOT_FINALIZING",
+          "A virada só começa depois de SeasonDue.",
+        ),
+      );
+    }
+    if (input.nextSeason.number !== season.number + 1) {
+      return fail(
+        new DomainError(
+          "INVALID_NEXT_SEASON",
+          "A próxima temporada deve ser N+1.",
+        ),
+      );
+    }
+    const created = SeasonRollover.create(input);
+    if (!created.ok) return created;
+    this.state = {
+      ...this.state,
+      rollovers: [...this.state.rollovers, created.value.snapshot()],
+      revision: this.state.revision + 1,
+    };
+    return succeed(created.value.snapshot());
+  }
+
+  public rollover(rolloverId: string): SeasonRolloverSnapshot | null {
+    return this.state.rollovers.find(({ id }) => id === rolloverId) ?? null;
+  }
+
+  public saveRollover(
+    snapshot: SeasonRolloverSnapshot,
+  ): Result<void, DomainError> {
+    const index = this.state.rollovers.findIndex(
+      ({ id }) => id === snapshot.id,
+    );
+    if (index < 0) {
+      return fail(
+        new DomainError("ROLLOVER_NOT_FOUND", "Rollover não encontrado."),
+      );
+    }
+    if (snapshot.gameWorldId !== this.state.gameWorldId) {
+      return fail(
+        new DomainError(
+          "WORLD_SCOPE_MISMATCH",
+          "O rollover pertence a outro mundo.",
+        ),
+      );
+    }
+    const rollovers = [...this.state.rollovers];
+    rollovers[index] = snapshot;
+    this.state = {
+      ...this.state,
+      rollovers,
+      revision: this.state.revision + 1,
+    };
+    return succeed(undefined);
+  }
+
+  public finalizeCompletedRollover(
+    rolloverId: string,
+  ): Result<void, DomainError> {
+    const rollover = this.rollover(rolloverId);
+    if (rollover === null || rollover.status !== "COMPLETED") {
+      return fail(
+        new DomainError(
+          "ROLLOVER_NOT_COMPLETED",
+          "Todos os checkpoints devem terminar antes do arquivamento.",
+        ),
+      );
+    }
+    if (this.state.seasons.some(({ id }) => id === rollover.nextSeason.id)) {
+      return succeed(undefined);
+    }
+    const index = this.state.seasons.findIndex(
+      ({ id }) => id === rollover.seasonId,
+    );
+    if (index < 0) {
+      return fail(
+        new DomainError("SEASON_NOT_FOUND", "Temporada não encontrada."),
+      );
+    }
+    const current = Season.fromSnapshot(this.state.seasons[index]!);
+    if (!current.ok) return current;
+    const sporting = current.value.finishSporting();
+    if (!sporting.ok) return sporting;
+    const completed = current.value.complete();
+    if (!completed.ok) return completed;
+    const next = Season.bootstrap({
+      ...rollover.nextSeason,
+      gameWorldId: this.state.gameWorldId,
+    });
+    if (!next.ok) return next;
+    const seasons = [...this.state.seasons];
+    seasons[index] = current.value.snapshot();
+    seasons.push(next.value.snapshot());
+    this.state = {
+      ...this.state,
+      seasons,
+      revision: this.state.revision + 1,
+    };
+    return succeed(undefined);
+  }
+
+  public recordCommandReceipt(
+    receipt: WorldCommandReceipt,
+  ): Result<WorldCommandReceipt, DomainError> {
+    if (
+      receipt.gameWorldId !== this.state.gameWorldId ||
+      receipt.rulesetVersion !== this.state.config.rulesetVersion
+    ) {
+      return fail(
+        new DomainError(
+          "WORLD_SCOPE_MISMATCH",
+          "O receipt não pertence a este mundo/ruleset.",
+        ),
+      );
+    }
+    const existing = this.commandReceipt(receipt.idempotencyKey);
+    if (existing !== null) {
+      return sameValue(existing, receipt)
+        ? succeed(existing)
+        : fail(
+            new DomainError(
+              "IDEMPOTENCY_KEY_CONFLICT",
+              "A chave idempotente já foi usada com outro resultado.",
+            ),
+          );
+    }
+    this.state = {
+      ...this.state,
+      commandReceipts: [...this.state.commandReceipts, receipt],
+      revision: this.state.revision + 1,
+    };
+    return succeed(receipt);
   }
 
   public schedule(
@@ -559,4 +798,8 @@ function requiredDate(value: string): WorldDate {
   const parsed = WorldDate.parse(value);
   if (!parsed.ok) throw parsed.error;
   return parsed.value;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }

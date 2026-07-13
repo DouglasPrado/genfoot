@@ -1,6 +1,6 @@
 # Admin — Complementos: Plataforma e Adendos
 
-> **Status:** Rascunho consolidado · **Fontes:** auditoria de completude (2026-07-11) sobre docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** auditoria de completude (2026-07-11) sobre docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
 
 Este documento **fecha as lacunas** da auditoria do admin (doc 21) contra a plataforma técnica. O doc 21 cobriu a **operação de mundo** (economia, competições, moderação, correções, auditoria). Aqui entram as telas de **plataforma/segurança/operação técnica** que faltavam (IAM/RBAC administrável, feature flags, jobs/DLQ, incidentes, backups, manutenção, broadcast, privacidade, report de bug) e os **adendos** a telas existentes. Segue o [template](00-visao-geral-e-design-system.md#template-de-especificação-de-tela).
 
@@ -55,7 +55,7 @@ Este documento **fecha as lacunas** da auditoria do admin (doc 21) contra a plat
 - **Componentes e dados:** janela (início, duração, serviços, mundos, prazos, partidas, **modo de acesso**); **congelamento de prazo**; manutenção `EMERGENCY`; ciclo de vida operacional do mundo (`HEALTHY/DEGRADED/AT_RISK/MAINTENANCE/READ_ONLY/RECOVERING/SUSPENDED/ARCHIVED`).
 - **Ações:** agendar/editar janela; congelar prazos; entrar/sair de `READ_ONLY`; **comunicar** (`A-BROADCAST`).
 - **Estados:** mundo em manutenção reflete `WORLD_READ_ONLY` no cliente.
-- **Referências:** [`04-plataforma §11`](../02-tecnico/04-plataforma-seguranca-operacoes.md); [`09-op §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md). > **Pendência:** critérios de arquivamento de mundo inativo (fonte em aberto).
+- **Referências:** [`04-plataforma §11`](../02-tecnico/04-plataforma-seguranca-operacoes.md); [`09-op §8`](../02-tecnico/09-operacao-e-admin-do-mundo.md). **Fechado:** ≥2 temporadas ociosas, aviso 30 dias e read-only reversível (R-56).
 
 ### `A-BROADCAST` — Comunicação a usuários
 - **Objetivo:** compositor único de mensagens aos usuários (manutenção, incidente, pós-correção).

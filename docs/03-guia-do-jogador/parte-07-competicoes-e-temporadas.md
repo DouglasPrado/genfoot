@@ -1,6 +1,6 @@
 # Parte VII — Competições e temporadas
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md) · **Revisão:** 2026-07-11
 
 Esta Parte explica **onde** o seu clube joga e **como o tempo passa** no Grinta. O Capítulo 29 apresenta os tipos de campeonato, seus formatos, critérios de classificação e as regras que decidem quem sobe, quem cai e quem se inscreve. O Capítulo 30 mostra a temporada como o relógio do jogo — as fases pelas quais o ano passa e como o calendário afeta não só a agenda, mas a vida do elenco. O Capítulo 31 trata do fim da temporada, o momento em que o mundo faz o balanço de tudo o que aconteceu e se transforma para o ano seguinte.
 

@@ -1,6 +1,6 @@
 # Temporada e Competições
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/campeonatos-fim-de-temporadas.md, chats/escopo-definitivo-simulador.md, chats/documento-definitivo-escopo.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/campeonatos-fim-de-temporadas.md, chats/escopo-definitivo-simulador.md, chats/documento-definitivo-escopo.md · **Revisão:** 2026-07-11
 
 A temporada é o **relógio principal** do core do **Grinta**. Ela organiza calendário, evolução dos jogadores, finanças, reputação, mercado, torcida e diretoria, e — ao virar — **recalcula o mundo do jogo**. Não serve apenas para "passar o ano": é um ciclo de causa e consequência em que o mundo reage ao que aconteceu.
 
@@ -81,7 +81,29 @@ SeasonPhase {
 
 Critérios de transição (estrutura): **Pré-temporada → Início** na 1ª rodada oficial; **Início → Meio** ao completar o 1º terço das rodadas; **Meio → Reta final** ao entrar no último terço; **Reta final → Fim** na última rodada; **Fim → Pós-temporada** quando o motor de virada (§6) conclui o encerramento esportivo; **Pós-temporada → Nova temporada** ao gerar o calendário seguinte (passo 18 do checklist).
 
-> **Recomendação (a ratificar — R-58):** parametrizar a **duração de cada fase** por frações da temporada, não por número absoluto de datas (para acomodar ligas de tamanhos diferentes). Proposta de 1ª passada: pré-temporada ≈ 3–5 datas; **Início** = primeiros ~33% das rodadas; **Meio** = ~34–66%; **Reta final** = últimos ~33%; **Fim** = da última rodada até a homologação (§14.1); **Pós-temporada** = janela fixa de ~2–4 semanas virtuais de férias/evolução. Racional: frações mantêm o ritmo narrativo (adaptação → crise → decisão) em ligas de 12 a 24 clubes sem recalibrar por competição; os limites exatos são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+### As três camadas de estado da temporada
+
+As **7 fases** acima são **rótulos narrativos** (`SeasonPhase`), **não** o estado persistido da temporada. O Grinta opera **três camadas distintas e não-contraditórias** de estado de temporada — a contagem diferente (7 × 6 × 4) é **intencional**, e a fonte única do mapeamento é o [dicionário canônico §2.2](../02-tecnico/11-dicionario-canonico.md):
+
+| Camada | Contagem | Valores | Onde vive | Papel |
+| --- | --- | --- | --- | --- |
+| **Fase narrativa** | 7 | Pré-temporada · Início · Meio · Reta final · Fim · Pós-temporada · Nova temporada | `SeasonPhase` (este doc, §1) | destrava eventos; ritmo narrativo; ancorada em marcos do calendário (§4) |
+| **Estado de máquina** | 6 | `PLANNING → REGISTRATION → IN_PROGRESS → FINALIZING → OFF_SEASON → COMPLETED` | [catálogo §3.2](../02-tecnico/05-catalogo-de-regras-e-formulas.md) | máquina de ciclo de vida |
+| **Estado persistido** | 4 | `SeasonStatus`: `PLANNED · ACTIVE · FINISHED · ARCHIVED` | [`schema.prisma`](../../prisma/schema.prisma) (`Season.status`, `CompetitionSeason.status`) | coluna gravada no banco — **vence para o banco** |
+
+Mapeamento canônico (fase narrativa → estado de máquina → `SeasonStatus`):
+
+| Fase narrativa | Estado de máquina | `SeasonStatus` persistido |
+| --- | --- | --- |
+| Pré-temporada | `PLANNING` / `REGISTRATION` | `PLANNED` |
+| Início · Meio · Reta final | `IN_PROGRESS` | `ACTIVE` |
+| Fim | `FINALIZING` | `FINISHED` |
+| Pós-temporada | `OFF_SEASON` | `FINISHED` |
+| Nova temporada | `COMPLETED` → (próxima) `PLANNING` | `ARCHIVED` → (próxima) `PLANNED` |
+
+> **Decisão ratificada — R-106:** adotar o mapeamento acima como **contrato único** entre as três camadas, com o [dicionário canônico §2.2](../02-tecnico/11-dicionario-canonico.md) como fonte e o `SeasonStatus` do [`schema.prisma`](../../prisma/schema.prisma) como valor persistido. Invariantes: **(a)** `SeasonStatus` é **linear e sem retorno** (`PLANNED→ACTIVE→FINISHED→ARCHIVED`), exatamente como no schema; **(b)** as 7 fases **não** são persistidas — derivam de `SeasonPhase` + marcos do calendário (§4) e **podem coexistir com um mesmo `SeasonStatus`** (ex.: Início, Meio e Reta final vivem todas em `ACTIVE`); **(c)** o encerramento esportivo (§6) leva `IN_PROGRESS→FINALIZING` (= `ACTIVE→FINISHED`), e o motor de virada (§6, passos 18–20) leva `OFF_SEASON→COMPLETED` (= `FINISHED→ARCHIVED`), abrindo a temporada seguinte em `PLANNED`. Racional: elimina a divergência de contagem 7×6×4 apontada na auditoria (B-03) **sem colapsar** as três visões, que têm papéis diferentes (evento narrativo × ciclo de vida × persistência) — o texto desta seção passa a **referenciar** o schema em vez de contradizê-lo.
+
+> **Decisão ratificada — R-58:** parametrizar a **duração de cada fase** por frações da temporada, não por número absoluto de datas (para acomodar ligas de tamanhos diferentes). Proposta de 1ª passada: pré-temporada ≈ 3–5 datas; **Início** = primeiros ~33% das rodadas; **Meio** = ~34–66%; **Reta final** = últimos ~33%; **Fim** = da última rodada até a homologação (§14.1); **Pós-temporada** = janela fixa de ~2–4 semanas virtuais de férias/evolução. Racional: frações mantêm o ritmo narrativo (adaptação → crise → decisão) em ligas de 12 a 24 clubes sem recalibrar por competição; os limites exatos são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 
@@ -170,7 +192,7 @@ ChampionshipRules {
 
 Os **critérios de desempate** são parte da estrutura de regras de cada campeonato: `ChampionshipRules` (§2) ganha um campo ordenado `tiebreakers` — lista aplicada em sequência até desempatar, com o conjunto de referência **pontos → nº de vitórias → saldo de gols → gols marcados → confronto direto → cartões (fair play) → sorteio**. Cada campeonato pode reordenar ou omitir critérios no seu regulamento; a ordem declarada é o que a homologação (§14.1) usa para fechar a tabela.
 
-> **Recomendação (a ratificar — R-59):** fixar `reputationWeight` e `financialWeight` (0–1) por tipo de campeonato, definindo quanto cada competição move a reputação (clube/jogador) e a receita ao virar a temporada. Proposta de 1ª passada: Mundial `rep 1,00 / fin 0,90`; Continental `0,85 / 0,85`; Liga nacional (elite) `0,70 / 1,00`; Copa nacional `0,55 / 0,70`; Estadual/regional `0,30 / 0,35`; Base `0,20 / 0,10`; Amistosos `0,05 / 0,15`. Racional: a liga nacional domina a **receita** recorrente, enquanto continental/mundial dominam o **prestígio**; os valores são de balanceamento e devem ser calibrados em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+> **Decisão ratificada — R-59:** fixar `reputationWeight` e `financialWeight` (0–1) por tipo de campeonato, definindo quanto cada competição move a reputação (clube/jogador) e a receita ao virar a temporada. Proposta de 1ª passada: Mundial `rep 1,00 / fin 0,90`; Continental `0,85 / 0,85`; Liga nacional (elite) `0,70 / 1,00`; Copa nacional `0,55 / 0,70`; Estadual/regional `0,30 / 0,35`; Base `0,20 / 0,10`; Amistosos `0,05 / 0,15`. Racional: a liga nacional domina a **receita** recorrente, enquanto continental/mundial dominam o **prestígio**; os valores são de balanceamento e devem ser calibrados em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ### Geração das competições no início da temporada
 
@@ -300,6 +322,95 @@ CalendarDay {
 ```
 
 Como cada jogador do **Grinta** é único, o calendário não é só jogo: ele afeta vida, moral, desgaste, família, foco e evolução.
+
+### 4.1 Modelo temporal âncora (conta fechada)
+
+A auditoria de prontidão (B-03) apontou que **20 clubes exigem 38 rodadas de liga** (`2 × (20 − 1)`), mas uma temporada de 45 dias com 4 rodadas/semana comporta apenas **~26 slots** — antes de copas e adiamentos. O modelo abaixo **fecha a aritmética** reduzindo a **divisão de referência para 16 clubes** e ancorando a cadência real.
+
+**Conta fechada (divisão de referência = 16 clubes):**
+
+| Etapa | Fórmula | Resultado |
+| --- | --- | --- |
+| Rodadas de liga (turno + returno) | `2 × (16 − 1)` | **30 rodadas** |
+| Datas de copa nacional (mata-mata, ~32 clubes de 2 divisões) | `32→16→8→4→2→final`, semis em ida-e-volta | **~7 datas** |
+| Cadência real | 4 rodadas de liga + 1 data de copa por semana | **5 datas/semana** (2 dias livres) |
+| Duração da liga | `30 ÷ 4` por semana | **7,5 semanas reais** |
+| Duração total de referência | pré-temporada + liga/copa + buffer + fim + entressafra | **≈ 9 semanas reais (~63 dias)** |
+
+Os **dois relógios** do mundo (ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) §1) permanecem coerentes: o **relógio real** (wall-clock) roda as rodadas em horários fixos ao longo de ~63 dias reais; o **relógio virtual** (calendário do mundo) avança vários dias virtuais por dia real e cobre um ano-futebol virtual (~10 meses), onde vivem `startDate`/`endDate` e as datas de `SeasonCalendar`. **Fadiga e descanso (§4.3) são medidos no relógio virtual; a cadência de slots é medida no relógio real.**
+
+> **Decisão ratificada — R-101:** fixar a **divisão de referência em 16 clubes → 30 rodadas de liga**, com cadência real de **4 rodadas de liga + 1 data de copa por semana** e temporada de referência de **≈ 9 semanas reais (~63 dias)**, conforme a conta acima. **Substitui** o par "20 clubes / 38 rodadas / 45 dias" (incompatível: 38 rodadas não cabem em ~26 slots de 45 dias). Racional: 16 clubes fecham a liga em 7,5 semanas a 4 rodadas/semana (cadência humana, 2 dias livres por semana para preparo e mercado), deixando as quintas para a copa e um buffer para adiamentos e datas FIFA; os números finais são de balanceamento e ficam para [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Mundos de outros tamanhos e o modo curto de 45 dias: ver **R-107** em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) §7.
+
+### 4.2 Calendário-âncora (blocos e datas relativas)
+
+Blocos da temporada de referência (dias reais relativos, `D1` = abertura da pré-temporada):
+
+| Bloco | Janela (dias reais) | Duração | Fase narrativa (§1) | Conteúdo |
+| --- | --- | --- | --- | --- |
+| Pré-temporada | D1–D3 | ~3 dias | Pré-temporada | Amistosos, inscrições, licenciamento (§15), montagem, metas da diretoria |
+| Turno (rodadas 1–15) | D4–D30 | ~3,75 semanas | Início → Meio | 15 rodadas de liga (Seg/Qua/Sex/Dom) |
+| Returno (rodadas 16–30) | D31–D56 | ~3,75 semanas | Meio → Reta final | 15 rodadas de liga (Seg/Qua/Sex/Dom) |
+| Copa nacional | D8–D56 (quintas) | embutida | Início → Reta final | ~7 datas de mata-mata (Qui) |
+| Buffer de adiamentos + datas FIFA | D57–D59 | ~3 dias | Reta final | 2 slots reserva de liga + 1 de copa; janelas FIFA remarcadas (§4.4/§4.5) |
+| Fim + homologação + premiação | D60–D61 | ~2 dias | Fim | Fecha tabelas, homologação (§14.1), premiação (§7) |
+| Entressafra / virada | D62–D63 | ~2 dias | Pós-temporada → Nova temporada | Motor de virada (§6), evolução, mercado, férias |
+
+Grade semanal real de referência (rodadas às 20h, ver [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) §4):
+
+| Dia real | 20h | Papel |
+| --- | --- | --- |
+| Segunda | Liga (rodada) | matchday |
+| Terça | — | preparo, treino, mercado |
+| Quarta | Liga (rodada) | matchday |
+| Quinta | Copa / Continental / **data FIFA** | matchday |
+| Sexta | Liga (rodada) | matchday |
+| Sábado | — | preparo, base, mercado |
+| Domingo | Liga (rodada) | matchday |
+
+O `SeasonCalendar` (`matchdays`, `transferWindows`, `nationalTeamDates`, `restPeriods`, `awardsDate`) materializa esses blocos; a grade acima é a fonte dos `matchdays`. A geração evita clássicos no mesmo dia e sequências longas de mando (§2, `generateCalendar`). As **janelas de transferência** (`transferWindows`) de referência são **duas**: uma na pré-temporada (D1–D3) e uma no intervalo turno↔returno (~D30); fora delas a lista de inscrição fica congelada (§15.2).
+
+### 4.3 Descanso mínimo entre partidas
+
+O scheduler garante um **descanso mínimo** entre partidas oficiais do mesmo clube, medido no **relógio virtual**:
+
+- **Descanso mínimo virtual:** ≥ **3 dias virtuais** de calendário entre duas partidas oficiais do mesmo clube (recuperação de fadiga). Na cadência de referência (§4.2), o menor intervalo real — Domingo → Segunda (24h reais) — corresponde a ~1 semana virtual, já **acima** do piso; os intervalos de 2 dias reais dão ~2 semanas virtuais.
+- **Preparo real:** ≥ **~20h reais** entre matchdays consecutivos garantem janela para o usuário ajustar a escalação de forma assíncrona (a rodada abre logo após a anterior ser publicada — ver o fluxo de rodada em [`../02-tecnico/03-multiplayer-e-mundos.md`](../02-tecnico/03-multiplayer-e-mundos.md) §5).
+
+O descanso **integra a fadiga do motor**: o excedente de fadiga acumulado por partida decai ao longo dos dias virtuais de descanso, seguindo `penal_F2`/F13 e a curva de recuperação do [catálogo de regras (F#)](../02-tecnico/05-catalogo-de-regras-e-formulas.md) e do [motor de partida](./05-motor-de-partida.md). Jogos em sequência sem descanso suficiente elevam `fatigue` (`0–100`, [dicionário canônico E1](../02-tecnico/11-dicionario-canonico.md)) e o risco de lesão.
+
+> **Decisão ratificada — R-102:** fixar o **descanso mínimo em ≥ 3 dias virtuais** entre partidas oficiais do mesmo clube, com o scheduler **recusando** marcar/remarcar partida que viole o piso e empurrando-a para o buffer (§4.4). A recuperação da fadiga excedente segue a curva do motor (`penal_F2`/F13), escalada por idade, equipe médica (`DepartmentType.MEDICAL`, nível 1–5) e `injuryProneness` do jogador. Racional: separa o **piso de recuperação** (virtual, alimenta fadiga/lesão) da **cadência de slots** (real), reusando a mecânica de fadiga já especificada em vez de criar um segundo modelo; o piso exato e os coeficientes de recuperação são de balanceamento e ficam para o [catálogo de regras](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+
+### 4.4 Prioridade entre competições e adiamentos
+
+Quando dois compromissos disputam o **mesmo slot real**, vale a **tabela de prioridade** já definida em [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §5:
+
+| Prioridade | Compromisso |
+| --- | --- |
+| 1 (máxima) | Data oficial de seleção (equivalente-FIFA) e competição internacional oficial |
+| 2 | Competição continental de clubes |
+| 3 | Liga e copa nacional |
+| 4 | Estadual / regional |
+| 5 (mínima) | Amistosos (clube ou seleção) |
+
+O compromisso de maior prioridade **mantém o slot**; o de menor é **remarcado** para o buffer (§4.2) ou libera o jogador.
+
+**Janela de adiamento:** uma rodada pode ser adiada por conflito de prioridade, colisão com data FIFA (§4.5), pendência de licenciamento (§15.1) ou força maior operacional. O adiamento é **remarcado para o próximo slot livre do buffer** (D57–D59 na referência, mais os 2 slots de liga + 1 de copa reservados), sempre **respeitando o descanso mínimo (§4.3)**. Uma partida adiada **não pode** ultrapassar a homologação da competição (§14.1): se não couber no buffer, aplica-se a regra de encerramento da competição (resultado técnico / decisão administrativa) antes de fechar a temporada.
+
+> **Decisão ratificada — R-103:** a **precedência entre competições** herda **integralmente** a tabela de [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §5 (mesma ordenação 1–5), aplicada pelo scheduler na alocação de slots reais; em **empate** de prioridade prevalece o compromisso oficial **agendado primeiro**. Racional: evita uma segunda tabela divergente — a prioridade de calendário é **uma só**, compartilhada entre clubes e seleções. A ordenação fina por competição é atributo do `ChampionshipRules` (§2).
+
+> **Decisão ratificada — R-104:** dimensionar o **buffer de adiamentos** em ~**2 slots de liga + 1 de copa por temporada** (≈ 0,5 semana real, bloco D57–D59 da referência) e definir a **janela de remarcação** como "próximo slot livre do buffer que respeite o descanso mínimo (§4.3), antes da homologação (§14.1)". **Efeito em convocações e janelas de transferência:** partidas remarcadas para dentro de uma data FIFA **liberam** o jogador convocado (a prioridade 1 vence, §4.5), e uma remarcação **não reabre** a janela de transferência — a elegibilidade permanece **congelada** pela lista de inscrição (§15.2). Racional: dá folga **finita e auditável** para adiamentos sem esticar a temporada nem quebrar a homologação; a magnitude do buffer é de balanceamento e fica para o [catálogo de regras](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+
+### 4.5 Datas FIFA / seleções no calendário
+
+As **datas oficiais de seleção** (equivalente-FIFA) ocupam slots reservados do calendário e têm **prioridade máxima** (§4.4, prioridade 1). Durante uma janela FIFA:
+
+- **nenhuma rodada oficial de clube** é agendada no slot (as que colidiriam são remarcadas para o buffer, §4.4);
+- o **clube libera o jogador convocado** (autoridade da convocação, [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §3);
+- a **fadiga de convocação** (R-64) retorna com o jogador e decai pela curva de descanso (§4.3).
+
+Na temporada de referência (~9 semanas), cabem **2–3 datas FIFA**, alocadas em quintas específicas (o slot de copa cede a semana), registradas em `SeasonCalendar.nationalTeamDates`. Como copa (~7 datas) e datas FIFA disputam a mesma quinta-feira, uma colisão **empurra a rodada de copa para o buffer** (§4.4); por isso a copa pode se **estender até o bloco Fim** (D60–D61), com a final homologada ali (§14.1). Na prática, ao reservar 2–3 quintas para a seleção, as ~7 datas de copa se distribuem pelas quintas restantes (liga + buffer + fim), nunca competindo com a prioridade 1.
+
+> **Decisão ratificada — R-105:** reservar **2–3 datas FIFA por temporada de referência**, na quinta-feira (slot compartilhado com a copa, que cede a semana), preemptando rodadas de clube conforme a prioridade 1 (§4.4). As convocações, elegibilidade e efeitos (fadiga, moral, lesão, compensação) seguem [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) (R-64/R-66/R-67). Racional: encaixa o calendário internacional no relógio real comprimido **sem inflar a temporada**, reusando o slot de copa; o número de datas é de balanceamento e fica para o [catálogo de regras](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 
@@ -455,7 +566,7 @@ A evolução é **multidimensional** e pode ser mista:
 - Jovem reserva: pode não evoluir em campo, mas evoluir em treino: `+Técnica +Disciplina −Ritmo de jogo`.
 - Veterano: perde físico, ganha liderança: `−Velocidade −Resistência +Liderança +Leitura de jogo`.
 
-> **Recomendação (a ratificar — R-60):** calcular a variação de cada dimensão de `PlayerSeasonDevelopment` como `Δdimensão = base(idade) + Σ(fator_i · peso_i)`, aplicada por dimensão (técnica, física, mental, tática). **Base etária** (curva de maturação/declínio): `≤ 21` → `+2`; `22–28` → `+0,5`; `29–31` → `0`; `32–34` → `−1,5`; `≥ 35` → `−3` (o físico declina antes do mental). **Fatores e pesos de 1ª passada** (cada fator normalizado 0–1, somado à base e arredondado): minutos jogados ×2,0 · qualidade de treino ×1,5 · nível dos campeonatos ×1,2 · potencial restante ×1,5 · moral/foco ×0,8 · pressão suportada ×0,6 (negativa se excedeu o limite mental) · disciplina/personalidade ×0,7 · penalidade por lesão `−(diasParado/30)` · relação com o técnico ×0,5. O ganho por dimensão é saturado em `[−4, +4]` por temporada, e a evolução permanece **multidimensional** (uma dimensão sobe enquanto outra cai). Racional: reproduz os três exemplos mistos da seção (jovem que evolui no treino, titular pressionado, veterano em declínio físico com ganho mental) sem virar "+2 de overall"; os pesos e a curva etária são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+> **Decisão ratificada — R-60:** calcular a variação de cada dimensão de `PlayerSeasonDevelopment` como `Δdimensão = base(idade) + Σ(fator_i · peso_i)`, aplicada por dimensão (técnica, física, mental, tática). **Base etária** (curva de maturação/declínio): `≤ 21` → `+2`; `22–28` → `+0,5`; `29–31` → `0`; `32–34` → `−1,5`; `≥ 35` → `−3` (o físico declina antes do mental). **Fatores e pesos de 1ª passada** (cada fator normalizado 0–1, somado à base e arredondado): minutos jogados ×2,0 · qualidade de treino ×1,5 · nível dos campeonatos ×1,2 · potencial restante ×1,5 · moral/foco ×0,8 · pressão suportada ×0,6 (negativa se excedeu o limite mental) · disciplina/personalidade ×0,7 · penalidade por lesão `−(diasParado/30)` · relação com o técnico ×0,5. O ganho por dimensão é saturado em `[−4, +4]` por temporada, e a evolução permanece **multidimensional** (uma dimensão sobe enquanto outra cai). Racional: reproduz os três exemplos mistos da seção (jovem que evolui no treino, titular pressionado, veterano em declínio físico com ganho mental) sem virar "+2 de overall"; os pesos e a curva etária são valor de balanceamento a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ### 6.5. Vida extra-campo no fim da temporada
 
@@ -513,7 +624,7 @@ Prêmios previstos:
 - Jogador mais evoluído
 - Jogador decepção
 
-> **Recomendação (a ratificar — R-61):** separar os prêmios em **objetivos** (contagem direta: artilheiro = mais gols; garçom = mais assistências; melhor goleiro por saldo de gols sofridos/defesas) e **subjetivos** (melhor jogador, revelação, seleção do campeonato, jogador mais evoluído, decepção), estes eleitos por `AwardScore = 0,5·médiaDeNotas (F15) + 0,3·contribuição para títulos/campanha + 0,2·impacto de reputação`, filtrado por elegibilidade (revelação: idade ≤ 21; decepção: alta expectativa/valor vs. baixo `AwardScore`). **Magnitude do efeito:** cada prêmio aplica `+reputationGain` e `marketValueMultiplier` proporcionais ao peso da competição (R-59) — 1ª passada: prêmio principal ×1,10 no valor de mercado e `+8` de reputação; secundários ×1,05 e `+4`; "decepção" inverte o sinal. Racional: dá regra auditável reutilizando a nota de partida (F15) e os pesos de campeonato (R-59); os coeficientes são de balanceamento e ficam para [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+> **Decisão ratificada — R-61:** separar os prêmios em **objetivos** (contagem direta: artilheiro = mais gols; garçom = mais assistências; melhor goleiro por saldo de gols sofridos/defesas) e **subjetivos** (melhor jogador, revelação, seleção do campeonato, jogador mais evoluído, decepção), estes eleitos por `AwardScore = 0,5·médiaDeNotas (F15) + 0,3·contribuição para títulos/campanha + 0,2·impacto de reputação`, filtrado por elegibilidade (revelação: idade ≤ 21; decepção: alta expectativa/valor vs. baixo `AwardScore`). **Magnitude do efeito:** cada prêmio aplica `+reputationGain` e `marketValueMultiplier` proporcionais ao peso da competição (R-59) — 1ª passada: prêmio principal ×1,10 no valor de mercado e `+8` de reputação; secundários ×1,05 e `+4`; "decepção" inverte o sinal. Racional: dá regra auditável reutilizando a nota de partida (F15) e os pesos de campeonato (R-59); os coeficientes são de balanceamento e ficam para [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 
@@ -660,7 +771,7 @@ Cada divisão tem um **limite natural de força**, para impedir que um clube mui
 
 Se um clube passa do teto da sua divisão, ele é **obrigado a subir** (ou a competir numa liga superior) — não pode continuar dominando uma camada que já superou.
 
-> **Recomendação (a ratificar — R-62):** expressar cada teto de divisão como **múltiplo da linha-base da divisão** (não valores absolutos, para escalar entre mundos). Proposta de 1ª passada: Liga Inicial → folha ≤ 1,0× base, overall médio ≤ 62, ≤ 3 estrangeiros, reputação ≤ 40, estrutura ≤ nível 2, premiação 1,0× base; Liga Intermediária → folha ≤ 3,0×, overall ≤ 74, ≤ 5 estrangeiros, reputação ≤ 70, estrutura ≤ nível 4, premiação ~3×; Elite → sem teto de força, premiação ~8×. Gatilho de "obrigado a subir": clube que excede **2 dos tetos** por 2 temporadas seguidas. Racional: múltiplos preservam o equilíbrio quando o valor absoluto do dinheiro varia por mundo; os números são de balanceamento e devem ser calibrados em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Os limites de estrangeiros aqui herdam a cota geral de **R-63** (§15.2).
+> **Decisão ratificada — R-62:** expressar cada teto de divisão como **múltiplo da linha-base da divisão** (não valores absolutos, para escalar entre mundos). Baseline: Liga Inicial → folha ≤ 1,0× base, overall médio ≤ 62, ≤ 3 estrangeiros, reputação ≤ 40, estrutura ≤ nível 2, premiação 1,0× base; Liga Intermediária → folha ≤ 3,0×, overall ≤ 74, ≤ 5 estrangeiros, reputação ≤ 70, estrutura ≤ nível 4, premiação ~3×; Elite → sem teto de força, premiação ~8×. Gatilho de "obrigado a subir": clube que excede **2 dos tetos** por 2 temporadas seguidas. Os números só mudam por calibração versionada. Os limites de estrangeiros herdam R-63 (§15.2). **Nota C-04:** a geração do elenco inicial (R-43) tem média-alvo **60**, faixa 58–60 e máximo 62, alinhada ao teto sem afrouxá-lo.
 
 ### 13.2 Objetivos diferentes por estágio do clube
 
@@ -804,7 +915,7 @@ A elegibilidade é validada e **congelada** na preparação pré-jogo. O sistema
 
 Se houver problema, o sistema tenta escalação automática e alternativas **antes** de declarar W.O. — o clube precisa manter um **elenco mínimo** apto e inscrito.
 
-> **Recomendação (a ratificar — R-63):** fixar os limites de inscrição por competição. Proposta de 1ª passada: `squadRegistrationLimit` = 26 (lista principal), com goleiros/base em cota própria; `foreignPlayerLimit` = 5 estrangeiros inscritos por partida (7 no elenco) na elite, mais restritivo nas divisões inferiores (herdado por R-62); `ageLimit` só em competições de base; cota de **jovens formados no clube** = mínimo de 2 na lista principal. A **nacionalidade** que alimenta `foreignPlayerLimit` é a `primaryNationality` do jogador (modelo em [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §1). Racional: números plausíveis e implementáveis que dão contorno à validação de escalação (§15.2) sem congelar o balanceamento; valores finais e variação por mundo/divisão a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
+> **Decisão ratificada — R-63:** fixar os limites de inscrição por competição. Proposta de 1ª passada: `squadRegistrationLimit` = 26 (lista principal), com goleiros/base em cota própria; `foreignPlayerLimit` = 5 estrangeiros inscritos por partida (7 no elenco) na elite, mais restritivo nas divisões inferiores (herdado por R-62); `ageLimit` só em competições de base; cota de **jovens formados no clube** = mínimo de 2 na lista principal. A **nacionalidade** que alimenta `foreignPlayerLimit` é a `primaryNationality` do jogador (modelo em [`./12-selecoes-e-calendario-internacional.md`](./12-selecoes-e-calendario-internacional.md) §1). Racional: números plausíveis e implementáveis que dão contorno à validação de escalação (§15.2) sem congelar o balanceamento; valores finais e variação por mundo/divisão a calibrar em [`../02-tecnico/05-catalogo-de-regras-e-formulas.md`](../02-tecnico/05-catalogo-de-regras-e-formulas.md).
 
 ---
 

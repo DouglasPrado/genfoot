@@ -1,6 +1,6 @@
 # Visão de Produto e Pitch
 
-> **Status:** Rascunho consolidado · **Fontes:** `chats/pitch-elevator.md`, `chats/organizacao-de-pensamentos.md` (seção "Visão do Jogo") · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** `chats/pitch-elevator.md`, `chats/organizacao-de-pensamentos.md` (seção "Visão do Jogo") · **Revisão:** 2026-07-10
 
 O **Grinta** é um manager de futebol online que resgata a simplicidade viciante dos clássicos do gênero e a combina com uma camada muito mais profunda de simulação. Cada jogador do mundo é único — tem origem, personalidade, histórico de vida e decisões fora de campo que impactam seu desempenho — e cada clube é comandado por uma pessoa real, dentro de um mundo persistente que continua evoluindo temporada após temporada. Este documento consolida o posicionamento do produto, os pitches curto e longo, os pilares de diferenciação, o público-alvo e a frase-gancho do projeto.
 

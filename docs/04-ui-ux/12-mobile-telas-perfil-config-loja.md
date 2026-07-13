@@ -1,6 +1,6 @@
 # Mobile — Perfil, Configurações e Loja
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/01-mundo-persistente-e-clubes.md, docs/01-game-design/14-monetizacao.md, docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/11-torcida-imprensa-e-narrativa.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/01-mundo-persistente-e-clubes.md, docs/01-game-design/14-monetizacao.md, docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/11-torcida-imprensa-e-narrativa.md · **Revisão:** 2026-07-11
 
 Perfil do clube, identidade/rebranding, configurações, loja/monetização, passe de temporada, regras de integridade, report de bug e suporte. Fluxos: [MF-24](02-mobile-fluxos.md#mf-24--ação-bloqueada-por-anti-abuso), [MF-25](02-mobile-fluxos.md#mf-25--personalização-e-loja). Encerra a aba **Clube**.
 
@@ -28,7 +28,7 @@ Perfil do clube, identidade/rebranding, configurações, loja/monetização, pas
 - **Componentes e dados:** idioma (pt-BR padrão), **tema** (claro/escuro/sistema), **notificações push** por categoria, som/vibração, preferência de modo simples/detalhado, acessibilidade (tamanho de fonte, reduce motion), conta (`M-ACCOUNT`), integridade (`M-INTEGRITY`), suporte (`M-SUPPORT`), sair, trocar/abandonar clube (`M-CLUB-LEAVE`).
 - **Ações:** alterar preferências (estado de UI local); gerenciar push.
 - **Estados:** padrão salvo localmente; reautenticação para conta.
-- **Referências:** [`00-visao-geral §7`](00-visao-geral-e-design-system.md#7-acessibilidade-i18n-e-tema). > **Pendência:** o GDD não especifica a tela de configurações; campos derivados dos requisitos de plataforma (i18n/tema/push/acessibilidade).
+- **Referências:** [`00-visao-geral §7`](00-visao-geral-e-design-system.md#7-acessibilidade-i18n-e-tema). Campos canônicos derivados de plataforma e R-98/R-165.
 
 ## `M-STORE` — Loja / monetização
 
@@ -36,14 +36,14 @@ Perfil do clube, identidade/rebranding, configurações, loja/monetização, pas
 - **Componentes e dados:** catálogo — identidades visuais, uniformes, **temas de UI**, personalização de estádio **sem efeito esportivo**, narrações/apresentações, itens comemorativos, **slots** de organização, passe de temporada (`M-SEASON-PASS`). Regra visível: nada altera resultado/economia/mercado/potencial/recuperação; itens proibidos **não aparecem**.
 - **Ações:** comprar item (fluxo de pagamento da store — IAP); aplicar (`M-IDENTITY`).
 - **Estados:** confirmação de que a compra é cosmética; restauração de compras.
-- **Referências:** [`14-monetizacao §1–4`](../01-game-design/14-monetizacao.md). > **Pendência:** moeda premium e assinatura recorrente **não** mencionadas na fonte (só passe de temporada e loja de cosméticos); "relatórios premium" só se forem informação já acessível melhor organizada.
+- **Referências:** [`14-monetizacao §1–4`](../01-game-design/14-monetizacao.md). **Fechado:** sem moeda premium, assinatura vantajosa ou relatório pago; R-75/R-167.
 
 ## `M-SEASON-PASS` — Passe de temporada
 
 - **Objetivo:** trilha de recompensas **exclusivamente cosméticas**.
 - **Componentes e dados:** trilha de recompensas cosméticas por progresso/temporada; sem qualquer vantagem competitiva.
 - **Ações:** adquirir; resgatar recompensa.
-- **Estados:** > **Pendência:** conteúdo do passe em aberto na fonte.
+- **Estados:** catálogo cosmético do passe definido em R-93/R-167; indisponível após a temporada, itens adquiridos permanecem conforme catálogo.
 - **Referências:** [`14-monetizacao §2`](../01-game-design/14-monetizacao.md).
 
 ## `M-INTEGRITY` — Regras de integridade

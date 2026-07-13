@@ -52,6 +52,14 @@ const playerSummaryOutputSchema = z.object({
   }),
 });
 const inspectedOutputSchema = z.object({ data: z.object({ id: z.string() }) });
+const advanceReceiptSchema = z.object({
+  data: z.object({
+    idempotencyKey: z.string(),
+    previousDate: z.string(),
+    currentDate: z.string(),
+    resultWorldVersion: z.number(),
+  }),
+});
 const errorOutputSchema = z.object({ error: z.object({ code: z.string() }) });
 
 afterEach(async () => {
@@ -162,6 +170,75 @@ describe("simulator CLI", () => {
       ).data.world.status,
     ).toBe("ACTIVE");
 
+    const clubPortfolioOutput = capture();
+    expect(
+      await runCli(["club:inspect", "--world", worldId], {
+        dataDirectory: directory,
+        io: clubPortfolioOutput.io,
+      }),
+    ).toBe(0);
+    const clubPortfolio = JSON.parse(clubPortfolioOutput.stdout.join("")) as {
+      data: {
+        clubs: Array<{
+          id: string;
+          version: number;
+          identity: { name: string };
+        }>;
+      };
+    };
+    expect(clubPortfolio.data.clubs).toHaveLength(16);
+    const managedClub = clubPortfolio.data.clubs[0]!;
+    const identityArguments = [
+      "club:identity:update",
+      "--world",
+      worldId,
+      "--club",
+      managedClub.id,
+      "--command-id",
+      "club-command-001",
+      "--idempotency-key",
+      "club:identity:001",
+      "--expected-version",
+      String(managedClub.version),
+      "--occurred-at",
+      "2026-01-02",
+      "--actor",
+      "board:validation",
+      "--name",
+      "Clube Validado",
+      "--short-code",
+      "VAL",
+    ];
+    const identityOutput = capture();
+    expect(
+      await runCli(identityArguments, {
+        dataDirectory: directory,
+        io: identityOutput.io,
+      }),
+    ).toBe(0);
+    const identityRetry = capture();
+    expect(
+      await runCli(identityArguments, {
+        dataDirectory: directory,
+        io: identityRetry.io,
+      }),
+    ).toBe(0);
+    expect(JSON.parse(identityRetry.stdout.join(""))).toEqual(
+      JSON.parse(identityOutput.stdout.join("")),
+    );
+    const managedClubOutput = capture();
+    await runCli(
+      ["club:inspect", "--world", worldId, "--club", managedClub.id],
+      { dataDirectory: directory, io: managedClubOutput.io },
+    );
+    expect(
+      (
+        JSON.parse(managedClubOutput.stdout.join("")) as {
+          data: { club: { identity: { name: string } } };
+        }
+      ).data.club.identity.name,
+    ).toBe("Clube Validado");
+
     const advancedOutput = capture();
     const advancedCode = await runCli(
       ["day:simulate", "--world", worldId, "--days", "1"],
@@ -213,6 +290,73 @@ describe("simulator CLI", () => {
       "PENDING",
     ]);
 
+    const windowOutput = capture();
+    expect(
+      await runCli(
+        [
+          "world:window:register",
+          "--world",
+          worldId,
+          "--type",
+          "TRANSFER",
+          "--name",
+          "Janela principal",
+          "--opens-on",
+          "2026-01-04",
+          "--closes-on",
+          "2026-01-10",
+        ],
+        { dataDirectory: directory, io: windowOutput.io },
+      ),
+    ).toBe(0);
+    const listedWindows = capture();
+    expect(
+      await runCli(
+        ["world:windows", "--world", worldId, "--on", "2026-01-04"],
+        { dataDirectory: directory, io: listedWindows.io },
+      ),
+    ).toBe(0);
+    expect(
+      (JSON.parse(listedWindows.stdout.join("")) as { data: unknown[] }).data,
+    ).toHaveLength(1);
+
+    const advanceArguments = [
+      "day:advance",
+      "--world",
+      worldId,
+      "--command-id",
+      "cli-command-001",
+      "--idempotency-key",
+      "advance:2026-01-04",
+      "--expected-date",
+      "2026-01-04",
+      "--expected-version",
+      "6",
+    ];
+    const idempotentAdvance = capture();
+    expect(
+      await runCli(advanceArguments, {
+        dataDirectory: directory,
+        io: idempotentAdvance.io,
+      }),
+    ).toBe(0);
+    const firstReceipt = advanceReceiptSchema.parse(
+      JSON.parse(idempotentAdvance.stdout.join("")) as unknown,
+    );
+    const repeatedAdvance = capture();
+    expect(
+      await runCli(advanceArguments, {
+        dataDirectory: directory,
+        io: repeatedAdvance.io,
+      }),
+    ).toBe(0);
+    expect(
+      advanceReceiptSchema.parse(
+        JSON.parse(repeatedAdvance.stdout.join("")) as unknown,
+      ),
+    ).toEqual(firstReceipt);
+    expect(firstReceipt.data.currentDate).toBe("2026-01-05");
+
     const playerSummaryOutput = capture();
     expect(
       await runCli(["players:summary", "--world", worldId], {
@@ -229,7 +373,7 @@ describe("simulator CLI", () => {
       playerCount: 368,
       generationEventCount: 368,
       developmentHistoryCount: 0,
-      lastProcessedOn: "2026-01-04",
+      lastProcessedOn: "2026-01-05",
     });
   });
 
@@ -246,4 +390,92 @@ describe("simulator CLI", () => {
         .error.code,
     ).toBe("INVALID_WORLD_DATE");
   });
+
+  it("inicia automaticamente, inspeciona e retoma SAGA-02", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "grinta-rollover-cli-"));
+    directories.push(directory);
+    const createdOutput = capture();
+    await runCli(
+      ["world:create", "--seed", "rollover-cli", "--start-date", "2026-01-01"],
+      { dataDirectory: directory, io: createdOutput.io },
+    );
+    const worldId = createdOutputSchema.parse(
+      JSON.parse(createdOutput.stdout.join("")) as unknown,
+    ).data.world.id;
+    await runCli(["world:genesis", "--world", worldId], {
+      dataDirectory: directory,
+      io: capture().io,
+    });
+    await runCli(["world:activate", "--world", worldId], {
+      dataDirectory: directory,
+      io: capture().io,
+    });
+    const advanced = capture();
+    expect(
+      await runCli(["day:simulate", "--world", worldId, "--days", "90"], {
+        dataDirectory: directory,
+        io: advanced.io,
+      }),
+    ).toBe(0);
+
+    const schedulerOutput = capture();
+    await runCli(["scheduler:inspect", "--world", worldId], {
+      dataDirectory: directory,
+      io: schedulerOutput.io,
+    });
+    const scheduler = JSON.parse(schedulerOutput.stdout.join("")) as {
+      data: { rollovers: { id: string; status: string }[]; seasons: unknown[] };
+    };
+    expect(scheduler.data.rollovers).toHaveLength(1);
+    expect(scheduler.data.rollovers[0]?.status).toBe("REQUESTED");
+    const rolloverId = scheduler.data.rollovers[0]!.id;
+
+    const inspected = capture();
+    expect(
+      await runCli(
+        [
+          "season:rollover:inspect",
+          "--world",
+          worldId,
+          "--rollover",
+          rolloverId,
+        ],
+        { dataDirectory: directory, io: inspected.io },
+      ),
+    ).toBe(0);
+    const resumed = capture();
+    expect(
+      await runCli(
+        [
+          "season:rollover:resume",
+          "--world",
+          worldId,
+          "--rollover",
+          rolloverId,
+          "--approve-all",
+        ],
+        { dataDirectory: directory, io: resumed.io },
+      ),
+    ).toBe(0);
+    expect(
+      JSON.parse(resumed.stdout.join("")) as {
+        data: { rollover: { status: string }; events: unknown[] };
+      },
+    ).toMatchObject({
+      data: { rollover: { status: "COMPLETED" } },
+    });
+
+    const finalSchedulerOutput = capture();
+    await runCli(["scheduler:inspect", "--world", worldId], {
+      dataDirectory: directory,
+      io: finalSchedulerOutput.io,
+    });
+    const finalScheduler = JSON.parse(finalSchedulerOutput.stdout.join("")) as {
+      data: { seasons: { status: string }[] };
+    };
+    expect(finalScheduler.data.seasons.map(({ status }) => status)).toEqual([
+      "ARCHIVED",
+      "PLANNED",
+    ]);
+  }, 20_000);
 });

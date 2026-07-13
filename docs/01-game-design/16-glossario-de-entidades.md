@@ -1,6 +1,6 @@
 # Glossário Conceitual de Entidades
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/documento-definitivo-escopo.md (Seção 22) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/documento-definitivo-escopo.md (Seção 22), R-149 · **Revisão:** 2026-07-13
 
 ## Resumo
 
@@ -13,7 +13,7 @@ Este glossário se articula com dois outros artefatos, que **não** devem ser co
 - **Mapeamento técnico** — a tradução destas entidades para o schema real (tabelas, campos, relações, tipos) vive em [`../02-tecnico/02-modelo-de-dados.md`](../02-tecnico/02-modelo-de-dados.md). Se você procura como uma entidade é *persistida*, é lá.
 - **Glossário do jogador** — os termos de *gameplay* voltados a quem joga (como cada conceito é nomeado e explicado na interface e nos tutoriais) ficam no [guia do jogador](../03-guia-do-jogador/). Se você procura como o jogador *ouve falar* de um conceito, é lá.
 
-> **Como ler:** cada grupo reúne entidades de um mesmo domínio funcional. As definições são deliberadamente enxutas; regras, fórmulas e comportamentos detalhados vivem nos documentos de sistema de `01-game-design/` e no [catálogo de regras](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Onde a fonte é vaga ou deixa uma decisão em aberto, há uma marcação `> **Pendência:**`.
+> **Como ler:** cada grupo reúne entidades de um mesmo domínio funcional. As definições são deliberadamente enxutas; regras, fórmulas e comportamentos detalhados vivem nos documentos de sistema de `01-game-design/` e no [catálogo de regras](../02-tecnico/05-catalogo-de-regras-e-formulas.md). Uma nova lacuna deve ser registrada formalmente, não preenchida por inferência.
 
 ## Sumário
 
@@ -35,13 +35,17 @@ Este glossário se articula com dois outros artefatos, que **não** devem ser co
 
 O contexto persistente em que tudo acontece: o ecossistema, seu ciclo anual, o espaço geográfico e o tempo oficial.
 
-**Mundo** — Ecossistema persistente e autossuficiente, com regras, economia, clubes, jogadores e história próprios. É o "universo" em que o usuário entra; múltiplos mundos coexistem de forma independente.
+**Mundo** — Ecossistema persistente e autossuficiente, com regras, economia, clubes, jogadores e história próprios. É a instância/servidor em que o usuário entra; múltiplos mundos coexistem de forma independente. **"Mundo" é o termo canônico** (`GameWorld`, `gameWorldId`); **"sala" é termo superado** e **"universo" é apenas sinônimo editorial permitido** — nunca nome de entidade/API/schema (R-149), ver [dicionário canônico §4](../02-tecnico/11-dicionario-canonico.md).
 
 **Temporada** — Ciclo anual do mundo que reúne o calendário, as competições, as janelas de mercado e o fechamento contábil e esportivo. É a unidade de tempo em que metas e resultados são medidos.
 
 **Região** — Contexto geográfico de um clube, que define clima, custos, perfil de torcida, captação de talentos e viagens. Influencia gestão e desempenho sem ser um sistema jogável em si.
 
 **Calendário** — Conjunto oficial de datas do mundo: partidas, janelas de transferência, períodos administrativos e prazos. É a linha do tempo canônica que todos os clubes seguem.
+
+**Competição** — Conceito geral regulado e versionado; liga, copa e torneio são formatos de competição.
+
+**Divisão** — Nível esportivo na pirâmide de uma competição. **Série** ou **grupo** é uma subdivisão de uma edição, não sinônimo de divisão nem de mundo.
 
 ## 2. Usuário e clube
 

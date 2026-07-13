@@ -1,10 +1,10 @@
 # Wireframes — Telas densas (mobile)
 
-> **Status:** Rascunho consolidado · **Fontes:** [`00-visao-geral-e-design-system.md`](00-visao-geral-e-design-system.md), [`04-mobile-telas-central-home-decisoes.md`](04-mobile-telas-central-home-decisoes.md), [`06-mobile-telas-tatica-escalacao-partida.md`](06-mobile-telas-tatica-escalacao-partida.md), [`07-mobile-telas-mercado-transferencias-contratos.md`](07-mobile-telas-mercado-transferencias-contratos.md), [`09-mobile-telas-financas-estrutura-estadio.md`](09-mobile-telas-financas-estrutura-estadio.md), [`10-mobile-telas-competicoes-calendario-selecoes.md`](10-mobile-telas-competicoes-calendario-selecoes.md), [`05-mobile-telas-elenco-jogador-treino-medicina.md`](05-mobile-telas-elenco-jogador-treino-medicina.md), doc 08 (partida ao vivo) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO como detalhamento dos seis casos densos; as demais telas herdam [`24-layouts-canonicos-e-cobertura.md`](24-layouts-canonicos-e-cobertura.md) · **Fontes:** [`00-visao-geral-e-design-system.md`](00-visao-geral-e-design-system.md), specs 03–13 e R-99 · **Revisão:** 2026-07-13
 
 Wireframes **textuais** (ASCII/blocos) das **telas mais densas** do app do jogador — aquelas onde a hierarquia visual e o comportamento responsivo precisam ser resolvidos antes da implementação. Cada tela já tem sua **especificação** (Objetivo/Layout/Componentes/Ações/Estados) no documento indicado; aqui fixamos o **arranjo espacial** e o **fluxo de leitura** em tela pequena.
 
-> **Recomendação (a ratificar — R-99):** os arranjos abaixo são a **1ª passada** de wireframe (baixa fidelidade, sem pixel-perfect). Complementam as specs de tela e o design system ([§4.2, R-99](00-visao-geral-e-design-system.md#42-especificações-dos-componentes-chave)); tokens de cor/tipografia/espaço vêm de [§3 (R-98)](00-visao-geral-e-design-system.md#3-design-tokens). Nada aqui é canônico — ajustável no protótipo de alta fidelidade. Componentes citados (`Header`, `Card`, `StatTile`, `TabBar`, `BottomSheet`, `ListRow`, `Badge`, `Toast`…) são os de §4.
+> **Decisão ratificada — R-99:** os arranjos abaixo são wireframes canônicos de baixa fidelidade. Protótipos podem refinar estética e responsividade, sem mudar hierarquia, estados ou consequências. Componentes citados são os do design system.
 
 **Convenções dos diagramas:**
 
@@ -208,7 +208,7 @@ Wireframes **textuais** (ASCII/blocos) das **telas mais densas** do app do jogad
 ```
 
 - **Hierarquia visual:** o **roll-up** (nível geral + estilo derivado) fica no topo fixo como leitura de "onde o clube está". A **árvore** organiza por **ramo** (colapsável) → **departamento** (card canônico). Cada card comunica em uma olhada: nível (Meter + faixa), custo/tempo de melhoria e se está **liberado / em obra / bloqueado por requisito** (cor: neutro / *warning* em obra / *danger*+ícone bloqueado).
-- **Card de departamento (canônico):** nível 1–10 + faixa nomeada (Amador→Elite), custo de melhoria, tempo, custo mensal, benefícios, requisitos, impacto — resumidos no card, detalhe em `M-DEPARTMENT` (▸).
+- **Card de departamento (canônico):** nível 1–5 + faixa nomeada (Amador→Elite), custo de melhoria, tempo, custo mensal, benefícios, requisitos, impacto — resumidos no card, detalhe em `M-DEPARTMENT` (▸).
 - **Responsivo (mobile):** por padrão **só o ramo focado fica aberto** (acordeão) para caber em tela pequena; demais colapsados com contador. Cards de departamento em 1 coluna (largura cheia) sempre. *Font scaling* grande: linha custo/tempo/requisito quebra em duas. Obra em andamento: `Meter` de progresso + dias restantes; requisito não atendido desabilita o toque de upgrade com o motivo.
 
 ---

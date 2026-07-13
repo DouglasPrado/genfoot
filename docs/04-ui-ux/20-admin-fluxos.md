@@ -1,6 +1,6 @@
 # Admin — Fluxos
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/02-tecnico/09-operacao-e-admin-do-mundo.md, docs/02-tecnico/04-plataforma-seguranca-operacoes.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
 
 Fluxos do **admin do mundo** (Next.js) — a superfície de operação que **acompanha o estado vivo do mundo**, corrige falhas concretas e preserva a competição, **sem alterar resultados discricionariamente**. Princípios herdados ([doc 09-op](../02-tecnico/09-operacao-e-admin-do-mundo.md)): **correção sobre o futuro, não sobre o passado**; **rastreabilidade total** (estado anterior + motivo + responsável); **autoridade do servidor**; **IA generativa nunca decide, só narra**.
 
@@ -36,7 +36,7 @@ Fluxos do **admin do mundo** (Next.js) — a superfície de operação que **aco
 2. Um sinal em alerta → *drill-down* na tela correspondente (`A-ECONOMY`, `A-MATCHES`, `A-CLUBS`, `A-MODERATION`, `A-COMPETITIONS`…).
 3. O painel pode exibir **resumo** de saúde técnica (latência, filas), mas o canônico é a plataforma técnica.
 
-**Referências:** [`09-op §2`](../02-tecnico/09-operacao-e-admin-do-mundo.md). > **Pendência:** limiares de alerta por item (fonte em aberto).
+**Referências:** [`09-op §2`](../02-tecnico/09-operacao-e-admin-do-mundo.md). **Fechado:** limiares R-125..R-137 e procedimento R-168.
 
 ## AF-02 — Verificações de saúde econômica e demográfica
 
@@ -53,7 +53,7 @@ Fluxos do **admin do mundo** (Next.js) — a superfície de operação que **aco
 3. Aplica a correção com **estado anterior preservado + motivo + responsável** (obrigatórios). Reautenticação para ação crítica.
 4. Grava evento no **`A-AUDIT`** (imutável); comunica o usuário quando aplicável.
 
-**Referências:** [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md). > **Pendência:** comunicação ao usuário após correção (fonte em aberto).
+**Referências:** [`09-op §4`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`04-plataforma §5, §6`](../02-tecnico/04-plataforma-seguranca-operacoes.md). **Fechado:** comunicação antes→depois e causalidade conforme R-87/R-156.
 
 ## AF-04 — Moderação de abuso (detecção → decisão)
 
@@ -102,7 +102,7 @@ Fluxos do **admin do mundo** (Next.js) — a superfície de operação que **aco
 2. Desvios orientam ajustes **sobre o futuro** → `A-RULES`.
 3. **SimulationLab** testa cenários de abuso antes de promover mudanças a mundos vivos (*gate*).
 
-**Referências:** [`09-op §6`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`09-anti-abuso (Dec. 1953)`](../01-game-design/09-anti-abuso-e-onboarding.md). > **Pendência:** metodologia/critérios de *gate* (fonte em aberto).
+**Referências:** [`09-op §6`](../02-tecnico/09-operacao-e-admin-do-mundo.md); [`09-anti-abuso (Dec. 1953)`](../01-game-design/09-anti-abuso-e-onboarding.md). **Fechado:** metodologia R-34/R-88 e gate G1..G8 (R-120).
 
 ## AF-10 — Versionamento de regras
 

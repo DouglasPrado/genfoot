@@ -1,10 +1,10 @@
 # Catálogo de Commands
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/02-tecnico/08-frontend-cliente-e-tempo-real.md (envelope de command), docs/04-ui-ux/ (ações referenciadas nos fluxos) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/02-tecnico/08-frontend-cliente-e-tempo-real.md (envelope de command), docs/04-ui-ux/ (ações referenciadas nos fluxos) · **Revisão:** 2026-07-11
 
 Este documento é o **catálogo canônico de commands** do **Grinta** — os nomes das ações que um cliente (app do jogador em Expo ou admin em Next.js) envia à API oficial. Ele existe porque os fluxos de UI em [`../04-ui-ux/`](../04-ui-ux/) referenciam commands por nome (ex.: `SignTransfer`, `RenewContract`), mas o contrato técnico define apenas o **envelope genérico** — sem enumerar os nomes. Aqui os nomes ganham um lar único.
 
-> **Escopo:** este catálogo fixa **nomes, intenção e contrato** de cada command — **payload** (campos de entrada, tipados conforme o [Modelo de Dados](./02-modelo-de-dados.md)), **pré-condições/validações**, **errorCodes**, **eventos de domínio emitidos** e **idempotência/concorrência**. Os valores de balanceamento que um contrato pressupõe (prazos, faixas plausíveis, limites) ficam em [Catálogo de Regras e Fórmulas](./05-catalogo-de-regras-e-formulas.md); quando ainda não ratificados, aparecem aqui como `> **Recomendação (a ratificar — R-2x)`.
+> **Escopo:** este catálogo fixa **nomes, intenção e contrato** de cada command — **payload** (campos de entrada, tipados conforme o [Modelo de Dados](./02-modelo-de-dados.md)), **pré-condições/validações**, **errorCodes**, **eventos de domínio emitidos** e **idempotência/concorrência**. Os valores de balanceamento que um contrato pressupõe (prazos, faixas plausíveis, limites) ficam em [Catálogo de Regras e Fórmulas](./05-catalogo-de-regras-e-formulas.md); quando ainda não ratificados, aparecem aqui como `> **Decisão ratificada — R-2x)`.
 
 ## Sumário
 
@@ -19,7 +19,7 @@ Este documento é o **catálogo canônico de commands** do **Grinta** — os nom
   - [Diretoria, comunicação e automação](#diretoria-comunicação-e-automação)
   - [Loja, identidade e suporte](#loja-identidade-e-suporte)
   - [Admin (mundo)](#admin-mundo)
-- [Recomendações a ratificar (R-25 a R-29)](#recomendações-a-ratificar-r-25-a-r-29)
+- [Decisões ratificadas (R-25 a R-29)](#recomendações-a-ratificar-r-25-a-r-29)
 - [Apêndice: errorCodes](#apêndice-errorcodes)
 
 ---
@@ -367,6 +367,13 @@ Transferência é **processo** (`TransferCase` + `TransferOffer`/`TransferOfferV
 - **Eventos:** `OfflinePlanSet`.
 - **Idempotência/concorrência:** agregado `ClubAIProfile`; `expectedVersion`.
 
+#### `SetNotificationPreferences` · Risco: baixo · fluxo: M-NOTIF-SETTINGS
+- **Payload:** `{ channels: Json, quietHours?: Json, grouping: Json, priorities: Json }` — preferências de entrega e agrupamento; alertas obrigatórios de segurança/integridade não podem ser desativados.
+- **Pré-condições:** sessão válida; canais pertencem ao usuário; configuração respeita os avisos obrigatórios de R-165/R-168.
+- **errorCodes:** `NOTIFICATION_PREFERENCES_INVALID`, `MANDATORY_NOTIFICATION_CANNOT_BE_DISABLED`.
+- **Eventos:** `NotificationPreferencesSet`.
+- **Idempotência/concorrência:** agregado `UserNotificationPreferences`; `expectedVersion` e `idempotencyKey`.
+
 ### Loja, identidade e suporte
 
 #### `PurchaseStoreItem` · Risco: baixo · fluxos: MF-25
@@ -392,23 +399,192 @@ Transferência é **processo** (`TransferCase` + `TransferOffer`/`TransferOfferV
 
 ### Admin (mundo)
 
-Os commands do admin (correções, W.O./sanções, filas, reprocessamento, reversão) seguem a **matriz de ações** (`VIEW`/`INVESTIGATE`/`PROPOSE`/`APPROVE`/`EXECUTE`/`ROLLBACK`/…) e o rito de aprovação de [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) e [`./09-operacao-e-admin-do-mundo.md`](./09-operacao-e-admin-do-mundo.md); não são reproduzidos aqui como `commandType` de jogador. Todos rejeitam com `WORLD_READ_ONLY` quando o mundo está fora de escrita e exigem trilha de auditoria (`AuditEvent`, cadeia de hash).
+Os commands administrativos são enviados pelo **admin do mundo** (Next.js), não pelo app do jogador. Eles seguem a **matriz de ações** (`VIEW`/`INVESTIGATE`/`PROPOSE`/`APPROVE`/`EXECUTE`/`ROLLBACK`/`EXPORT`/`DELETE`/`ANONYMIZE`/`IMPERSONATE`/`BREAK_GLASS`) e o rito de aprovação de [`./04-plataforma-seguranca-operacoes.md`](./04-plataforma-seguranca-operacoes.md) e [`./09-operacao-e-admin-do-mundo.md`](./09-operacao-e-admin-do-mundo.md), e materializam as ações dos fluxos `AF-*` e telas `A-*` de [`../04-ui-ux/20-admin-fluxos.md`](../04-ui-ux/20-admin-fluxos.md), [`../04-ui-ux/21-admin-telas.md`](../04-ui-ux/21-admin-telas.md) e [`../04-ui-ux/22-admin-complementos-plataforma.md`](../04-ui-ux/22-admin-complementos-plataforma.md).
+
+**Convenção específica dos commands administrativos** (além do envelope e da convenção de contrato acima, cada spec ganha dois campos):
+
+- **Autoridade (RBAC)** — papel efetivo mínimo (`READ_ONLY_ANALYST` … `PLATFORM_OWNER`) + célula da **matriz de ações × escopo** (`environment/gameWorldId/service/entityType/operation/dataClassification`). **Ações críticas** exigem **reautenticação**; **alto impacto** exige **aprovação em quatro olhos** (`FOUR_EYES_APPROVAL`) — o command entra em `AWAITING_APPROVAL` e só efetiva após `ApproveAdminAction` de um 2º operador (segregação de funções: o autor **não** aprova o próprio).
+- **Auditoria** — **toda** escrita administrativa é **append-only** no `GameAuditLog` (cadeia de hash), com **motivo obrigatório**, `before`/`after`, `operatorId`, `riskScore`, IP/dispositivo (por permissão) e `rulesetVersion`. Correção **nunca apaga**: cria novo evento referenciando o anterior ([INV-34](./05-catalogo-de-regras-e-formulas.md#5-invariantes)). Ações sobre estado do mundo respeitam **"correção sobre o futuro, não sobre o passado"**.
+
+Estes commands rejeitam com `WORLD_READ_ONLY` quando a ação seria **gameplay** num mundo fora de escrita — **exceto** os commands de **operação do próprio mundo** (manutenção, `READ_ONLY`, backup, arquivamento, flags), que **operam** o estado read-only e por isso rodam nele. Todo command administrativo tem selo **Risco: alto** salvo indicação; a IA generativa **nunca** decide correções/sanções/resultados — só narra fatos já definidos ([21-admin-telas](../04-ui-ux/21-admin-telas.md)).
+
+Comuns adicionais a todos os commands admin: `REASON_REQUIRED` (motivo obrigatório ausente), `ADMIN_FORBIDDEN_ROLE` (papel não cobre a célula da matriz), `REAUTHENTICATION_REQUIRED` (ação crítica sem reautenticação fresca), `FOUR_EYES_APPROVAL_REQUIRED` (alto impacto sem 2º aprovador), `SELF_APPROVAL_FORBIDDEN` (autor tentando aprovar), `OUT_OF_SCOPE_FOR_SESSION` (fora do escopo da sessão elevada).
+
+#### Correção, reprocessamento e reversão — `AF-03`/`AF-07` · `A-CORRECTIONS`
+
+##### `ApplyAdministrativeCorrection` · Risco: alto · fluxos: AF-03
+- **Payload:** `{ targetType: string, targetRef: UUID, correctionType: string, scope: Json, params: Json, reason: string, beforeSnapshotRef?: UUID }` — correção de falha concreta (partida interrompida, duplicidade, tabela incorreta, contrato mal processado, premiação duplicada, transferência fraudulenta, falha de encerramento).
+- **Autoridade (RBAC):** papel **Correção** · matriz `EXECUTE` no `entityType` alvo; alto impacto → `FOUR_EYES_APPROVAL` (`AWAITING_APPROVAL`) + reautenticação.
+- **Pré-condições:** entidade-alvo existe no mundo; correção **reversível ou justificada**; correção **sobre o futuro** (não reescreve histórico homologado sem rito §14.2); estado anterior capturado.
+- **errorCodes:** `CORRECTION_TARGET_NOT_FOUND`, `CORRECTION_NOT_REVERSIBLE`, `CORRECTION_ON_HOMOLOGATED_FORBIDDEN`, `FOUR_EYES_APPROVAL_REQUIRED`.
+- **Eventos:** `AdministrativeCorrectionApplied` (+ `GameAuditLogAppended`; efeito aplicado pelo contexto-alvo ao consumir).
+- **Auditoria:** `before`/`after` do alvo, `reason`, `operatorId`, aprovadores; comunica o usuário via `A-BROADCAST` quando aplicável.
+
+##### `ReprocessMatch` / `ReprocessJob` · Risco: alto · fluxos: AF-07 · A-MATCHES/A-OPS
+- **Payload (`ReprocessMatch`):** `{ matchId: UUID, fromCheckpoint?: BigInt, reason: string }` · **(`ReprocessJob`):** `{ jobId: UUID, reason: string }`.
+- **Autoridade (RBAC):** papel **Correção**/**Operação** · matriz `EXECUTE`.
+- **Pré-condições:** partida represada/interrompida (runtime não `PROCESSED`) **ou** job em `STALLED`/`PAUSED`/`DEAD_LETTERED`; reprocessamento **idempotente** (resultado divergente = incidente de integridade, não sobrescrita).
+- **errorCodes:** `MATCH_NOT_REPROCESSABLE`, `JOB_NOT_REPROCESSABLE`, `REPROCESS_WOULD_DIVERGE`.
+- **Eventos:** `ReprocessingStarted` (+ `MatchProcessed`/`JobRetried` no sucesso).
+- **Auditoria:** estado do job/partida antes, checkpoint de origem, `reason`.
+
+##### `RevertOperation` · Risco: alto · fluxos: AF-07 · A-CORRECTIONS
+- **Payload:** `{ auditRef: UUID, reason: string, confirmationText: string }` — desfaz uma operação anterior criando **novo** evento (nunca apaga).
+- **Autoridade (RBAC):** **maior privilégio** (papel **Reversão**/superadmin) · matriz `ROLLBACK`; **reautenticação** + `FOUR_EYES_APPROVAL` obrigatórios.
+- **Pré-condições:** operação-alvo **reversível** e ainda revertível (não superada por fato oficial irreversível); cadeia de auditoria íntegra.
+- **errorCodes:** `OPERATION_NOT_REVERSIBLE`, `INSUFFICIENT_PRIVILEGE`, `FOUR_EYES_APPROVAL_REQUIRED`.
+- **Eventos:** `OperationReverted` (+ `GameAuditLogAppended` referenciando o `auditRef`).
+- **Auditoria:** aponta o evento revertido; append-only ([INV-34](./05-catalogo-de-regras-e-formulas.md#5-invariantes)).
+
+##### `ApproveAdminAction` / `RejectAdminAction` · Risco: alto · fluxos: A-QUEUES (quatro olhos)
+- **Payload:** `{ pendingActionId: UUID, decision: "APPROVE" | "REJECT", note?: string }`.
+- **Autoridade (RBAC):** papel de **revisor** habilitado para a célula, **distinto do autor** (segregação de funções).
+- **Pré-condições:** ação pendente em `AWAITING_APPROVAL`; revisor ≠ autor; não decidida ainda.
+- **errorCodes:** `APPROVAL_TARGET_NOT_FOUND`, `SELF_APPROVAL_FORBIDDEN`, `APPROVAL_ALREADY_DECIDED`.
+- **Eventos:** `AdminActionApproved` (libera a execução da ação original) · `AdminActionRejected`.
+- **Auditoria:** decisão, revisor, nota; a ação original só efetiva após `AdminActionApproved`.
+
+#### W.O. e sanções — `AF-05` · `A-WO-SANCTIONS`
+
+##### `DeclareWalkover` · Risco: alto · fluxos: AF-05
+- **Payload:** `{ matchId: UUID, beneficiaryClubId?: UUID, reason: string, sanctionRef?: UUID }` — W.O. por não comparecimento/punição.
+- **Autoridade (RBAC):** papel **Punição** · matriz `EXECUTE`.
+- **Pré-condições:** partida elegível a W.O. (`SCHEDULED`/`PRE_MATCH`/`ABANDONED`, doc 14 RS-2); ainda não `PROCESSED`; motivo.
+- **errorCodes:** `MATCH_NOT_WALKOVER_ELIGIBLE`, `MATCH_ALREADY_FINISHED`.
+- **Eventos:** `WalkoverDeclared` (+ `MatchFinished` com `resultStatus=WALKOVER`, **pula `LIVE`**; alimenta standings da competição).
+- **Auditoria:** motivo, beneficiário, sanção vinculada.
+
+##### `ApplySanction` / `LiftSanction` · Risco: alto · fluxos: AF-05 · A-WO-SANCTIONS/A-QUEUES
+- **Payload (`ApplySanction`):** `{ subjectType: "ACCOUNT" | "CLUB" | "USER", subjectRef: UUID, sanctionType: "WARNING" | "BLOCK" | "COOLDOWN" | "MARKET_RESTRICTION" | "FINE" | "POINTS_DEDUCTION" | "RESULT_REVERSAL" | "ACCOUNT_SUSPENSION" | "BAN", magnitude?: Json, durationTicks?: BigInt, publicNotice: boolean, reason: string, caseId?: UUID }` · **(`LiftSanction`):** `{ sanctionId: UUID, reason: string }`.
+- **Autoridade (RBAC):** papel **Punição** · matriz `EXECUTE`; graus altos (`BAN`/`RESULT_REVERSAL`) → `FOUR_EYES_APPROVAL`.
+- **Pré-condições:** sanção do **catálogo progressivo** (aviso→bloqueio→cooldown→restrição→multa→perda de pontos→reversão→suspensão→banimento); proporcional ao caso; **falso positivo não é punido**; `LiftSanction` só sobre sanção ativa.
+- **errorCodes:** `SANCTION_TARGET_NOT_FOUND`, `SANCTION_NOT_IN_CATALOG`, `SANCTION_DISPROPORTIONATE`, `SANCTION_NOT_ACTIVE`, `FOUR_EYES_APPROVAL_REQUIRED`.
+- **Eventos:** `SanctionApplied` (+ conforme tipo: `PointsDeducted`, `MarketRestrictionApplied`, `AccountCooldownStarted`, `ResultReverted`; pública → notícia narrativa) · `SanctionLifted`.
+- **Auditoria:** tipo/magnitude, caso de origem, `riskScore`; o audit log **em si** não vira notícia.
+
+#### Moderação, quarentena e suporte — `AF-04`/`AF-06` · `A-MODERATION`/`A-QUEUES`/`A-SUPPORT`
+
+##### `ResolveModerationCase` / `QuarantineAction` / `ReclassifyAccountRelation` · Risco: alto · fluxos: AF-04
+- **Payload (`ResolveModerationCase`):** `{ caseId: UUID, decision: "RELEASE" | "QUARANTINE" | "SANCTION", reason: string, sanctionParams?: Json }` · **(`QuarantineAction`):** `{ targetActionRef?: UUID, subjectRef: UUID, scope: Json, reason: string, reviewDeadline: DateTime }` · **(`ReclassifyAccountRelation`):** `{ accountA: UUID, accountB: UUID, relationDegree: "WEAK" | "MODERATE" | "STRONG" | "CONFIRMED", reason: string }`.
+- **Autoridade (RBAC):** papel **Revisão** (`INVESTIGATE`/`EXECUTE`); sanção → papel **Punição**.
+- **Pré-condições:** caso na fila (`A-QUEUES`); quarentena **congela** a ação (jogador não muda, dinheiro não move) até o prazo; ambíguos não são punidos automaticamente; privacidade preservada.
+- **errorCodes:** `MODERATION_CASE_NOT_FOUND`, `MODERATION_CASE_ALREADY_RESOLVED`, `QUARANTINE_TARGET_NOT_FOUND`, `ALREADY_QUARANTINED`.
+- **Eventos:** `ModerationCaseResolved` · `AntiAbuseQuarantineApplied` · `RiskFlagRaised` · `AccountRelationReclassified` (conforme decisão).
+- **Auditoria:** sinais avaliados, grau de relação, decisão; fórmula de risco **não** exposta.
+
+##### `RevealSensitiveData` · Risco: alto · fluxos: A-AUDIT/A-MODERATION/A-SUPPORT
+- **Payload:** `{ subjectRef: UUID, dataClass: string, reason: string, durationMinutes: Int }` — revela e-mail/token/documento/IP para investigação.
+- **Autoridade (RBAC):** matriz `INVESTIGATE` + `dataClassification` sensível; **reautenticação**; janela **curta**.
+- **Pré-condições:** motivo; escopo/duração limitados; **a própria busca é auditada**.
+- **errorCodes:** `SENSITIVE_ACCESS_DENIED`, `SENSITIVE_SCOPE_INVALID`.
+- **Eventos:** `SensitiveDataRevealed`.
+- **Auditoria:** que dado, motivo, duração, operador — sempre registrado ([INV-34](./05-catalogo-de-regras-e-formulas.md#5-invariantes)).
+
+##### `ResolveAppeal` / `StartSupportImpersonation` · Risco: alto · fluxos: AF-06 · A-SUPPORT
+- **Payload (`ResolveAppeal`):** `{ supportTicketId: UUID, decision: string, responseText: string }` · **(`StartSupportImpersonation`):** `{ targetUserId: UUID, mode: "READ_ONLY_IMPERSONATION" | "ASSISTED_IMPERSONATION", reason: string, approvalRef?: UUID }`.
+- **Autoridade (RBAC):** papel **Suporte**/**Revisão**; impersonação exige **verificação de identidade**, **notificação ao usuário**, reautenticação e (para `ASSISTED_`) aprovação; obedece às **proibições** durante impersonação.
+- **Pré-condições:** ticket/recurso aberto e não decidido; máquina de ticket (`OPEN…RESOLVED/REOPENED`).
+- **errorCodes:** `APPEAL_NOT_FOUND`, `APPEAL_ALREADY_DECIDED`, `IMPERSONATION_NOT_APPROVED`, `IDENTITY_VERIFICATION_REQUIRED`, `IMPERSONATION_FORBIDDEN_ACTION`.
+- **Eventos:** `AppealResolved` (+ `SupportTicketUpdated`) · `SupportImpersonationStarted` (temporário, `supportAccessSessionId`).
+- **Auditoria:** decisão/resposta; sessão de impersonação sinalizada, temporária e auditada.
+
+#### Ciclo de vida e manutenção do mundo — `A-WORLDS`/`A-MAINTENANCE` (doc 14 · Máquina 1)
+
+##### `PauseWorld` / `ResumeWorld` · Risco: alto · fluxos: A-WORLDS
+- **Payload:** `{ reason: string }`.
+- **Autoridade (RBAC):** papel de **Operação** (`PLATFORM_ADMIN`) · matriz `EXECUTE` no `gameWorldId`.
+- **Pré-condições:** `PauseWorld` (M1-2): sem partida `LIVE` bloqueante (drena runtime); `ResumeWorld` (M1-3): mundo `PAUSED`. Não afeta partidas em `PAUSED_FOR_DECISION` (isso é runtime, não mundo — doc 14 §9).
+- **errorCodes:** `WORLD_HAS_LIVE_MATCHES`, `WORLD_STATE_INVALID`.
+- **Eventos:** `WorldPaused` · `WorldResumed`.
+- **Auditoria:** motivo, janela; roda **mesmo** com o mundo fora de gameplay (opera o estado).
+
+##### `SetWorldReadOnly` / `ScheduleMaintenanceWindow` / `FreezeDeadlines` · Risco: alto · fluxos: A-MAINTENANCE
+- **Payload (`SetWorldReadOnly`):** `{ enabled: boolean, reason: string, window?: Json }` · **(`ScheduleMaintenanceWindow`):** `{ startAt: DateTime, durationMinutes: Int, services: [string], worlds: [UUID], accessMode: string, freezeDeadlines: boolean, emergency?: boolean }` · **(`FreezeDeadlines`):** `{ worldId: UUID, scope: Json, untilAt: DateTime, reason: string }`.
+- **Autoridade (RBAC):** papel de **Operação** · matriz `EXECUTE`.
+- **Pré-condições:** janela não conflita com partidas críticas (ou **congela prazos** para não punir por indisponibilidade); `EMERGENCY` dispensa antecedência.
+- **errorCodes:** `MAINTENANCE_WINDOW_CONFLICT`, `WORLD_STATE_INVALID`.
+- **Eventos:** `WorldReadOnlyEntered`/`WorldReadOnlyExited` · `MaintenanceWindowScheduled` · `DeadlinesFrozen`.
+- **Auditoria:** serviços/mundos afetados, modo de acesso; comunica via `A-BROADCAST`. Reflete `WORLD_READ_ONLY` no cliente.
+
+##### `FinishWorld` / `ArchiveWorld` / `RestoreWorld` · Risco: alto · fluxos: A-WORLDS/A-MAINTENANCE
+- **Payload (`FinishWorld`):** `{ reason: string, confirmationText: string }` · **(`ArchiveWorld`):** `{ worldId: UUID, reason: string, acknowledgeReadOnly: boolean }` · **(`RestoreWorld`):** `{ worldId: UUID, targetStatus: "ACTIVE" | "FINISHED", reason: string }`.
+- **Autoridade (RBAC):** **Operação máxima** (`PLATFORM_OWNER`) · matriz `EXECUTE`/`ROLLBACK`; reautenticação; `RestoreWorld` → `FOUR_EYES_APPROVAL`.
+- **Pré-condições:** `FinishWorld` (M1-4/M1-5): decisão de encerramento; `ArchiveWorld` (M1-6, **BASELINE RATIFICADA — R-56**): mundo sem usuário ativo por **≥ 2 temporadas**, avaliado entre temporadas, após **aviso de 30 dias**; `RestoreWorld` (M1-7, **BASELINE RATIFICADA — R-56**): reversão excepcional (read-only reversível).
+- **errorCodes:** `WORLD_STATE_INVALID`, `WORLD_ARCHIVE_CRITERIA_NOT_MET`, `FOUR_EYES_APPROVAL_REQUIRED`.
+- **Eventos:** `WorldFinished` · `WorldArchived` *(BASELINE RATIFICADA — R-56)* · `WorldRestored` *(BASELINE RATIFICADA — R-56)*.
+- **Auditoria:** critério de arquivamento, aviso prévio; histórico/títulos/recordes **preservados** (read-only, não reset).
+
+#### Versionamento de regras — `AF-10`/`AF-02` · `A-RULES`
+
+##### `PublishRuleSetVersion` · Risco: alto · fluxos: AF-10
+- **Payload:** `{ ruleConfigType: "GENERATION" | "ECONOMY" | "ANTI_ABUSE", version: string, params: Json, effectiveFrom: DateTime, scope: Json, reason: string }` — versiona geração/economia/anti-abuso.
+- **Autoridade (RBAC):** **Operação máxima** · matriz `EXECUTE`; ligada a `A-ECONOMY`/`A-BALANCE`.
+- **Pré-condições:** **não retroativa** (`effectiveFrom ≥ agora`); quando aplicável, passou pelo **gate do SimulationLab**; `version`/manifesto coerente (bump de `rulesetVersion` — **BASELINE RATIFICADA — R-24**).
+- **errorCodes:** `RULESET_VERSION_CONFLICT`, `RULESET_RETROACTIVE_FORBIDDEN`, `SIMULATION_GATE_NOT_PASSED`.
+- **Eventos:** `RuleSetVersionPublished` (novo `GameRuleConfig`/`GameEconomyConfig` versionado; carimba `rulesetVersion` dali para frente).
+- **Auditoria:** versão, pesos, data efetiva, mundo/temporada, motivo (correção **sobre o futuro**).
+
+#### Feature flags e kill switches — `A-FLAGS`
+
+##### `SetFeatureFlag` / `TriggerKillSwitch` / `ReleaseKillSwitch` · Risco: alto · telas: A-FLAGS
+- **Payload (`SetFeatureFlag`):** `{ flagKey: string, enabled: boolean, scope: "GLOBAL" | "ENVIRONMENT" | "REGION" | "WORLD" | "USER_COHORT" | "USER" | "SERVICE", scopeRef?: UUID, reviewAt?: DateTime, expiresAt?: DateTime, reason: string }` · **(`TriggerKillSwitch`):** `{ switchKey: "MARKET" | "CHAT" | "EXTERNAL_NOTIFICATIONS" | "FEATURE" | "INTEGRATION" | "JOB", targetRef?: UUID, reason: string }` · **(`ReleaseKillSwitch`):** `{ switchKey: string, reason: string }`.
+- **Autoridade (RBAC):** papel de **Plataforma** · matriz `EXECUTE`; kill switch → **reautenticação**.
+- **Pré-condições:** flag/switch existe no registro; flag sem `reviewAt`/`expiresAt` é sinalizada como **dívida** (não bloqueia).
+- **errorCodes:** `FLAG_NOT_FOUND`, `FLAG_SCOPE_INVALID`, `KILL_SWITCH_NOT_FOUND`.
+- **Eventos:** `FeatureFlagChanged` · `KillSwitchActivated` (pode ligar a `A-INCIDENTS`) · `KillSwitchReleased`.
+- **Auditoria:** responsável, motivo, escopo, `reviewAt`/`expiresAt`; opera **mesmo** em mundo read-only (corte de emergência).
+
+#### Filas, jobs, DLQ e reconciliação — `A-OPS`
+
+##### `RetryStalledJob` / `CancelJob` / `ReprocessDeadLetter` / `RunReconciliation` · Risco: alto · telas: A-OPS
+- **Payload (`RetryStalledJob`):** `{ jobId: UUID, reason: string }` · **(`CancelJob`):** `{ jobId: UUID, mode: "GRACEFUL" | "IMMEDIATE" | "AFTER_CURRENT_ITEM", reason: string }` · **(`ReprocessDeadLetter`):** `{ dlqMessageId?: UUID, batchRef?: UUID, reason: string }` · **(`RunReconciliation`):** `{ scope: "LEDGER" | "POPULATION" | "STANDINGS" | "REGISTRATIONS", worldId: UUID, reason: string }`.
+- **Autoridade (RBAC):** papel de **Operação** · matriz `EXECUTE` (ou somente-leitura/espelho se a ação viver em ferramenta SRE externa — escopo a decidir, [doc 22 A-OPS](../04-ui-ux/22-admin-complementos-plataforma.md)).
+- **Pré-condições:** job em `STALLED`/`PAUSED`; mensagem em **DLQ** (poison bloqueada exige análise); reprocessamento **idempotente**; reconciliação é read-mostly (grava só o relatório).
+- **errorCodes:** `JOB_NOT_FOUND`, `JOB_NOT_RETRYABLE`, `DLQ_MESSAGE_NOT_FOUND`, `POISON_MESSAGE_BLOCKED`.
+- **Eventos:** `JobRetried` · `JobCancelled` · `DeadLetterReprocessed` · `ReconciliationRun` (+ `ReconciliationInconsistencyDetected` quando acha desvio).
+- **Auditoria:** estado do job/fila, escopo da reconciliação, resultado (`CONSISTENT`…`CRITICAL_INCONSISTENCY`).
+
+#### Plataforma: backups, incidentes, broadcast, privacidade e bugs — `A-BACKUPS`/`A-INCIDENTS`/`A-BROADCAST`/`A-PRIVACY`/`A-BUGS`
+
+##### `RestoreBackup` · Risco: alto · telas: A-BACKUPS
+- **Payload:** `{ worldId: UUID, restoreType: "WORLD_RESTORE" | "POINT_IN_TIME_RECOVERY", targetPoint: Json, reason: string, confirmationText: string }`.
+- **Autoridade (RBAC):** **Operação máxima** · matriz `EXECUTE`; **quatro olhos** + reautenticação obrigatórios.
+- **Pré-condições:** backup `VALID`/verificado; `RPO`/`RTO` respeitados; replay seguro / modo seguro de integrações.
+- **errorCodes:** `BACKUP_INVALID`, `RESTORE_CRITERIA_NOT_MET`, `FOUR_EYES_APPROVAL_REQUIRED`.
+- **Eventos:** `BackupRestoreStarted` (+ `WorldRestored` quando aplicável).
+- **Auditoria:** ponto de restauração, tipo, aprovadores.
+
+##### `OpenIncident` / `UpdateIncident` / `PublishBroadcast` · Risco: alto · telas: A-INCIDENTS/A-BROADCAST
+- **Payload (`OpenIncident`):** `{ severity: "SEV_1" | "SEV_2" | "SEV_3" | "SEV_4" | "SEV_5", title: string, publicState?: string, commanderId?: UUID }` · **(`UpdateIncident`):** `{ incidentId: UUID, state: string, publicState?: string, note?: string }` · **(`PublishBroadcast`):** `{ audience: "ALL" | "WORLD" | "SEGMENT" | "AFFECTED", channel: "IN_APP" | "PUSH", level: string, message: string, scheduleAt?: DateTime }`.
+- **Autoridade (RBAC):** papel de **Operação**/**Suporte** · matriz `EXECUTE`.
+- **Pré-condições:** incidente aberto para atualizar; broadcast com público/canal válidos (usado por manutenção, incidente e pós-correção).
+- **errorCodes:** `INCIDENT_NOT_FOUND`, `BROADCAST_AUDIENCE_INVALID`.
+- **Eventos:** `IncidentOpened` · `IncidentUpdated` · `BroadcastPublished`.
+- **Auditoria:** severidade/estado, comandante, histórico de comunicações (`userNotificationId`).
+
+##### `ProcessDataSubjectRequest` / `TriageBugReport` · Risco: alto · telas: A-PRIVACY/A-BUGS
+- **Payload (`ProcessDataSubjectRequest`):** `{ requestType: "EXPORT" | "DELETE" | "ANONYMIZE" | "ACCESS" | "RESTRICT", subjectUserId: UUID, reason: string, legalHold?: boolean }` · **(`TriageBugReport`):** `{ reportId: UUID, status: string, rewardType?: "COSMETIC_BADGE" | "MENTION" }`.
+- **Autoridade (RBAC):** `COMPLIANCE_REVIEWER` (matriz `EXPORT`/`DELETE`/`ANONYMIZE`) + reautenticação e **verificação de identidade**; triagem de bug → papel **Suporte**.
+- **Pré-condições:** pipeline de exclusão (`IDENTITY_VERIFICATION → UNDER_REVIEW → WAITING_RETENTION_PERIOD → ANONYMIZING → COMPLETED`); export **mascara terceiros**; separa dado pessoal × **fato competitivo** (este permanece); recompensa de bug **nunca** competitiva (só cosmético).
+- **errorCodes:** `DSR_IDENTITY_UNVERIFIED`, `DSR_LEGAL_HOLD_ACTIVE`, `DSR_RETENTION_PERIOD_ACTIVE`, `BUG_REPORT_NOT_FOUND`, `COMPETITIVE_REWARD_FORBIDDEN`.
+- **Eventos:** `DataSubjectRequestProcessed` · `BugReportTriaged` (+ `CosmeticRewardGranted`).
+- **Auditoria:** tipo de solicitação, legal hold, verificação de identidade; badge cosmético registrado.
 
 ---
 
-## Recomendações a ratificar (R-25 a R-29)
+## Decisões ratificadas (R-25 a R-29)
 
 Os contratos acima estão fechados quanto à **forma** (payload/validações/errorCodes/eventos/idempotência). Restam **valores de balanceamento** que os contratos apenas referenciam; ficam como recomendação até o [Catálogo de Regras e Fórmulas](./05-catalogo-de-regras-e-formulas.md) ratificar.
 
-> **Recomendação (a ratificar — R-25):** TTL da reserva de vaga (`ReserveClubSlot` → `ClubEntryReservation`). Racional: precisa ser curto o suficiente para liberar a vaga a outro jogador, longo o suficiente para o onboarding (`M-CLUB-PREVIEW` → `M-SLOT-RESERVE` → `M-CONTROL-ACTIVATE`). Sugestão inicial: **30 minutos**, com um único `renew` por reserva. Expirado → `CLUB_SLOT_RESERVATION_EXPIRED`.
+> **Decisão ratificada — R-25:** TTL da reserva de vaga (`ReserveClubSlot` → `ClubEntryReservation`). Racional: precisa ser curto o suficiente para liberar a vaga a outro jogador, longo o suficiente para o onboarding (`M-CLUB-PREVIEW` → `M-SLOT-RESERVE` → `M-CONTROL-ACTIVATE`). Sugestão inicial: **30 minutos**, com um único `renew` por reserva. Expirado → `CLUB_SLOT_RESERVATION_EXPIRED`.
 
-> **Recomendação (a ratificar — R-26):** (a) **faixa plausível** de oferta de transferência que dispara `OFFER_OUT_OF_PLAUSIBLE_RANGE` (`MakeTransferOffer`/`MakeCounterOffer`) — sugestão: fora de **[40%, 250%]** do valor de mercado estimado entra em sinalização/quarentena antiabuso; (b) **cooldown de `LeaveClub`** e restrição de negociação com o clube antigo — sugestão: **1 janela de transferência** ou **até a virada de temporada**. Racional: dá teto objetivo ao antiabuso (MF-24) sem revelar fórmula.
+> **Decisão ratificada — R-26:** (a) **faixa plausível** de oferta de transferência que dispara `OFFER_OUT_OF_PLAUSIBLE_RANGE` (`MakeTransferOffer`/`MakeCounterOffer`) — sugestão: fora de **[40%, 250%]** do valor de mercado estimado entra em sinalização/quarentena antiabuso; (b) **cooldown de `LeaveClub`** e restrição de negociação com o clube antigo — sugestão: **1 janela de transferência** ou **até a virada de temporada**. Racional: dá teto objetivo ao antiabuso (MF-24) sem revelar fórmula.
 
-> **Recomendação (a ratificar — R-27):** limites de `SetTicketPrices` que disparam `TICKET_PRICE_OUT_OF_BOUNDS`. Sugestão: preço por setor em **[25%, 400%]** do preço de referência do setor. Racional: o trade-off ocupação×receita (MF-23) precisa de contorno para não permitir preços degenerados nem exploração de público.
+> **Decisão ratificada — R-27:** limites de `SetTicketPrices` que disparam `TICKET_PRICE_OUT_OF_BOUNDS`. Sugestão: preço por setor em **[25%, 400%]** do preço de referência do setor. Racional: o trade-off ocupação×receita (MF-23) precisa de contorno para não permitir preços degenerados nem exploração de público.
 
-> **Recomendação (a ratificar — R-28):** (a) **janela de renovação** antecipada de `RenewContract` (a partir de quando `CONTRACT_NOT_RENEWABLE` deixa de valer) — sugestão: **última temporada** do contrato ou **faltando ≤ 12 meses virtuais**; (b) **máximo de missões de scouting simultâneas** por clube (`StartScoutMission` → `SCOUT_MISSION_LIMIT_EXCEEDED`) — sugestão: derivado do **nível do departamento de scouting**. Racional: liga o contrato ao balanceamento de estrutura sem fixar número mágico.
+> **Decisão ratificada — R-28:** (a) **janela de renovação** antecipada de `RenewContract` (a partir de quando `CONTRACT_NOT_RENEWABLE` deixa de valer) — sugestão: **última temporada** do contrato ou **faltando ≤ 12 meses virtuais**; (b) **máximo de missões de scouting simultâneas** por clube (`StartScoutMission` → `SCOUT_MISSION_LIMIT_EXCEEDED`) — sugestão: derivado do **nível do departamento de scouting**. Racional: liga o contrato ao balanceamento de estrutura sem fixar número mágico.
 
-> **Recomendação (a ratificar — R-29):** parâmetros da janela ao vivo: (a) **máximo de substituições** por partida (`MakeSubstitution` → `SUBSTITUTIONS_EXHAUSTED`) — sugestão: **5** (regra competitiva padrão, configurável por `CompetitionRuleSet`); (b) **duração da janela** de resposta a `DECISION_POINT` (`ResolveDecisionPoint`) e **rate-limit** de `IssueMatchCommand` por minuto simulado, para evitar spam de comando. Racional: define quando `MATCH_COMMAND_WINDOW_CLOSED` é retornado.
+> **Decisão ratificada — R-29:** parâmetros da janela ao vivo: (a) **máximo de substituições** por partida (`MakeSubstitution` → `SUBSTITUTIONS_EXHAUSTED`) — sugestão: **5** (regra competitiva padrão, configurável por `CompetitionRuleSet`); (b) **duração da janela** de resposta a `DECISION_POINT` (`ResolveDecisionPoint`) e **rate-limit** de `IssueMatchCommand` por minuto simulado, para evitar spam de comando. Racional: define quando `MATCH_COMMAND_WINDOW_CLOSED` é retornado.
 
 ---
 
@@ -437,5 +613,17 @@ Todos os códigos são **estáveis e independentes do texto traduzido** (doc 08)
 **Diretoria/comunicação/automação:** `BOARD_MESSAGE_NOT_FOUND`, `BOARD_RESPONSE_INVALID`, `RESPONSE_WINDOW_CLOSED`, `PROMISE_NOT_VERIFIABLE`, `DUPLICATE_OPEN_PROMISE`, `INVALID_CONVERSATION_OPTION`, `PRESS_QUESTION_NOT_FOUND`, `INVALID_PRESS_STANCE`, `AUTOMATION_RULE_INVALID`, `AUTOMATION_HIGH_RISK_NOT_DELEGABLE`, `AUTOMATION_CONFLICT`, `AUTOMATION_RULE_NOT_FOUND`, `OFFLINE_PLAN_INVALID`, `AUTHORITY_LIMIT_EXCEEDED`.
 
 **Loja/identidade/suporte:** `PAY_TO_WIN_ITEM_FORBIDDEN`, `PRODUCT_UNAVAILABLE`, `PAYMENT_FAILED`, `IDENTITY_ASSET_LOCKED`, `IDENTITY_CHANGE_NOT_ALLOWED`, `APPEAL_TARGET_NOT_FOUND`, `APPEAL_ALREADY_OPEN`.
+
+**Admin — comuns:** `REASON_REQUIRED`, `ADMIN_FORBIDDEN_ROLE`, `REAUTHENTICATION_REQUIRED`, `FOUR_EYES_APPROVAL_REQUIRED`, `SELF_APPROVAL_FORBIDDEN`, `OUT_OF_SCOPE_FOR_SESSION`, `INSUFFICIENT_PRIVILEGE`.
+
+**Admin — correção/reprocessamento/reversão:** `CORRECTION_TARGET_NOT_FOUND`, `CORRECTION_NOT_REVERSIBLE`, `CORRECTION_ON_HOMOLOGATED_FORBIDDEN`, `MATCH_NOT_REPROCESSABLE`, `JOB_NOT_REPROCESSABLE`, `REPROCESS_WOULD_DIVERGE`, `OPERATION_NOT_REVERSIBLE`, `APPROVAL_TARGET_NOT_FOUND`, `APPROVAL_ALREADY_DECIDED`.
+
+**Admin — W.O./sanções:** `MATCH_NOT_WALKOVER_ELIGIBLE`, `MATCH_ALREADY_FINISHED`, `SANCTION_TARGET_NOT_FOUND`, `SANCTION_NOT_IN_CATALOG`, `SANCTION_DISPROPORTIONATE`, `SANCTION_NOT_ACTIVE`.
+
+**Admin — moderação/suporte:** `MODERATION_CASE_NOT_FOUND`, `MODERATION_CASE_ALREADY_RESOLVED`, `QUARANTINE_TARGET_NOT_FOUND`, `ALREADY_QUARANTINED`, `SENSITIVE_ACCESS_DENIED`, `SENSITIVE_SCOPE_INVALID`, `APPEAL_NOT_FOUND`, `APPEAL_ALREADY_DECIDED`, `IMPERSONATION_NOT_APPROVED`, `IDENTITY_VERIFICATION_REQUIRED`, `IMPERSONATION_FORBIDDEN_ACTION`.
+
+**Admin — mundo/manutenção/regras:** `WORLD_HAS_LIVE_MATCHES`, `WORLD_STATE_INVALID`, `MAINTENANCE_WINDOW_CONFLICT`, `WORLD_ARCHIVE_CRITERIA_NOT_MET`, `RULESET_VERSION_CONFLICT`, `RULESET_RETROACTIVE_FORBIDDEN`, `SIMULATION_GATE_NOT_PASSED`.
+
+**Admin — plataforma (flags/ops/backup/incidente/privacidade/bug):** `FLAG_NOT_FOUND`, `FLAG_SCOPE_INVALID`, `KILL_SWITCH_NOT_FOUND`, `JOB_NOT_FOUND`, `JOB_NOT_RETRYABLE`, `DLQ_MESSAGE_NOT_FOUND`, `POISON_MESSAGE_BLOCKED`, `BACKUP_INVALID`, `RESTORE_CRITERIA_NOT_MET`, `INCIDENT_NOT_FOUND`, `BROADCAST_AUDIENCE_INVALID`, `DSR_IDENTITY_UNVERIFIED`, `DSR_LEGAL_HOLD_ACTIVE`, `DSR_RETENTION_PERIOD_ACTIVE`, `BUG_REPORT_NOT_FOUND`, `COMPETITIVE_REWARD_FORBIDDEN`.
 
 > **Governança de errorCodes:** novos códigos entram por este apêndice com convenção `SCREAMING_SNAKE` e um command de origem. Ao promover o pacote `/packages/contracts`, este apêndice vira a fonte do enum `ErrorCode` compartilhado entre app (Expo) e admin (Next.js).

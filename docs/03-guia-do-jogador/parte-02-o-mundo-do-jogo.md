@@ -1,6 +1,6 @@
 # Parte II — O mundo do jogo
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md); [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md); [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/01-mundo-persistente-e-clubes.md`](../01-game-design/01-mundo-persistente-e-clubes.md); [`../01-game-design/06-temporada-e-competicoes.md`](../01-game-design/06-temporada-e-competicoes.md); [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md) · **Revisão:** 2026-07-11
 
 O seu clube não vive isolado. Ele existe dentro de um **mundo compartilhado, contínuo e vivo**, que segue funcionando com ou sem você. Esta Parte explica como esse mundo se comporta: por que ele nunca reinicia, como o tempo passa e o calendário se organiza, e como os clubes conduzidos pela inteligência do jogo agem ao seu redor. Entender o mundo é entender o terreno onde todas as suas decisões vão repercutir.
 

@@ -14,7 +14,11 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["packages/**/*.test.ts", "apps/simulator/**/*.test.ts"],
+    include: [
+      "packages/**/*.test.ts",
+      "apps/simulator/**/*.test.ts",
+      "scripts/roadmap/**/*.test.ts",
+    ],
     coverage: {
       reporter: ["text", "json", "html"],
     },

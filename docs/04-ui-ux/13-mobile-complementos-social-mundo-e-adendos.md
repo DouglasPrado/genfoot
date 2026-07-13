@@ -1,6 +1,6 @@
 # Mobile — Complementos: Social, Mundo e Adendos
 
-> **Status:** Rascunho consolidado · **Fontes:** auditoria de completude (2026-07-11) sobre docs/01-game-design/* e docs/02-tecnico/03-multiplayer-e-mundos.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** auditoria de completude (2026-07-11) sobre docs/01-game-design/* e docs/02-tecnico/03-multiplayer-e-mundos.md · **Revisão:** 2026-07-11
 
 Este documento **fecha as lacunas** encontradas na auditoria de completude das telas mobile (docs 03–12) contra o GDD. Traz: (A) **telas novas** que faltavam — sobretudo superfícies **multiplayer/mundo** (ver outro clube/gestor, espectar partidas, múltiplos mundos) e ferramentas de gestão (comparar, entrosamento, retreinar, relatórios, produtos, sócio-torcedor, cláusulas, busca); e (B) **adendos** — campos/ações que faltavam em telas já escritas, listados por tela. Segue o [template](00-visao-geral-e-design-system.md#template-de-especificação-de-tela).
 
@@ -55,7 +55,7 @@ Este documento **fecha as lacunas** encontradas na auditoria de completude das t
 - **Componentes e dados:** caixa de conversas; thread por gestor/negociação; anexos de proposta; controles anti-spam (cooldown de sondagem).
 - **Ações:** enviar mensagem; anexar/abrir proposta; bloquear/silenciar; reportar.
 - **Estados:** cooldown/limite de spam; entrega por WebSocket (presença).
-- **Referências:** [`03-economia §7, §11`](../01-game-design/03-economia.md) (mercado usuário-usuário); [`09-anti-abuso §1 (Dec. 1917, 1945)`](../01-game-design/09-anti-abuso-e-onboarding.md). > **Pendência:** o GDD não detalha chat de liga/mensageria entre gestores — superfície prevista aqui; regras de moderação/escopo a definir.
+- **Referências:** [`03-economia §7, §11`](../01-game-design/03-economia.md); [`09-anti-abuso §1`](../01-game-design/09-anti-abuso-e-onboarding.md). **Fechado:** escopo, retenção e moderação em R-163.
 
 ### `M-LIVE-WORLD` — Rodada ao vivo / espectar partidas do mundo
 - **Objetivo:** acompanhar partidas que o usuário **não** controla (rodada em andamento), em modo somente-leitura.
@@ -102,7 +102,7 @@ Este documento **fecha as lacunas** encontradas na auditoria de completude das t
 - **Como se chega:** aba Clube; Home.
 - **Componentes e dados:** atalhos aos relatórios (profundidade conforme a comissão): **partida** (prévia/ao vivo/pós → `M-PREMATCH`/`M-LIVE`/`M-POSTMATCH`), **elenco** (`M-SQUAD`), **base** (`M-ACADEMY`), **financeiro** (`M-FINANCE`), **mercado** (`M-MARKET`), **profissionais** (`M-STAFF`), **fim de temporada** (`M-SEASON-CLOSE`); cada um com resumo e "por quê" (explicabilidade), sem revelar fórmulas/dados de adversário.
 - **Ações:** abrir relatório; comparar histórico.
-- **Estados:** profundidade limitada por nível de comissão; > **Pendência:** frequência e retenção histórica (fonte em aberto).
+- **Estados:** profundidade/frequência por comissão conforme R-76; retenção acompanha temporadas consultáveis e política de históricos.
 - **Referências:** [`13-relatorios §1, §5`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).
 
 ### `M-MEMBERSHIP` — Sócio-torcedor
@@ -177,7 +177,7 @@ A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lac
 - **Como se chega:** `M-CALENDAR` (fase pré-temporada); `M-NEXTMATCH`; briefing de temporada.
 - **Componentes e dados:** agenda de amistosos; escolha de adversários; datas/turnê; mando/receita/viagem; objetivo do amistoso (testar tática/jovens/condição). Caráter de **baixo risco** (sem punição de moral/torcida). Alimenta `M-PREMATCH` (flag "importância: amistoso").
 - **Ações:** agendar amistoso; escolher adversário; definir objetivo; cancelar.
-- **Estados:** só na fase pré-temporada/janela; > **Pendência:** a mecânica de *arranjo* do amistoso (aceite do adversário, oferta) é pendência da fonte — a superfície existe, os parâmetros a definir.
+- **Estados:** convite, aceite/recusa, TTL e limites definidos em R-164.
 - **Referências:** [`06-temporada §1, §2`](../01-game-design/06-temporada-e-competicoes.md); [`05-motor §10`](../01-game-design/05-motor-de-partida.md).
 
 ### `M-TUTORIAL` — Tutorial / tour guiado de primeira vez
@@ -198,7 +198,7 @@ A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lac
 - **`M-NOTIFS` / design system §5:** categoria **"comunicado do mundo"** (broadcast do admin) e aviso proativo de manutenção com contagem regressiva.
 - **`M-CONTROL-ACTIVATE` / `M-CLUB-PREVIEW`:** ao entrar em **temporada avançada**, situar na rodada assíncrona ("assume na rodada 15 de 38; próxima simulação em 2 dias; janela de escalação fecha em X; a IA já tem escalação-fallback") [`03-mp §2`].
 - **`M-SETTINGS` / `M-ACCOUNT`:** *toggle* de **privacidade de presença** (mostrar/ocultar online e visto-por-último); tratamento de **sessão concorrente** em múltiplos dispositivos ("sessão iniciada em outro aparelho") [`03-mp §3`; design system §5].
-- **`M-WORLD-STRUCTURE` / `M-FEED`:** evento de **transição de liga por nível estrutural** (Liga Inicial→Acesso→Intermediária→Principal→Elite) e **criação/renumeração dinâmica de divisões** quando entram mais usuários [`03-mp §7`]. > **Pendência:** limiares de expansão e interação dos dois eixos (fonte em aberto).
+- **`M-WORLD-STRUCTURE` / `M-FEED`:** transição de liga por nível estrutural e criação/renumeração dinâmica seguem R-83/R-84, com abertura a ~60% de ocupação e fila ≥20.
 
 ### Temporada, competição e seleções
 > Dobrado em [09-mobile-telas-financas-estrutura-estadio.md](09-mobile-telas-financas-estrutura-estadio.md) — `M-BOARD` (teto da divisão vs. clube → "acima do teto → obrigado a subir").
@@ -213,9 +213,9 @@ A segunda passada (multiplayer/sessão e temporada/seleções) encontrou uma lac
 > Dobrado em [10-mobile-telas-competicoes-calendario-selecoes.md](10-mobile-telas-competicoes-calendario-selecoes.md) — `M-NATIONAL` (dispensa médica solicitada→arbitragem; grade de rotação por datas FIFA + projeção de prontidão).
 
 - **`M-AWARDS` / `M-PLAYER`:** roll-up **"prêmios do meu elenco"** e **efeito psicológico** do prêmio no jogador (confiança↑ + pressão↑) no bloco de estados [`06 §7, §14.3`].
-- **`M-PLAYER`:** **elegibilidade de seleção** (por qual seleção pode ser convocado; dupla nacionalidade/naturalização) [`12 §1`]. > **Pendência:** estrutura de dados de nacionalidade (fonte em aberto).
+- **`M-PLAYER`:** elegibilidade, dupla nacionalidade e naturalização usam `PersonNationality`/`NationalTeamEligibility` de R-169.
 
 ### Mercado (residual)
 - **`M-PLAYER` / `M-NEGOTIATION`:** micro-bloco **"valor percebido vs. valor de tabela"** com os drivers nomeados (jovem, artilheiro, convocado, contrato longo, clube não precisa vender) [`07 §3.3`].
 
-> **Hall da fama / cerimônias** ([`13-relatorios §6.4`](../01-game-design/13-relatorios-notificacoes-e-memoria.md)) permanece **pendência da fonte** — o acervo de dados já está em `M-HISTORY`; a cerimônia como evento aguarda decisão do GDD, não é lacuna de UI.
+> **Hall da fama / cerimônias:** camada narrativa e de apresentação sobre o acervo homologado de `M-HISTORY`, sem bônus mecânico, conforme [`13-relatorios §6.4`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).

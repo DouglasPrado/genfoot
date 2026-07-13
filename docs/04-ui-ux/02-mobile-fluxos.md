@@ -1,6 +1,6 @@
 # Mobile — Fluxos
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/15-fluxos-completos.md, docs/01-game-design/10-experiencia-e-telas.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/15-fluxos-completos.md, docs/01-game-design/10-experiencia-e-telas.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md · **Revisão:** 2026-07-11
 
 Este documento descreve **todos os fluxos** do app do jogador (Expo), ponta a ponta, mapeando cada passo às telas (`M-*`) e aos *commands* da API oficial. Ele traduz os 16 *golden paths* do jogo ([`../01-game-design/15-fluxos-completos.md`](../01-game-design/15-fluxos-completos.md)) em navegação real, acrescentando os fluxos de plataforma que o GDD não cobre (autenticação, sessão, tempo real, offline).
 
@@ -368,7 +368,7 @@ Este documento descreve **todos os fluxos** do app do jogador (Expo), ponta a po
 2. Tela mostra o **perfil mental** do jogador e o motivo; usuário escolhe uma opção de resposta.
 3. Consequência aplicada em moral/promessas/relação; pode abrir renovação ([MF-20](#mf-20--renovação-de-contrato)) ou promessa registrada em **`M-PROMISES`**.
 
-> **Recomendação (a ratificar — R-96):** a árvore fina de opções de resposta do `M-CONVO` e seus efeitos numéricos — proposta: cada opção mapeia deltas em moral/relação/promessa modulados pelo perfil mental do jogador (atributos 0–100) e por `CoachTrust`; efeitos calibrados junto ao sistema de jogadores (R-03/R-08).
+> **Decisão ratificada — R-96:** a árvore fina de opções de resposta do `M-CONVO` e seus efeitos numéricos — proposta: cada opção mapeia deltas em moral/relação/promessa modulados pelo perfil mental do jogador (atributos 0–100) e por `CoachTrust`; efeitos calibrados junto ao sistema de jogadores (R-03/R-08).
 
 **Referências:** [`07-ia §3.4,§6`](../01-game-design/07-inteligencia-artificial.md).
 

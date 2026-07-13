@@ -1,12 +1,12 @@
 # Estrutura do Clube e Comissão Técnica (Staff)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/planejamento-agrupado-do-jogo.md, chats/organizacao-de-pensamentos.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/planejamento-agrupado-do-jogo.md, chats/organizacao-de-pensamentos.md · **Revisão:** 2026-07-10
 
 No **Grinta**, o usuário não gerencia apenas uma escalação: ele constrói uma instituição de futebol ao longo do tempo. O nível real de um clube é resultado da soma entre estrutura física, funcionários, reputação, finanças, desempenho esportivo e capacidade de formar e contratar jogadores. Dois clubes podem ter o mesmo caixa e ainda assim evoluir de formas completamente diferentes, dependendo de onde investem.
 
-Este documento consolida a estrutura organizacional do clube em um **modelo único**: seis **núcleos funcionais** são a camada oficial de modelagem, medidos numa **escala única 1–5**; as ~10 **áreas** são subdivisões qualitativas dentro desses núcleos; a **infraestrutura física** (estádio, CT, academia) sai da escala de nível e é modelada de forma **granular** (dimensões e projetos); e os **funcionários** são modelados individualmente, com o antigo "multiplicador de qualidade" reinterpretado como **eficiência emergente** do núcleo. As seções 11–13 aprofundam, respectivamente, os núcleos, a infraestrutura granular e a separação entre cargo, responsabilidade e delegação. A escolha desse modelo canônico está registrada como **Recomendação R-10 (a ratificar)**, porque afeta o schema Club.
+Este documento consolida a estrutura organizacional do clube em um **modelo único**: seis **núcleos funcionais** são a camada oficial de modelagem, medidos numa **escala única 1–5**; as ~10 **áreas** são subdivisões qualitativas dentro desses núcleos; a **infraestrutura física** (estádio, CT, academia) sai da escala de nível e é modelada de forma **granular** (dimensões e projetos); e os **funcionários** são modelados individualmente, com o antigo "multiplicador de qualidade" reinterpretado como **eficiência emergente** do núcleo. As seções 11–13 aprofundam, respectivamente, os núcleos, a infraestrutura granular e a separação entre cargo, responsabilidade e delegação. A escolha desse modelo canônico está registrada como **Decisão R-10 ratificada**, porque afeta o schema Club.
 
-> **Recomendação (a ratificar — R-10):** adotar como **modelo canônico único de estrutura do clube**:
+> **Decisão ratificada — R-10:** adotar como **modelo canônico único de estrutura do clube**:
 > - **Escala única 1–5** em todo o sistema (núcleos, áreas, comissão em partida e [Motor de partida](./05-motor-de-partida.md)), aposentando a escala 1–10 das fontes antigas. A tabela de faixas é a do núcleo: 1 Básico · 2 Funcional · 3 Competitivo · 4 Avançado · 5 Elite.
 > - **Seis núcleos funcionais como camada oficial de modelagem** (nível, eficiência, moral, orçamento, especialização, adaptação). As **~10 áreas** passam a ser **subdivisões** com nível próprio 1–5; o nível do núcleo é a **agregação** dos níveis das suas áreas, e a **eficiência real** modula esse nível nominal por orçamento, sobrecarga, crise e adequação dos profissionais.
 > - **Infraestrutura física fora da escala de nível:** estádio, CT e academia são modelados por **dimensões granulares** (propriedade/acesso, condição, capacidades, conformidade) e por **projetos de 9 etapas** (seção 12). Onde o texto ainda fala em "nível" de infraestrutura, trata-se de **leitura derivada** da dimensão de serviço/operacional que alimenta os núcleos.
@@ -38,7 +38,7 @@ O clube não tem apenas um número único: ele tem **vários níveis internos** 
 
 O nível geral é calculado como uma composição da **estrutura interna** (a média ponderada dos seis núcleos) com **desempenho esportivo, finanças e reputação/torcida**, com a estrutura tendo peso alto.
 
-> **Recomendação (a ratificar — R-11):** adotar **uma única fórmula** de nível geral, substituindo as duas formulações das fontes (40/25/15/10/10 e 60/20/10/10). Proposta: **composição externa 60/20/10/10** com a estrutura interna calculada pela **média ponderada dos seis núcleos**.
+> **Decisão ratificada — R-11:** adotar **uma única fórmula** de nível geral, substituindo as duas formulações das fontes (40/25/15/10/10 e 60/20/10/10). Proposta: **composição externa 60/20/10/10** com a estrutura interna calculada pela **média ponderada dos seis núcleos**.
 >
 > **Composição externa (final):**
 >
@@ -184,7 +184,7 @@ Afeta o desenvolvimento geral do elenco. Impacta: qualidade do treino, evoluçã
 
 O CT físico é **infraestrutura granular** (seção 12): o "nível 1–5" acima é a **leitura derivada** do serviço de treino que alimenta o núcleo técnico. Além do nível, o CT tem **capacidade operacional** própria (def-simulador §7.5): **disponibilidade de campos**, **capacidade de treinar categorias diferentes simultaneamente** (profissional + base) e **integração de grupos**. **Conflitos de agenda e indisponibilidade de áreas** do CT devem ser possíveis — treinar todas as categorias ao mesmo tempo pode competir por campos/horários, exigindo priorização.
 
-> **Recomendação (a ratificar — R-13):** fixar a **capacidade operacional do CT por nível de serviço (1–5)**:
+> **Decisão ratificada — R-13:** fixar a **capacidade operacional do CT por nível de serviço (1–5)**:
 >
 > | Nível do CT | Campos | Sessões simultâneas | Categorias em paralelo |
 > | --- | --- | --- | --- |
@@ -239,7 +239,7 @@ Isso mantém seis núcleos como camada oficial (R-10) e evita multiplicar depart
 
 Funcionários **não** dão vantagem direta absurda. Seu efeito agregado é o de **multiplicadores de qualidade**: a estrutura não cria talento do nada, ela ajuda o clube a extrair melhor o talento existente. No modelo canônico (R-10), esse multiplicador **não é um parâmetro fixo por nível**: é a **eficiência emergente** do núcleo, resultado das competências, autonomia e carga de trabalho dos profissionais (seção 13). As curvas abaixo são a **leitura agregada** desse efeito.
 
-> **Recomendação (a ratificar — R-12):** fixar a **curva de aproveitamento (eficiência) por nível de núcleo (1–5)**, substituindo os pontos 40/70/95% da escala 1–10:
+> **Decisão ratificada — R-12:** fixar a **curva de aproveitamento (eficiência) por nível de núcleo (1–5)**, substituindo os pontos 40/70/95% da escala 1–10:
 >
 > | Nível do núcleo | Aproveitamento do potencial |
 > | --- | --- |
@@ -283,7 +283,7 @@ A capacidade de contratação combina, portanto: nível da diretoria + reputaç�
 
 **Teto de contratação por nível geral.** Além da diretoria e da reputação, o **nível geral** do clube define a faixa de jogadores que ele consegue disputar:
 
-> **Recomendação (a ratificar — R-14):** fixar o **teto de contratação por nível geral (1–5)**, remapeando a tabela antiga (que usava 1/3/5/7/10):
+> **Decisão ratificada — R-14:** fixar o **teto de contratação por nível geral (1–5)**, remapeando a tabela antiga (que usava 1/3/5/7/10):
 >
 > | Nível geral do clube | Faixa de jogadores acessível |
 > | --- | --- |

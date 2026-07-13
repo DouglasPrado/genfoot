@@ -1,6 +1,6 @@
 # Mobile — Tática, Escalação e Partida
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/05-motor-de-partida.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/01-game-design/07-inteligencia-artificial.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/05-motor-de-partida.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/01-game-design/07-inteligencia-artificial.md · **Revisão:** 2026-07-11
 
 A aba **Jogo**: preparar (escalação, tática, plano de jogo, dossiê, pré-jogo), acompanhar **a partida ao vivo** (a tela mais densa do app) e ler o pós-jogo. Fluxo principal: [MF-07](02-mobile-fluxos.md#mf-07--preparação-e-partida). A partida ao vivo consome o feed do `matchSequence`; o cliente **nunca** executa regras — o motor roda no servidor.
 

@@ -1,10 +1,10 @@
 # Mobile — Comunicação, Torcida e Moral
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/11-torcida-imprensa-e-narrativa.md, docs/01-game-design/07-inteligencia-artificial.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/11-torcida-imprensa-e-narrativa.md, docs/01-game-design/07-inteligencia-artificial.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
 
 Telas de moral do elenco, torcida, rivalidades, imprensa/coletiva, conversas com atletas, feed narrativo, promessas públicas, reputação e imagem pública. Fluxos: [MF-15](02-mobile-fluxos.md#mf-15--crise-esportiva), [MF-18](02-mobile-fluxos.md#mf-18--conversa-com-atleta), [MF-19](02-mobile-fluxos.md#mf-19--imprensa-e-comunicação). Vive na aba **Clube** (parte 2) e é alimentada por eventos.
 
-> **Nota:** vários efeitos numéricos (posturas de comunicação, transição de faixas de torcida, árvore de diálogo com atletas) são pendências do GDD — a UI define os padrões de interação; os valores ficam a calibrar.
+> **Nota:** efeitos numéricos usam as baselines R-68..R-76/R-96 e mudam apenas por ruleset versionado. A UI define o padrão de interação e nunca calcula esses efeitos localmente.
 
 ---
 
@@ -48,7 +48,7 @@ Telas de moral do elenco, torcida, rivalidades, imprensa/coletiva, conversas com
 - **Layout:** cabeçalho do jogador + motivo + opções de resposta + consequência.
 - **Componentes e dados:** motivo (pedir aumento, reclamar de minutos, renovação, forçar saída, conflito, liderança, **despedida de ídolo**); **perfil mental** do jogador (ambição, lealdade, ego, temperamento, resiliência); opções de resposta; consequência (moral, promessa, relação).
 - **Ações:** escolher resposta; abrir renovação (`M-CONTRACT`); registrar promessa (`M-PROMISES`); conduzir a **despedida de ídolo** como fluxo guiado (reduz o desgaste da torcida) — reflete em `M-FANS` [`11 §7`].
-- **Estados:** > **Pendência:** árvore fina de respostas e efeitos numéricos não especificados no GDD.
+- **Estados:** árvore e modulação por perfil mental/`CoachTrust` definidas em R-96.
 - **Referências:** [`07-ia §3.4, §6`](../01-game-design/07-inteligencia-artificial.md); [`11-torcida §7`](../01-game-design/11-torcida-imprensa-e-narrativa.md).
 
 ## `M-FEED` — Feed de eventos / narrativa
@@ -72,7 +72,7 @@ Telas de moral do elenco, torcida, rivalidades, imprensa/coletiva, conversas com
 - **Objetivo:** mostrar como o mundo enxerga o clube e o gestor.
 - **Componentes e dados:** **reputação do gestor** (10 dimensões: tática, financeira, formadora, negociadora, disciplinar, comunicativa, lealdade, ousadia, gestão de crise, confiabilidade); **rótulos do clube** (formador, comprador, vendedor, vitrine, pagador confiável, instável, tradicional, inovador, ofensivo, defensivo, físico, regional); reputação por faixa.
 - **Ações:** ver histórico de reputação (`M-HISTORY`).
-- **Estados:** > **Pendência:** se rótulos são exclusivos ou acumuláveis (fonte em aberto).
+- **Estados:** rótulo atual exclusivo por eixo; badges históricos acumuláveis (R-166).
 - **Referências:** [`11-torcida §14, §15`](../01-game-design/11-torcida-imprensa-e-narrativa.md).
 
 ## `M-SPONSORS-IMAGE` — Imagem pública / patrocinadores

@@ -1,5 +1,7 @@
 import type { GameWorldId, RulesetVersion } from "@grinta/shared";
 
+import type { SeasonRolloverSnapshot } from "./season-rollover-types.js";
+
 export const SeasonStatus = {
   PLANNED: "PLANNED",
   ACTIVE: "ACTIVE",
@@ -71,6 +73,41 @@ export interface WorldSchedulerConfig {
   readonly clockLeaseDurationMs: number;
 }
 
+export const TemporalWindowType = {
+  TRANSFER: "TRANSFER",
+  REGISTRATION: "REGISTRATION",
+  RENEWAL: "RENEWAL",
+  CUSTOM: "CUSTOM",
+} as const;
+
+export type TemporalWindowType =
+  (typeof TemporalWindowType)[keyof typeof TemporalWindowType];
+
+export interface TemporalWindowSnapshot {
+  readonly id: string;
+  readonly gameWorldId: GameWorldId;
+  readonly type: TemporalWindowType;
+  readonly name: string;
+  readonly opensOn: string;
+  readonly closesOn: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly configVersion: number;
+  readonly version: number;
+}
+
+export interface WorldCommandReceipt {
+  readonly commandId: string;
+  readonly idempotencyKey: string;
+  readonly commandType: "AdvanceWorldDay";
+  readonly gameWorldId: GameWorldId;
+  readonly expectedDate: string;
+  readonly resultDate: string;
+  readonly resultWorldVersion: number;
+  readonly fencingToken: number;
+  readonly rulesetVersion: RulesetVersion;
+  readonly processedTaskIds: readonly string[];
+}
+
 export interface WorldClockSnapshot {
   readonly leaseOwnerId: string | null;
   readonly leaseExpiresAtMs: number | null;
@@ -78,10 +115,14 @@ export interface WorldClockSnapshot {
 }
 
 export interface WorldSchedulerSnapshot {
+  readonly schemaVersion: 2;
   readonly gameWorldId: GameWorldId;
   readonly config: WorldSchedulerConfig;
   readonly seasons: readonly SeasonSnapshot[];
   readonly tasks: readonly ScheduledTaskSnapshot[];
+  readonly windows: readonly TemporalWindowSnapshot[];
+  readonly commandReceipts: readonly WorldCommandReceipt[];
+  readonly rollovers: readonly SeasonRolloverSnapshot[];
   readonly clock: WorldClockSnapshot;
   readonly runtimeEpoch: number;
   readonly revision: number;

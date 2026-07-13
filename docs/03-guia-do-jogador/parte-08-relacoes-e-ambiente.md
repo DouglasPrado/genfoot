@@ -1,6 +1,6 @@
 # Parte VIII — Relações e ambiente do clube
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/11-torcida-imprensa-e-narrativa.md`](../01-game-design/11-torcida-imprensa-e-narrativa.md); [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md); [`../01-game-design/08-estadio-regiao-e-clima.md`](../01-game-design/08-estadio-regiao-e-clima.md); [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/11-torcida-imprensa-e-narrativa.md`](../01-game-design/11-torcida-imprensa-e-narrativa.md); [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md); [`../01-game-design/12-selecoes-e-calendario-internacional.md`](../01-game-design/12-selecoes-e-calendario-internacional.md); [`../01-game-design/08-estadio-regiao-e-clima.md`](../01-game-design/08-estadio-regiao-e-clima.md); [`../01-game-design/07-inteligencia-artificial.md`](../01-game-design/07-inteligencia-artificial.md) · **Revisão:** 2026-07-11
 
 Um clube não vive só dentro das quatro linhas. Ao redor dele existe um ambiente vivo — torcida, imprensa, patrocinadores, empresários, seleções e a própria vida pessoal dos jogadores — que reage ao que o clube faz e devolve pressão, apoio, oportunidade e crise. Esta Parte explica esse ambiente. O Capítulo 32 trata da torcida: quem ela é, o que espera e como reage. O Capítulo 33 trata da comunicação e da imprensa: como as narrativas se formam e como você pode influenciá-las. O Capítulo 34 trata dos eventos externos: convocações, vida pessoal dos atletas e tudo o que acontece fora do seu controle direto, mas ainda assim afeta o seu clube.
 
@@ -123,7 +123,7 @@ Quando um jogador é convocado, uma série de efeitos reais recai sobre ele e so
 
 > **ATENÇÃO:** Um jogador convocado pode voltar cansado, com moral abalada ou até lesionado — e a lesão sofrida na seleção afeta o clube normalmente, conforme a gravidade. Pode haver uma compensação parcial ao clube em alguns casos, mas ela depende da competição e das regras do mundo, e não cobre tudo. Elencos curtos sofrem mais em datas de seleção; profundidade é proteção.
 
-As seleções, no núcleo do jogo, são conduzidas pela inteligência do jogo. Como expansão futura, está previsto que gestores de reputação muito alta possam disputar o comando de uma seleção — conectando a evolução do gestor no mundo ao acesso a esse tipo de cargo.
+As seleções são conduzidas pela inteligência do jogo quando não houver gestor humano. Gestores com reputação mínima 85 podem disputar o comando de uma seleção principal, sub-20 ou sub-17 sem abandonar o clube; conflitos de agenda seguem a prioridade internacional e a delegação definida em R-150.
 
 ### Vida pessoal e acontecimentos dos jogadores
 

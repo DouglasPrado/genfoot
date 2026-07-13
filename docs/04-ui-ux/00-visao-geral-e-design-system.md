@@ -1,6 +1,6 @@
 # Visão Geral e Design System
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/00-arquitetura-geral.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/00-arquitetura-geral.md · **Revisão:** 2026-07-11
 
 Este documento define os **fundamentos transversais** da interface do Grinta: os princípios de UX, a decisão de stack (Expo mobile + Next.js admin), os *design tokens*, a biblioteca de componentes, os estados globais que toda tela deve tratar, acessibilidade/i18n/tema, o **template de especificação de tela** usado em toda a área, e como a UI conversa com a API oficial (commands, idempotência, versão, erros) e com o tempo real (WebSocket).
 
@@ -61,13 +61,13 @@ Bibliotecas compartilhadas com o que já foi decidido no doc 08 (reaproveitadas 
 - Mobile-first; o app nativo reutiliza **integralmente** commands, respostas, eventos e contratos.
 - O **relógio do mundo é do servidor** — o app nunca deriva prazos do relógio local do aparelho.
 
-> **Monorepo.** `/apps/mobile` (Expo), `/apps/admin` (Next.js), `/apps/api`, `/apps/realtime-gateway`, `/packages/*`. A antiga PWA `/apps/web` do doc 08 pode coexistir ou ser substituída pelo app Expo; esta área assume o **app nativo como cliente principal do jogador**.
+> **Monorepo.** `/apps/mobile` (Expo), `/apps/admin` (Next.js), `/apps/api`, `/apps/realtime-gateway`, `/packages/*`. **Decisão ratificada — R-152:** o cliente canônico do jogador é o app Expo; a antiga PWA `/apps/web` está **SUPERADA** e não coexistirá como terceiro cliente. A web pública limita-se a guia/site e não envia commands esportivos.
 
 ---
 
 ## 3. Design tokens
 
-> **Recomendação (a ratificar — R-98):** os valores concretos abaixo (hex, tamanhos, pesos, raios, sombras) são uma **1ª passada** para destravar a implementação do design system. **Não são canônicos.** Serão ajustados quando a identidade de marca "Grinta" fechar ([`../00-produto/02-identidade-e-nome.md`](../00-produto/02-identidade-e-nome.md)) — em especial `color.primary`, que é o candidato a **cor de marca provisória**. O *mapa semântico* (§3.1) e a escala 4-pt já eram convenção da área e permanecem; o que R-98 acrescenta são os **valores**. Meta de acessibilidade: todos os pares texto/fundo aqui satisfazem **WCAG AA** (≥ 4.5:1 texto normal, ≥ 3:1 texto grande e componentes de UI) — ver §3.2. Registrado na Série R (R-98/R-99) do ADR ([`../99-decisoes/registro-de-decisoes.md`](../99-decisoes/registro-de-decisoes.md)).
+> **Decisão ratificada — R-98:** os valores abaixo são a **versão canônica atual** do design system. Mudanças de identidade visual exigem nova versão/ADR e não podem reduzir as metas WCAG AA (≥ 4.5:1 para texto normal; ≥ 3:1 para texto grande e componentes). O mapa semântico e a escala de 4 pt permanecem estáveis mesmo quando tokens visuais forem versionados.
 
 Tokens definidos uma vez em `/packages/ui` (web) e espelhados em `/packages/ui-native` (RN). Cada token resolve por **tema** (claro/escuro). Nomes semânticos — nenhuma tela referencia hex direto.
 
@@ -85,7 +85,7 @@ Deriva do **código de cores de decisão** do doc 08 (partida, decisões, notifi
 | `color.primary` | Identidade, ação primária (= `color.brand`) | — |
 | `color.bg` / `color.surface` / `color.text` | Fundo, superfícies, texto (variam por tema) | — |
 
-> **Nota de separação (a ratificar):** `color.primary` (verde-grama, matiz ~142°) e `color.success` (esmeralda, matiz ~160°) são **famílias de verde próximas de propósito**. Para não confundir "ação de marca" com "resultado positivo", `success` **sempre** aparece pareado a ícone/rótulo (regra de acessibilidade §7: nunca só cor) e nunca como preenchimento de botão de ação. Se a marca final adotar verde, `success` migra para teal; se a marca adotar outra matiz, essa restrição cai.
+> **Nota de separação (ratificada):** `color.primary` (verde-grama, matiz ~142°) e `color.success` (esmeralda, matiz ~160°) são **famílias de verde próximas de propósito**. Para não confundir "ação de marca" com "resultado positivo", `success` **sempre** aparece pareado a ícone/rótulo (regra de acessibilidade §7: nunca só cor) e nunca como preenchimento de botão de ação. Se a marca final adotar verde, `success` migra para teal; se a marca adotar outra matiz, essa restrição cai.
 
 ### 3.2 Cor — valores concretos (light / dark)
 
@@ -119,7 +119,7 @@ Deriva do **código de cores de decisão** do doc 08 (partida, decisões, notifi
 
 ### 3.3 Tipografia
 
-- **Família (a ratificar):** **Inter** (variável) para toda a UI, com **`font-variant-numeric: tabular-nums`** ligado em números (placar, tabela, dinheiro) para alinhamento em colunas. `mono` = **JetBrains Mono** (ou Roboto Mono) reservado a **placar ao vivo, extratos financeiros e IDs**. Respeita *font scaling* do SO (§7); tamanhos abaixo em `pt`/`sp` na escala padrão (100%).
+- **Família (ratificada):** **Inter** (variável) para toda a UI, com **`font-variant-numeric: tabular-nums`** ligado em números (placar, tabela, dinheiro) para alinhamento em colunas. `mono` = **JetBrains Mono** (ou Roboto Mono) reservado a **placar ao vivo, extratos financeiros e IDs**. Respeita *font scaling* do SO (§7); tamanhos abaixo em `pt`/`sp` na escala padrão (100%).
 - **Pesos:** `regular 400 · medium 500 · semibold 600 · bold 700`.
 
 | Token | Tamanho / line-height | Peso | Tracking | Uso |
@@ -189,7 +189,7 @@ Componentes reutilizados em toda a área (nomeados aqui para as telas referencia
 
 ### 4.2 Especificações dos componentes-chave
 
-> **Recomendação (a ratificar — R-99):** variantes, estados e props abaixo são a **1ª passada** de contrato de API dos 10 componentes mais usados. Complementam (não substituem) o inventário. Ajustáveis na implementação de `/packages/ui`/`/packages/ui-native`. Tokens referenciados vêm de §3 (R-98). Os demais componentes do inventário ficam como **inventário** até serem demandados por uma tela.
+> **Decisão ratificada — R-99:** variantes, estados e props abaixo são a **1ª passada** de contrato de API dos 10 componentes mais usados. Complementam (não substituem) o inventário. Ajustáveis na implementação de `/packages/ui`/`/packages/ui-native`. Tokens referenciados vêm de §3 (R-98). Os demais componentes do inventário ficam como **inventário** até serem demandados por uma tela.
 >
 > Os **wireframes de baixa fidelidade** das telas densas (arranjo espacial destes componentes em `M-HOME`, `M-LIVE`, `M-SEASON-CLOSE`, `M-STRUCTURE`, `M-SQUAD`, `M-NEGOTIATION`) estão em [`14-wireframes-telas-densas.md`](14-wireframes-telas-densas.md).
 

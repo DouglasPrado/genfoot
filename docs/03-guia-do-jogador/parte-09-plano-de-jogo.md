@@ -1,6 +1,6 @@
 # Parte IX — Plano de jogo
 
-> **Status:** Rascunho consolidado · **Fontes:** `../01-game-design/00-gdd-overview.md`, `../01-game-design/10-experiencia-e-telas.md`, `../01-game-design/15-fluxos-completos.md`, `../01-game-design/09-anti-abuso-e-onboarding.md`, `../01-game-design/13-relatorios-notificacoes-e-memoria.md`, `../01-game-design/14-monetizacao.md` · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** `../01-game-design/00-gdd-overview.md`, `../01-game-design/10-experiencia-e-telas.md`, `../01-game-design/15-fluxos-completos.md`, `../01-game-design/09-anti-abuso-e-onboarding.md`, `../01-game-design/13-relatorios-notificacoes-e-memoria.md`, `../01-game-design/14-monetizacao.md` · **Revisão:** 2026-07-11
 
 As Partes anteriores explicaram **os sistemas** do Grinta — o clube, os jogadores, o mercado, a partida, as competições e o ambiente. Esta Parte muda o foco: em vez de descrever cada peça isoladamente, ela mostra **como organizar suas decisões ao longo do tempo**.
 

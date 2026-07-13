@@ -1,6 +1,6 @@
 # Parte VI — Tática e partidas
 
-> **Status:** Rascunho consolidado · **Fontes:** ../01-game-design/05-motor-de-partida.md; ../01-game-design/07-inteligencia-artificial.md; ../01-game-design/02-sistema-de-jogadores.md; ../01-game-design/08-estadio-regiao-e-clima.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** ../01-game-design/05-motor-de-partida.md; ../01-game-design/07-inteligencia-artificial.md; ../01-game-design/02-sistema-de-jogadores.md; ../01-game-design/08-estadio-regiao-e-clima.md · **Revisão:** 2026-07-11
 
 Esta Parte é sobre o **jogo** propriamente dito: o que acontece do apito de preparação ao apito final. Você vai entender como preparar a partida (Cap. 22), como formação e funções moldam o time (Cap. 23), como o motor decide o resultado (Cap. 24), como intervir ao vivo (Cap. 25), como surgem os pontos de decisão (Cap. 26), o que acontece quando você está offline (Cap. 27) e como nascem os eventos da partida (Cap. 28).
 

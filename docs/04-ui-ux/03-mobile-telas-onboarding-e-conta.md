@@ -1,10 +1,10 @@
 # Mobile — Onboarding e Conta
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/01-mundo-persistente-e-clubes.md, docs/01-game-design/08-estadio-regiao-e-clima.md, docs/01-game-design/15-fluxos-completos.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/09-anti-abuso-e-onboarding.md, docs/01-game-design/01-mundo-persistente-e-clubes.md, docs/01-game-design/08-estadio-regiao-e-clima.md, docs/01-game-design/15-fluxos-completos.md · **Revisão:** 2026-07-11
 
 Telas de autenticação, entrada no mundo, escolha/criação de clube, revisão inicial, retorno após ausência e troca de clube. Fluxos: [MF-00](02-mobile-fluxos.md#mf-00--bootstrap-autenticação-e-sessão), [MF-01](02-mobile-fluxos.md#mf-01--criação-e-entrada-em-clube), [MF-02](02-mobile-fluxos.md#mf-02--retorno-após-ausência-longa), [MF-03](02-mobile-fluxos.md#mf-03--abandono-ou-troca-de-clube). Template em [00 §Template](00-visao-geral-e-design-system.md#template-de-especificação-de-tela).
 
-> **Nota transversal:** o onboarding está consolidado em nível de princípio no GDD (Decisão 1961). Onde a fonte é omissa (valores de caixa inicial, duração de pré-temporada, critérios de "clube disponível", parâmetros do Programa de Clube Novo), a tela **prevê o campo** e marca `> **Pendência:**`, sem inventar número.
+> **Nota transversal:** onboarding usa os valores ratificados R-43/R-50..R-57 e o ajuste C-04; nenhuma tela define regra própria.
 
 ---
 
@@ -53,7 +53,7 @@ Telas de autenticação, entrada no mundo, escolha/criação de clube, revisão 
 - **Componentes e dados:** por mundo: nome, temporada atual, tipo (**Liga nova** / **Em andamento** / **Temática/especial**), nº de clubes, vagas, elegibilidade do usuário. `Chip` de tipo; `Badge` de vagas.
 - **Ações:** **Selecionar mundo** → verifica elegibilidade/vagas → `M-CLUB-PICK` ou `M-CLUB-CREATE`.
 - **Estados:** vazio ("nenhum mundo disponível"); **bloqueado** por cooldown/conta relacionada com motivo geral; *loading* da lista (cursor).
-- **Referências:** [`09-anti-abuso §2.9`](../01-game-design/09-anti-abuso-e-onboarding.md); [`03-multiplayer-e-mundos`](../02-tecnico/03-multiplayer-e-mundos.md). > **Pendência:** regras de cada liga temática (Decisão 3, em aberto).
+- **Referências:** [`09-anti-abuso §2.9`](../01-game-design/09-anti-abuso-e-onboarding.md); [`03-multiplayer-e-mundos`](../02-tecnico/03-multiplayer-e-mundos.md). **Fechado:** tipos e limites de ligas temáticas definidos em R-55.
 
 ## `M-CLUB-PICK` — Assumir clube existente
 
@@ -101,7 +101,7 @@ Telas de autenticação, entrada no mundo, escolha/criação de clube, revisão 
 - **Componentes e dados:** **aporte inicial fixo** (igualdade competitiva, sem vantagem por dinheiro real); prazo de **reserva de vaga** (`Countdown`); banner do **Programa de Clube Novo** (upgrades 1→3 mais baratos, obras mais rápidas, contratos protegidos, premiações proporcionais) quando aplicável.
 - **Ações:** **Confirmar reserva** → command `ReserveClubSlot` → `M-CONTROL-ACTIVATE`.
 - **Estados:** vaga expirando (`Countdown`); vaga tomada → volta a `M-CLUB-PICK`.
-- **Referências:** [`09-anti-abuso §2.2, §2.8`](../01-game-design/09-anti-abuso-e-onboarding.md); [`15-fluxos §1 passos 5–6`](../01-game-design/15-fluxos-completos.md). > **Pendência:** valor do aporte e parâmetros do Programa.
+- **Referências:** [`09-anti-abuso §2.2, §2.8`](../01-game-design/09-anti-abuso-e-onboarding.md); [`15-fluxos §1 passos 5–6`](../01-game-design/15-fluxos-completos.md). **Fechado:** aporte R-43 e Programa R-54/R-161.
 
 ## `M-CONTROL-ACTIVATE` — Ativação de controle / pré-temporada
 

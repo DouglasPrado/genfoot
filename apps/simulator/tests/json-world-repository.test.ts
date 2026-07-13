@@ -3,19 +3,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  WorldScheduler,
+  SeasonRollover,
   WorldGenesisGenerator,
   WorldPlayerLifecycle,
   WorldStatus,
+  buildClubPortfolioFromGenesis,
   type GameWorldSnapshot,
 } from "@grinta/core";
-import { newGameWorldId, parseRulesetVersion } from "@grinta/shared";
+import {
+  newEntityId,
+  newGameWorldId,
+  parseRulesetVersion,
+} from "@grinta/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(4) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(6) });
 
 afterEach(async () => {
   await Promise.all(
@@ -62,7 +69,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(4);
+    expect(file.schemaVersion).toBe(6);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -96,6 +103,24 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "PLAYER_LIFECYCLE_REVISION_CONFLICT" });
   });
 
+  it("persiste o portfólio C3 com restart e revisão otimista", async () => {
+    const store = await repository();
+    const world = snapshot();
+    const genesis = new WorldGenesisGenerator().generate(world);
+    const portfolio = buildClubPortfolioFromGenesis(world, genesis);
+    await store.value.save(world, null);
+    await store.value.saveGenesis(genesis, world.version);
+
+    await store.value.saveClubPortfolio(portfolio, null);
+
+    expect(await store.value.findClubPortfolioByWorldId(world.id)).toEqual(
+      portfolio,
+    );
+    await expect(
+      store.value.saveClubPortfolio(portfolio, 99),
+    ).rejects.toMatchObject({ code: "CLUB_PORTFOLIO_REVISION_CONFLICT" });
+  });
+
   it("lê snapshots v1 e os migra na próxima escrita", async () => {
     const store = await repository();
     const world = snapshot();
@@ -113,7 +138,97 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(6);
+  });
+
+  it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const scheduler = WorldScheduler.create(world.id, {
+      rulesetVersion: world.rulesetVersion,
+      maxTaskAttempts: 3,
+      clockLeaseDurationMs: 30_000,
+    });
+    if (!scheduler.ok) throw scheduler.error;
+    const receipt = {
+      commandId: newEntityId<"Command">(),
+      idempotencyKey: "advance:legacy",
+      commandType: "AdvanceWorldDay" as const,
+      gameWorldId: world.id,
+      expectedDate: "2026-01-01",
+      resultDate: "2026-01-02",
+      resultWorldVersion: 2,
+      fencingToken: 1,
+      rulesetVersion: world.rulesetVersion,
+      processedTaskIds: [],
+    };
+    const recorded = scheduler.value.recordCommandReceipt(receipt);
+    if (!recorded.ok) throw recorded.error;
+
+    await store.value.saveScheduling(scheduler.value.snapshot(), null);
+
+    expect(
+      await store.value.findSchedulingCommandReceipt(
+        world.id,
+        receipt.idempotencyKey,
+      ),
+    ).toEqual(receipt);
+    expect(await store.value.findSchedulingByWorldId(world.id)).toMatchObject({
+      schemaVersion: 2,
+      windows: [],
+      rollovers: [],
+    });
+  });
+
+  it("persiste rollover interrompido para retomada por checkpoint", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const scheduler = WorldScheduler.create(world.id, {
+      rulesetVersion: world.rulesetVersion,
+      maxTaskAttempts: 3,
+      clockLeaseDurationMs: 30_000,
+    });
+    if (!scheduler.ok) throw scheduler.error;
+    const rollover = SeasonRollover.create({
+      id: newEntityId<"SeasonRollover">(),
+      gameWorldId: world.id,
+      seasonId: newEntityId<"Season">(),
+      nextSeason: {
+        id: newEntityId<"Season">(),
+        number: 2,
+        name: "Temporada 2",
+        startsOn: "2026-04-15",
+        endsOn: "2026-07-15",
+      },
+      rulesetVersion: world.rulesetVersion,
+      maxAttemptsPerStep: 3,
+    });
+    if (!rollover.ok) throw rollover.error;
+    const lease = rollover.value.acquireLease("worker-a", 1_000, 100);
+    if (!lease.ok) throw lease.error;
+    const claimed = rollover.value.claimCurrentStep(lease.value);
+    if (!claimed.ok) throw claimed.error;
+
+    await store.value.saveScheduling(
+      {
+        ...scheduler.value.snapshot(),
+        rollovers: [rollover.value.snapshot()],
+      },
+      null,
+    );
+
+    const persisted = await store.value.findSchedulingByWorldId(world.id);
+    expect(persisted?.rollovers).toHaveLength(1);
+    expect(persisted?.rollovers[0]).toMatchObject({
+      currentStepIndex: 0,
+      status: "RUNNING",
+    });
+    expect(persisted?.rollovers[0]?.steps[0]).toMatchObject({
+      stepId: "FINISH_PENDING_MATCHES",
+      status: "RUNNING",
+    });
   });
 
   it("retorna null para mundo inexistente", async () => {

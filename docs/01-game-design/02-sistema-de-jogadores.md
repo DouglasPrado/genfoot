@@ -1,12 +1,12 @@
 # Sistema de Jogadores
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/lista-envolvidos-jogo.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/lista-envolvidos-jogo.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
 
 ## Resumo
 
 O Sistema de Jogadores é o núcleo do **Grinta**. Ao contrário de managers clássicos como o Brasfoot, onde o atleta carrega atributos essencialmente fixos, aqui o jogador **nasce com uma tendência, não com um destino fixo**. Ele começa com uma base, um talento natural e um potencial, mas os clubes por onde passa, a metodologia de treino, os minutos jogados e os eventos de carreira empurram seus atributos para direções específicas. Dois jogadores gerados com o mesmo potencial podem terminar a carreira como atletas completamente diferentes.
 
-Este documento consolida o modelo conceitual do jogador: a fórmula de identidade, a separação entre atributo, estado e traço (com a **lista canônica de atributos** na §2), a geração inicial, o sistema de potencial em camadas, as tabelas de treino e evolução, a memória acumulativa de jogador e clube, e o papel da personalidade. Ao final, a §18 fecha os vazios de design que a fonte enumerava — consolidando-os em seções existentes, especificando-os como subsistemas, deferindo-os ao documento dono ou promovendo-os a recomendações a ratificar.
+Este documento consolida o modelo conceitual do jogador: a fórmula de identidade, a separação entre atributo, estado e traço (com a **lista canônica de atributos** na §2), a geração inicial, o sistema de potencial em camadas, as tabelas de treino e evolução, a memória acumulativa de jogador e clube, e o papel da personalidade. Ao final, a §18 fecha os vazios de design que a fonte enumerava — consolidando-os em seções existentes, especificando-os como subsistemas, deferindo-os ao documento dono ou promovendo-os a decisões ratificadas.
 
 > As fórmulas exatas e as definições de schema (tipos, campos, ranges) vivem em `../02-tecnico/02-modelo-de-dados.md` e `../02-tecnico/05-catalogo-de-regras-e-formulas.md`. Aqui tratamos apenas do conceito de design.
 
@@ -29,7 +29,7 @@ Este documento consolida o modelo conceitual do jogador: a fórmula de identidad
 15. [Elenco como grupo social](#15-elenco-como-grupo-social)
 16. [Medicina, saúde e recuperação](#16-medicina-saúde-e-recuperação)
 17. [Ciclo de vida do jogador: aposentadoria, funcionário e proteção de menores](#17-ciclo-de-vida-do-jogador-aposentadoria-funcionário-e-proteção-de-menores)
-18. [Subsistemas complementares e recomendações a ratificar](#18-subsistemas-complementares-e-recomendações-a-ratificar)
+18. [Subsistemas complementares e decisões ratificadas](#18-subsistemas-complementares-e-recomendações-a-ratificar)
 
 ---
 
@@ -769,9 +769,9 @@ Um jovem não promovido pode: permanecer na base, ser emprestado, mudar de clube
 
 ---
 
-## 18. Subsistemas complementares e recomendações a ratificar
+## 18. Subsistemas complementares e decisões ratificadas
 
-Os vazios de design enumerados na fonte são fechados aqui por quatro caminhos: **(18.1)** consolidados quando já cobertos por outra seção; **(18.2)** especificados como subsistema (entidade/estado) próprio do jogador; **(18.3)** promovidos a **Recomendação (a ratificar — R-XX)** quando dependiam de um valor de balanceamento ou de uma decisão de produto; **(18.4)** deferidos ao documento dono quando o assunto não é do sistema de jogadores. Nenhum permanece como pendência aberta.
+Os vazios de design enumerados na fonte são fechados aqui por quatro caminhos: **(18.1)** consolidados quando já cobertos por outra seção; **(18.2)** especificados como subsistema (entidade/estado) próprio do jogador; **(18.3)** promovidos a **Decisão ratificada — R-XX)** quando dependiam de um valor de balanceamento ou de uma decisão de produto; **(18.4)** deferidos ao documento dono quando o assunto não é do sistema de jogadores. Nenhum permanece como pendência aberta.
 
 ### 18.1. Gaps já cobertos por outras seções
 
@@ -803,23 +803,23 @@ Os vazios de design enumerados na fonte são fechados aqui por quatro caminhos: 
 
 **Jogador como ativo múltiplo.** Princípio de design: o atleta tem valor em **seis dimensões** — esportivo, financeiro, emocional, de marca, de tradição e de torcida. Vender um ídolo pode melhorar o caixa e destruir moral e identidade ao mesmo tempo. Conecta o valor de mercado (§12), a memória do clube (§13, ídolos) e a economia; nenhuma decisão sobre o jogador deve olhar só a dimensão financeira.
 
-### 18.3. Recomendações a ratificar (Série R)
+### 18.3. Decisões ratificadas (Série R)
 
-> **Recomendação (a ratificar — [R-02](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** modelar a **compatibilidade jogador-clube** como fator multiplicativo `playerCompatibility` (0–1) da fórmula de desenvolvimento (§6), média ponderada proposta de: estilo do clube ×0,25, função/posição usada ×0,20, personalidade/traços ×0,15, pressão do ambiente ×0,10, metodologia/qualidade de treino ×0,15, relação com o técnico ×0,10, idioma/cultura ×0,05. Racional: consolida os fatores qualitativos já listados na §6 num único multiplicador auditável, com o encaixe de estilo e de função dominando o ganho.
+> **Decisão ratificada — [R-02](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** modelar a **compatibilidade jogador-clube** como fator multiplicativo `playerCompatibility` (0–1) da fórmula de desenvolvimento (§6), média ponderada proposta de: estilo do clube ×0,25, função/posição usada ×0,20, personalidade/traços ×0,15, pressão do ambiente ×0,10, metodologia/qualidade de treino ×0,15, relação com o técnico ×0,10, idioma/cultura ×0,05. Racional: consolida os fatores qualitativos já listados na §6 num único multiplicador auditável, com o encaixe de estilo e de função dominando o ganho.
 
-> **Recomendação (a ratificar — [R-03](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** fixar o índice `LockerRoomClimate` (0–100) como `0,30·moral + 0,20·CoachTrust + 0,15·liderança interna + 0,15·satisfação contratual + 0,10·distribuição de minutos + 0,10·estabilidade política − penalidades (panelas, conflitos, salários atrasados, promessas quebradas, até −40 somadas)`. Racional: moral e confiança no técnico devem dominar, e as penalidades precisam de teto para não zerar o clima com um único evento.
+> **Decisão ratificada — [R-03](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** fixar o índice `LockerRoomClimate` (0–100) como `0,30·moral + 0,20·CoachTrust + 0,15·liderança interna + 0,15·satisfação contratual + 0,10·distribuição de minutos + 0,10·estabilidade política − penalidades (panelas, conflitos, salários atrasados, promessas quebradas, até −40 somadas)`. Racional: moral e confiança no técnico devem dominar, e as penalidades precisam de teto para não zerar o clima com um único evento.
 
-> **Recomendação (a ratificar — [R-04](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** definir as bandas de incerteza do `ScoutReport` por qualidade do olheiro: olheiro ruim → faixa de ±10 sobre o atributo real e `confidence ≤ 40`; olheiro bom → faixa de ±3 e `confidence ≥ 80`; a faixa estreita ~30% a cada ciclo de observação continuada. Racional: reproduz o exemplo "70–90" vs "83–88" da §3 como regra, mantendo a informação sempre como faixa, nunca como zero.
+> **Decisão ratificada — [R-04](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** definir as bandas de incerteza do `ScoutReport` por qualidade do olheiro: olheiro ruim → faixa de ±10 sobre o atributo real e `confidence ≤ 40`; olheiro bom → faixa de ±3 e `confidence ≥ 80`; a faixa estreita ~30% a cada ciclo de observação continuada. Racional: reproduz o exemplo "70–90" vs "83–88" da §3 como regra, mantendo a informação sempre como faixa, nunca como zero.
 
-> **Recomendação (a ratificar — [R-05](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** classificar o retorno de um `LoanSpell` por `scoreEmprestimo = minutosReais% × qualidadeFormaçãoRecebida (compatibilidade R-02)`: **melhor** se `≥ 0,60`, **igual** se `0,30–0,60`, **pior** se `< 0,30` (ou lesão grave / moral despencada). Racional: liga o resultado do empréstimo aos mesmos fatores de desenvolvimento do resto do sistema, evitando um modelo paralelo.
+> **Decisão ratificada — [R-05](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** classificar o retorno de um `LoanSpell` por `scoreEmprestimo = minutosReais% × qualidadeFormaçãoRecebida (compatibilidade R-02)`: **melhor** se `≥ 0,60`, **igual** se `0,30–0,60`, **pior** se `< 0,30` (ou lesão grave / moral despencada). Racional: liga o resultado do empréstimo aos mesmos fatores de desenvolvimento do resto do sistema, evitando um modelo paralelo.
 
-> **Recomendação (a ratificar — [R-06](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** padronizar o `CareerEvent` com os campos já listados na §9 (intensidade, duração, alvo, origem, efeitos imediatos/futuros, chance de cascata, chance de reversão) e curvas de decaimento por faixa: curto (meia-vida ~3 dias), médio (~3 semanas), longo (~1 temporada), histórico (não decai — vira tradição, §13). Racional: fixa uma única estrutura de evento reutilizável e dá meias-vidas concretas às quatro durações que a §9 já nomeia.
+> **Decisão ratificada — [R-06](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** padronizar o `CareerEvent` com os campos já listados na §9 (intensidade, duração, alvo, origem, efeitos imediatos/futuros, chance de cascata, chance de reversão) e curvas de decaimento por faixa: curto (meia-vida ~3 dias), médio (~3 semanas), longo (~1 temporada), histórico (não decai — vira tradição, §13). Racional: fixa uma única estrutura de evento reutilizável e dá meias-vidas concretas às quatro durações que a §9 já nomeia.
 
-> **Recomendação (a ratificar — [R-07](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** dimensionar a `PlayerChemistry`: cada aresta soma até **±8** ao desempenho setorial em partida (dupla entrosada vs. recém-formada) e cresce ~2/temporada de minutos juntos, com bônus de mentoria capitão→jovem acelerando a evolução mental do jovem. Racional: efeito perceptível mas não dominante frente aos atributos individuais, coerente com "relações afetam moral e desempenho tanto quanto atributos" (§15) sem sobrepujá-los.
+> **Decisão ratificada — [R-07](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** dimensionar a `PlayerChemistry`: cada aresta soma até **±8** ao desempenho setorial em partida (dupla entrosada vs. recém-formada) e cresce ~2/temporada de minutos juntos, com bônus de mentoria capitão→jovem acelerando a evolução mental do jovem. Racional: efeito perceptível mas não dominante frente aos atributos individuais, coerente com "relações afetam moral e desempenho tanto quanto atributos" (§15) sem sobrepujá-los.
 
-> **Recomendação (a ratificar — [R-08](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** parametrizar o `Agent`: gatilho de evento dispara quando `aggressiveness + commissionDrive − boardRelationship > 120` diante de proposta externa ou último ano de contrato; `influenceOverPlayer` pondera o quanto o empresário desloca a decisão do jogador (0 = ignora, 100 = decide por ele). Racional: torna o empresário um ator com peso calibrável nos eventos de renovação/saída sem reescrever a economia de contratos.
+> **Decisão ratificada — [R-08](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** parametrizar o `Agent`: gatilho de evento dispara quando `aggressiveness + commissionDrive − boardRelationship > 120` diante de proposta externa ou último ano de contrato; `influenceOverPlayer` pondera o quanto o empresário desloca a decisão do jogador (0 = ignora, 100 = decide por ele). Racional: torna o empresário um ator com peso calibrável nos eventos de renovação/saída sem reescrever a economia de contratos.
 
-> **Recomendação (a ratificar — [R-09](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11)):** definir os **pesos de agregação do `overall` por posição** sobre o grid canônico da §2 (ex.: atacante = 0,45 técnico + 0,20 físico + 0,20 mental + 0,15 finalização-específica; goleiro = 0,60 grid de goleiro + 0,25 mental + 0,15 físico). Racional: o corpus usa "overall/nota" (overview §10, IA) sem definir a fórmula; ancorar os pesos na posição impede que um atributo irrelevante para a função infle a nota.
+> **Decisão ratificada — [R-09](../99-decisoes/registro-de-decisoes.md#6-série-r--resolução-de-pendências-2026-07-11):** definir os **pesos de agregação do `overall` por posição** sobre o grid canônico da §2 (ex.: atacante = 0,45 técnico + 0,20 físico + 0,20 mental + 0,15 finalização-específica; goleiro = 0,60 grid de goleiro + 0,25 mental + 0,15 físico). Racional: o corpus usa "overall/nota" (overview §10, IA) sem definir a fórmula; ancorar os pesos na posição impede que um atributo irrelevante para a função infle a nota.
 
 ### 18.4. Gaps que pertencem a outros documentos (fronteira de escopo)
 
@@ -835,3 +835,13 @@ Estes assuntos não são do sistema de jogadores; ficam registrados com o dono e
 - **Papéis internos do clube** (diretor de base, coordenador de transição, head de performance, etc.) → [`./04-estrutura-do-clube-e-staff.md`](./04-estrutura-do-clube-e-staff.md); a estrutura de **suporte ao atleta** já está na §14.
 - **Linha do tempo da temporada** (ciclos diário → multitemporada) → [`./06-temporada-e-competicoes.md`](./06-temporada-e-competicoes.md); os eventos de carreira (§9, R-06) são encaixados nesses ciclos.
 - **Narrativa gerada por jogador** → [`./07-inteligencia-artificial.md`](./07-inteligencia-artificial.md) §3.8 (IA narrativa) + [`./13-relatorios-notificacoes-e-memoria.md`](./13-relatorios-notificacoes-e-memoria.md); o insumo é a memória do jogador (§13).
+
+---
+
+## Rastreabilidade — regras e fórmulas (catálogo)
+
+Os sistemas de jogadores têm identificadores estáveis no [Catálogo de Regras e Fórmulas](../02-tecnico/05-catalogo-de-regras-e-formulas.md):
+
+- **Regras de jogadores:** `PLY-001` a `PLY-020` (unicidade, geração e equilíbrio etário, atributos, desenvolvimento, lesões, aposentadoria, `ScoutReport`).
+- **Recomendações de balanceamento (ratificada):** `R-02`..`R-09` (compatibilidade jogador-clube, clima de vestiário, bandas do scout, empréstimo, `CareerEvent`, química, empresário, `overall` por posição — ver [Série R](../99-decisoes/registro-de-decisoes.md)).
+- **Lista canônica de atributos (0–100):** §2 deste documento é a fonte única.

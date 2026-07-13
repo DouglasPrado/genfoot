@@ -1,6 +1,6 @@
 # Roadmap de Implementação
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/como-construir-jogo-regras.md · **Revisão:** 2026-07-10
 
 Este documento define a ordem de construção do **Grinta**, um manager de futebol online no estilo Brasfoot. O princípio central é que o **primeiro produto técnico não é a interface nem o banco de dados**, e sim um **simulador completo do universo executado por linha de comando (headless)**, capaz de criar clubes, jogadores e campeonatos e simular temporadas inteiras. A UI, a API e a persistência definitiva chegam apenas depois que o mundo já roda e fecha corretamente no terminal.
 

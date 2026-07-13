@@ -1,6 +1,6 @@
 # UI/UX — Interface do Grinta
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/*, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md, decisão de stack 2026-07-11 · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/*, docs/02-tecnico/08-frontend-cliente-e-tempo-real.md, docs/02-tecnico/09-operacao-e-admin-do-mundo.md, Série R ratificada · **Revisão:** 2026-07-13
 
 Esta área especifica **toda a interface** do **Grinta** — o manager de futebol online, persistente e com jogadores únicos. Ela transforma os sistemas descritos no GDD (`../01-game-design/`) e nos documentos técnicos (`../02-tecnico/`) em **fluxos de navegação** e **telas descritas uma a uma**, cobrindo dois clientes:
 
@@ -33,12 +33,14 @@ O princípio herdado do frontend técnico atravessa toda a área: **o servidor �
 | 20 | [Admin — Fluxos](20-admin-fluxos.md) | Todos os fluxos de operação do mundo. |
 | 21 | [Admin — Telas](21-admin-telas.md) | Login/RBAC, painel do mundo, saúde econômica/demográfica, competições, correções, moderação/anti-abuso, W.O./punições, suporte/recurso, testes de equilíbrio. |
 | 22 | [Admin — Complementos: Plataforma e Adendos](22-admin-complementos-plataforma.md) | Telas da **auditoria de completude**: IAM/RBAC administrável, feature flags/kill switches, jobs/DLQ, incidentes, backups/recuperação, manutenção, broadcast, privacidade/compliance, report de bug + adendos ao doc 21. |
+| 23 | [Rastreabilidade UX/API](23-rastreabilidade-ux-api.md) | Ações críticas ligadas a query, command, evento, estado, erros e invariantes. |
+| 24 | [Layouts canônicos e cobertura](24-layouts-canonicos-e-cobertura.md) | Arquétipos, mapeamento das 138 telas, estados obrigatórios, confirmação por risco e critérios de aceite. |
 
 ## Convenções desta área
 
 - **Template de tela.** Cada tela é descrita com o mesmo esqueleto: **Objetivo · Como se chega · Layout · Componentes e dados · Ações · Estados · Tempo real/notificações · Referências**. O template completo está em [`00-visao-geral-e-design-system.md`](00-visao-geral-e-design-system.md#template-de-especificação-de-tela).
 - **IDs de tela.** Telas mobile usam prefixo `M-` (ex.: `M-HOME`), telas admin usam `A-` (ex.: `A-WORLD`). Fluxos usam `MF-##` (mobile) e `AF-##` (admin).
-- **Rastreabilidade.** Cada tela e fluxo referencia o(s) documento(s) de GDD/técnico de origem. Nada é inventado: onde a fonte é omissa, marca-se `> **Pendência:**`.
+- **Rastreabilidade.** Cada tela e fluxo referencia o documento de GDD/técnico de origem. Nova omissão deve abrir decisão no ADR e falhar a validação documental; o corpus canônico não mantém marcadores de pendência silenciosos.
 - **Nome do produto:** **Grinta** (o diretório `genfoot` é codinome antigo).
 - **Não duplicar regras.** A UI descreve **apresentação e interação**; regras, fórmulas e máquinas de estado permanecem nos docs de origem, apenas referenciados.
 

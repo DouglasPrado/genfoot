@@ -1,6 +1,6 @@
 # Experiência do Usuário e Telas
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/campeonatos-fim-de-temporadas.md, chats/economics-initial.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/campeonatos-fim-de-temporadas.md, chats/economics-initial.md, chats/escopo-definitivo-simulador.md · **Revisão:** 2026-07-11
 
 ## Resumo
 
@@ -413,4 +413,4 @@ Este documento não duplica esse desenho — apenas o referencia.
 
 > **Resolvido (2026-07-11):** o desenho tela-a-tela completo da experiência foi especificado na área [`../04-ui-ux/`](../04-ui-ux/) — 97 telas do app do jogador (Expo) nos docs `03`–`12` e 15 telas do admin (Next.js) no doc `21`. Isso cobre o que antes estava listado como pendência aqui: mercado/negociação, treino, base, tática, escalação, conversas/imprensa, tabela/calendário, central de notícias, Central/Agenda/lembretes e o construtor de automações.
 
-> **Recomendação (a ratificar — R-91):** granularidade de exibição dos indicadores (Seção 7) — proposta: rótulo qualitativo + barra visual por padrão, com valor numérico exato só quando a qualidade da comissão o revela (coerente com "informação incompleta nunca vira zero"). Layout em [`../04-ui-ux/`](../04-ui-ux/).
+> **Decisão ratificada — R-91:** granularidade de exibição dos indicadores (Seção 7) — proposta: rótulo qualitativo + barra visual por padrão, com valor numérico exato só quando a qualidade da comissão o revela (coerente com "informação incompleta nunca vira zero"). Layout em [`../04-ui-ux/`](../04-ui-ux/).

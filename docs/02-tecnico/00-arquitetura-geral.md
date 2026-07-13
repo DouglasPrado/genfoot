@@ -1,6 +1,6 @@
 # Arquitetura Geral (Stack e Topologia)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md, chats/ux-do-jogo.md (Bloco 25), decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/como-construir-jogo-regras.md, chats/funcionamento-brasfoot.md, chats/ux-do-jogo.md (Bloco 25), decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
 
 Este documento define a arquitetura de referência do **Grinta**, um manager de futebol online com jogadores únicos e mundo persistente (herdeiro conceitual do Brasfoot, mas com identidade própria por atleta). Ele consolida as decisões de topologia, estrutura de repositório, stack tecnológica e princípios transversais que orientam toda a construção técnica do jogo.
 
@@ -93,7 +93,7 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 | Admin do mundo (web) | **Next.js 15** | Painel de operação do mundo. |
 | Banco de dados | **PostgreSQL** | Estado persistente do mundo e fonte única de verdade. |
 | ORM / Persistência | **Prisma** | Camada `packages/database`. |
-| Mensageria / broker | **Redis + BullMQ** na fundação; **RabbitMQ** (durável, exchanges, filas quorum) ou **NATS** na evolução | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna. Broker inicial recomendado em R-78 (a ratificar); desenho durável em `./01-arquitetura-de-dados.md`. |
+| Mensageria / broker | **Redis + BullMQ** na fundação; **RabbitMQ** (durável, exchanges, filas quorum) ou **NATS** na evolução | Eventos de domínio, commands assíncronos, jobs distribuídos e integração interna. Broker inicial recomendado em R-78 (ratificada); desenho durável em `./01-arquitetura-de-dados.md`. |
 | Cache / dados efêmeros | **Redis** | Cache, presença, rate limiting, adapter de Socket.IO e locks não críticos. Nunca fonte definitiva de dados competitivos. |
 | Fila / Assíncrono | **Redis + BullMQ** | Execução de jobs dos workers (retries, backoff, agendamento, dead letters), reaproveitando o Redis. Ver R-78. |
 | Tempo real | WebSocket com **Socket.IO** | Partidas ao vivo, presença e comandos em tempo real. |
@@ -106,9 +106,9 @@ A stack a seguir reúne as escolhas apresentadas nos chats de origem.
 
 ### Framework da API
 
-> **Recomendação (a ratificar — R-77):** adotar **NestJS + TypeScript** como framework oficial da API. Racional: é o candidato preferencial já citado e a única escolha explícita das fontes (Bloco 25 de UX); atende diretamente os critérios levantados — suporte de primeira classe a **WebSocket/Socket.IO** (gateways), **módulos** que espelham os bounded contexts da seção 6, injeção de dependência que reforça a fronteira domínio↔infra, e integração pronta com a camada de mensageria (R-78) e com Zod nas fronteiras. **Fastify** entra como *adapter* HTTP sob o NestJS caso a latência exija (NestJS roda sobre Fastify), sem trocar o framework; **AdonisJS** fica descartado por acoplar ORM/estrutura próprios que conflitam com Prisma e com o desenho de módulos.
+> **Decisão ratificada — R-77:** adotar **NestJS + TypeScript** como framework oficial da API. Racional: é o candidato preferencial já citado e a única escolha explícita das fontes (Bloco 25 de UX); atende diretamente os critérios levantados — suporte de primeira classe a **WebSocket/Socket.IO** (gateways), **módulos** que espelham os bounded contexts da seção 6, injeção de dependência que reforça a fronteira domínio↔infra, e integração pronta com a camada de mensageria (R-78) e com Zod nas fronteiras. **Fastify** entra como *adapter* HTTP sob o NestJS caso a latência exija (NestJS roda sobre Fastify), sem trocar o framework; **AdonisJS** fica descartado por acoplar ORM/estrutura próprios que conflitam com Prisma e com o desenho de módulos.
 
-> **Recomendação (a ratificar — R-78):** adotar **Redis + BullMQ** como broker/execução assíncrona oficial na fase de fundação. Racional: para um **monólito modular + workers** (seção 1), Redis + BullMQ entrega filas duráveis, retries, backoff, jobs agendados e dead letters reaproveitando o Redis já presente (cache, presença, adapter de Socket.IO), sem o custo operacional de introduzir e operar um broker AMQP cedo. A modelagem de **Outbox/Inbox** (ver `./01-arquitetura-de-dados.md`) é independente do broker e preserva a garantia `AT_LEAST_ONCE` + idempotência. **Evolução:** migrar para **RabbitMQ** (exchanges, filas quorum, roteamento por routing key) — ou **NATS** para fan-out de eventos de domínio — quando volume, roteamento e múltiplos consumidores justificarem (fase 2+, ver seção 10). **Reconciliação:** onde as seções 7–10 e o [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md) descrevem RabbitMQ, trata-se do **desenho-alvo de mensageria durável**; na fundação o broker é Redis + BullMQ até a ratificação.
+> **Decisão ratificada — R-78:** adotar **Redis + BullMQ** como broker/execução assíncrona oficial na fase de fundação. Racional: para um **monólito modular + workers** (seção 1), Redis + BullMQ entrega filas duráveis, retries, backoff, jobs agendados e dead letters reaproveitando o Redis já presente (cache, presença, adapter de Socket.IO), sem o custo operacional de introduzir e operar um broker AMQP cedo. A modelagem de **Outbox/Inbox** (ver `./01-arquitetura-de-dados.md`) é independente do broker e preserva a garantia `AT_LEAST_ONCE` + idempotência. **Evolução:** migrar para **RabbitMQ** (exchanges, filas quorum, roteamento por routing key) — ou **NATS** para fan-out de eventos de domínio — quando volume, roteamento e múltiplos consumidores justificarem (fase 2+, ver seção 10). **Reconciliação:** onde as seções 7–10 e o [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md) descrevem RabbitMQ, trata-se do **desenho-alvo de mensageria durável**; na fundação o broker é Redis + BullMQ até a ratificação.
 
 O restante da stack (Next.js, PostgreSQL, Prisma, Redis, Cloudflare R2, observabilidade e deploy) é consenso e é adotado como padrão.
 
@@ -275,6 +275,8 @@ A infraestrutura inicial é projetada para caber em uma única instância operac
 - **Falha do broker de mensageria** (Redis/BullMQ na fundação; RabbitMQ/NATS na evolução): a API continua aceitando commands cuja transação e Outbox sejam gravadas — o evento é publicado depois.
 - **Falha do Redis:** apenas degradação (perda de cache, reconstrução de presença); dados oficiais preservados.
 - **Falha do R2:** uploads/downloads indisponíveis, mas partidas, contratos e finanças continuam.
+
+> **Raio de explosão do Redis (fundação → evolução).** Na fundação, um **único Redis** acumula quatro workloads — **cache**, **broker/filas** (BullMQ, R-78), **rate limiting** e **adapter de Socket.IO** — que compartilham um mesmo domínio de falha. Isso é aceitável porque **o caminho crítico não depende da persistência do Redis**: commands, ledger e eventos são duráveis no **PostgreSQL** e publicados via **Outbox transacional** (gravada na mesma transação do agregado — ver [`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md)), de modo que perder o Redis **degrada** (cache frio, presença reconstruída, jobs reenfileirados) mas **nunca perde nem corrompe** estado de mundo. A evolução **separa os domínios de falha**: o broker migra para **RabbitMQ (filas quorum)**/NATS (fase 2+) e o cache ganha **réplica + Sentinel** (fase 5, seção 10) — uma falha de cache deixa de derrubar a mensageria, e vice-versa.
 
 ### Configuração e segredos
 

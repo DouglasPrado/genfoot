@@ -1,10 +1,18 @@
 // =============================================================================
-// Grinta — Schema Prisma Canônico (EXECUTÁVEL / validado)
+// Grinta — BASELINE FÍSICA EXECUTÁVEL (pré-migration) / validada
 // -----------------------------------------------------------------------------
-// Este é o schema executável e validado (`prisma validate`). A referência de
-// domínio comentada, com os ~250 models granulares e as decisões de modelagem,
-// vive em `docs/02-tecnico/02-modelo-de-dados.md`. Em caso de divergência de
-// SINTAXE, este arquivo prevalece; para o DOMÍNIO detalhado, consulte o doc.
+// Esta é a baseline física executável e validada (`prisma validate`). Não há
+// exigência de uma tabela para cada um dos ~250 conceitos de domínio. A política
+// de materialização, ownership e constraints vive em
+// `docs/02-tecnico/20-modelo-fisico-constraints-e-ownership.md`.
+// O conjunto cobre os agregados de topo e,
+// agora, as famílias que faltavam ao bloqueador B-06 (passo 9): eventing/outbox,
+// ledger financeiro de partidas dobradas, inscrições, concorrência/recuperação
+// (sagas + idempotência), histórico append-only e replay determinístico.
+// Não gerar migrations de produção antes de cumprir o gate DB-01..DB-16,
+// incluindo constraints PostgreSQL não expressáveis no Prisma e a conversão das
+// FKs world-scoped restantes em compostas. Em caso de
+// divergência de SINTAXE, este arquivo prevalece; para o DOMÍNIO detalhado, o doc.
 //
 // Convenções canônicas aplicadas (ver §1 do doc 02 e Decisões 19.7/19.8):
 //  - PK: String @id @default(uuid(7)) @db.Uuid  (UUIDv7)
@@ -22,10 +30,12 @@
 //    `Person` ao mudar de papel (ex.: jogador que vira staff).
 //  - Concorrência otimista: `version Int @default(1)` nas entidades mutáveis.
 //
-// Núcleo coerente (~51 models). NÃO é o inventário completo dos ~250 granulares
-// da §6 do doc — é o subconjunto executável que cobre identidade, mundo, clube,
-// pessoa/jogador, staff/treino, elenco, scouting/mercado, finanças, competição,
-// partida/simulação, narrativa, notificação, automação e auditoria.
+// Cobertura atual (75 models · 57 enums). Famílias cobertas: identidade,
+// autenticação/RBAC (credencial+refresh token+permissões — C-12), mundo, clube,
+// pessoa/jogador, disciplina/suspensões (A-13), staff/treino, elenco,
+// scouting/mercado, finanças (razão de partidas dobradas), competição/inscrição,
+// partida/simulação/replay, narrativa, notificação, automação, auditoria
+// (hash-chain), eventing/outbox, concorrência/sagas e histórico append-only.
 // =============================================================================
 
 generator client {
@@ -34,17 +44,31 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // B-06: no Prisma 7 a `url` do datasource NÃO vive mais no schema (causava
+  // P1012). A connection string mudou para `prisma.config.ts`
+  // (datasource.url = env("DATABASE_URL")); em runtime o PrismaClient recebe
+  // `adapter`/`accelerateUrl`. Ver prisma.config.ts.
 }
 
 // =============================================================================
 // ENUMS
 // =============================================================================
 
+// C-12 · RBAC. `PLAYER` é o papel-base do usuário comum (não-operador) e o
+// @default de UserAccount. Acima dele vêm os SEIS níveis administrativos
+// CUMULATIVOS ratificados no R-87 (docs/02-tecnico/09-operacao-e-admin-do-mundo.md
+// §5 e /04-plataforma-seguranca-operacoes.md §2), cada um herdando o anterior:
+//   Visualização → Suporte → Revisão → Correção → Punição → Reversão.
+// Nomes canônicos R-87 mapeados para tokens em inglês (VIEW..REVERSAL). Os
+// antigos MODERATOR/ADMIN foram substituídos por esta escala (ver relatório).
 enum UserRole {
-  PLAYER
-  MODERATOR
-  ADMIN
+  PLAYER // usuário comum (não-operador) — default
+  VIEW // R-87 nível 1 · Visualização (somente leitura administrativa)
+  SUPPORT // R-87 nível 2 · Suporte (atendimento; não altera estado percebido)
+  REVIEW // R-87 nível 3 · Revisão (investiga/analisa casos)
+  CORRECTION // R-87 nível 4 · Correção (aplica correções de estado)
+  PUNISHMENT // R-87 nível 5 · Punição (sanções esportivas/administrativas)
+  REVERSAL // R-87 nível 6 · Reversão (rollback — maior privilégio)
 }
 
 enum UserAccountStatus {
@@ -92,12 +116,35 @@ enum DominantFoot {
   BOTH
 }
 
+// M-02 · `PlayerStatus` é preservado (evita cascata destrutiva) mas passa a
+// significar CARREIRA: use ACTIVE/RETIRED/FREE_AGENT. A INDISPONIBILIDADE
+// (INJURED/SUSPENDED) migra para o novo `Player.availability`
+// (`PlayerAvailability`). Os valores INJURED/SUSPENDED aqui ficam DEPRECADOS.
 enum PlayerStatus {
   ACTIVE
   RETIRED
   FREE_AGENT
-  INJURED
-  SUSPENDED
+  INJURED // DEPRECADO: usar Player.availability = INJURED
+  SUSPENDED // DEPRECADO: usar Player.availability = SUSPENDED
+}
+
+// M-02 / R-157 · disponibilidade esportiva separada da carreira (`PlayerStatus`).
+// Carreira (base/profissional/aposentado) fica em `PlayerStatus`; pessoa
+// (viva/falecida/anonimizada) em `Person`. Estes são os estados de DISPONIBILIDADE.
+enum PlayerAvailability {
+  AVAILABLE // apto
+  INJURED // lesionado
+  SUSPENDED // suspenso
+  CONVENED // convocado (seleção) — R-157
+  UNAVAILABLE // indisponível (outras causas) — R-157
+}
+
+// A-13 · ciclo de vida de uma suspensão de jogador.
+enum SuspensionStatus {
+  PENDING
+  ACTIVE
+  SERVED
+  CANCELLED
 }
 
 enum PlayerGenerationSource {
@@ -127,7 +174,7 @@ enum PlayerPosition {
 }
 
 enum StaffRole {
-  HEAD_COACH
+  HEAD_COACH // C-03: papel assessor/IA — NÃO substitui o comando tático do usuário humano (R-01)
   ASSISTANT_COACH
   FITNESS_COACH
   GOALKEEPER_COACH
@@ -426,6 +473,140 @@ enum AutomationRuleStatus {
   ARCHIVED
 }
 
+// -----------------------------------------------------------------------------
+// EVENTING / CONCORRÊNCIA / RECUPERAÇÃO (§6.3.11 · context-map §5/§6)
+// Enums da camada de eventing, idempotência e sagas (antes ausentes no schema).
+// -----------------------------------------------------------------------------
+
+/// Ciclo do outbox transacional (publicação pós-commit, AT_LEAST_ONCE).
+enum OutboxStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  DEAD_LETTER
+}
+
+/// Sagas canônicas do blueprint (context-map §6.3): SAGA-01..05.
+enum SagaType {
+  TRANSFER // SAGA-01 · Transferência
+  SEASON_ROLLOVER // SAGA-02 · Virada de temporada
+  ONBOARDING // SAGA-03 · Entrada/onboarding
+  STADIUM_WORKS // SAGA-04 · Obra/estrutura
+  LOAN // SAGA-05 · Empréstimo
+}
+
+/// Estado do process manager (sem 2PC — Decisão 19.10).
+enum SagaStatus {
+  CREATED
+  RUNNING
+  WAITING
+  COMPENSATING
+  COMPLETED
+  FAILED
+  MANUAL_REVIEW
+}
+
+enum SagaStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  COMPENSATED
+  SKIPPED
+}
+
+// -----------------------------------------------------------------------------
+// LEDGER FINANCEIRO (partidas dobradas — §6.3.9 / doc 13 ledger e conservação)
+// -----------------------------------------------------------------------------
+
+/// Escopo de propriedade da conta do razão: clube (caixa em circulação) ou mundo
+/// (contas sistêmicas SYS_*, contraparte de faucet/sink — doc 13 §2.2/§3.1).
+enum AccountOwnerScope {
+  CLUB
+  WORLD
+}
+
+/// Contas sistêmicas nomeadas (`ownerScope=WORLD`). Faucets criam oferta; sinks a
+/// destroem — sempre com contraparte rastreável (doc 13 §2.2, INV-3b). PROPOSTO (R-110).
+enum SystemAccount {
+  SYS_INITIAL_ENDOWMENT // faucet — dotação de caixa inicial (ECO-001)
+  SYS_MATCHDAY_FAUCET // faucet — bilheteria/sócio-torcedor
+  SYS_SPONSOR_FAUCET // faucet — patrocínio/comercial
+  SYS_BROADCAST_FAUCET // faucet — direitos de TV
+  SYS_PRIZE_FAUCET // faucet — premiação/participação
+  SYS_OWNER_INJECTION_FAUCET // faucet — aporte de diretoria/mecenas
+  SYS_TAX_SINK // sink — impostos/taxas
+  SYS_WAGE_SINK // sink — salários/comissão (consumo)
+  SYS_OPERATING_SINK // sink — manutenção/viagens/médico/base/obra
+  SYS_CREDIT_SINK // sink — juros a bancos externos
+  SYS_PENALTY_SINK // sink — multas/punições
+  SYS_AGENT_SINK // sink — comissão de empresário
+}
+
+enum FinancialAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+  SYSTEM_FAUCET
+  SYSTEM_SINK
+}
+
+enum AccountNormalSide {
+  DEBIT
+  CREDIT
+}
+
+/// Classe de fluxo do lançamento (doc 13 §2.1): TRANSFER conserva a oferta;
+/// FAUCET cria; SINK destrói. Só faucet/sink movem `totalMoney` (INV-3b).
+enum MoneyFlowClass {
+  TRANSFER
+  FAUCET
+  SINK
+}
+
+/// Ciclo do lançamento (§6.3.9): só `POSTED` afeta saldo; reversão cria NOVO
+/// lançamento com `reversalOfJournalEntryId` (publicado nunca é editado).
+enum JournalEntryStatus {
+  DRAFT
+  POSTING
+  POSTED
+  REVERSED
+}
+
+enum JournalLineDirection {
+  DEBIT
+  CREDIT
+}
+
+// -----------------------------------------------------------------------------
+// INSCRIÇÕES COMPETITIVAS (§6.3.7 · context-map C7) — cotas e limites
+// -----------------------------------------------------------------------------
+
+/// Estado da inscrição (clube na edição / jogador na lista). Forma granular
+/// §6.2: `PlayerRegistrationStatus`.
+enum RegistrationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+  SUSPENDED
+}
+
+/// Classifica o jogador inscrito para as cotas (estrangeiros/formados/idade).
+enum RegistrationSlotType {
+  GENERAL
+  FOREIGN // conta na cota de estrangeiros
+  HOMEGROWN // formado no país
+  CLUB_TRAINED // formado no clube
+  UNDER21
+  GOALKEEPER
+}
+
 // =============================================================================
 // PLATAFORMA (globais, sem gameWorldId) — §3.1 / §6.3.1
 // =============================================================================
@@ -447,6 +628,8 @@ model UserAccount {
   sessions            UserSession[]
   worldParticipations WorldParticipant[]
   notifications       Notification[]
+  credential          UserCredential? // C-12: autenticação
+  refreshTokens       AuthRefreshToken[] // C-12: rotação/detecção de reuso
 }
 
 model UserSession {
@@ -484,6 +667,66 @@ model WorldParticipant {
   @@index([gameWorldId])
 }
 
+// -----------------------------------------------------------------------------
+// AUTENTICAÇÃO / RBAC / AUDITORIA (C-12 · §6.3.1 / R-85/R-87)
+// Materializa no schema o que antes só existia em doc: credencial local
+// (Argon2id — R-85), rotação de refresh token com detecção de reuso, e RBAC
+// granular (Permission/RolePermission) sobre os 6 níveis do R-87 (UserRole).
+// -----------------------------------------------------------------------------
+
+/// Credencial local do usuário (1:1 com UserAccount). `algo` default argon2id (R-85).
+model UserCredential {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  userId       String   @unique @db.Uuid
+  passwordHash String
+  algo         String   @default("argon2id")
+  mfaEnabled   Boolean  @default(false)
+  mfaSecret    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id])
+}
+
+/// Refresh token rotacionável. `family` agrupa a linhagem; `rotatedFromId` liga
+/// ao token anterior — reuso de um token já rotacionado indica roubo (revoga a família).
+model AuthRefreshToken {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  userId        String    @db.Uuid
+  tokenHash     String    @unique
+  family        String
+  rotatedFromId String?   @db.Uuid
+  issuedAt      DateTime  @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  user UserAccount @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([family])
+}
+
+/// Permissão granular nomeada (RBAC). `key` estável (ex.: WORLD.CALENDAR.EXECUTE).
+model Permission {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  key         String  @unique
+  description String?
+
+  rolePermissions RolePermission[]
+}
+
+/// Concessão de uma permissão a um papel (UserRole). Grão de autorização do R-87.
+model RolePermission {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  role         UserRole
+  permissionId String   @db.Uuid
+
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([role, permissionId])
+  @@index([permissionId])
+}
+
 // =============================================================================
 // MUNDO E TEMPORADA — §3.1 / §6.3.2
 // =============================================================================
@@ -498,6 +741,7 @@ model GameWorld {
   currentDate             DateTime // data virtual do mundo
   timezone                String      @default("America/Sao_Paulo")
   maxClubs                Int
+  seasonDays              Int? // R-107: duração real da temporada por tamanho de mundo (16 clubes→~63d)
   initialClubCashMinor    BigInt // caixa inicial em unidade mínima
   currencyId              String      @db.Uuid // moeda-base do mundo (FK Currency)
   createdAt               DateTime    @default(now())
@@ -601,30 +845,31 @@ model Club {
   boardPatience       Int             @default(50)
   pressureLevel       Int             @default(0)
   currencyId          String          @db.Uuid // moeda operacional do clube (FK Currency)
-  cashMinor           BigInt // dinheiro em unidade mínima
+  cashMinor           BigInt // C-06: PROJEÇÃO DERIVADA do razão (fonte de verdade = JournalLine POSTED, ownerScope=CLUB). NÃO é campo editável — reconstruído a partir do ledger.
   wageBudgetMinor     BigInt
   transferBudgetMinor BigInt
   version             Int             @default(1)
 
-  gameWorld        GameWorld              @relation(fields: [gameWorldId], references: [id])
-  controls         ClubControl[]
-  departments      ClubDepartment[]
-  aiProfile        ClubAIProfile?
-  players          Player[]
-  playerContracts  PlayerContract[]
-  staffContracts   StaffContract[]
-  trainingPlans    TrainingPlan[]
-  squads           Squad[]
-  scoutReports     ScoutReport[]
-  transferListings TransferListing[]
-  finances         FinancialTransaction[]
-  financeSnapshots ClubFinanceSnapshot[]
-  automationRules  AutomationRule[]
-  seasonStats      ClubSeasonStats[]
-  homeMatches      Match[]                @relation("HomeClubMatches")
-  awayMatches      Match[]                @relation("AwayClubMatches")
-  offersBuying     Offer[]                @relation("BuyingClubOffers")
-  offersSelling    Offer[]                @relation("SellingClubOffers")
+  gameWorld         GameWorld              @relation(fields: [gameWorldId], references: [id])
+  controls          ClubControl[]
+  departments       ClubDepartment[]
+  aiProfile         ClubAIProfile?
+  players           Player[]
+  playerContracts   PlayerContract[]
+  staffContracts    StaffContract[]
+  trainingPlans     TrainingPlan[]
+  squads            Squad[]
+  scoutReports      ScoutReport[]
+  transferListings  TransferListing[]
+  finances          FinancialTransaction[]
+  financeSnapshots  ClubFinanceSnapshot[]
+  financialAccounts FinancialAccount[] // razão de partidas dobradas (§6.3.9)
+  automationRules   AutomationRule[]
+  seasonStats       ClubSeasonStats[]
+  homeMatches       Match[]                @relation("HomeClubMatches")
+  awayMatches       Match[]                @relation("AwayClubMatches")
+  offersBuying      Offer[]                @relation("BuyingClubOffers")
+  offersSelling     Offer[]                @relation("SellingClubOffers")
 
   @@unique([gameWorldId, slug])
   @@unique([gameWorldId, id]) // par de referência para FKs compostas por mundo
@@ -663,6 +908,7 @@ model ClubDepartment {
   maintenanceCostPerSeasonMinor BigInt
   upgradeCostMinor              BigInt
   effectJson                    Json?
+  version                       Int            @default(1) // concorrência otimista (agregado C3)
 
   club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
 
@@ -702,6 +948,9 @@ model Person {
   birthDate   DateTime
   ageVirtual  Int
   gender      Gender       @default(MALE)
+  // M-02 nota: `Person.status` é de CARREIRA/ciclo-de-vida da pessoa (ACTIVE/RETIRED/
+  // FREE_AGENT), NÃO disponibilidade esportiva. A indisponibilidade de jogo vive em
+  // `Player.availability`; não foi replicada aqui (Person pode ser staff, sem jogo).
   status      PlayerStatus @default(ACTIVE)
   createdAt   DateTime     @default(now())
   version     Int          @default(1)
@@ -729,6 +978,7 @@ model Player {
   status                  PlayerStatus           @default(ACTIVE)
   generationSource        PlayerGenerationSource
   generatedAtSeasonNumber Int?
+  availability            PlayerAvailability     @default(AVAILABLE) // M-02: disponibilidade esportiva (separada da carreira em `status`)
   currentAbility          Int
   potentialAbility        Int
   currencyId              String                 @db.Uuid
@@ -748,25 +998,28 @@ model Player {
   professionalism         Int                    @default(50)
   version                 Int                    @default(1)
 
-  gameWorld          GameWorld             @relation(fields: [gameWorldId], references: [id])
-  person             Person                @relation(fields: [personId], references: [id])
-  club               Club?                 @relation(fields: [clubId], references: [id])
-  attributes         PlayerAttributes?
-  background         PlayerBackground?
-  personality        PlayerPersonality?
-  development        PlayerDevelopment?
-  contracts          PlayerContract[]
-  injuries           PlayerInjury[]
-  scoutReports       ScoutReport[]
-  transferListings   TransferListing[]
-  offers             Offer[]
-  squadMemberships   SquadMembership[]
-  seasonStats        PlayerSeasonStats[]
-  matchStats         PlayerMatchStats[]
-  lineupPlayers      MatchLineupPlayer[]
-  trainingEntries    TrainingPlayerEntry[]
-  matchEvents        MatchEvent[]          @relation("EventPlayer")
-  relatedMatchEvents MatchEvent[]          @relation("EventRelatedPlayer")
+  gameWorld             GameWorld                     @relation(fields: [gameWorldId], references: [id])
+  person                Person                        @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  club                  Club?                         @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  attributes            PlayerAttributes?
+  background            PlayerBackground?
+  personality           PlayerPersonality?
+  development           PlayerDevelopment?
+  developmentAccruals   PlayerDevelopmentAccrual[] // buffer de accrual (doc 13 §5.2)
+  contracts             PlayerContract[]
+  injuries              PlayerInjury[]
+  scoutReports          ScoutReport[]
+  transferListings      TransferListing[]
+  offers                Offer[]
+  squadMemberships      SquadMembership[]
+  seasonStats           PlayerSeasonStats[]
+  matchStats            PlayerMatchStats[]
+  lineupPlayers         MatchLineupPlayer[]
+  trainingEntries       TrainingPlayerEntry[]
+  matchEvents           MatchEvent[]                  @relation("EventPlayer")
+  relatedMatchEvents    MatchEvent[]                  @relation("EventRelatedPlayer")
+  suspensions           PlayerSuspension[] // A-13
+  competitionDiscipline PlayerCompetitionDiscipline[] // A-13
 
   @@unique([gameWorldId, personId])
   @@unique([gameWorldId, id])
@@ -885,7 +1138,7 @@ model PlayerContract {
   version              Int            @default(1)
 
   player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
-  club   Club   @relation(fields: [clubId], references: [id])
+  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
 
   @@index([gameWorldId, playerId])
   @@index([clubId])
@@ -904,10 +1157,55 @@ model PlayerInjury {
   causedByMatchId              String?        @db.Uuid
   causedByTrainingPlanId       String?        @db.Uuid
   medicalDepartmentLevelAtTime Int?
+  version                      Int            @default(1) // concorrência otimista (agregado C4 · medicina)
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
 
   @@index([gameWorldId, playerId])
+}
+
+// -----------------------------------------------------------------------------
+// DISCIPLINA / SUSPENSÕES (A-13) — world-scoped, escopo competitivo opcional.
+// -----------------------------------------------------------------------------
+
+/// Suspensão de um jogador (A-13). `competitionSeasonId` delimita o escopo (NULL =
+/// global). FK composta world-scoped ao Player. `matchesServed` avança até
+/// `matchesTotal`; `status` percorre PENDING→ACTIVE→SERVED (ou CANCELLED).
+model PlayerSuspension {
+  id                  String           @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String           @db.Uuid
+  playerId            String           @db.Uuid
+  competitionSeasonId String?          @db.Uuid // escopo competitivo (NULL = global); ref. escalar a CompetitionSeason
+  reason              String
+  matchesTotal        Int
+  matchesServed       Int              @default(0)
+  status              SuspensionStatus @default(PENDING)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  version             Int              @default(1)
+
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+
+  @@index([gameWorldId, playerId])
+  @@index([gameWorldId, competitionSeasonId])
+}
+
+/// Contador de cartões acumulados por jogador/competição (A-13). Deriva de
+/// `MatchEvent` (YELLOW_CARD/RED_CARD) mas é materializado para aplicar a regra de
+/// suspensão por acúmulo sem varrer o feed. 1 linha por (mundo, jogador, edição).
+model PlayerCompetitionDiscipline {
+  id                  String @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String @db.Uuid
+  playerId            String @db.Uuid
+  competitionSeasonId String @db.Uuid // ref. escalar a CompetitionSeason (escopo do acúmulo)
+  yellowAccumulated   Int    @default(0)
+  redCount            Int    @default(0)
+  version             Int    @default(1)
+
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, playerId, competitionSeasonId]) // 1 contador por jogador/edição
+  @@index([gameWorldId, competitionSeasonId])
 }
 
 // =============================================================================
@@ -933,7 +1231,7 @@ model StaffMember {
   version           Int              @default(1)
 
   gameWorld GameWorld       @relation(fields: [gameWorldId], references: [id])
-  person    Person          @relation(fields: [personId], references: [id])
+  person    Person          @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
   contracts StaffContract[]
 
   @@unique([gameWorldId, personId])
@@ -1054,9 +1352,10 @@ model ScoutReport {
   recommendationScore       Int
   discoveredAt              DateTime  @default(now())
   expiresAt                 DateTime?
+  version                   Int       @default(1) // concorrência otimista (agregado C6 · scouting)
 
   club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
 
   @@index([gameWorldId, clubId])
   @@index([playerId])
@@ -1074,9 +1373,10 @@ model TransferListing {
   listedAt         DateTime       @default(now())
   expiresAt        DateTime?
   reason           String?
+  version          Int            @default(1) // concorrência otimista (agregado C6)
 
   club   Club    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  player Player  @relation(fields: [playerId], references: [id])
+  player Player  @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
   offers Offer[]
 
   @@index([gameWorldId, clubId])
@@ -1104,6 +1404,7 @@ model Offer {
   playerInterestScore      Int?
   sellingClubInterestScore Int?
   buyingClubNeedScore      Int?
+  version                  Int                     @default(1) // concorrência otimista (agregado C6 · TransferCase)
 
   listing     TransferListing? @relation(fields: [listingId], references: [id])
   player      Player           @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
@@ -1172,6 +1473,7 @@ model Competition {
   country     String?
   tier        Int?
   reputation  Int               @default(1)
+  version     Int               @default(1) // concorrência otimista (agregado C7)
 
   gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id])
   seasons   CompetitionSeason[]
@@ -1190,11 +1492,15 @@ model CompetitionSeason {
   endsAt        DateTime?
   prizeJson     Json?
   rulesJson     Json? // regras flexíveis por competição
+  version       Int          @default(1) // concorrência otimista (agregado C7 · edição)
 
-  competition Competition        @relation(fields: [competitionId], references: [id])
-  clubs       CompetitionClub[]
-  stages      CompetitionStage[]
-  matches     Match[]
+  competition       Competition               @relation(fields: [competitionId], references: [id])
+  clubs             CompetitionClub[]
+  stages            CompetitionStage[]
+  matches           Match[]
+  registrations     CompetitionRegistration[] // inscrições de clubes na edição (§6.3.7)
+  clubSeasonStats   ClubSeasonStats[] // M-04: estatísticas de clube por competição
+  playerSeasonStats PlayerSeasonStats[] // M-04: estatísticas de jogador por competição
 
   @@unique([competitionId, seasonId])
 }
@@ -1219,6 +1525,7 @@ model CompetitionStage {
   format              CompetitionFormat
   startsAt            DateTime?
   endsAt              DateTime?
+  version             Int               @default(1) // concorrência otimista (agregado C7 · estágio)
 
   competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
   matches           Match[]
@@ -1270,21 +1577,41 @@ model Match {
   @@index([awayClubId])
 }
 
+/// Cabeçalho do `SimulationManifest` imutável (I + R + A + s + C + hashes) — o
+/// registro que permite replay bit-a-bit e auditoria (doc 15 §3). Uma vez que a
+/// partida sai de PRE_MATCH (entradas congeladas) e FINISHED (commands fechados),
+/// o manifesto NÃO muda; correção gera nova versão.
 model MatchSimulation {
-  id                   String @id @default(uuid(7)) @db.Uuid
-  gameWorldId          String @db.Uuid
-  matchId              String @unique @db.Uuid
-  engineVersion        String // versão do motor (compatibilidade de replay)
-  tickIntervalSeconds  Int
-  totalTicks           Int
-  homeStrengthSnapshot Json // fotografia da força ofensiva/defensiva
-  awayStrengthSnapshot Json
-  randomSeed           String // determinismo da simulação
-  balanceJson          Json?
-  finalMomentumJson    Json?
+  id                    String  @id @default(uuid(7)) @db.Uuid
+  gameWorldId           String  @db.Uuid
+  matchId               String  @unique @db.Uuid
+  engineVersion         String // identifica o kernel K (compatibilidade de replay)
+  tickIntervalSeconds   Int // timestep canônico (PROPOSTO R-143: 60 s virtuais)
+  totalTicks            Int
+  homeStrengthSnapshot  Json // fotografia da força ofensiva/defensiva (parte de I)
+  awayStrengthSnapshot  Json
+  randomSeed            String // seed mestra s (determinismo)
+  balanceJson           Json?
+  finalMomentumJson     Json?
+  // --- SimulationManifest: campos a adicionar (doc 15 §3.1) — PROPOSTO (R-145/R-146) ---
+  rulesetVersionId      String? @db.Uuid // carimba R (ruleset da época) no kickoff (R-145)
+  rngAlgorithm          String? // nomeia A (ex.: pcg32-xsh-rr) — R-146
+  rngStreamsJson        Json? // seletores das streams por finalidade (R-146)
+  contextSnapshot       Json? // clima/gramado/árbitro/torcida/importância/mando (I) — R-145
+  lineupSnapshot        Json? // escalações congeladas e imutáveis no kickoff (I) — R-145
+  inputHash             String? // hash de todo I (força+contexto+escalação+ruleset+rng+seed)
+  homeStrengthHash      String? // hash por snapshot (isola qual entrada divergiu)
+  awayStrengthHash      String?
+  contextHash           String?
+  lineupHash            String?
+  resultHash            String? // hash do O (placar+eventos+série de ticks)
+  hashAlgorithm         String? // nomeia a função de hash (ex.: sha256) — R-145
+  manifestSchemaVersion Int? // versiona o formato do próprio manifesto — R-145
+  version               Int     @default(1) // concorrência otimista durante a construção
 
-  match Match                 @relation(fields: [matchId], references: [id])
-  ticks MatchSimulationTick[]
+  match      Match                 @relation(fields: [matchId], references: [id])
+  ticks      MatchSimulationTick[]
+  commandLog MatchCommandLog[] // C ordenado (doc 15 §3.2) — R-145
 }
 
 model MatchSimulationTick {
@@ -1323,18 +1650,27 @@ model MatchTeamState {
   fatigueAvg          Int                @default(0)
   tacticalCohesion    Int                @default(50)
   currentInstructions Json?
+  version             Int                @default(1) // concorrência otimista (agregado C8 · runtime)
 
   match Match @relation(fields: [matchId], references: [id])
 
   @@unique([matchId, clubId])
 }
 
+/// Escalação da partida. Canônico (doc 15 §3.1, campo 8, PROPOSTO R-145):
+/// a escalação usada pelo kernel é um SNAPSHOT CONGELADO E IMUTÁVEL no kickoff
+/// (parte de `I`). Após `frozenAtTick`/PRE_MATCH ela NÃO pode mutar — corresponde
+/// ao `lineupSnapshot` do manifesto; `lineupHash` prova a não-adulteração.
 model MatchLineup {
-  id        String  @id @default(uuid(7)) @db.Uuid
-  matchId   String  @db.Uuid
-  clubId    String  @db.Uuid
-  formation String
-  isInitial Boolean @default(true)
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  matchId             String  @db.Uuid
+  clubId              String  @db.Uuid
+  formation           String
+  isInitial           Boolean @default(true)
+  isImmutableSnapshot Boolean @default(true) // congelada no kickoff (não mutável)
+  frozenAtTick        Int? // tick em que a escalação foi congelada (kickoff)
+  snapshotJson        Json? // estado congelado (titulares/banco/funções) para o manifesto
+  lineupHash          String? // hash do snapshot (integridade — doc 15 §3.3)
 
   match   Match               @relation(fields: [matchId], references: [id])
   players MatchLineupPlayer[]
@@ -1370,6 +1706,7 @@ model MatchEvent {
   type            MatchEventType
   minute          Int
   second          Int?
+  eventSequence   Int // C-11: ordem TOTAL do feed por partida (desempata minute/second); a partida (matchId) é o escopo — MatchEvent não tem simulationId
   description     String
   importance      Int            @default(1)
   x               Decimal?       @db.Decimal(8, 4) // coordenada no campo
@@ -1380,6 +1717,7 @@ model MatchEvent {
   player        Player? @relation("EventPlayer", fields: [playerId], references: [id])
   relatedPlayer Player? @relation("EventRelatedPlayer", fields: [relatedPlayerId], references: [id])
 
+  @@unique([matchId, eventSequence]) // C-11: ordem total estável do feed
   @@index([matchId])
   @@index([playerId])
 }
@@ -1427,6 +1765,7 @@ model MatchDecisionPoint {
   resolvedAt            DateTime?
   chosenActionId        String?              @db.Uuid
   data                  Json?
+  version               Int                  @default(1) // concorrência otimista (agregado C8 · runtime)
 
   match           Match                       @relation(fields: [matchId], references: [id])
   recommendations MatchActionRecommendation[]
@@ -1457,44 +1796,48 @@ model MatchActionRecommendation {
 // =============================================================================
 
 model ClubSeasonStats {
-  id                String    @id @default(uuid(7)) @db.Uuid
-  clubId            String    @db.Uuid
-  seasonId          String    @db.Uuid
-  matchesPlayed     Int
-  wins              Int
-  draws             Int
-  losses            Int
-  goalsFor          Int
-  goalsAgainst      Int
-  points            Int
-  finalPosition     Int?
-  titlesWon         Int       @default(0)
-  averageAttendance Int       @default(0)
-  fanMood           MoodLevel @default(NEUTRAL)
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  clubId              String    @db.Uuid
+  seasonId            String    @db.Uuid
+  competitionSeasonId String?   @db.Uuid // M-04: dimensão por competição; NULL = agregado geral da temporada
+  matchesPlayed       Int
+  wins                Int
+  draws               Int
+  losses              Int
+  goalsFor            Int
+  goalsAgainst        Int
+  points              Int
+  finalPosition       Int?
+  titlesWon           Int       @default(0)
+  averageAttendance   Int       @default(0)
+  fanMood             MoodLevel @default(NEUTRAL)
 
-  club Club @relation(fields: [clubId], references: [id])
+  club              Club               @relation(fields: [clubId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
 
-  @@unique([clubId, seasonId])
+  @@unique([clubId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
 
 model PlayerSeasonStats {
-  id            String  @id @default(uuid(7)) @db.Uuid
-  playerId      String  @db.Uuid
-  seasonId      String  @db.Uuid
-  clubId        String? @db.Uuid
-  appearances   Int
-  starts        Int
-  minutesPlayed Int
-  goals         Int
-  assists       Int
-  yellowCards   Int
-  redCards      Int
-  averageRating Decimal @default(0) @db.Decimal(4, 2)
-  injuriesCount Int     @default(0)
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  playerId            String  @db.Uuid
+  seasonId            String  @db.Uuid
+  clubId              String? @db.Uuid
+  competitionSeasonId String? @db.Uuid // M-04: dimensão por competição; NULL = agregado geral da temporada
+  appearances         Int
+  starts              Int
+  minutesPlayed       Int
+  goals               Int
+  assists             Int
+  yellowCards         Int
+  redCards            Int
+  averageRating       Decimal @default(0) @db.Decimal(4, 2)
+  injuriesCount       Int     @default(0)
 
-  player Player @relation(fields: [playerId], references: [id])
+  player            Player             @relation(fields: [playerId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
 
-  @@unique([playerId, seasonId])
+  @@unique([playerId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
 
 model Narrative {
@@ -1540,17 +1883,19 @@ model Notification {
 /// Projeção transversal de auditoria — referência genérica (entity/entityId)
 /// permitida. Forma canônica com cadeia de hash de integridade: AuditEvent (§6.3.11).
 model GameAuditLog {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  gameWorldId String?  @db.Uuid
-  userId      String?  @db.Uuid
-  clubId      String?  @db.Uuid
-  action      String
-  entity      String
-  entityId    String?  @db.Uuid
-  beforeJson  Json?
-  afterJson   Json?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId           String?  @db.Uuid
+  userId                String?  @db.Uuid
+  clubId                String?  @db.Uuid
+  action                String
+  entity                String
+  entityId              String?  @db.Uuid
+  beforeJson            Json?
+  afterJson             Json?
+  metadata              Json?
+  integrityHash         String? // C-12: hash deste registro (append-only, à prova de adulteração)
+  previousIntegrityHash String? // C-12: encadeia ao registro anterior (hash-chain)
+  createdAt             DateTime @default(now())
 
   gameWorld GameWorld? @relation(fields: [gameWorldId], references: [id])
 
@@ -1586,4 +1931,432 @@ model AutomationRule {
   club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
 
   @@index([gameWorldId, clubId])
+}
+
+// =============================================================================
+// EVENTING / OUTBOX / EVENT SOURCING HÍBRIDO — §6.3.11 (concern Eventing/Projeção;
+// context-map §5/§6). Publicação pós-commit AT_LEAST_ONCE + idempotência de consumo.
+// Referência genérica (aggregateType/aggregateId) permitida por ser event log (§6.4).
+// =============================================================================
+
+/// Outbox transacional: evento gravado na MESMA tx do agregado e publicado
+/// pós-commit. Ordenado por `sequence` (worldSequence). Forma granular §6.3.11: OutboxEvent.
+model OutboxEvent {
+  id               String       @id @default(uuid(7)) @db.Uuid // = eventId
+  gameWorldId      String       @db.Uuid
+  aggregateType    String
+  aggregateId      String       @db.Uuid
+  aggregateVersion BigInt?
+  eventType        String
+  eventVersion     Int          @default(1)
+  payloadJson      Json
+  status           OutboxStatus @default(PENDING)
+  sequence         BigInt // worldSequence monotônico por mundo
+  correlationId    String?      @db.Uuid
+  causationId      String?      @db.Uuid
+  contentHash      String? // integridade do payload
+  attemptCount     Int          @default(0)
+  occurredAt       DateTime     @default(now())
+  publishedAt      DateTime?
+
+  @@unique([gameWorldId, sequence])
+  @@index([gameWorldId, status])
+  @@index([aggregateType, aggregateId])
+}
+
+/// Idempotência de consumo (Inbox): 1 processamento por consumidor/evento.
+/// Forma granular §6.3.11: InboxEvent. Constraint: unique(consumerName, eventId).
+model InboxDedup {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  consumerName String
+  eventId      String   @db.Uuid
+  gameWorldId  String?  @db.Uuid
+  resultHash   String?
+  processedAt  DateTime @default(now())
+
+  @@unique([consumerName, eventId])
+  @@index([gameWorldId])
+}
+
+/// Event sourcing híbrido: log append-only de eventos de domínio com cadeia de
+/// hash de integridade (`prevEventHash`→`eventHash`). Forma granular §6.3.11:
+/// DomainEvent. Ordem por agregado (aggregateVersion) e por mundo (sequence).
+model DomainEventLog {
+  id                  String   @id @default(uuid(7)) @db.Uuid // = eventId
+  gameWorldId         String   @db.Uuid
+  aggregateType       String
+  aggregateId         String   @db.Uuid
+  aggregateVersion    BigInt
+  sequence            BigInt // worldSequence
+  eventType           String
+  eventVersion        Int      @default(1)
+  payloadJson         Json
+  actorType           String?
+  actorId             String?  @db.Uuid
+  correlationId       String?  @db.Uuid
+  causationId         String?  @db.Uuid
+  prevEventHash       String? // encadeamento de integridade
+  eventHash           String?
+  occurredAt          DateTime @default(now())
+  occurredAtWorldTick BigInt?
+
+  @@unique([gameWorldId, aggregateType, aggregateId, aggregateVersion])
+  @@unique([gameWorldId, sequence])
+  @@index([gameWorldId, eventType])
+}
+
+// =============================================================================
+// CONCORRÊNCIA / RECUPERAÇÃO — idempotência de command e sagas (§6.3.11,
+// context-map §6.3). Sem 2PC (Decisão 19.10); fencing por token monotônico.
+// =============================================================================
+
+/// Idempotência de command: 1 execução lógica por (actor, idempotencyKey) e 1 por
+/// commandId. Forma granular §6.3.11: IdempotencyRecord/CommandExecution.
+model IdempotencyKey {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String?   @db.Uuid
+  actorId        String?   @db.Uuid
+  idempotencyKey String
+  commandId      String?   @db.Uuid
+  commandType    String?
+  status         String    @default("PENDING")
+  resultHash     String?
+  resultPayload  Json?
+  errorCode      String?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  expiresAt      DateTime?
+
+  @@unique([actorId, idempotencyKey])
+  @@unique([commandId])
+  @@index([gameWorldId])
+}
+
+/// Saga / process manager (multiagregado, multicontexto). Cada passo é uma tx
+/// local do contexto dono; falha posterior dispara compensação. Forma granular
+/// §6.3.11: ProcessManager. Estados/timeouts finos: passo 10 da ordem de correção.
+model SagaInstance {
+  id            String     @id @default(uuid(7)) @db.Uuid
+  gameWorldId   String     @db.Uuid
+  sagaType      SagaType
+  status        SagaStatus @default(CREATED)
+  currentStep   Int        @default(0)
+  correlationId String?    @db.Uuid
+  contextJson   Json?
+  fencingToken  BigInt     @default(0) // token monotônico (impede dois executores)
+  lastError     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  completedAt   DateTime?
+  version       Int        @default(1)
+
+  steps SagaStep[]
+
+  @@index([gameWorldId, status])
+  @@index([sagaType, status])
+}
+
+/// Passo de uma saga (com estado de compensação). Forma granular §6.3.11: ProcessManagerStep.
+model SagaStep {
+  id                 String          @id @default(uuid(7)) @db.Uuid
+  sagaInstanceId     String          @db.Uuid
+  stepIndex          Int
+  name               String
+  status             SagaStepStatus  @default(PENDING)
+  compensationStatus SagaStepStatus?
+  attemptCount       Int             @default(0)
+  payloadJson        Json?
+  error              String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+
+  saga SagaInstance @relation(fields: [sagaInstanceId], references: [id])
+
+  @@unique([sagaInstanceId, stepIndex])
+  @@index([sagaInstanceId])
+}
+
+// =============================================================================
+// LEDGER FINANCEIRO (partidas dobradas) — §6.3.9 + doc 13 (ledger e conservação).
+// Saldo DERIVADO do razão (sem caixa editável isolado — fecha C-06). Conta pode
+// ser de escopo CLUBE ou MUNDO (SYS_* de contraparte a faucet/sink — INV-3b).
+// Forma granular §6.3.9: FinancialJournalEntry/FinancialJournalLine.
+// =============================================================================
+
+/// Conta do razão. `ownerScope=WORLD` + `systemAccount` para as SYS_* sistêmicas
+/// (contraparte de faucet/sink; NÃO entram em `totalMoney`); `ownerScope=CLUB`
+/// referencia um clube. Saldo deriva das linhas POSTED — não há coluna de saldo.
+/// PROPOSTO (R-110) quanto ao `ownerScope=WORLD` das contas sistêmicas.
+model FinancialAccount {
+  id              String               @id @default(uuid(7)) @db.Uuid
+  gameWorldId     String               @db.Uuid
+  ownerScope      AccountOwnerScope    @default(CLUB)
+  clubId          String?              @db.Uuid // nulo quando ownerScope=WORLD
+  systemAccount   SystemAccount? // preenchido só para contas SYS_* (WORLD)
+  accountCode     String
+  accountType     FinancialAccountType
+  normalSide      AccountNormalSide
+  currencyId      String               @db.Uuid
+  parentAccountId String?              @db.Uuid
+  status          String               @default("ACTIVE")
+  version         Int                  @default(1)
+
+  club     Club?              @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  parent   FinancialAccount?  @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children FinancialAccount[] @relation("AccountHierarchy")
+  lines    JournalLine[]
+
+  @@unique([gameWorldId, ownerScope, accountCode])
+  @@unique([gameWorldId, systemAccount]) // 1 conta por SYS_* por mundo (nulos distintos)
+  @@index([gameWorldId, clubId])
+}
+
+/// Lançamento (transação lógica) balanceado: Σ débitos = Σ créditos por moeda
+/// (INV-3a). Ciclo DRAFT→POSTING→POSTED→REVERSED; só POSTED afeta saldo. Reversão
+/// cria NOVO lançamento com `reversalOfJournalEntryId` (publicado nunca é editado).
+/// `flowClass` (doc 13 §2.1): TRANSFER conserva; FAUCET cria; SINK destrói a oferta.
+/// Forma granular §6.3.9: FinancialJournalEntry.
+model JournalEntry {
+  id                       String                  @id @default(uuid(7)) @db.Uuid
+  gameWorldId              String                  @db.Uuid
+  clubId                   String?                 @db.Uuid // clube "dono" (nulo p/ lançamento sistêmico puro)
+  currencyId               String                  @db.Uuid
+  flowClass                MoneyFlowClass
+  financeType              FinanceTransactionType?
+  status                   JournalEntryStatus      @default(DRAFT)
+  description              String?
+  reversalOfJournalEntryId String?                 @db.Uuid
+  sourceEventId            String?                 @db.Uuid // idempotência da projeção (1 lançamento por evento)
+  seasonNumber             Int?
+  occurredAt               DateTime                @default(now())
+  postedAt                 DateTime?
+  version                  Int                     @default(1)
+
+  lines JournalLine[]
+
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId, status])
+}
+
+/// Linha de débito/crédito. `amountMinor > 0` (CHECK em migration); o sinal vem
+/// de `direction`. Constraint: soma dos débitos = soma dos créditos por lançamento
+/// e moeda. Forma granular §6.3.9: FinancialJournalLine.
+model JournalLine {
+  id                 String               @id @default(uuid(7)) @db.Uuid
+  gameWorldId        String               @db.Uuid
+  journalEntryId     String               @db.Uuid
+  lineNumber         Int
+  financialAccountId String               @db.Uuid
+  direction          JournalLineDirection
+  amountMinor        BigInt // dinheiro em unidade mínima (> 0; sinal vem de `direction`)
+  currencyId         String               @db.Uuid
+  costCenterCode     String?
+  referenceType      String?
+  referenceId        String?              @db.Uuid
+
+  entry   JournalEntry     @relation(fields: [journalEntryId], references: [id])
+  account FinancialAccount @relation(fields: [financialAccountId], references: [id])
+
+  @@unique([journalEntryId, lineNumber])
+  @@index([financialAccountId])
+  @@index([gameWorldId])
+}
+
+/// Buffer de accrual de desenvolvimento (doc 13 §5.2 — PROPOSTO R-113). Pós-partida
+/// ACUMULA evidência por jogador/atributo/temporada; a mutação estrutural do
+/// atributo ocorre 1× na virada (CMP-005). `pendingDeltaMinor` é delta ESCALADO
+/// (base interna E8), NÃO dinheiro (o sufixo segue o nome do doc 13). Idempotência:
+/// buffer consumido (zerado) na aplicação — reprocessar a virada não reaplica ganho.
+model PlayerDevelopmentAccrual {
+  id                String  @id @default(uuid(7)) @db.Uuid
+  gameWorldId       String  @db.Uuid
+  playerId          String  @db.Uuid
+  seasonId          String  @db.Uuid
+  attributeCode     String
+  pendingDeltaMinor BigInt  @default(0) // delta escalado acumulado (±), NÃO-monetário
+  evidenceCount     Int     @default(0)
+  lastUpdatedTick   BigInt?
+  version           Int     @default(1)
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, seasonId, attributeCode])
+  @@index([gameWorldId, playerId])
+}
+
+// =============================================================================
+// INSCRIÇÕES COMPETITIVAS (independentes do contrato) — §6.3.7 / context-map C7.
+// Registro competitivo ≠ contrato (C6) ≠ elenco (C3). Cotas: estrangeiros,
+// formados, limite de elenco. Relação inscrição↔competição é EXPLÍCITA (§6.4).
+// =============================================================================
+
+/// Inscrição de um clube numa edição (a "lista"/roster — SquadRegistration).
+/// Guarda cotas e contadores. Invariante: 1 inscrição por clube/edição.
+model CompetitionRegistration {
+  id                  String             @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String             @db.Uuid
+  competitionSeasonId String             @db.Uuid
+  clubId              String             @db.Uuid
+  status              RegistrationStatus @default(DRAFT)
+  squadSizeLimit      Int? // limite de elenco inscrito
+  foreignPlayerLimit  Int? // cota de estrangeiros
+  homegrownMinimum    Int? // mínimo de formados (cota de formação)
+  registeredCount     Int                @default(0)
+  foreignCount        Int                @default(0)
+  homegrownCount      Int                @default(0)
+  submittedAt         DateTime?
+  approvedAt          DateTime?
+  version             Int                @default(1)
+
+  competitionSeason CompetitionSeason    @relation(fields: [competitionSeasonId], references: [id])
+  players           PlayerRegistration[]
+
+  @@unique([competitionSeasonId, clubId]) // 1 inscrição por clube/edição
+  @@index([gameWorldId, clubId])
+}
+
+/// Inscrição individual de jogador sob a lista do clube. `slotType` classifica o
+/// jogador para as cotas. Invariantes: 1 inscrição por jogador/edição; nº de
+/// camisa único por lista. Forma granular §6.3.5/§6.3.7: PlayerRegistration.
+model PlayerRegistration {
+  id             String               @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String               @db.Uuid
+  registrationId String               @db.Uuid
+  playerId       String               @db.Uuid
+  clubId         String               @db.Uuid
+  status         RegistrationStatus   @default(SUBMITTED)
+  slotType       RegistrationSlotType @default(GENERAL)
+  shirtNumber    Int?
+  registeredAt   DateTime             @default(now())
+  deregisteredAt DateTime?
+  version        Int                  @default(1)
+
+  registration CompetitionRegistration @relation(fields: [registrationId], references: [id])
+
+  @@unique([registrationId, playerId]) // 1 inscrição por jogador/edição
+  @@unique([registrationId, shirtNumber]) // nº de camisa único por lista (nulos distintos)
+  @@index([gameWorldId, playerId])
+}
+
+// =============================================================================
+// REPLAY — log imutável de commands da partida (`C` do kernel) — doc 15 §3.2.
+// =============================================================================
+
+/// Log imutável de commands da partida (`C`) para replay bit-a-bit (doc 15 §3.2 —
+/// PROPOSTO R-145). Ordem-verdade por `matchSequence` (server-assigned);
+/// `appliedAtTick` = tick determinístico de aplicação (§2.3). `payloadSnapshot` é
+/// estado CONGELADO (não referência mutável). Reaplicar em ordem sobre (I,R,A,s) = replay.
+model MatchCommandLog {
+  id              String             @id @default(uuid(7)) @db.Uuid
+  gameWorldId     String             @db.Uuid
+  simulationId    String             @db.Uuid
+  matchSequence   BigInt // ordem-verdade (server-assigned)
+  appliedAtTick   Int // tick determinístico de aplicação
+  commandType     String
+  controlSource   MatchControlSource
+  payloadSnapshot Json // estado congelado do command
+  commandId       String             @db.Uuid // idempotência / desempate estável
+  idempotencyKey  String?
+  acceptedAt      DateTime           @default(now()) // auditoria (não entra no cálculo)
+
+  simulation MatchSimulation @relation(fields: [simulationId], references: [id])
+
+  @@unique([simulationId, matchSequence])
+  @@index([gameWorldId])
+}
+
+// =============================================================================
+// HISTÓRICO (append-only) — "a história nunca é apagada" (CMP-019, INV-6). §6.3.11.
+// Projeções transversais: referência escalar/genérica controlada permitida (§6.4).
+// =============================================================================
+
+/// Livro da temporada (append-only): campeões, rebaixados, prêmios e recordes do
+/// ano consolidados. Forma granular §6.3.11: SeasonHistoryBook.
+model SeasonHistory {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId  String   @db.Uuid
+  seasonId     String   @db.Uuid
+  seasonNumber Int
+  summaryJson  Json? // campeões/rebaixados/prêmios/artilharia consolidados
+  recordedAt   DateTime @default(now())
+
+  @@unique([gameWorldId, seasonNumber])
+  @@index([gameWorldId])
+}
+
+/// Livro de recordes (append-only): ocorrência + detentor de um recorde. Forma
+/// granular §6.3.11: RecordDefinition/RecordOccurrence/RecordHolder (definição
+/// separada da ocorrência). `holderType`/`holderId` = referência genérica controlada.
+model RecordBook {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId   String   @db.Uuid
+  recordCode    String // ex.: MOST_GOALS_SEASON
+  scope         String   @default("WORLD") // WORLD | CLUB | COMPETITION
+  holderType    String? // PLAYER | CLUB | STAFF
+  holderId      String?  @db.Uuid
+  clubId        String?  @db.Uuid
+  competitionId String?  @db.Uuid
+  seasonNumber  Int?
+  valueNumeric  Decimal? @db.Decimal(18, 4)
+  valueText     String?
+  achievedAt    DateTime @default(now())
+
+  @@index([gameWorldId, recordCode])
+}
+
+/// Linha de história do clube (append-only): título, acesso, rebaixamento, troca
+/// de identidade, marco. Forma granular §6.3.11: HistoricalEvent/ClubHistoricalIdentityPeriod.
+model ClubHistoryEntry {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId   String   @db.Uuid
+  clubId        String   @db.Uuid
+  entryType     String // TITLE | PROMOTION | RELEGATION | IDENTITY_CHANGE | MILESTONE
+  seasonNumber  Int?
+  competitionId String?  @db.Uuid
+  title         String
+  detailJson    Json?
+  occurredAt    DateTime @default(now())
+
+  @@index([gameWorldId, clubId])
+}
+
+/// Carreira do jogador (append-only): passagens por clube e marcos. Substitui a
+/// visão introdutória `PlayerClubHistory` (§3.3). Forma granular §6.3.11:
+/// PlayerCareerMilestone. Referência escalar (projeção histórica — §6.4).
+model PlayerCareerHistory {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  playerId       String   @db.Uuid
+  clubId         String?  @db.Uuid
+  entryType      String   @default("CLUB_SPELL") // CLUB_SPELL | MILESTONE | AWARD | RETIREMENT
+  joinedAtSeason Int?
+  leftAtSeason   Int?
+  appearances    Int      @default(0)
+  goals          Int      @default(0)
+  assists        Int      @default(0)
+  detailJson     Json?
+  reason         String?
+  recordedAt     DateTime @default(now())
+
+  @@index([gameWorldId, playerId])
+}
+
+/// Histórico de transferências (append-only): toda transferência concluída fica
+/// registrada para sempre (INV-6 — jogador não some sem evento). Forma granular §6.3.8.
+model TransferHistory {
+  id               String         @id @default(uuid(7)) @db.Uuid
+  gameWorldId      String         @db.Uuid
+  playerId         String         @db.Uuid
+  fromClubId       String?        @db.Uuid
+  toClubId         String?        @db.Uuid
+  type             TransferType
+  status           TransferStatus @default(COMPLETED)
+  currencyId       String         @db.Uuid
+  transferFeeMinor BigInt         @default(0) // dinheiro em unidade mínima
+  seasonNumber     Int?
+  sourceOfferId    String?        @db.Uuid
+  completedAt      DateTime       @default(now())
+
+  @@index([gameWorldId, playerId])
+  @@index([gameWorldId, toClubId])
 }

@@ -1,6 +1,6 @@
 # Parte IV — Jogadores de futebol
 
-> **Status:** Rascunho consolidado · **Fontes:** [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md), [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** [`../01-game-design/02-sistema-de-jogadores.md`](../01-game-design/02-sistema-de-jogadores.md), [`../01-game-design/04-estrutura-do-clube-e-staff.md`](../01-game-design/04-estrutura-do-clube-e-staff.md) · **Revisão:** 2026-07-11
 
 No **Grinta**, o jogador é o coração do jogo. Ao contrário dos managers clássicos, em que o atleta carrega números praticamente fixos, aqui cada jogador **nasce com uma tendência, não com um destino**. Ele começa com uma base, um talento natural e um potencial, mas os clubes por onde passa, a metodologia de treino, os minutos que joga e os acontecimentos da carreira empurram seus atributos para direções específicas. Dois jogadores gerados com o mesmo potencial podem terminar a carreira como atletas completamente diferentes.
 

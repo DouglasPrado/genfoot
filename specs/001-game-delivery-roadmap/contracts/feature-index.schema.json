@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://grinta.local/schemas/feature-index.schema.json",
+  "title": "Grinta feature roadmap index",
+  "description": "Machine-readable constraints for the roadmap index and its reusable planning entities.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "baseline", "features"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "baseline": {
+      "type": "string",
+      "format": "date"
+    },
+    "features": {
+      "type": "array",
+      "minItems": 34,
+      "maxItems": 34,
+      "items": {
+        "$ref": "#/$defs/Feature"
+      },
+      "$comment": "Feature id, slug and childDirectory uniqueness is a cross-item invariant enforced by validate-feature-index.mjs."
+    }
+  },
+  "$defs": {
+    "NonEmptyText": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "FeatureId": {
+      "type": "string",
+      "pattern": "^(?:(?:FND|VAL|OPS)-001|BC-(?:00[1-9]|01[0-2])|X-00[1-3]|GP-(?:00[1-9]|01[0-6]))$"
+    },
+    "MilestoneId": {
+      "type": "string",
+      "enum": ["M0", "M1", "M2", "M3", "M4"]
+    },
+    "Feature": {
+      "title": "Feature",
+      "description": "Stable delivery unit. The index stores its identity projection; richer planning fields can be populated as the child packet is authored.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "slug",
+        "status",
+        "milestone",
+        "wave",
+        "prerequisites",
+        "contractFreeze",
+        "childDirectory"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/FeatureId"
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "title": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "milestone": {
+          "$ref": "#/$defs/MilestoneId",
+          "description": "Serialized milestoneId used by feature-index.yaml."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["DELIVERED", "PARTIAL", "PLANNED", "BLOCKED", "DEFERRED"]
+        },
+        "childDirectory": {
+          "type": "string",
+          "pattern": "^specs/[0-9]{3}-[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "scope": {
+          "$ref": "#/$defs/UniqueNonEmptyTextList"
+        },
+        "outOfScope": {
+          "$ref": "#/$defs/UniqueNonEmptyTextList"
+        },
+        "owners": {
+          "$ref": "#/$defs/NonEmptyUniqueTextList"
+        },
+        "sourceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/CanonicalSource"
+          }
+        },
+        "acceptanceRefs": {
+          "$ref": "#/$defs/NonEmptyUniqueTextList"
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        },
+        "blocker": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "unblockCondition": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "deferReason": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "wave": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prerequisites": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/FeatureId"
+          }
+        },
+        "contractFreeze": {
+          "type": "string",
+          "enum": ["NOT_REQUIRED", "PENDING", "FROZEN"]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "DELIVERED"
+              }
+            },
+            "required": ["status", "evidenceRefs"]
+          },
+          "then": {
+            "properties": {
+              "evidenceRefs": {
+                "minItems": 1,
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/Evidence"
+                    },
+                    {
+                      "properties": {
+                        "result": {
+                          "const": "PASS"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "BLOCKED"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["blocker", "unblockCondition"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "DEFERRED"
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["deferReason"]
+          }
+        }
+      ],
+      "$comment": "Self-dependencies, cross-feature uniqueness and historical status transitions require repository-aware validation. The evidence condition applies when evidenceRefs is present in the index projection."
+    },
+    "Dependency": {
+      "title": "Dependency",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prerequisiteFeatureId",
+        "dependentFeatureId",
+        "kind",
+        "reason",
+        "requiredEvidence"
+      ],
+      "properties": {
+        "prerequisiteFeatureId": {
+          "$ref": "#/$defs/FeatureId"
+        },
+        "dependentFeatureId": {
+          "$ref": "#/$defs/FeatureId"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["STARTS_AFTER", "FINISHES_AFTER", "CONTRACT_ONLY"]
+        },
+        "reason": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "requiredEvidence": {
+          "$ref": "#/$defs/NonEmptyUniqueTextList"
+        }
+      },
+      "$comment": "The two feature ids must differ. DAG acyclicity and prohibition of synchronous reverse ownership edges are graph-level invariants."
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "exitCriteria", "featureIds"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/MilestoneId"
+        },
+        "name": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "exitCriteria": {
+          "$ref": "#/$defs/NonEmptyUniqueTextList"
+        },
+        "featureIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/FeatureId"
+          }
+        }
+      }
+    },
+    "Evidence": {
+      "title": "Evidence",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "location", "result", "observedAt"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "TEST",
+            "BUILD",
+            "REPORT",
+            "TRACE",
+            "MIGRATION",
+            "LOAD_TEST",
+            "SECURITY_TEST",
+            "GAMEDAY",
+            "REVIEW"
+          ]
+        },
+        "location": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "rulesetVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seedSet": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          }
+        },
+        "result": {
+          "type": "string",
+          "enum": ["PASS", "FAIL"]
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "$comment": "rulesetVersion is mandatory when behavior depends on rules; seedSet is mandatory for simulation or replay evidence. Those context-sensitive requirements are enforced by evidence validation."
+    },
+    "CanonicalSource": {
+      "title": "CanonicalSource",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document", "section", "authority"],
+      "properties": {
+        "document": {
+          "type": "string",
+          "pattern": "^docs/(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\r\\n]+\\.md$"
+        },
+        "section": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "decisionIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "authority": {
+          "type": "string",
+          "enum": ["GDD", "TECHNICAL", "ADR", "BASELINE", "UI_UX"]
+        }
+      }
+    },
+    "CoverageLink": {
+      "title": "CoverageLink",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureId", "coverageType", "coverageId", "role"],
+      "properties": {
+        "featureId": {
+          "$ref": "#/$defs/FeatureId"
+        },
+        "coverageType": {
+          "type": "string",
+          "enum": [
+            "BOUNDED_CONTEXT",
+            "CONCERN",
+            "GOLDEN_PATH",
+            "SCREEN_SET",
+            "QUALITY_GATE"
+          ]
+        },
+        "coverageId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["OWNER", "CONTRIBUTOR", "EVIDENCE"]
+        }
+      }
+    },
+    "UniqueNonEmptyTextList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/NonEmptyText"
+      }
+    },
+    "NonEmptyUniqueTextList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/NonEmptyText"
+      }
+    }
+  }
+}

@@ -1,10 +1,10 @@
 # Mobile — Mercado, Transferências e Contratos
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/03-economia.md, docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/03-economia.md, docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/09-anti-abuso-e-onboarding.md · **Revisão:** 2026-07-11
 
 A aba **Mercado**: buscar e observar jogadores, scouting, negociar (proposta/contra-proposta), contratos e renovações, empréstimos e empresários. Fluxos: [MF-08](02-mobile-fluxos.md#mf-08--contratação-de-jogador), [MF-09](02-mobile-fluxos.md#mf-09--venda-de-jogador), [MF-10](02-mobile-fluxos.md#mf-10--empréstimo-de-jogador), [MF-20](02-mobile-fluxos.md#mf-20--renovação-de-contrato), [MF-24](02-mobile-fluxos.md#mf-24--ação-bloqueada-por-anti-abuso).
 
-> **Nota:** o GDD descreve o **ciclo** de mercado e a natureza emocional das negociações, mas não fixa um passo-a-passo formal proposta→contra-proposta com estados de tela — esta área define o **padrão de UI** de negociação (estados abaixo) preservando as regras econômicas da fonte. Coeficientes/valores são pendências de calibração.
+> **Nota:** esta área materializa o ciclo de mercado nas máquinas e sagas ratificadas. Coeficientes e valores vêm do ruleset versionado; a UI não os redefine.
 
 ---
 

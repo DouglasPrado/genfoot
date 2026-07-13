@@ -1,6 +1,6 @@
 # Mobile — Central, Home e Decisões
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md, docs/01-game-design/07-inteligencia-artificial.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/10-experiencia-e-telas.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md, docs/01-game-design/07-inteligencia-artificial.md · **Revisão:** 2026-07-11
 
 A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Central de decisões** (caixa de decisões com prazo/impacto/recomendação/ação padrão), a central de **notificações** e as **automações** (delegação à IA). Fluxos: [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão), [MF-0B](02-mobile-fluxos.md#mf-0b--notificações-e-navegação-por-contexto), [MF-22](02-mobile-fluxos.md#mf-22--configurar-automações--delegar).
 
@@ -33,7 +33,7 @@ A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Cent
 - **Ações:** tocar → `M-DECISION-DETAIL`; ação rápida inline (aceitar recomendação); *swipe* para adiar/lembrete.
 - **Estados:** vazio ("tudo em dia"); prazo expirado → item some e a **ação padrão** é registrada no `M-FEED`; offline enfileira a resposta.
 - **Tempo real/notificações:** novas decisões chegam por `userSequence`/`clubSequence`; push para críticas.
-- **Referências:** [`13-relatorios §1–3`](../01-game-design/13-relatorios-notificacoes-e-memoria.md); [`10-experiencia §5`](../01-game-design/10-experiencia-e-telas.md). > **Pendência:** dependências/bloqueios e lembretes de agenda não estão especificados no GDD (sinalizados como lacuna na fonte); a tela prevê *swipe*-lembrete sem regra fina.
+- **Referências:** [`13-relatorios §1–3`](../01-game-design/13-relatorios-notificacoes-e-memoria.md); [`10-experiencia §5`](../01-game-design/10-experiencia-e-telas.md). **Fechado:** DAG de dependências e lembretes definidos em R-165.
 
 ## `M-DECISION-DETAIL` — Detalhe de uma decisão
 
@@ -53,7 +53,7 @@ A aba **Início** — o "casa" do app. Reúne o painel do clube (Home), a **Cent
 - **Ações:** tocar → *deep link*; marcar lida; silenciar categoria; ir a `M-SETTINGS` (preferências de push).
 - **Estados:** vazio; agrupamento por dia; offline mostra cache.
 - **Tempo real/notificações:** entrega por WebSocket + push espelhado (críticas/importantes).
-- **Referências:** [`13-relatorios §2`](../01-game-design/13-relatorios-notificacoes-e-memoria.md); [`10-experiencia §4`](../01-game-design/10-experiencia-e-telas.md). > **Pendência:** paleta de cores e regras de agrupamento não fechadas na fonte (só os 4 níveis).
+- **Referências:** [`13-relatorios §2`](../01-game-design/13-relatorios-notificacoes-e-memoria.md); [`10-experiencia §4`](../01-game-design/10-experiencia-e-telas.md). **Fechado:** tokens R-98 e agrupamento R-165; urgência nunca depende só de cor.
 
 ## `M-AUTOMATIONS` — Automações / delegação à IA
 

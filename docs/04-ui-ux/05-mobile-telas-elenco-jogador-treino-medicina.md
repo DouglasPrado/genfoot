@@ -1,10 +1,10 @@
 # Mobile — Elenco, Jogador, Treino e Medicina
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/02-sistema-de-jogadores.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/13-relatorios-notificacoes-e-memoria.md · **Revisão:** 2026-07-11
 
 A aba **Elenco**: lista do plantel, ficha completa do jogador (atributos, desenvolvimento, memória), papéis/liderança, promessas, treino (coletivo e individual) e departamento médico. Fluxos: [MF-05](02-mobile-fluxos.md#mf-05--ciclo-semanal-de-gestão), [MF-12](02-mobile-fluxos.md#mf-12--lesão-e-recuperação), [MF-17](02-mobile-fluxos.md#mf-17--treino-e-condição), [MF-18](02-mobile-fluxos.md#mf-18--conversa-com-atleta).
 
-> **Nota sobre indicadores:** atributos são 0–100. Modo simples mostra faixa/cor; detalhado mostra o número. Dados imperfeitos (potencial, risco de lesão via scouting) aparecem como **estimativa com confiança**, nunca número exato. Escala canônica de scores é [pendência do GDD](../01-game-design/02-sistema-de-jogadores.md).
+> **Nota sobre indicadores:** atributos usam a escala canônica 0–100 de R-02/E1. Modo simples mostra faixa, rótulo e cor; detalhado mostra o número. Dados imperfeitos aparecem como estimativa com confiança, nunca como verdade exata.
 
 ---
 

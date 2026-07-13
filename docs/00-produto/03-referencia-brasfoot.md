@@ -1,6 +1,6 @@
 # Referência: Brasfoot e o ponto de partida do design
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/funcionamento-brasfoot.md · **Revisão:** 2026-07-10
+> **Status:** REFERÊNCIA HISTÓRICA · **Fontes:** chats/funcionamento-brasfoot.md · **Revisão:** 2026-07-10
 
 > **Documento de REFERÊNCIA / contexto.** Este texto registra a inspiração histórica (o Brasfoot) e as primeiras ideias de design que surgiram no brainstorming do **Grinta**. Ele **não é a especificação canônica**. Sempre que houver conflito, valem o documento de modelo de dados e o documento do motor de partida, que são as fontes canônicas para jogador e simulação.
 

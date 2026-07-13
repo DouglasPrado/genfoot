@@ -1,10 +1,10 @@
 # Mobile — Finanças, Estrutura, Estádio e Diretoria
 
-> **Status:** Rascunho consolidado · **Fontes:** docs/01-game-design/03-economia.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/08-estadio-regiao-e-clima.md, docs/01-game-design/01-mundo-persistente-e-clubes.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** docs/01-game-design/03-economia.md, docs/01-game-design/04-estrutura-do-clube-e-staff.md, docs/01-game-design/08-estadio-regiao-e-clima.md, docs/01-game-design/01-mundo-persistente-e-clubes.md · **Revisão:** 2026-07-11
 
 A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comercial, bilheteria, dívidas), estrutura (instalações, staff, obras), estádio (bilheteria, obras, licenciamento) e diretoria (objetivos, intervenção). Fluxos: [MF-13](02-mobile-fluxos.md#mf-13--ciclo-financeiro-mensal), [MF-14](02-mobile-fluxos.md#mf-14--projeto-de-infraestrutura), [MF-16](02-mobile-fluxos.md#mf-16--crise-financeira), [MF-23](02-mobile-fluxos.md#mf-23--estádio-preço-manutenção-e-mando).
 
-> **Nota:** todos os coeficientes numéricos (faixas, custos, elasticidades) são pendências de calibração nos docs de origem — a UI prevê os campos e usa faixas/rótulos qualitativos no modo simples.
+> **Nota:** coeficientes, faixas, custos e elasticidades usam a baseline versionada dos docs de origem. A UI usa faixas/rótulos qualitativos no modo simples e não congela valores no cliente.
 
 ---
 
@@ -63,7 +63,7 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 - **Objetivo:** ver e evoluir a estrutura física do clube.
 - **Como se chega:** aba Clube; MF-14.
 - **Layout:** árvore por ramos (Administração, Futebol, Saúde, Base, Marca, Infraestrutura) com cards por departamento.
-- **Componentes e dados:** por departamento, o **card canônico** ([doc 04, §7](../01-game-design/04-estrutura-do-clube-e-staff.md)): **nível atual (1–10)** com faixa nomeada (Amador→Elite), custo de melhoria, tempo de melhoria, custo mensal, benefícios, requisitos, impacto. Departamentos: diretoria, comissão técnica, preparação física, equipe médica, **psicologia** (área de investimento distinta [`03 §9.3`]), olheiros, comunicação, base, CT, estádio, análise (+ jurídico/financeiro/fisioterapia/marketing etc. — [pendência de granularidade](../01-game-design/04-estrutura-do-clube-e-staff.md)). **Marca** como ativo que cresce [`03 §9.10`]. **Estilo do clube** derivado (Formador/Comprador/Competitivo/Popular). **Nível geral** do clube. Visão comparativa de **ROI por área**.
+- **Componentes e dados:** por núcleo, o **card canônico** ([doc 04, §7](../01-game-design/04-estrutura-do-clube-e-staff.md)): nível 1–5, faixa nomeada, custo/tempo de melhoria, custo mensal, benefícios, requisitos e impacto. Jurídico, financeiro, fisioterapia, marketing e áreas equivalentes aparecem como subdivisões dos seis núcleos ratificados; CT e estádio são infraestrutura física, não departamentos com nível concorrente. A tela também exibe marca, estilo derivado e ROI comparativo.
 - **Ações:** abrir departamento (`M-DEPARTMENT`); escolher onde investir (define estilo).
 - **Estados:** departamento "em obra/implantação" (contagem de dias); requisitos não atendidos bloqueiam upgrade.
 - **Referências:** [`04-estrutura §2, §3, §7, §8`](../01-game-design/04-estrutura-do-clube-e-staff.md); [`03-economia §9.3, §9.10`](../01-game-design/03-economia.md).
@@ -79,9 +79,9 @@ A aba **Clube** (parte 1): finanças (visão, contabilidade, orçamento, comerci
 ## `M-STAFF` — Comissão técnica / staff
 
 - **Objetivo:** montar e avaliar a comissão.
-- **Componentes e dados:** cargos (técnico, auxiliar, preparador físico, médico, fisiologista, psicólogo, analista, olheiro, coordenador de base, diretor de futebol/financeiro/comunicação); atributos por cargo (ex.: auxiliar — leitura tática, sugestão, substituições, correção defensiva/ofensiva); **qualidade da comissão** e seu efeito nas sugestões (partida) e na IA offline; **relatório de profissionais** ([doc 13, §5.6](../01-game-design/13-relatorios-notificacoes-e-memoria.md): eficiência, sobrecarga, conflitos, necessidades).
+- **Componentes e dados:** cargos (técnico/`HEAD_COACH` [**papel assessor** — sugere/assiste; **não** substitui o comando tático do usuário humano, R-01], auxiliar, preparador físico, médico, fisiologista, psicólogo, analista, olheiro, coordenador de base, diretor de futebol/financeiro/comunicação); atributos por cargo (ex.: auxiliar — leitura tática, sugestão, substituições, correção defensiva/ofensiva); **qualidade da comissão** e seu efeito nas sugestões (partida) e na IA offline; **relatório de profissionais** ([doc 13, §5.6](../01-game-design/13-relatorios-notificacoes-e-memoria.md): eficiência, sobrecarga, conflitos, necessidades).
 - **Ações:** contratar/demitir (`M-STAFF-HIRE`); avaliar.
-- **Estados:** > **Pendência:** atributos de cargos além do auxiliar não definidos no GDD.
+- **Estados:** competências por cargo derivam do catálogo de staff e do nível 1–5; o **técnico/`HEAD_COACH` é papel assessor** (sugere/assiste, conforme R-162) e **não** substitui o comando tático do usuário humano (R-01) — o usuário permanece o comandante tático. **Decisão (reversível, registrada 2026-07-13); registro formal no ADR (C-03).**
 - **Referências:** [`04-estrutura §9`](../01-game-design/04-estrutura-do-clube-e-staff.md).
 
 ## `M-STAFF-HIRE` — Contratar / demitir funcionário

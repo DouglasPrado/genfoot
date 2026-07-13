@@ -1,6 +1,6 @@
 # Monetização e Justiça Competitiva
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/documento-definitivo-escopo.md (Seção 19) · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/documento-definitivo-escopo.md (Seção 19) · **Revisão:** 2026-07-10
 
 Este documento consolida a política de **monetização** de **Grinta** e a regra inegociável que a governa: **nada pago pode alterar resultado esportivo, economia competitiva, mercado, potencial ou recuperação**. A monetização existe para reforçar identidade, expressão e conveniência de uso, nunca para comprar vantagem esportiva ou econômica.
 
@@ -67,8 +67,8 @@ Essa fronteira é o que mantém o passe de temporada e todos os itens de coleç�
 
 ## 5. Pendências em aberto
 
-> **Recomendação (a ratificar — R-92):** catálogo final de cosméticos de lançamento (identidades visuais, uniformes, temas, itens comemorativos) — escopo puramente estético, a fechar junto ao roadmap de produto.
+> **Decisão ratificada — R-92:** catálogo final de cosméticos de lançamento (identidades visuais, uniformes, temas, itens comemorativos) — escopo puramente estético, a fechar junto ao roadmap de produto.
 
-> **Recomendação (a ratificar — R-93):** conteúdo do passe de temporada cosmético — recompensas puramente estéticas (temas de UI, itens comemorativos, personalização de estádio sem efeito esportivo); nada altera resultado/economia/potencial.
+> **Decisão ratificada — R-93:** conteúdo do passe de temporada cosmético — recompensas puramente estéticas (temas de UI, itens comemorativos, personalização de estádio sem efeito esportivo); nada altera resultado/economia/potencial.
 
-> **Recomendação (a ratificar — R-75):** relatórios premium **não existem** — todos os relatórios são gratuitos e a qualidade da comissão é o único diferenciador (no-pay-to-win). Vender informação de scouting/dado oculto cruzaria a linha e fica proibido.
+> **Decisão ratificada — R-75:** relatórios premium **não existem** — todos os relatórios são gratuitos e a qualidade da comissão é o único diferenciador (no-pay-to-win). Vender informação de scouting/dado oculto cruzaria a linha e fica proibido.

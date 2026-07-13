@@ -1,6 +1,6 @@
 # Guia Oficial do Jogador — Grinta
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/guia-jogador-initial.md · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/guia-jogador-initial.md · **Revisão:** 2026-07-10
 
 O **Guia Oficial do Jogador** é a documentação voltada a quem joga **Grinta** — um manager de futebol online com jogadores únicos e mundo persistente, na tradição de simuladores como o Brasfoot, porém em um mundo que nunca reinicia. Este README define o propósito, a estrutura completa dos 42 capítulos, os padrões de conteúdo, a especificação técnica do site de documentação e o mapeamento com os documentos de game design.
 
@@ -295,7 +295,7 @@ game/
 
 Isso garante que o jogador tenha o guia **disponível offline, sem depender de internet nem de instalar o PWA**, abrindo direto o `guide/index.html` embarcado. Ele é distinto do pacote `.zip` (que precisa ser baixado e descompactado à parte) e do guia contextual (que exibe regras específicas dentro da interface do jogo): aqui, o manual completo já vem embutido na própria instalação.
 
-> **Recomendação (a ratificar — R-97):** site do guia em subdomínio `docs.<domínio-oficial>` (domínio a definir na verificação de marca — ver [identidade](../00-produto/02-identidade-e-nome.md)); rotas contextuais espelhando a hierarquia de capítulos (`/guia/<parte>/<capitulo>`), com deep-link a partir do app; PDF gerado por versão de conteúdo, nomeado `grinta-guia-v<major.minor>.pdf`, regenerado a cada release do guia.
+> **Decisão ratificada — R-97:** site do guia em subdomínio `docs.<domínio-oficial>` (domínio a definir na verificação de marca — ver [identidade](../00-produto/02-identidade-e-nome.md)); rotas contextuais espelhando a hierarquia de capítulos (`/guia/<parte>/<capitulo>`), com deep-link a partir do app; PDF gerado por versão de conteúdo, nomeado `grinta-guia-v<major.minor>.pdf`, regenerado a cada release do guia.
 
 ---
 
@@ -337,4 +337,4 @@ O conteúdo dos **42 capítulos foi redigido** (2026-07-11), puxando das decisõ
 | IX — Plano de jogo | 35–39 | [parte-09-plano-de-jogo.md](parte-09-plano-de-jogo.md) |
 | X — Referência | 40–42 | [parte-10-referencia.md](parte-10-referencia.md) |
 
-> **Recomendação (a ratificar — R-100):** construir o **site do guia** — template Astro navegável (menu, busca, página inicial, página de regra, versão mobile e impressão/PDF, §5) e encaixar estes capítulos como conteúdo. É tarefa de engenharia (build) a partir da spec do §5 e de [R-97](../99-decisoes/registro-de-decisoes.md); o conteúdo dos capítulos já está redigido acima.
+> **Decisão ratificada — R-100:** construir o **site do guia** — template Astro navegável (menu, busca, página inicial, página de regra, versão mobile e impressão/PDF, §5) e encaixar estes capítulos como conteúdo. É tarefa de engenharia (build) a partir da spec do §5 e de [R-97](../99-decisoes/registro-de-decisoes.md); o conteúdo dos capítulos já está redigido acima.

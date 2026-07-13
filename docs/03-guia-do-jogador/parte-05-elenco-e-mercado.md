@@ -1,6 +1,6 @@
 # Parte V — Elenco e mercado
 
-> **Status:** Rascunho consolidado · **Fontes:** ../01-game-design/02-sistema-de-jogadores.md; ../01-game-design/03-economia.md; ../01-game-design/04-estrutura-do-clube-e-staff.md · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** ../01-game-design/02-sistema-de-jogadores.md; ../01-game-design/03-economia.md; ../01-game-design/04-estrutura-do-clube-e-staff.md · **Revisão:** 2026-07-11
 
 Esta Parte trata do **grupo** de jogadores e de como ele entra e sai do clube. Nos capítulos anteriores você conheceu o jogador como indivíduo: identidade, desenvolvimento, condição física e moral. Agora o foco muda para o conjunto — como montar um elenco equilibrado (Cap. 18), como os contratos amarram esse elenco ao clube (Cap. 19), como o mercado repõe e renova as peças (Cap. 20) e o que acontece quando um jogador fica sem clube (Cap. 21).
 

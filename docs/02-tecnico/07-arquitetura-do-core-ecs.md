@@ -1,6 +1,6 @@
 # Arquitetura do Core (Entity–Component–Effect–Event)
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/lista-envolvidos-jogo.md (2ª metade) · **Revisão:** 2026-07-10
+> **Status:** CANÔNICO · **Fontes:** chats/lista-envolvidos-jogo.md (2ª metade) · **Revisão:** 2026-07-10
 
 ## Resumo
 
@@ -71,7 +71,7 @@ Clube investe em nutrição
 
 A mesma mecânica cobre desde um lance de segundos até a evolução de um clube ao longo de temporadas.
 
-> **Recomendação (a ratificar — R-80):** o paradigma **Entity–Component–Effect–Event descrito aqui é o *runtime* do motor de ecossistema**, não um substituto do modelo relacional — **ECS e Prisma/Postgres coexistem**. A **fonte de verdade persistente** é o relacional ([`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md), [`./02-modelo-de-dados.md`](./02-modelo-de-dados.md)): entidades e componentes são **carregados** do Postgres para montar o grafo ECS em memória no início de um tick/simulação, os sistemas aplicam efeitos e eventos sobre esse grafo, e o resultado é **projetado de volta** para as tabelas de estado + `game_events` (event sourcing híbrido, ver `./00-arquitetura-geral.md` §4.2). Racional: o ECS dá a expressividade das cascatas emergentes sem números cravados, enquanto o relacional dá durabilidade, consultabilidade, integridade e auditoria — cada um no seu papel, não competindo. O `core` monta o ECS a partir de *snapshots* e **não** depende de Prisma (a hidratação/persistência é responsabilidade da camada de infraestrutura), preservando o motor headless e determinístico (§4.1/§4.3 de `./00-arquitetura-geral.md`).
+> **Decisão ratificada — R-80:** o paradigma **Entity–Component–Effect–Event descrito aqui é o *runtime* do motor de ecossistema**, não um substituto do modelo relacional — **ECS e Prisma/Postgres coexistem**. A **fonte de verdade persistente** é o relacional ([`./01-arquitetura-de-dados.md`](./01-arquitetura-de-dados.md), [`./02-modelo-de-dados.md`](./02-modelo-de-dados.md)): entidades e componentes são **carregados** do Postgres para montar o grafo ECS em memória no início de um tick/simulação, os sistemas aplicam efeitos e eventos sobre esse grafo, e o resultado é **projetado de volta** para as tabelas de estado + `game_events` (event sourcing híbrido, ver `./00-arquitetura-geral.md` §4.2). Racional: o ECS dá a expressividade das cascatas emergentes sem números cravados, enquanto o relacional dá durabilidade, consultabilidade, integridade e auditoria — cada um no seu papel, não competindo. O `core` monta o ECS a partir de *snapshots* e **não** depende de Prisma (a hidratação/persistência é responsabilidade da camada de infraestrutura), preservando o motor headless e determinístico (§4.1/§4.3 de `./00-arquitetura-geral.md`).
 
 ---
 
@@ -445,7 +445,7 @@ Campos-chave:
 
 Leitura: jogadores sensíveis do mandante ganham +8 de pressão durante a partida, e o efeito vai diminuindo com o tempo.
 
-> **Recomendação (a ratificar — R-81):** gramática mínima e ordem de resolução do Effect System.
+> **Decisão ratificada — R-81:** gramática mínima e ordem de resolução do Effect System.
 >
 > **`TargetSelector`** — string de query `raiz.coleção.where(predicado)`. **Raiz:** `self`, `homeTeam`, `awayTeam`, `match`, `club`, `world`. **Coleção** (opcional; sem coleção, o alvo é a própria raiz): `players`, `staff`, `supporters`, `pieces`. **`.where(pred)`** (opcional): predicado sobre caminhos de componente (`attributes.*`, `state.*`, `mental.*`, `traits.*`, `relations.*`), com operadores `> >= < <= == !=`, combináveis por `&&`/`||` e agrupáveis por parênteses (ex.: `homeTeam.players.where(mental.sensitivity > 70 && state.fatigue < 60)`). O seletor resolve para um **conjunto de entidades**; efeito sem alvo resolvível é **no-op auditável**, nunca erro silencioso.
 >

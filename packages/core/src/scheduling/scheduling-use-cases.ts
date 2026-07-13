@@ -18,6 +18,9 @@ import type {
   ScheduledTaskHandler,
   TaskExecutionReport,
   WorldSchedulerSnapshot,
+  WorldCommandReceipt,
+  TemporalWindowSnapshot,
+  TemporalWindowType,
 } from "./scheduling-types.js";
 import { WorldScheduler, type ScheduleTaskInput } from "./world-scheduler.js";
 
@@ -33,6 +36,16 @@ export interface BootstrapWorldSchedulerInput {
   }>;
   readonly startTaskId: string;
   readonly dueTaskId: string;
+  readonly rollover?: Readonly<{
+    id: string;
+    nextSeason: Readonly<{
+      id: string;
+      number: number;
+      name: string;
+      startsOn: string;
+      endsOn: string;
+    }>;
+  }>;
 }
 
 export class BootstrapWorldScheduler {
@@ -72,7 +85,11 @@ export class BootstrapWorldScheduler {
       type: "season:check-start-end",
       dueOn: input.season.endsOn,
       priority: 10,
-      payload: { seasonId: input.season.id, action: "DUE" },
+      payload: {
+        seasonId: input.season.id,
+        action: "DUE",
+        ...(input.rollover === undefined ? {} : { rollover: input.rollover }),
+      },
       idempotencyKey: `season:${input.season.id}:due`,
     });
     if (!due.ok) return due;
@@ -98,6 +115,38 @@ export class InspectWorldScheduler {
           ),
         )
       : succeed(snapshot);
+  }
+}
+
+export class RegisterTemporalWindow {
+  public constructor(private readonly repository: SchedulingRepository) {}
+
+  public async execute(
+    gameWorldId: GameWorldId,
+    window: TemporalWindowSnapshot,
+  ): Promise<Result<WorldSchedulerSnapshot, DomainError>> {
+    const loaded = await loadScheduler(this.repository, gameWorldId);
+    if (!loaded.ok) return loaded;
+    const revision = loaded.value.snapshot().revision;
+    const registered = loaded.value.registerWindow(window);
+    if (!registered.ok) return registered;
+    if (loaded.value.snapshot().revision !== revision) {
+      await this.repository.saveScheduling(loaded.value.snapshot(), revision);
+    }
+    return succeed(loaded.value.snapshot());
+  }
+}
+
+export class ListTemporalWindows {
+  public constructor(private readonly repository: SchedulingRepository) {}
+
+  public async execute(
+    gameWorldId: GameWorldId,
+    on: WorldDate,
+    type?: TemporalWindowType,
+  ): Promise<Result<readonly TemporalWindowSnapshot[], DomainError>> {
+    const loaded = await loadScheduler(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.openWindows(on, type)) : loaded;
   }
 }
 
@@ -218,6 +267,22 @@ export class ProcessDueWorldTasks {
         if (claimed.value.type === "season:check-start-end") {
           const applied = loaded.value.applySeasonCheck(claimed.value, on);
           if (!applied.ok) throw applied.error;
+          if (applied.value === "SeasonDue") {
+            const rollover = parseRolloverPayload(
+              claimed.value.payload.rollover,
+            );
+            if (rollover !== null) {
+              const started = loaded.value.startRollover({
+                id: rollover.id,
+                gameWorldId,
+                seasonId: String(claimed.value.payload.seasonId),
+                nextSeason: rollover.nextSeason,
+                rulesetVersion: loaded.value.snapshot().config.rulesetVersion,
+                maxAttemptsPerStep: 3,
+              });
+              if (!started.ok) throw started.error;
+            }
+          }
           emittedEvents = [
             {
               type: applied.value,
@@ -292,6 +357,176 @@ export class ProcessDueWorldTasks {
 
 export interface ScheduledWorldMutationResult extends WorldMutationResult {
   readonly processedTasks: readonly TaskExecutionReport[];
+}
+
+export interface AdvanceWorldDayCommandInput {
+  readonly commandId: string;
+  readonly idempotencyKey: string;
+  readonly expectedDate: string;
+  readonly expectedVersion: number;
+  readonly rulesetVersion: RulesetVersion;
+}
+
+export interface AdvanceWorldDayCommandResult extends WorldCommandReceipt {
+  readonly previousDate: string;
+  readonly currentDate: string;
+}
+
+export class AdvanceWorldDayCommand {
+  public constructor(
+    private readonly worldRepository: WorldRepository,
+    private readonly schedulingRepository: SchedulingRepository,
+    private readonly handlers: Readonly<
+      Record<string, ScheduledTaskHandler>
+    > = {},
+    private readonly executorId = "advance-world-day-command",
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  public async execute(
+    gameWorldId: GameWorldId,
+    input: AdvanceWorldDayCommandInput,
+  ): Promise<Result<AdvanceWorldDayCommandResult, DomainError>> {
+    const scheduler = await loadScheduler(
+      this.schedulingRepository,
+      gameWorldId,
+    );
+    if (!scheduler.ok) return scheduler;
+    const repeated = scheduler.value.commandReceipt(input.idempotencyKey);
+    if (repeated !== null) {
+      if (
+        repeated.commandId !== input.commandId ||
+        repeated.expectedDate !== input.expectedDate ||
+        repeated.rulesetVersion !== input.rulesetVersion
+      ) {
+        return fail(
+          new DomainError(
+            "IDEMPOTENCY_KEY_CONFLICT",
+            "A chave idempotente já foi usada por outro command.",
+          ),
+        );
+      }
+      return succeed(toAdvanceResult(repeated));
+    }
+
+    const world = await this.worldRepository.findById(gameWorldId);
+    if (world === null) {
+      return fail(
+        new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", {
+          gameWorldId,
+        }),
+      );
+    }
+    if (world.currentDate !== input.expectedDate) {
+      return fail(
+        new DomainError(
+          "WORLD_DATE_CONFLICT",
+          "A data esperada diverge do relógio autoritativo.",
+          { expectedDate: input.expectedDate, actualDate: world.currentDate },
+        ),
+      );
+    }
+    if (world.version !== input.expectedVersion) {
+      return fail(
+        new DomainError(
+          "AGGREGATE_VERSION_CONFLICT",
+          "A versão esperada do mundo está obsoleta.",
+        ),
+      );
+    }
+    if (
+      world.rulesetVersion !== input.rulesetVersion ||
+      scheduler.value.snapshot().config.rulesetVersion !== input.rulesetVersion
+    ) {
+      return fail(
+        new DomainError(
+          "RULESET_VERSION_MISMATCH",
+          "O command usa um ruleset incompatível com o mundo.",
+        ),
+      );
+    }
+
+    let revision = scheduler.value.snapshot().revision;
+    const lease = scheduler.value.acquireClockLease(
+      this.executorId,
+      this.now(),
+    );
+    if (!lease.ok) return lease;
+    scheduler.value.recoverInterruptedTasks();
+    await this.schedulingRepository.saveScheduling(
+      scheduler.value.snapshot(),
+      revision,
+    );
+
+    let receipt: WorldCommandReceipt | null = null;
+    try {
+      const advanced = await new AdvanceWorldDays(this.worldRepository).execute(
+        gameWorldId,
+        1,
+      );
+      if (!advanced.ok) return advanced;
+      const on = WorldDate.parse(advanced.value.world.currentDate);
+      if (!on.ok) return on;
+      const processed = await new ProcessDueWorldTasks(
+        this.schedulingRepository,
+        this.handlers,
+      ).execute(gameWorldId, on.value);
+      if (!processed.ok) return processed;
+
+      const latest = await loadScheduler(
+        this.schedulingRepository,
+        gameWorldId,
+      );
+      if (!latest.ok) return latest;
+      revision = latest.value.snapshot().revision;
+      receipt = {
+        commandId: input.commandId,
+        idempotencyKey: input.idempotencyKey,
+        commandType: "AdvanceWorldDay",
+        gameWorldId,
+        expectedDate: input.expectedDate,
+        resultDate: advanced.value.world.currentDate,
+        resultWorldVersion: advanced.value.world.version,
+        fencingToken: lease.value,
+        rulesetVersion: input.rulesetVersion,
+        processedTaskIds: processed.value.map(({ taskId }) => taskId),
+      };
+      const recorded = latest.value.recordCommandReceipt(receipt);
+      if (!recorded.ok) return recorded;
+      const released = latest.value.releaseClockLease(
+        this.executorId,
+        lease.value,
+      );
+      if (!released.ok) return released;
+      await this.schedulingRepository.saveScheduling(
+        latest.value.snapshot(),
+        revision,
+      );
+    } catch (error: unknown) {
+      return fail(
+        error instanceof DomainError
+          ? error
+          : new DomainError(
+              "WORLD_DAY_ADVANCE_FAILED",
+              "Falha ao avançar o mundo.",
+              {
+                cause: error instanceof Error ? error.message : String(error),
+              },
+            ),
+      );
+    }
+    return succeed(toAdvanceResult(receipt));
+  }
+}
+
+function toAdvanceResult(
+  receipt: WorldCommandReceipt,
+): AdvanceWorldDayCommandResult {
+  return {
+    ...receipt,
+    previousDate: receipt.expectedDate,
+    currentDate: receipt.resultDate,
+  };
 }
 
 export class AdvanceScheduledWorldDays {
@@ -463,4 +698,42 @@ async function loadScheduler(
     );
   }
   return WorldScheduler.fromSnapshot(snapshot);
+}
+
+function parseRolloverPayload(value: unknown): Readonly<{
+  id: string;
+  nextSeason: Readonly<{
+    id: string;
+    number: number;
+    name: string;
+    startsOn: string;
+    endsOn: string;
+  }>;
+}> | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  const next = candidate.nextSeason;
+  if (
+    typeof candidate.id !== "string" ||
+    typeof next !== "object" ||
+    next === null
+  )
+    return null;
+  const season = next as Record<string, unknown>;
+  return typeof season.id === "string" &&
+    typeof season.number === "number" &&
+    typeof season.name === "string" &&
+    typeof season.startsOn === "string" &&
+    typeof season.endsOn === "string"
+    ? {
+        id: candidate.id,
+        nextSeason: {
+          id: season.id,
+          number: season.number,
+          name: season.name,
+          startsOn: season.startsOn,
+          endsOn: season.endsOn,
+        },
+      }
+    : null;
 }

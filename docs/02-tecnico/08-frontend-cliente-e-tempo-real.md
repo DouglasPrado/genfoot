@@ -1,10 +1,10 @@
 # Frontend, Cliente e Tempo Real
 
-> **Status:** Rascunho consolidado · **Fontes:** chats/ux-do-jogo.md, decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
+> **Status:** CANÔNICO · **Fontes:** chats/ux-do-jogo.md, decisão de stack de interface 2026-07-11 (ver [`../04-ui-ux/`](../04-ui-ux/)) · **Revisão:** 2026-07-11
 
 Este documento consolida as decisões de **frontend**, **clientes**, **estratégia mobile**, **API** e **tempo real** do **Grinta** (manager de futebol online, jogadores únicos, mundo persistente) que até então estavam registradas apenas no chat de UX e não haviam sido documentadas oficialmente.
 
-A partir de **2026-07-11** o Grinta tem **dois clientes**: o **app do jogador** (mobile, Android+iOS, em **Expo / React Native**) e o **admin do mundo** (web, em **Next.js**). O princípio que atravessa todas as seções vale para **ambos** e é único: **o servidor é autoritativo e o cliente é não-autoritativo**. Cada cliente renderiza, navega, sincroniza e oferece experiência offline limitada, mas nunca executa regras oficiais do jogo. A camada de tempo real acelera a percepção do estado, porém a API oficial permanece a única fonte de verdade. Justamente por isso a arquitetura de backend nunca dependeu de recursos exclusivos da web — a decisão de mobile nativo abaixo apenas exerce essa garantia já prevista. O **desenho de telas e fluxos** de ambos os clientes vive na área [`../04-ui-ux/`](../04-ui-ux/); aqui ficam os **contratos** que essas telas consomem.
+A partir de **2026-07-11** o Grinta tem **dois clientes**: o **app do jogador** (mobile, Android+iOS, em **Expo / React Native**) e o **admin do mundo** (web, em **Next.js**). O princípio que atravessa todas as seções vale para **ambos** e é único: **o servidor é autoritativo e o cliente é não-autoritativo**. Cada cliente renderiza, navega, sincroniza e oferece experiência offline limitada — **leitura do cache mais uma whitelist de *intents* com TTL** (ajustes reversíveis da próxima rodada; nunca ações irreversíveis) —, mas nunca executa regras oficiais do jogo. A camada de tempo real acelera a percepção do estado, porém a API oficial permanece a única fonte de verdade. Justamente por isso a arquitetura de backend nunca dependeu de recursos exclusivos da web — a decisão de mobile nativo abaixo apenas exerce essa garantia já prevista. O **desenho de telas e fluxos** de ambos os clientes vive na área [`../04-ui-ux/`](../04-ui-ux/); aqui ficam os **contratos** que essas telas consomem.
 
 ## Sumário
 
@@ -74,7 +74,7 @@ O app nativo cobre, por meios nativos, as mesmas capacidades que se esperava da 
 - **Instalação** e presença na tela inicial (loja + ícone próprio).
 - **Tela inicial** (splash) nativa.
 - **Cache do shell** e da navegação.
-- **Leitura offline limitada** (apoiada em Expo SQLite/MMKV/AsyncStorage).
+- **Leitura offline limitada + fila de *intents*** (apoiada em Expo SQLite/MMKV/AsyncStorage): leitura do cache e uma **whitelist de intents com TTL** (preferências, planos de treino/carreira, escalação/tática/plano de jogo da próxima rodada — R-153), **nunca** ações irreversíveis (pagamento, contrato, transferência) — ver [Fila de intents offline (whitelist + TTL)](#fila-de-intents-offline-whitelist--ttl).
 - **Push nativo** (APNs/FCM via Expo Notifications), espelhando as notificações estratégicas.
 - **Atualização controlada** (releases nas lojas + OTA via EAS Update).
 
@@ -211,7 +211,7 @@ O handshake do WebSocket **não** reutiliza credenciais longas. A conexão é ab
 - **Vínculo à sessão HTTP autenticada.** A sessão do socket é vinculada à sessão HTTP autenticada; se essa sessão for revogada ou expirar, o socket perde autorização.
 - **Reconexão revalida.** Toda reconexão exige **nova validação** da credencial, além da recuperação de sequência (ver [Recuperação, idempotência e cenários de falha](#recuperação-idempotência-e-cenários-de-falha)).
 
-> **Recomendação (a ratificar — R-95):** credencial efêmera de sessão — proposta: access token JWT curto (~15 min) + refresh token rotativo (endpoint `/auth/refresh`), reautorização do WebSocket por assinatura do token, revogação por lista de sessões no servidor (logout/expiração fecham o socket).
+> **Decisão ratificada — R-95:** credencial efêmera de sessão — proposta: access token JWT curto (~15 min) + refresh token rotativo (endpoint `/auth/refresh`), reautorização do WebSocket por assinatura do token, revogação por lista de sessões no servidor (logout/expiração fecham o socket).
 
 ### Usos do WebSocket
 
@@ -279,6 +279,19 @@ Quando o cliente **reenvia** um command (por reconexão, timeout ou repetição)
 - O **`commandId` repetido retorna o resultado anterior**, sem reexecutar o efeito.
 - A **`idempotencyKey`** mantém uma única execução lógica para o mesmo command.
 
+### Fila de intents offline (whitelist + TTL)
+
+Offline é **leitura por padrão**. R-153 permite enfileirar apenas a whitelist fechada abaixo; o cliente bloqueia localmente qualquer command fora dela. Os critérios de aceite correspondentes são CA-UX-01 em [`./17-criterios-de-aceite-e-bandas.md`](./17-criterios-de-aceite-e-bandas.md) §4.9.
+
+| Enfileira offline? | Commands (ver [catálogo](./10-catalogo-de-commands.md)) | Regra |
+| --- | --- | --- |
+| **✅ Whitelist** | `SetNotificationPreferences`, `SetOfflinePlan`, `SetTrainingPlan`, `SetLineup`, `SetTactics`, `SetGamePlan`, `SetPlayerCareerPlan`, `SetTransferStrategy` | Ao reconectar, envia via `idempotencyKey` + `expectedVersion`; mudança relevante exige reconfirmação. |
+| **⛔ Nunca enfileira** | pagamento, contrato, proposta/aceite de transferência, empréstimo, demissão, obra, crédito, inscrição, abandono/troca de clube, ação ao vivo e ação admin | Exigem conexão e validação server-side no ato; o disparo offline retorna erro local, sem fila. |
+
+- **TTL de intent — R-153:** expira no menor entre **15 minutos reais** e o prazo do domínio. Mudança de versão, custo, elegibilidade ou lock exige reconfirmação.
+- **Reconfirmação ao expirar:** intent expirada — ou cujo `expectedVersion` já não corresponde ao agregado no reenvio — **não** é enviada automaticamente; o cliente exige **reconfirmação explícita** do usuário. A intent é uma proposta local, nunca um command garantido.
+- **Servidor continua autoritativo:** mesmo uma intent da whitelist pode ser **rejeitada** (`REJECTED`/`CONFLICT`) na chegada — enfileirar offline não antecipa nem garante o efeito oficial.
+
 ### Cenários de falha relevantes ao cliente
 
 | Cenário | Comportamento |
@@ -292,6 +305,8 @@ Quando o cliente **reenvia** um command (por reconexão, timeout ou repetição)
 | A partida termina enquanto o usuário está desconectado | O motor continua e o usuário recebe o estado oficial ao retornar |
 | O usuário altera o relógio do celular | Nenhum prazo oficial é alterado (o relógio do mundo é do servidor) |
 | O aplicativo antigo usa contrato incompatível | Commands críticos são bloqueados, com exigência de atualização |
+| O usuário dispara offline um command fora da whitelist | Não entra na fila; erro local, exige conexão (pagamento, aceite de transferência, ação irreversível) |
+| Uma intent offline expira antes de reconectar | Não é enviada automaticamente; exige reconfirmação explícita do usuário |
 
 ---
 
@@ -408,6 +423,7 @@ Relativos a frontend, cliente e tempo real, o bloco é considerado correto quand
 - Erros possuírem **códigos estáveis**.
 - Paginação por **cursor** ser suportada.
 - Filtros serem **limitados e indexados**.
+- A **fila offline** aceitar **apenas** a whitelist de *intents* de R-153 (preferências, planos de treino/carreira, escalação/tática/plano de jogo da próxima rodada), com **TTL**, e **nunca** enfileirar pagamento, aceite de transferência ou ação irreversível; intent **expirada** exigir **reconfirmação** (CA-UX-01).
 
 ---
 
