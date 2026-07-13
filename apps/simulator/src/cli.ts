@@ -2,14 +2,20 @@ import { resolve } from "node:path";
 
 import {
   ActivateProvisionedWorld,
-  AdvanceWorldDays,
+  AdvanceScheduledWorldDays,
+  CancelScheduledTask,
   CreateWorld,
   GenerateWorldGenesis,
   InspectWorld,
+  InspectWorldScheduler,
+  ResumeWorldScheduler,
+  RetryScheduledTask,
+  ScheduleWorldTask,
 } from "@grinta/core";
 import {
   DomainError,
   WorldDate,
+  newEntityId,
   parseGameWorldId,
   parseRulesetVersion,
   type Result,
@@ -146,9 +152,11 @@ export async function runCli(
 
       exitCode = writeResult(
         io,
-        await new ActivateProvisionedWorld(repository, repository).execute(
-          id.value,
-        ),
+        await new ActivateProvisionedWorld(
+          repository,
+          repository,
+          repository,
+        ).execute(id.value),
       );
     });
 
@@ -175,7 +183,159 @@ export async function runCli(
 
       exitCode = writeResult(
         io,
-        await new AdvanceWorldDays(repository).execute(id.value, days.data),
+        await new AdvanceScheduledWorldDays(
+          repository,
+          repository,
+          {},
+          newEntityId<"WorldClockExecutor">(),
+        ).execute(id.value, days.data),
+      );
+    });
+
+  program
+    .command("scheduler:inspect")
+    .description("Exibe temporadas, agenda e estado do scheduler")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new InspectWorldScheduler(repository).execute(id.value),
+      );
+    });
+
+  program
+    .command("scheduler:run")
+    .description("Retoma e processa tarefas devidas na data atual")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new ResumeWorldScheduler(
+          repository,
+          repository,
+          {},
+          newEntityId<"WorldClockExecutor">(),
+        ).execute(id.value),
+      );
+    });
+
+  program
+    .command("scheduler:schedule")
+    .description("Agenda uma tarefa persistente no mundo")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--type <type>")
+    .requiredOption("--due-on <YYYY-MM-DD>")
+    .requiredOption("--idempotency-key <key>")
+    .option("--priority <number>", "Menor número executa primeiro", "100")
+    .option("--payload <json>", "Payload JSON", "{}")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      const input = z
+        .object({
+          type: z.string().trim().min(1),
+          dueOn: z.string(),
+          idempotencyKey: z.string().trim().min(1),
+          priority: z.coerce.number().int(),
+          payload: z.string().transform((value, context) => {
+            try {
+              const parsed: unknown = JSON.parse(value);
+              if (
+                typeof parsed !== "object" ||
+                parsed === null ||
+                Array.isArray(parsed)
+              ) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  message: "payload deve ser um objeto JSON.",
+                });
+                return z.NEVER;
+              }
+              return parsed as Record<string, unknown>;
+            } catch {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "payload deve ser JSON válido.",
+              });
+              return z.NEVER;
+            }
+          }),
+        })
+        .safeParse(raw);
+      if (!input.success) {
+        exitCode = writeError(io, invalidArguments(input.error.message));
+        return;
+      }
+      const dueOn = WorldDate.parse(input.data.dueOn);
+      if (!dueOn.ok) {
+        exitCode = writeError(io, dueOn.error);
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new ScheduleWorldTask(repository).execute(id.value, {
+          id: newEntityId<"ScheduledTask">(),
+          type: input.data.type,
+          dueOn: dueOn.value.toString(),
+          idempotencyKey: input.data.idempotencyKey,
+          priority: input.data.priority,
+          payload: input.data.payload,
+        }),
+      );
+    });
+
+  program
+    .command("scheduler:retry")
+    .description("Recoloca uma tarefa falha e elegível na fila")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--task <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      if (typeof raw.task !== "string") {
+        exitCode = writeError(io, invalidArguments("task é obrigatório."));
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new RetryScheduledTask(repository).execute(id.value, raw.task),
+      );
+    });
+
+  program
+    .command("scheduler:cancel")
+    .description("Cancela uma tarefa pendente ou falha")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--task <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      if (typeof raw.task !== "string") {
+        exitCode = writeError(io, invalidArguments("task é obrigatório."));
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new CancelScheduledTask(repository).execute(id.value, raw.task),
       );
     });
 
@@ -231,6 +391,11 @@ function errorCode(code: string): number {
     code === "WORLD_GENESIS_NOT_ALLOWED" ||
     code === "WORLD_GENESIS_ALREADY_EXISTS" ||
     code === "AGGREGATE_VERSION_CONFLICT" ||
+    code === "SCHEDULER_REVISION_CONFLICT" ||
+    code === "SCHEDULER_NOT_FOUND" ||
+    code === "TASK_NOT_RETRYABLE" ||
+    code === "TASK_NOT_CANCELLABLE" ||
+    code === "WORLD_CLOCK_LEASE_HELD" ||
     code === "WORLD_ALREADY_EXISTS"
   ) {
     return 4;

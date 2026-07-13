@@ -10,6 +10,9 @@ import {
   ActivateWorld,
   type WorldMutationResult,
 } from "../world/world-use-cases.js";
+import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import type { SchedulingRepository } from "../scheduling/scheduling-repository.js";
+import { BootstrapWorldScheduler } from "../scheduling/scheduling-use-cases.js";
 import type { WorldRepository } from "../world/world-repository.js";
 import { WorldStatus } from "../world/world-types.js";
 import type { WorldGenesisSummary } from "./genesis-types.js";
@@ -71,6 +74,7 @@ export class ActivateProvisionedWorld {
   public constructor(
     private readonly worldRepository: WorldRepository,
     private readonly genesisRepository: WorldGenesisRepository,
+    private readonly schedulingRepository?: SchedulingRepository,
   ) {}
 
   public async execute(
@@ -97,6 +101,47 @@ export class ActivateProvisionedWorld {
 
     const validated = validateWorldGenesis(world, genesis);
     if (!validated.ok) return validated;
+
+    if (this.schedulingRepository !== undefined) {
+      const fixtureDates = genesis.fixtures.map(
+        ({ scheduledWorldDate }) => scheduledWorldDate,
+      );
+      const startsOn = fixtureDates.reduce((left, right) =>
+        left < right ? left : right,
+      );
+      const endsOn = fixtureDates.reduce((left, right) =>
+        left > right ? left : right,
+      );
+      const timestampMilliseconds = Date.parse(`${world.startDate}T00:00:00Z`);
+      const scheduler = await new BootstrapWorldScheduler(
+        this.schedulingRepository,
+      ).execute({
+        gameWorldId,
+        rulesetVersion: world.rulesetVersion,
+        season: {
+          id: deterministicUuidV7<"Season">({
+            worldSeed: world.seed,
+            context: "season:1",
+            timestampMilliseconds,
+          }),
+          number: 1,
+          name: "Temporada 1",
+          startsOn,
+          endsOn,
+        },
+        startTaskId: deterministicUuidV7<"ScheduledTask">({
+          worldSeed: world.seed,
+          context: "season:1:start",
+          timestampMilliseconds,
+        }),
+        dueTaskId: deterministicUuidV7<"ScheduledTask">({
+          worldSeed: world.seed,
+          context: "season:1:due",
+          timestampMilliseconds,
+        }),
+      });
+      if (!scheduler.ok) return scheduler;
+    }
 
     return new ActivateWorld(this.worldRepository).execute(
       gameWorldId,
