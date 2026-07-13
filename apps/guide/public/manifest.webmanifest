@@ -1,0 +1,15 @@
+{
+  "name": "Grinta — Guia Oficial do Jogador",
+  "short_name": "Grinta Guia",
+  "description": "O manual oficial do Grinta: o que você pode fazer e a relação de causa e efeito de cada decisão.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0C0D11",
+  "theme_color": "#0C0D11",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/brand/grinta-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/brand/grinta-icon-square.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

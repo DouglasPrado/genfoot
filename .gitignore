@@ -1,0 +1,16 @@
+node_modules/
+.turbo/
+dist/
+coverage/
+.grinta/
+
+# Framework/build output
+.next/
+out/
+
+# Environment and editor files
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
