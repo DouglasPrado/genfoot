@@ -51,6 +51,13 @@ pnpm simulator scheduler:retry --world <uuid-v7> --task <uuid-v7>
 pnpm simulator scheduler:cancel --world <uuid-v7> --task <uuid-v7>
 ```
 
+A gênese também materializa o lifecycle autoritativo das 368 pessoas/jogadores e um evento `PlayerGenerated` por atleta. O scheduler mantém um job diário recorrente para atualizar os checkpoints e estados dinâmicos sem duplicar processamento:
+
+```bash
+pnpm simulator players:summary --world <uuid-v7>
+pnpm simulator player:inspect --world <uuid-v7> --player <uuid-v7>
+```
+
 ## Qualidade
 
 ```bash

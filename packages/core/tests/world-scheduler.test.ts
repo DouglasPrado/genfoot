@@ -326,4 +326,56 @@ describe("WorldScheduler", () => {
       ),
     ).toMatchObject({ ok: true });
   });
+
+  it("reagenda recorrência com chave idempotente por ocorrência", async () => {
+    const repository = new MemorySchedulingRepository();
+    const bootstrapInput = input();
+    await new BootstrapWorldScheduler(repository).execute(bootstrapInput);
+    const loaded = WorldScheduler.fromSnapshot(repository.snapshot!);
+    if (!loaded.ok) throw loaded.error;
+    const taskId = newEntityId<"ScheduledTask">();
+    const scheduled = loaded.value.schedule({
+      id: taskId,
+      type: "recurring:test",
+      dueOn: "2026-01-02",
+      idempotencyKey: "recurring:test",
+      recurrence: { everyDays: 1, untilOn: "2026-01-04" },
+    });
+    if (!scheduled.ok) throw scheduled.error;
+    await repository.saveScheduling(
+      loaded.value.snapshot(),
+      repository.snapshot!.revision,
+    );
+    const keys: string[] = [];
+    const processor = new ProcessDueWorldTasks(repository, {
+      "recurring:test": (context) => {
+        keys.push(context.idempotencyKey);
+        return Promise.resolve();
+      },
+    });
+
+    for (const value of ["2026-01-02", "2026-01-03", "2026-01-04"]) {
+      const result = await processor.execute(
+        bootstrapInput.gameWorldId,
+        date(value),
+      );
+      expect(
+        result.ok
+          ? result.value.filter(({ type }) => type === "recurring:test")
+          : [],
+      ).toHaveLength(1);
+    }
+
+    expect(keys).toEqual([
+      "recurring:test:2026-01-02",
+      "recurring:test:2026-01-03",
+      "recurring:test:2026-01-04",
+    ]);
+    expect(
+      repository.snapshot?.tasks.find(({ id }) => id === taskId),
+    ).toMatchObject({
+      status: ScheduledTaskStatus.COMPLETED,
+      dueOn: "2026-01-04",
+    });
+  });
 });

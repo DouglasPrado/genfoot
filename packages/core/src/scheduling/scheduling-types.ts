@@ -52,6 +52,10 @@ export interface ScheduledTaskSnapshot {
   readonly priority: number;
   readonly payload: Readonly<Record<string, unknown>>;
   readonly idempotencyKey: string;
+  readonly recurrence: Readonly<{
+    everyDays: number;
+    untilOn: string;
+  }> | null;
   readonly status: ScheduledTaskStatus;
   readonly attempts: number;
   readonly maxAttempts: number;
@@ -93,6 +97,7 @@ export interface TaskExecutionContext {
   readonly idempotencyKey: string;
   readonly fencingToken: number;
   readonly worldDate: string;
+  readonly dueOn: string;
   readonly payload: Readonly<Record<string, unknown>>;
 }
 

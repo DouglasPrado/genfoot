@@ -11,8 +11,16 @@ import {
   type WorldMutationResult,
 } from "../world/world-use-cases.js";
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import type { PlayerLifecycleRepository } from "../players/player-lifecycle-repository.js";
+import {
+  InitializePlayerLifecycle,
+  buildPlayerDailyTasks,
+} from "../players/player-lifecycle-use-cases.js";
 import type { SchedulingRepository } from "../scheduling/scheduling-repository.js";
-import { BootstrapWorldScheduler } from "../scheduling/scheduling-use-cases.js";
+import {
+  BootstrapWorldScheduler,
+  ScheduleWorldTasks,
+} from "../scheduling/scheduling-use-cases.js";
 import type { WorldRepository } from "../world/world-repository.js";
 import { WorldStatus } from "../world/world-types.js";
 import type { WorldGenesisSummary } from "./genesis-types.js";
@@ -30,6 +38,7 @@ export class GenerateWorldGenesis {
     private readonly worldRepository: WorldRepository,
     private readonly genesisRepository: WorldGenesisRepository,
     private readonly generator = new WorldGenesisGenerator(),
+    private readonly playerLifecycleRepository?: PlayerLifecycleRepository,
   ) {}
 
   public async execute(
@@ -56,9 +65,10 @@ export class GenerateWorldGenesis {
     const existing = await this.genesisRepository.findByWorldId(gameWorldId);
     if (existing !== null) {
       const validated = validateWorldGenesis(world, existing);
-      return validated.ok
-        ? succeed({ created: false, summary: validated.value.summary })
-        : validated;
+      if (!validated.ok) return validated;
+      const initialized = await this.initializePlayers(world, existing);
+      if (!initialized.ok) return initialized;
+      return succeed({ created: false, summary: validated.value.summary });
     }
 
     const genesis = this.generator.generate(world);
@@ -66,7 +76,20 @@ export class GenerateWorldGenesis {
     if (!validated.ok) return validated;
 
     await this.genesisRepository.saveGenesis(genesis, world.version);
+    const initialized = await this.initializePlayers(world, genesis);
+    if (!initialized.ok) return initialized;
     return succeed({ created: true, summary: validated.value.summary });
+  }
+
+  private async initializePlayers(
+    world: Parameters<InitializePlayerLifecycle["execute"]>[0],
+    genesis: Parameters<InitializePlayerLifecycle["execute"]>[1],
+  ): Promise<Result<void, DomainError>> {
+    if (this.playerLifecycleRepository === undefined) return succeed(undefined);
+    const initialized = await new InitializePlayerLifecycle(
+      this.playerLifecycleRepository,
+    ).execute(world, genesis);
+    return initialized.ok ? succeed(undefined) : initialized;
   }
 }
 
@@ -75,6 +98,7 @@ export class ActivateProvisionedWorld {
     private readonly worldRepository: WorldRepository,
     private readonly genesisRepository: WorldGenesisRepository,
     private readonly schedulingRepository?: SchedulingRepository,
+    private readonly playerLifecycleRepository?: PlayerLifecycleRepository,
   ) {}
 
   public async execute(
@@ -101,6 +125,13 @@ export class ActivateProvisionedWorld {
 
     const validated = validateWorldGenesis(world, genesis);
     if (!validated.ok) return validated;
+
+    if (this.playerLifecycleRepository !== undefined) {
+      const initialized = await new InitializePlayerLifecycle(
+        this.playerLifecycleRepository,
+      ).execute(world, genesis);
+      if (!initialized.ok) return initialized;
+    }
 
     if (this.schedulingRepository !== undefined) {
       const fixtureDates = genesis.fixtures.map(
@@ -141,6 +172,18 @@ export class ActivateProvisionedWorld {
         }),
       });
       if (!scheduler.ok) return scheduler;
+      const playerTasks = await new ScheduleWorldTasks(
+        this.schedulingRepository,
+      ).execute(
+        gameWorldId,
+        buildPlayerDailyTasks({
+          gameWorldId,
+          worldSeed: world.seed,
+          fromExclusive: world.startDate,
+          throughInclusive: endsOn,
+        }),
+      );
+      if (!playerTasks.ok) return playerTasks;
     }
 
     return new ActivateWorld(this.worldRepository).execute(

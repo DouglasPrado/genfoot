@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   WorldGenesisGenerator,
+  WorldPlayerLifecycle,
   WorldStatus,
   type GameWorldSnapshot,
 } from "@grinta/core";
@@ -14,7 +15,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(3) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(4) });
 
 afterEach(async () => {
   await Promise.all(
@@ -61,7 +62,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(3);
+    expect(file.schemaVersion).toBe(4);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -74,6 +75,25 @@ describe("JsonWorldRepository", () => {
 
     expect(await store.value.findByWorldId(world.id)).toEqual(genesis);
     expect(await store.value.findById(world.id)).toEqual(world);
+  });
+
+  it("persiste lifecycle de jogadores com controle de revisão", async () => {
+    const store = await repository();
+    const world = snapshot();
+    const genesis = new WorldGenesisGenerator().generate(world);
+    const lifecycle = WorldPlayerLifecycle.fromGenesis(world, genesis);
+    if (!lifecycle.ok) throw lifecycle.error;
+    await store.value.save(world, null);
+    await store.value.saveGenesis(genesis, world.version);
+
+    await store.value.savePlayerLifecycle(lifecycle.value.snapshot(), null);
+
+    expect(await store.value.findPlayerLifecycleByWorldId(world.id)).toEqual(
+      lifecycle.value.snapshot(),
+    );
+    await expect(
+      store.value.savePlayerLifecycle(lifecycle.value.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "PLAYER_LIFECYCLE_REVISION_CONFLICT" });
   });
 
   it("lê snapshots v1 e os migra na próxima escrita", async () => {
@@ -93,7 +113,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
   });
 
   it("retorna null para mundo inexistente", async () => {

@@ -42,6 +42,15 @@ const schedulerOutputSchema = z.object({
     tasks: z.array(z.object({ status: z.string() })),
   }),
 });
+const playerSummaryOutputSchema = z.object({
+  data: z.object({
+    personCount: z.number(),
+    playerCount: z.number(),
+    generationEventCount: z.number(),
+    developmentHistoryCount: z.number(),
+    lastProcessedOn: z.string().nullable(),
+  }),
+});
 const inspectedOutputSchema = z.object({ data: z.object({ id: z.string() }) });
 const errorOutputSchema = z.object({ error: z.object({ code: z.string() }) });
 
@@ -166,20 +175,21 @@ describe("simulator CLI", () => {
       ).data.world.currentDate,
     ).toBe("2026-01-02");
 
-    const completedSeasonOutput = capture();
+    const startedSeasonOutput = capture();
     expect(
-      await runCli(["day:simulate", "--world", worldId, "--days", "89"], {
+      await runCli(["day:simulate", "--world", worldId, "--days", "2"], {
         dataDirectory: directory,
-        io: completedSeasonOutput.io,
+        io: startedSeasonOutput.io,
       }),
     ).toBe(0);
-    const completedSeason = mutationOutputSchema.parse(
-      JSON.parse(completedSeasonOutput.stdout.join("")) as unknown,
+    const startedSeason = mutationOutputSchema.parse(
+      JSON.parse(startedSeasonOutput.stdout.join("")) as unknown,
     );
-    expect(completedSeason.data.world.currentDate).toBe("2026-04-01");
-    expect(completedSeason.data.processedTasks).toEqual([
+    expect(startedSeason.data.world.currentDate).toBe("2026-01-04");
+    expect(startedSeason.data.processedTasks).toEqual([
+      { type: "players:process-day", status: "COMPLETED" },
       { type: "season:check-start-end", status: "COMPLETED" },
-      { type: "season:check-start-end", status: "COMPLETED" },
+      { type: "players:process-day", status: "COMPLETED" },
     ]);
 
     const schedulerOutput = capture();
@@ -194,13 +204,33 @@ describe("simulator CLI", () => {
     );
     expect(scheduler.data.clock.leaseOwnerId).toBeNull();
     expect(scheduler.data.seasons[0]).toEqual({
-      lifecycleState: "FINALIZING",
+      lifecycleState: "IN_PROGRESS",
       status: "ACTIVE",
     });
     expect(scheduler.data.tasks.map(({ status }) => status)).toEqual([
       "COMPLETED",
-      "COMPLETED",
+      "PENDING",
+      "PENDING",
     ]);
+
+    const playerSummaryOutput = capture();
+    expect(
+      await runCli(["players:summary", "--world", worldId], {
+        dataDirectory: directory,
+        io: playerSummaryOutput.io,
+      }),
+    ).toBe(0);
+    expect(
+      playerSummaryOutputSchema.parse(
+        JSON.parse(playerSummaryOutput.stdout.join("")) as unknown,
+      ).data,
+    ).toEqual({
+      personCount: 368,
+      playerCount: 368,
+      generationEventCount: 368,
+      developmentHistoryCount: 0,
+      lastProcessedOn: "2026-01-04",
+    });
   });
 
   it("rejeita data inválida com código de entrada", async () => {

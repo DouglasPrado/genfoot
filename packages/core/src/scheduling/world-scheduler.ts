@@ -23,6 +23,7 @@ export interface ScheduleTaskInput {
   readonly payload?: Readonly<Record<string, unknown>>;
   readonly idempotencyKey: string;
   readonly maxAttempts?: number;
+  readonly recurrence?: Readonly<{ everyDays: number; untilOn: string }>;
 }
 
 export class WorldScheduler {
@@ -98,7 +99,15 @@ export class WorldScheduler {
       }
       keys.add(task.idempotencyKey);
     }
-    return succeed(new WorldScheduler(snapshot));
+    return succeed(
+      new WorldScheduler({
+        ...snapshot,
+        tasks: snapshot.tasks.map((task) => ({
+          ...task,
+          recurrence: task.recurrence ?? null,
+        })),
+      }),
+    );
   }
 
   public bootstrapSeason(
@@ -145,6 +154,7 @@ export class WorldScheduler {
       priority: input.priority ?? 100,
       payload: input.payload ?? {},
       idempotencyKey: input.idempotencyKey.trim(),
+      recurrence: input.recurrence ?? null,
       status: ScheduledTaskStatus.PENDING,
       attempts: 0,
       maxAttempts: input.maxAttempts ?? this.state.config.maxTaskAttempts,
@@ -205,6 +215,35 @@ export class WorldScheduler {
   ): Result<void, DomainError> {
     const task = this.runningTask(taskId, fencingToken);
     if (!task.ok) return task;
+    let nextDue =
+      task.value.recurrence === null
+        ? null
+        : requiredDate(task.value.dueOn).addDays(
+            task.value.recurrence.everyDays,
+          );
+    while (
+      nextDue !== null &&
+      task.value.recurrence !== null &&
+      nextDue.toString() <= on.toString()
+    ) {
+      nextDue = nextDue.addDays(task.value.recurrence.everyDays);
+    }
+    if (
+      nextDue !== null &&
+      nextDue.toString() <= task.value.recurrence!.untilOn
+    ) {
+      this.updateTask({
+        ...task.value,
+        dueOn: nextDue.toString(),
+        status: ScheduledTaskStatus.PENDING,
+        attempts: 0,
+        fencingToken: null,
+        lastError: null,
+        completedOn: null,
+        version: task.value.version + 1,
+      });
+      return succeed(undefined);
+    }
     this.updateTask({
       ...task.value,
       status: ScheduledTaskStatus.COMPLETED,
@@ -480,6 +519,22 @@ function validateTask(task: ScheduledTaskSnapshot): Result<void, DomainError> {
   }
   const dueOn = WorldDate.parse(task.dueOn);
   if (!dueOn.ok) return dueOn;
+  if (task.recurrence !== null) {
+    const untilOn = WorldDate.parse(task.recurrence.untilOn);
+    if (!untilOn.ok) return untilOn;
+    if (
+      !Number.isSafeInteger(task.recurrence.everyDays) ||
+      task.recurrence.everyDays < 1 ||
+      task.recurrence.untilOn < task.dueOn
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_SCHEDULED_TASK",
+          "A recorrência da tarefa é inválida.",
+        ),
+      );
+    }
+  }
   if (
     !Number.isSafeInteger(task.priority) ||
     !Number.isSafeInteger(task.attempts) ||
@@ -498,4 +553,10 @@ function validateTask(task: ScheduledTaskSnapshot): Result<void, DomainError> {
     );
   }
   return succeed(undefined);
+}
+
+function requiredDate(value: string): WorldDate {
+  const parsed = WorldDate.parse(value);
+  if (!parsed.ok) throw parsed.error;
+  return parsed.value;
 }
