@@ -63,10 +63,10 @@
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] Add RED SAGA-04 transition, milestone, sunk-cost and licensing tests in packages/core/tests/clubs/infrastructure-project.test.ts
-- [ ] T021 [P] [US2] Add RED lease takeover, stale fencing, retry, compensation and manual-review tests in packages/core/tests/clubs/infrastructure-project-recovery.test.ts
-- [ ] T022 [P] [US2] Add RED orchestration tests with synthetic C9 financing and licensing ports in packages/core/tests/clubs/infrastructure-project-use-cases.test.ts
-- [ ] T023 [P] [US2] Add RED daily maintenance, deterioration and due-event tests in packages/core/tests/clubs/club-maintenance.test.ts
+- [x] T020 [P] [US2] Add RED SAGA-04 transition, milestone, sunk-cost and licensing tests in packages/core/tests/clubs/infrastructure-project.test.ts
+- [x] T021 [P] [US2] Add RED lease takeover, stale fencing, retry, compensation and manual-review tests in packages/core/tests/clubs/infrastructure-project-recovery.test.ts
+- [x] T022 [P] [US2] Add RED orchestration tests with synthetic C9 financing and licensing ports in packages/core/tests/clubs/infrastructure-project-use-cases.test.ts
+- [x] T023 [P] [US2] Add RED daily maintenance, deterioration and due-event tests in packages/core/tests/clubs/club-maintenance.test.ts
 
 ### Implementation for User Story 2
 
