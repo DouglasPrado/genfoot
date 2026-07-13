@@ -13,6 +13,9 @@ import { join } from "node:path";
 import {
   DominantFoot,
   PlayerPosition,
+  PlayerAvailability,
+  PlayerCareerStatus,
+  PlayerGenerationSource,
   ScheduledTaskStatus,
   SeasonLifecycleState,
   SeasonStatus,
@@ -22,6 +25,8 @@ import {
   type WorldGenesisSnapshot,
   type WorldRepository,
   type SchedulingRepository,
+  type PlayerLifecycleRepository,
+  type WorldPlayerLifecycleSnapshot,
   type WorldSchedulerSnapshot,
 } from "@grinta/core";
 import {
@@ -174,6 +179,13 @@ const schedulerSchema = z.object({
       priority: z.number().int(),
       payload: z.record(z.unknown()),
       idempotencyKey: z.string().min(1),
+      recurrence: z
+        .object({
+          everyDays: z.number().int().positive(),
+          untilOn: z.string(),
+        })
+        .nullable()
+        .optional(),
       status: z.enum([
         ScheduledTaskStatus.PENDING,
         ScheduledTaskStatus.RUNNING,
@@ -198,6 +210,109 @@ const schedulerSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const scoreSchema = z.number().int().min(0).max(100);
+const playerLifecycleSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  persons: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      birthDate: z.string(),
+      nationality: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  players: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      personId: identifierSchema,
+      primaryPosition: playerPositionSchema,
+      secondaryPosition: playerPositionSchema.optional(),
+      dominantFoot: z.enum([
+        DominantFoot.LEFT,
+        DominantFoot.RIGHT,
+        DominantFoot.BOTH,
+      ]),
+      careerStatus: z.enum([
+        PlayerCareerStatus.ACTIVE,
+        PlayerCareerStatus.FREE_AGENT,
+        PlayerCareerStatus.RETIRED,
+      ]),
+      availability: z.enum([
+        PlayerAvailability.AVAILABLE,
+        PlayerAvailability.INJURED,
+        PlayerAvailability.SUSPENDED,
+        PlayerAvailability.CONVENED,
+        PlayerAvailability.UNAVAILABLE,
+      ]),
+      generationSource: z.enum([
+        PlayerGenerationSource.INITIAL_WORLD,
+        PlayerGenerationSource.SCOUT_FOUND,
+        PlayerGenerationSource.YOUTH_ACADEMY,
+        PlayerGenerationSource.REGEN_AFTER_RETIREMENT,
+        PlayerGenerationSource.MARKET_BALANCE,
+      ]),
+      generatedAtSeasonNumber: z.number().int().positive(),
+      attributes: z.object({
+        technical: scoreSchema,
+        physical: scoreSchema,
+        mental: scoreSchema,
+        goalkeeping: scoreSchema,
+      }),
+      currentAbility: scoreSchema,
+      potentialAbility: scoreSchema,
+      dynamicState: z.object({
+        morale: scoreSchema,
+        confidence: scoreSchema,
+        happiness: scoreSchema,
+        fatigue: scoreSchema,
+        matchSharpness: scoreSchema,
+      }),
+      lastProcessedOn: z.string(),
+      version: z.number().int().positive(),
+    }),
+  ),
+  generationEvents: z.array(
+    z.object({
+      id: identifierSchema,
+      type: z.literal("PlayerGenerated"),
+      gameWorldId: identifierSchema,
+      playerId: identifierSchema,
+      personId: identifierSchema,
+      source: z.enum([
+        PlayerGenerationSource.INITIAL_WORLD,
+        PlayerGenerationSource.SCOUT_FOUND,
+        PlayerGenerationSource.YOUTH_ACADEMY,
+        PlayerGenerationSource.REGEN_AFTER_RETIREMENT,
+        PlayerGenerationSource.MARKET_BALANCE,
+      ]),
+      seasonNumber: z.number().int().positive(),
+      worldDate: z.string(),
+      rulesetVersion: z.string(),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  developmentHistory: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      playerId: identifierSchema,
+      attributeCode: z.enum(["technical", "physical", "mental", "goalkeeping"]),
+      previousValue: scoreSchema,
+      nextValue: scoreSchema,
+      cause: z.string().min(1),
+      worldDate: z.string(),
+      rulesetVersion: z.string(),
+    }),
+  ),
+  processedDayKeys: z.array(z.string().min(1)),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -211,16 +326,28 @@ const persistedSnapshotSchema = z.union([
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(4),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
   readonly world: GameWorldSnapshot;
   readonly genesis: WorldGenesisSnapshot | null;
   readonly scheduler: WorldSchedulerSnapshot | null;
+  readonly playerLifecycle: WorldPlayerLifecycleSnapshot | null;
 }
 
 export class JsonWorldRepository
-  implements WorldRepository, WorldGenesisRepository, SchedulingRepository
+  implements
+    WorldRepository,
+    WorldGenesisRepository,
+    SchedulingRepository,
+    PlayerLifecycleRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -259,6 +386,7 @@ export class JsonWorldRepository
       world: snapshot,
       genesis: current?.genesis ?? null,
       scheduler: current?.scheduler ?? null,
+      playerLifecycle: current?.playerLifecycle ?? null,
     });
   }
 
@@ -288,6 +416,7 @@ export class JsonWorldRepository
       world: current.world,
       genesis,
       scheduler: current.scheduler,
+      playerLifecycle: current.playerLifecycle,
     });
   }
 
@@ -332,6 +461,48 @@ export class JsonWorldRepository
     });
   }
 
+  public async findPlayerLifecycleByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldPlayerLifecycleSnapshot | null> {
+    return (await this.load(id))?.playerLifecycle ?? null;
+  }
+
+  public async savePlayerLifecycle(
+    playerLifecycle: WorldPlayerLifecycleSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withSchedulingLock(playerLifecycle.gameWorldId, async () => {
+      const current = await this.load(playerLifecycle.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.playerLifecycle !== null) {
+        throw new DomainError(
+          "PLAYER_LIFECYCLE_ALREADY_EXISTS",
+          "O lifecycle de jogadores já existe.",
+        );
+      }
+      if (
+        expectedRevision !== null &&
+        current.playerLifecycle?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "PLAYER_LIFECYCLE_REVISION_CONFLICT",
+          "O lifecycle foi alterado desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.playerLifecycle?.revision ?? null,
+          },
+        );
+      }
+      await this.write(playerLifecycle.gameWorldId, {
+        ...current,
+        playerLifecycle,
+      });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -355,15 +526,22 @@ export class JsonWorldRepository
         rulesetVersion: parsedRuleset.value,
       };
       const genesis =
-        (persisted.schemaVersion === 2 || persisted.schemaVersion === 3) &&
+        (persisted.schemaVersion === 2 ||
+          persisted.schemaVersion === 3 ||
+          persisted.schemaVersion === 4) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
       const scheduler =
-        persisted.schemaVersion === 3 && persisted.scheduler !== null
+        (persisted.schemaVersion === 3 || persisted.schemaVersion === 4) &&
+        persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
-      return { world, genesis, scheduler };
+      const playerLifecycle =
+        persisted.schemaVersion === 4 && persisted.playerLifecycle !== null
+          ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
+          : null;
+      return { world, genesis, scheduler, playerLifecycle };
     } catch (error: unknown) {
       throw new DomainError(
         "SNAPSHOT_CORRUPTED",
@@ -384,10 +562,11 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 3,
+        schemaVersion: 4,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
+        playerLifecycle: envelope.playerLifecycle,
       },
       null,
       2,

@@ -8,9 +8,11 @@ import {
   GenerateWorldGenesis,
   InspectWorld,
   InspectWorldScheduler,
+  InspectPlayerLifecycle,
   ResumeWorldScheduler,
   RetryScheduledTask,
   ScheduleWorldTask,
+  createPlayerDayTaskHandler,
 } from "@grinta/core";
 import {
   DomainError,
@@ -133,9 +135,12 @@ export async function runCli(
 
       exitCode = writeResult(
         io,
-        await new GenerateWorldGenesis(repository, repository).execute(
-          id.value,
-        ),
+        await new GenerateWorldGenesis(
+          repository,
+          repository,
+          undefined,
+          repository,
+        ).execute(id.value),
       );
     });
 
@@ -153,6 +158,7 @@ export async function runCli(
       exitCode = writeResult(
         io,
         await new ActivateProvisionedWorld(
+          repository,
           repository,
           repository,
           repository,
@@ -186,9 +192,49 @@ export async function runCli(
         await new AdvanceScheduledWorldDays(
           repository,
           repository,
-          {},
+          { "players:process-day": createPlayerDayTaskHandler(repository) },
           newEntityId<"WorldClockExecutor">(),
         ).execute(id.value, days.data),
+      );
+    });
+
+  program
+    .command("players:summary")
+    .description("Exibe integridade e checkpoint do lifecycle de jogadores")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new InspectPlayerLifecycle(repository).summary(id.value),
+      );
+    });
+
+  program
+    .command("player:inspect")
+    .description("Exibe o estado autoritativo de um jogador")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--player <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const id = parseWorldOption(raw);
+      if (!id.ok) {
+        exitCode = writeError(io, id.error);
+        return;
+      }
+      if (typeof raw.player !== "string") {
+        exitCode = writeError(io, invalidArguments("player é obrigatório."));
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new InspectPlayerLifecycle(repository).player(
+          id.value,
+          raw.player,
+        ),
       );
     });
 
@@ -223,7 +269,7 @@ export async function runCli(
         await new ResumeWorldScheduler(
           repository,
           repository,
-          {},
+          { "players:process-day": createPlayerDayTaskHandler(repository) },
           newEntityId<"WorldClockExecutor">(),
         ).execute(id.value),
       );
@@ -396,6 +442,9 @@ function errorCode(code: string): number {
     code === "TASK_NOT_RETRYABLE" ||
     code === "TASK_NOT_CANCELLABLE" ||
     code === "WORLD_CLOCK_LEASE_HELD" ||
+    code === "PLAYER_LIFECYCLE_NOT_FOUND" ||
+    code === "PLAYER_LIFECYCLE_REVISION_CONFLICT" ||
+    code === "PLAYER_NOT_FOUND" ||
     code === "WORLD_ALREADY_EXISTS"
   ) {
     return 4;

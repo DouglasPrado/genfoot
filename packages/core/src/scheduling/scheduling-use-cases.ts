@@ -123,6 +123,30 @@ export class ScheduleWorldTask {
   }
 }
 
+export class ScheduleWorldTasks {
+  public constructor(private readonly repository: SchedulingRepository) {}
+
+  public async execute(
+    gameWorldId: GameWorldId,
+    inputs: readonly ScheduleTaskInput[],
+  ): Promise<Result<WorldSchedulerSnapshot, DomainError>> {
+    const loaded = await loadScheduler(this.repository, gameWorldId);
+    if (!loaded.ok) return loaded;
+    const expectedRevision = loaded.value.snapshot().revision;
+    for (const input of inputs) {
+      const scheduled = loaded.value.schedule(input);
+      if (!scheduled.ok) return scheduled;
+    }
+    if (loaded.value.snapshot().revision !== expectedRevision) {
+      await this.repository.saveScheduling(
+        loaded.value.snapshot(),
+        expectedRevision,
+      );
+    }
+    return succeed(loaded.value.snapshot());
+  }
+}
+
 export class RetryScheduledTask {
   public constructor(private readonly repository: SchedulingRepository) {}
 
@@ -215,9 +239,13 @@ export class ProcessDueWorldTasks {
           await handler({
             gameWorldId,
             taskId: claimed.value.id,
-            idempotencyKey: claimed.value.idempotencyKey,
+            idempotencyKey:
+              claimed.value.recurrence === null
+                ? claimed.value.idempotencyKey
+                : `${claimed.value.idempotencyKey}:${claimed.value.dueOn}`,
             fencingToken: claimed.value.fencingToken!,
             worldDate: on.toString(),
+            dueOn: claimed.value.dueOn,
             payload: claimed.value.payload,
           });
         }
