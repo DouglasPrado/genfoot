@@ -12,6 +12,19 @@ export const API_PREFIX = "api/v1";
 export async function createApp(): Promise<INestApplication> {
   const app = await NestFactory.create(AppModule, { logger: false });
   app.setGlobalPrefix(API_PREFIX);
+  if (process.env.GRINTA_API_LOG_REQUESTS === "1") {
+    const instance = app.getHttpAdapter().getInstance() as {
+      use: (fn: (req: unknown, res: unknown, next: () => void) => void) => void;
+    };
+    instance.use((req, _res, next) => {
+      const r = req as { method?: string; originalUrl?: string; headers?: Record<string, string> };
+      // eslint-disable-next-line no-console
+      console.log(
+        `[req] ${r.method} ${r.originalUrl} origin=${r.headers?.origin ?? "-"}`,
+      );
+      next();
+    });
+  }
   // Clientes (admin Next.js, mobile Expo) rodam em outra origem.
   app.enableCors({
     origin: true,

@@ -42,8 +42,15 @@ export class GrintaClient {
   constructor(options: ClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.token = options.token;
-    const globalFetch = globalThis.fetch as unknown as FetchLike | undefined;
-    const resolved = options.fetch ?? globalFetch;
+    // Envolve o fetch global num wrapper: no browser, `window.fetch` precisa ser
+    // chamado com `this === window` (senão "Illegal invocation"); guardá-lo
+    // destacado e chamá-lo como `this.fetchImpl(...)` quebraria. O wrapper
+    // preserva o contexto correto e funciona igual em Node.
+    const boundGlobal: FetchLike | undefined =
+      typeof globalThis.fetch === "function"
+        ? (input, init) => globalThis.fetch(input, init)
+        : undefined;
+    const resolved = options.fetch ?? boundGlobal;
     if (resolved === undefined) {
       throw new Error("Nenhuma implementação de fetch disponível.");
     }
