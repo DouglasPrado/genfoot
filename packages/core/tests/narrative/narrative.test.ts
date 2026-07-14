@@ -258,4 +258,105 @@ describe("Supporters and narrative", () => {
     expect(repeated).toEqual(firstRun);
     expect(repository.snapshot.revision).toBe(revision);
   });
+
+  it("responde à imprensa publicando mídia só com opções aprovadas", () => {
+    const ctx = narrative();
+    // opção fora do conjunto aprovado é rejeitada
+    expect(
+      ctx.value.chooseConversationOption({
+        clubId: CLUB,
+        context: "press-conference",
+        options: ["calm", "defiant"],
+        choice: "insult",
+        frame: "aggressive",
+        factRefs: ["match:1"],
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "conv:bad",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "OPTION_NOT_AVAILABLE" } });
+
+    const story = ctx.value.chooseConversationOption({
+      clubId: CLUB,
+      context: "press-conference",
+      options: ["calm", "defiant"],
+      choice: "calm",
+      frame: "measured-tone",
+      factRefs: ["match:1"],
+      reputationEffect: 3,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "conv:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-03-02",
+    });
+    expect(story).toMatchObject({ ok: true, value: { status: "PUBLISHED" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "MediaStoryPublished"),
+    ).toHaveLength(1);
+    expect(ctx.value.reputationFor(CLUB)).toBe(53);
+
+    // idempotência por chave: mesma escolha não republica
+    const revision = ctx.value.snapshot().revision;
+    const repeated = ctx.value.chooseConversationOption({
+      clubId: CLUB,
+      context: "press-conference",
+      options: ["calm", "defiant"],
+      choice: "calm",
+      frame: "measured-tone",
+      factRefs: ["match:1"],
+      reputationEffect: 3,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "conv:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-03-02",
+    });
+    expect(repeated).toMatchObject({ ok: true });
+    expect(ctx.value.snapshot().revision).toBe(revision);
+  });
+
+  it("cancela promessa ativa e bloqueia cancelamento após o prazo", () => {
+    const ctx = narrative();
+    const promise = ctx.value.makePublicPromise({
+      clubId: CLUB,
+      metric: "TOP_4",
+      targetValue: 4,
+      deadline: "2026-06-30",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "prom:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!promise.ok) throw promise.error;
+
+    // cancelar após o prazo é bloqueado
+    expect(
+      ctx.value.cancelPromise({
+        promiseId: promise.value.id,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "prom:late",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-07-15",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "PROMISE_EXPIRED" } });
+
+    const cancelled = ctx.value.cancelPromise({
+      promiseId: promise.value.id,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "prom:cancel",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(cancelled).toMatchObject({ ok: true, value: { status: "CANCELLED" } });
+
+    // rivalidade simétrica registra o par normalizado
+    const rival = ctx.value.setRivalry({
+      clubA: CLUB,
+      clubB: "019f0000-0000-7000-8000-0000000000c2" as NarrativeClubRef,
+      intensity: 80,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+    });
+    expect(rival).toMatchObject({ ok: true, value: { intensity: 80 } });
+    expect(ctx.value.summary().rivalryCount).toBe(1);
+  });
 });

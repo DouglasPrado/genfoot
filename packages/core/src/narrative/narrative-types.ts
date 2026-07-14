@@ -3,7 +3,17 @@ import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 export type NarrativeClubRef = EntityId<"Club">;
 export type PromiseId = EntityId<"NarrativePromise">;
 export type NarrativeCrisisId = EntityId<"NarrativeCrisis">;
+export type ConversationId = EntityId<"Conversation">;
+export type MediaStoryId = EntityId<"MediaStory">;
 export type NarrativeEventId = EntityId<"NarrativeEvent">;
+
+export const MediaStoryStatus = {
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+} as const;
+
+export type MediaStoryStatus =
+  (typeof MediaStoryStatus)[keyof typeof MediaStoryStatus];
 
 export const FanbaseSegment = {
   ULTRAS: "ULTRAS",
@@ -81,6 +91,34 @@ export interface NarrativeCrisisSnapshot {
   readonly version: number;
 }
 
+export interface ConversationSnapshot {
+  readonly id: ConversationId;
+  readonly gameWorldId: GameWorldId;
+  readonly clubId: NarrativeClubRef;
+  readonly context: string;
+  readonly options: readonly string[];
+  readonly choice: string;
+  readonly reputationEffect: number;
+  readonly idempotencyKey: string;
+}
+
+export interface MediaStorySnapshot {
+  readonly id: MediaStoryId;
+  readonly gameWorldId: GameWorldId;
+  readonly clubId: NarrativeClubRef;
+  readonly factRefs: readonly string[];
+  readonly frame: string;
+  readonly status: MediaStoryStatus;
+  readonly visibility: string;
+  readonly idempotencyKey: string;
+}
+
+export interface RivalrySnapshot {
+  readonly clubA: NarrativeClubRef;
+  readonly clubB: NarrativeClubRef;
+  readonly intensity: number;
+}
+
 export interface SupporterSatisfactionChangedEvent {
   readonly id: NarrativeEventId;
   readonly type: "SupporterSatisfactionChanged";
@@ -138,12 +176,25 @@ export interface NarrativeCrisisChangedEvent {
   readonly idempotencyKey: string;
 }
 
+export interface MediaStoryPublishedEvent {
+  readonly id: NarrativeEventId;
+  readonly type: "MediaStoryPublished";
+  readonly gameWorldId: GameWorldId;
+  readonly storyId: MediaStoryId;
+  readonly clubId: NarrativeClubRef;
+  readonly frame: string;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type NarrativeDomainEvent =
   | SupporterSatisfactionChangedEvent
   | PromiseMadeEvent
   | PromiseSettledEvent
   | ReputationChangedEvent
-  | NarrativeCrisisChangedEvent;
+  | NarrativeCrisisChangedEvent
+  | MediaStoryPublishedEvent;
 
 export interface WorldNarrativeSnapshot {
   readonly gameWorldId: GameWorldId;
@@ -152,6 +203,9 @@ export interface WorldNarrativeSnapshot {
   readonly reputation: readonly ClubReputationSnapshot[];
   readonly promises: readonly NarrativePromiseSnapshot[];
   readonly crises: readonly NarrativeCrisisSnapshot[];
+  readonly conversations?: readonly ConversationSnapshot[];
+  readonly mediaStories?: readonly MediaStorySnapshot[];
+  readonly rivalries?: readonly RivalrySnapshot[];
   readonly appliedFactIds: readonly string[];
   readonly events: readonly NarrativeDomainEvent[];
   readonly revision: number;
@@ -161,5 +215,7 @@ export interface NarrativeSummary {
   readonly fanbaseCount: number;
   readonly activePromiseCount: number;
   readonly openCrisisCount: number;
+  readonly mediaStoryCount: number;
+  readonly rivalryCount: number;
   readonly eventCount: number;
 }

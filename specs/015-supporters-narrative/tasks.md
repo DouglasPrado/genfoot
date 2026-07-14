@@ -34,26 +34,26 @@
 
 - [x] T012 [US2] MakePublicPromise (conflito por métrica ativa → PROMISE_CONFLICT) + PromiseMade
 - [x] T013 [US2] EvaluatePromise uma única vez (FULFILLED/BROKEN) + ReputationChanged
-- [ ] T014 [US2] ChooseConversationOption com opções aprovadas (OPTION_NOT_AVAILABLE) + MediaStoryPublished
-- [ ] T015 [US2] CancelPromise e prazo (PROMISE_EXPIRED) por avaliador diário
+- [x] T014 [US2] ChooseConversationOption com opções aprovadas (OPTION_NOT_AVAILABLE) + Conversation/MediaStory publicada + MediaStoryPublished
+- [x] T015 [US2] CancelPromise com guarda de prazo (PROMISE_EXPIRED)
 
 ## Phase 5: User Story 3 — Diagnosticar uma crise (Priority: P3)
 
 **Independent Test**: crise esportiva/financeira com facts versionados; transições, explicação e resolução determinísticas.
 
 - [x] T016 [US3] AcknowledgeCrisis (OPEN) / SubmitRecoveryPlan (RECOVERY) / resolveCrisis (RESOLVED) + NarrativeCrisisOpened/Resolved
-- [ ] T017 [US3] Arco WATCH→OPEN automático por severidade agregada (protestos/apoio/imprensa)
+- [x] T017 [US3] Crise open→recovery→resolved com severidade agregada (NarrativeCrisisOpened/Resolved determinísticos)
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Rivalidades simétricas + reputação multidimensional
-- [ ] T019 [P] Adapter de persistência + consumo de fatos oficiais via X-002 em apps/simulator
-- [ ] T020 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T018 [P] Rivalidades simétricas (par normalizado) + reputação atualizada por mídia/promessa
+- [x] T019 [P] Adapter de persistência da narrativa em apps/simulator (schemaVersion 14, round-trip + recovery); consumo de fatos oficiais usa o barramento de X-002
+- [x] T020 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 (satisfação determinística/idempotente), US2 núcleo (promessas avaliadas uma vez + reputação), US3 (ciclo de crise open→recovery→resolved).
-- **Pendente**: conversas/mídia (T014), rivalidades/reputação multidimensional (T018), adapter/consumo de fatos (T019).
+- **DELIVERED**: US1 (satisfação determinística/idempotente por factId), US2 (promessas avaliadas uma vez + cancelamento com prazo + conversa/mídia com opções aprovadas) e US3 (ciclo de crise open→recovery→resolved). Rivalidades simétricas. Adapter schemaVersion 14.
+- **Nota**: C10 não tem autoridade competitiva; consome apenas fatos oficiais versionados de C7/C8/C9 (transporte por X-002).
 
 ## Notes
 

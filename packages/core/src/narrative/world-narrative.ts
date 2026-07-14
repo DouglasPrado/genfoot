@@ -14,8 +14,12 @@ import type {
 import {
   CrisisStatus,
   FanbaseSegment,
+  MediaStoryStatus,
   PromiseStatus,
   type ClubFanbaseSnapshot,
+  type ConversationSnapshot,
+  type MediaStoryPublishedEvent,
+  type MediaStorySnapshot,
   type NarrativeClubRef,
   type NarrativeCrisisChangedEvent,
   type NarrativeCrisisSnapshot,
@@ -25,6 +29,7 @@ import {
   type PromiseMadeEvent,
   type PromiseSettledEvent,
   type ReputationChangedEvent,
+  type RivalrySnapshot,
   type SegmentSatisfaction,
   type SupporterSatisfactionChangedEvent,
   type WorldNarrativeSnapshot,
@@ -383,6 +388,210 @@ export class WorldNarrative {
     );
   }
 
+  public chooseConversationOption(
+    input: Readonly<{
+      clubId: NarrativeClubRef;
+      context: string;
+      options: readonly string[];
+      choice: string;
+      frame: string;
+      factRefs: readonly string[];
+      visibility?: string;
+      reputationEffect?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<MediaStorySnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("MediaStoryPublished", input.idempotencyKey);
+    if (replay !== undefined) {
+      const story = (this.state.mediaStories ?? []).find(
+        ({ id }) => id === replay.storyId,
+      );
+      if (story !== undefined) return succeed(story);
+    }
+    if (input.context.trim() === "" || input.options.length === 0) {
+      return fail(
+        new DomainError("INVALID_CONVERSATION", "Contexto e opções obrigatórios."),
+      );
+    }
+    if (!input.options.includes(input.choice)) {
+      return fail(
+        new DomainError(
+          "OPTION_NOT_AVAILABLE",
+          "A opção escolhida não está entre as aprovadas.",
+          { choice: input.choice },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const conversationId = deterministicUuidV7<"Conversation">({
+      worldSeed: input.worldSeed,
+      context: `conversation:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const storyId = deterministicUuidV7<"MediaStory">({
+      worldSeed: input.worldSeed,
+      context: `media-story:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const reputationEffect = clampEffect(input.reputationEffect ?? 0);
+    const conversation: ConversationSnapshot = {
+      id: conversationId,
+      gameWorldId: this.state.gameWorldId,
+      clubId: input.clubId,
+      context: input.context.trim(),
+      options: [...input.options],
+      choice: input.choice,
+      reputationEffect,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const story: MediaStorySnapshot = {
+      id: storyId,
+      gameWorldId: this.state.gameWorldId,
+      clubId: input.clubId,
+      factRefs: [...input.factRefs],
+      frame: input.frame,
+      status: MediaStoryStatus.PUBLISHED,
+      visibility: input.visibility ?? "PUBLIC",
+      idempotencyKey: input.idempotencyKey,
+    };
+    const event: MediaStoryPublishedEvent = {
+      id: this.eventId(input.worldSeed, `media-published:${input.idempotencyKey}`, date.value.toString()),
+      type: "MediaStoryPublished",
+      gameWorldId: this.state.gameWorldId,
+      storyId,
+      clubId: input.clubId,
+      frame: input.frame,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const events: NarrativeDomainEvent[] = [...this.state.events, event];
+    let reputation = this.state.reputation;
+    if (reputationEffect !== 0) {
+      const nextScore = clampScore(
+        this.reputationFor(input.clubId) + reputationEffect,
+      );
+      reputation = this.upsertReputation(input.clubId, nextScore);
+      events.push({
+        id: this.eventId(input.worldSeed, `reputation-media:${input.idempotencyKey}`, date.value.toString()),
+        type: "ReputationChanged",
+        gameWorldId: this.state.gameWorldId,
+        clubId: input.clubId,
+        score: nextScore,
+        worldDate: date.value.toString(),
+        rulesetVersion: input.rulesetVersion,
+        idempotencyKey: input.idempotencyKey,
+      });
+    }
+    this.state = {
+      ...this.state,
+      conversations: [...(this.state.conversations ?? []), conversation],
+      mediaStories: [...(this.state.mediaStories ?? []), story],
+      reputation,
+      events,
+      revision: this.state.revision + 1,
+    };
+    return succeed(story);
+  }
+
+  public cancelPromise(
+    input: Readonly<{
+      promiseId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<NarrativePromiseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const index = this.state.promises.findIndex(
+      ({ id }) => id === input.promiseId,
+    );
+    if (index < 0) {
+      return fail(
+        new DomainError("PROMISE_NOT_FOUND", "Promessa não encontrada.", {
+          promiseId: input.promiseId,
+        }),
+      );
+    }
+    const promise = this.state.promises[index]!;
+    if (promise.status === PromiseStatus.CANCELLED) return succeed(promise);
+    if (promise.status !== PromiseStatus.ACTIVE) {
+      return fail(
+        new DomainError("PROMISE_TERMINAL", "A promessa já foi encerrada.", {
+          promiseId: promise.id,
+        }),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    if (date.value.toString() > promise.deadline) {
+      return fail(
+        new DomainError("PROMISE_EXPIRED", "A promessa venceu; não pode ser cancelada.", {
+          promiseId: promise.id,
+          deadline: promise.deadline,
+        }),
+      );
+    }
+    const cancelled: NarrativePromiseSnapshot = {
+      ...promise,
+      status: PromiseStatus.CANCELLED,
+      version: promise.version + 1,
+    };
+    const promises = [...this.state.promises];
+    promises[index] = cancelled;
+    this.state = {
+      ...this.state,
+      promises,
+      revision: this.state.revision + 1,
+    };
+    return succeed(cancelled);
+  }
+
+  public setRivalry(
+    input: Readonly<{
+      clubA: NarrativeClubRef;
+      clubB: NarrativeClubRef;
+      intensity: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<RivalrySnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (input.clubA === input.clubB || !clampable(input.intensity)) {
+      return fail(new DomainError("INVALID_RIVALRY", "Clubes/intensidade inválidos."));
+    }
+    // par normalizado: rivalidade é simétrica
+    const [first, second] =
+      input.clubA < input.clubB
+        ? [input.clubA, input.clubB]
+        : [input.clubB, input.clubA];
+    const rivalry: RivalrySnapshot = {
+      clubA: first,
+      clubB: second,
+      intensity: input.intensity,
+    };
+    const others = (this.state.rivalries ?? []).filter(
+      (current) => !(current.clubA === first && current.clubB === second),
+    );
+    this.state = {
+      ...this.state,
+      rivalries: [...others, rivalry],
+      revision: this.state.revision + 1,
+    };
+    return succeed(rivalry);
+  }
+
   public fanbaseFor(clubId: string): ClubFanbaseSnapshot {
     return (
       this.state.fanbases.find((fanbase) => fanbase.clubId === clubId) ?? {
@@ -409,8 +618,20 @@ export class WorldNarrative {
       openCrisisCount: this.state.crises.filter(
         ({ status }) => status !== CrisisStatus.RESOLVED,
       ).length,
+      mediaStoryCount: (this.state.mediaStories ?? []).length,
+      rivalryCount: (this.state.rivalries ?? []).length,
       eventCount: this.state.events.length,
     };
+  }
+
+  private findEvent<T extends NarrativeDomainEvent["type"]>(
+    type: T,
+    idempotencyKey: string,
+  ): Extract<NarrativeDomainEvent, { type: T }> | undefined {
+    return this.state.events.find(
+      (event): event is Extract<NarrativeDomainEvent, { type: T }> =>
+        event.type === type && event.idempotencyKey === idempotencyKey,
+    );
   }
 
   public snapshot(): WorldNarrativeSnapshot {
@@ -534,6 +755,11 @@ function outcomeDelta(outcome: string, expected: string): number {
 
 function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function clampEffect(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-10, Math.min(10, Math.round(value)));
 }
 
 function clampable(value: number): boolean {

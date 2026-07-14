@@ -17,7 +17,9 @@ import {
   WorldLedger,
   WorldMarket,
   WorldMatches,
+  WorldNarrative,
   WorldScheduler,
+  CancelPromise,
   JoinWorld,
   SeasonRollover,
   WorldGenesisGenerator,
@@ -32,6 +34,7 @@ import {
   type MarketPlayerRef,
   type MatchClubRef,
   type MatchFixtureRef,
+  type NarrativeClubRef,
 } from "@grinta/core";
 import {
   newEntityId,
@@ -44,7 +47,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(13) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(14) });
 
 afterEach(async () => {
   await Promise.all(
@@ -91,7 +94,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(13);
+    expect(file.schemaVersion).toBe(14);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -745,6 +748,67 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "ADMIN_REVISION_CONFLICT" });
   });
 
+  it("persiste a narrativa C10 com promessa e mídia (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldNarrative.initialize(world);
+    if (!created.ok) throw created.error;
+    const narrative = created.value;
+    const club = "019f0000-0000-7000-8000-0000000000c1" as NarrativeClubRef;
+    const promise = narrative.makePublicPromise({
+      clubId: club,
+      metric: "TOP_4",
+      targetValue: 4,
+      deadline: "2026-06-30",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "prom:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!promise.ok) throw promise.error;
+    const story = narrative.chooseConversationOption({
+      clubId: club,
+      context: "press-conference",
+      options: ["calm", "defiant"],
+      choice: "calm",
+      frame: "measured-tone",
+      factRefs: ["match:1"],
+      reputationEffect: 3,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "conv:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-06",
+    });
+    if (!story.ok) throw story.error;
+
+    await store.value.saveNarrative(narrative.snapshot(), null);
+    // round-trip: promises, conversations, mediaStories e events preservados
+    expect(await store.value.findNarrativeByWorldId(world.id)).toEqual(
+      narrative.snapshot(),
+    );
+
+    // recovery: cancelar a promessa após restart = efeito único no retry
+    const restarted = new JsonWorldRepository(store.directory);
+    const cancel = new CancelPromise(restarted);
+    const cancelInput = {
+      promiseId: promise.value.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "prom:1:cancel",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    };
+    const first = await cancel.execute(world.id, cancelInput);
+    const retry = await cancel.execute(world.id, cancelInput);
+    expect(first).toMatchObject({ ok: true, value: { status: "CANCELLED" } });
+    expect(retry).toEqual(first);
+    const reloaded = await restarted.findNarrativeByWorldId(world.id);
+    expect(reloaded!.mediaStories).toHaveLength(1);
+    await expect(
+      store.value.saveNarrative(narrative.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "NARRATIVE_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -780,7 +844,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(13);
+    expect(migrated.schemaVersion).toBe(14);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

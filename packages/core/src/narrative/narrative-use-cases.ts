@@ -12,6 +12,7 @@ import type { NarrativeRepository } from "./narrative-repository.js";
 import type {
   ClubFanbaseSnapshot,
   MatchOutcome,
+  MediaStorySnapshot,
   NarrativeClubRef,
   NarrativeCrisisSnapshot,
   NarrativePromiseSnapshot,
@@ -191,6 +192,51 @@ export class ResolveNarrativeCrisis {
   ): Promise<Result<NarrativeCrisisSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (narrative) =>
       narrative.resolveCrisis(input),
+    );
+  }
+}
+
+export class ChooseConversationOption {
+  public constructor(private readonly repository: NarrativeRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      clubId: NarrativeClubRef;
+      context: string;
+      options: readonly string[];
+      choice: string;
+      frame: string;
+      factRefs: readonly string[];
+      visibility?: string;
+      reputationEffect?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<MediaStorySnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (narrative) =>
+      narrative.chooseConversationOption(input),
+    );
+  }
+}
+
+export class CancelPromise {
+  public constructor(private readonly repository: NarrativeRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      promiseId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<NarrativePromiseSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (narrative) =>
+      narrative.cancelPromise(input),
     );
   }
 }
