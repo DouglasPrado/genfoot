@@ -49,6 +49,8 @@ export * from "./automation/automation-repository.js";
 export * from "./automation/automation-types.js";
 export * from "./automation/automation-use-cases.js";
 export * from "./automation/world-automation.js";
+export * from "./calibration/calibration-types.js";
+export * from "./calibration/calibration.js";
 export * from "./players/player.js";
 export * from "./players/world-player-lifecycle.js";
 export * from "./scheduling/scheduling-repository.js";
