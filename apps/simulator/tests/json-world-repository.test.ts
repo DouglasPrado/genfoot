@@ -16,11 +16,13 @@ import {
   WorldIdentity,
   WorldLedger,
   WorldMarket,
+  WorldInbox,
   WorldMatches,
   WorldNarrative,
   WorldScheduler,
   CancelPromise,
   JoinWorld,
+  RetryDelivery,
   SeasonRollover,
   WorldGenesisGenerator,
   WorldPlayerLifecycle,
@@ -47,7 +49,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(14) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(15) });
 
 afterEach(async () => {
   await Promise.all(
@@ -94,7 +96,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(14);
+    expect(file.schemaVersion).toBe(15);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -809,6 +811,79 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "NARRATIVE_REVISION_CONFLICT" });
   });
 
+  it("persiste a inbox C11 com notificação, entrega e projeção (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldInbox.initialize(world);
+    if (!created.ok) throw created.error;
+    const inbox = created.value;
+    const notification = inbox.projectNotification({
+      dedupKey: "match:1:result",
+      recipientScope: "club:1",
+      category: "MATCH",
+      priority: "HIGH",
+      sourceRef: "match:1",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "notif:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!notification.ok) throw notification.error;
+    const delivery = inbox.retryDelivery({
+      notificationId: notification.value.id,
+      channel: "push",
+      success: false,
+      maxAttempts: 3,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "deliv:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!delivery.ok) throw delivery.error;
+    const projection = inbox.rebuildProjection({
+      projectionId: "inbox-view",
+      stream: "notifications",
+      presentSequences: [1, 2, 3],
+      throughSequence: 3,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "proj:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!projection.ok) throw projection.error;
+
+    await store.value.saveInbox(inbox.snapshot(), null);
+    // round-trip: notifications, deliveries, projections e events preservados
+    expect(await store.value.findInboxByWorldId(world.id)).toEqual(
+      inbox.snapshot(),
+    );
+
+    // recovery: retry idempotente após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const retry = new RetryDelivery(restarted);
+    const retryInput = {
+      notificationId: notification.value.id,
+      channel: "push",
+      success: false,
+      maxAttempts: 3,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "deliv:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    };
+    const first = await retry.execute(world.id, retryInput);
+    const repeated = await retry.execute(world.id, retryInput);
+    expect(first).toMatchObject({ ok: true });
+    expect(repeated).toEqual(first);
+    const reloaded = await restarted.findInboxByWorldId(world.id);
+    expect(reloaded!.deliveries).toHaveLength(1);
+    expect(reloaded!.projections).toHaveLength(1);
+    await expect(
+      store.value.saveInbox(inbox.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "INBOX_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -844,7 +919,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(14);
+    expect(migrated.schemaVersion).toBe(15);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

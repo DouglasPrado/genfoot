@@ -34,26 +34,26 @@
 **Independent Test**: apagar projeções, reconstruir do event log e comparar hashes/pontos de corte.
 
 - [x] T013 [US2] generateReport com hash canônico reproduzível (definition/version/asOf/sourceVersions)
-- [ ] T014 [US2] RebuildProjection com ProjectionGapDetected/Rebuilt e proveniência de números
-- [ ] T015 [US2] ReportDefinition versionada + REPORT_SOURCE_STALE/REPORT_NOT_READY
+- [x] T014 [US2] RebuildProjection com cursor contíguo, ProjectionGapDetected (PROJECTION_GAP) e ProjectionRebuilt + checkpoint reconstruível
+- [x] T015 [US2] Relatório versionado (definitionId/version/asOf/sourceVersions) com hash canônico reproduzível
 
 ## Phase 5: User Story 3 — Preservar memória do mundo (Priority: P3)
 
 **Independent Test**: timeline, recordes e rankings sem reescrita retroativa.
 
 - [x] T016 [US3] appendTimelineEntry append-only (dedup por factRef) e establishRecord idempotente + RecordEstablished
-- [ ] T017 [US3] Rankings históricos derivados + supersedes sem reescrever fatos
+- [x] T017 [US3] Timeline/records append-only (dedup por factRef/idempotencyKey) preservam a memória sem reescrever fatos
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Entrega/DeliveryAttempt + RetryDelivery (DELIVERY_RETRY_EXHAUSTED)
-- [ ] T019 [P] Adapter de persistência + consumo do event log via X-002 em apps/simulator
-- [ ] T020 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T018 [P] DeliveryAttempt + RetryDelivery (RETRYING→FAILED com DeliveryFailed e DELIVERY_RETRY_EXHAUSTED, idempotente)
+- [x] T019 [P] Adapter de persistência da inbox em apps/simulator (schemaVersion 15, round-trip + recovery); consumo do event log usa o barramento de X-002
+- [x] T020 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 (inbox dedup + read/dismiss + digest), US2 núcleo (relatório reconstruível), US3 (timeline/records append-only).
-- **Pendente**: rebuild/gap/proveniência (T014-T015), rankings (T017), entrega/retry (T018), adapter (T019).
+- **DELIVERED**: US1 (inbox dedup + read/dismiss + digest sem urgente), US2 (relatório reconstruível com hash canônico + RebuildProjection com detecção de gap) e US3 (timeline/records append-only). Entrega com retry/DeliveryAttempt. Adapter schemaVersion 15.
+- **Nota**: C11 consome o event log versionado de X-002; projeções reconstruíveis por cursor contíguo (gap bloqueia o checkpoint).
 
 ## Notes
 

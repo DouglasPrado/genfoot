@@ -10,7 +10,9 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { InboxRepository } from "./notifications-repository.js";
 import type {
+  DeliveryAttemptSnapshot,
   DigestResult,
+  InboxProjectionSnapshot,
   InboxSummary,
   NotificationPriority,
   NotificationSnapshot,
@@ -171,6 +173,51 @@ export class GenerateReport {
   ): Promise<Result<ReportArtifactSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (inbox) =>
       inbox.generateReport(input),
+    );
+  }
+}
+
+export class RebuildInboxProjection {
+  public constructor(private readonly repository: InboxRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      projectionId: string;
+      stream: string;
+      presentSequences: readonly number[];
+      throughSequence?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<InboxProjectionSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (inbox) =>
+      inbox.rebuildProjection(input),
+    );
+  }
+}
+
+export class RetryDelivery {
+  public constructor(private readonly repository: InboxRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      notificationId: string;
+      channel: string;
+      success: boolean;
+      maxAttempts: number;
+      providerRef?: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<DeliveryAttemptSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (inbox) =>
+      inbox.retryDelivery(input),
     );
   }
 }

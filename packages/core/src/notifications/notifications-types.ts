@@ -2,7 +2,28 @@ import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 
 export type NotificationId = EntityId<"Notification">;
 export type ReportArtifactId = EntityId<"ReportArtifact">;
+export type DeliveryAttemptId = EntityId<"DeliveryAttempt">;
 export type NotificationEventId = EntityId<"NotificationEvent">;
+
+export const DeliveryStatus = {
+  PENDING: "PENDING",
+  DELIVERED: "DELIVERED",
+  RETRYING: "RETRYING",
+  FAILED: "FAILED",
+} as const;
+
+export type DeliveryStatus =
+  (typeof DeliveryStatus)[keyof typeof DeliveryStatus];
+
+export const InboxProjectionStatus = {
+  REBUILDING: "REBUILDING",
+  VERIFIED: "VERIFIED",
+  ACTIVE: "ACTIVE",
+  FAILED: "FAILED",
+} as const;
+
+export type InboxProjectionStatus =
+  (typeof InboxProjectionStatus)[keyof typeof InboxProjectionStatus];
 
 export const NotificationPriority = {
   URGENT: "URGENT",
@@ -65,6 +86,27 @@ export interface ReportArtifactSnapshot {
   readonly idempotencyKey: string;
 }
 
+export interface DeliveryAttemptSnapshot {
+  readonly id: DeliveryAttemptId;
+  readonly gameWorldId: GameWorldId;
+  readonly notificationId: NotificationId;
+  readonly channel: string;
+  readonly attempt: number;
+  readonly status: DeliveryStatus;
+  readonly providerRef: string | null;
+  readonly idempotencyKey: string;
+}
+
+export interface InboxProjectionSnapshot {
+  readonly projectionId: string;
+  readonly gameWorldId: GameWorldId;
+  readonly stream: string;
+  readonly cursor: number;
+  readonly stateHash: string;
+  readonly status: InboxProjectionStatus;
+  readonly updatedOn: string;
+}
+
 export interface NotificationCreatedEvent {
   readonly id: NotificationEventId;
   readonly type: "NotificationCreated";
@@ -120,12 +162,53 @@ export interface RecordEstablishedEvent {
   readonly idempotencyKey: string;
 }
 
+export interface DeliveryFailedEvent {
+  readonly id: NotificationEventId;
+  readonly type: "DeliveryFailed";
+  readonly gameWorldId: GameWorldId;
+  readonly notificationId: NotificationId;
+  readonly channel: string;
+  readonly attempts: number;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface ProjectionRebuiltEvent {
+  readonly id: NotificationEventId;
+  readonly type: "ProjectionRebuilt";
+  readonly gameWorldId: GameWorldId;
+  readonly projectionId: string;
+  readonly stream: string;
+  readonly cursor: number;
+  readonly stateHash: string;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface ProjectionGapDetectedEvent {
+  readonly id: NotificationEventId;
+  readonly type: "ProjectionGapDetected";
+  readonly gameWorldId: GameWorldId;
+  readonly projectionId: string;
+  readonly stream: string;
+  readonly contiguousThrough: number;
+  readonly requested: number;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type NotificationDomainEvent =
   | NotificationCreatedEvent
   | NotificationReadEvent
   | DigestReadyEvent
   | ReportGeneratedEvent
-  | RecordEstablishedEvent;
+  | RecordEstablishedEvent
+  | DeliveryFailedEvent
+  | ProjectionRebuiltEvent
+  | ProjectionGapDetectedEvent;
 
 export interface DigestResult {
   readonly recipientScope: string;
@@ -139,6 +222,8 @@ export interface WorldInboxSnapshot {
   readonly timeline: readonly TimelineEntrySnapshot[];
   readonly records: readonly RecordSnapshot[];
   readonly reports: readonly ReportArtifactSnapshot[];
+  readonly deliveries?: readonly DeliveryAttemptSnapshot[];
+  readonly projections?: readonly InboxProjectionSnapshot[];
   readonly events: readonly NotificationDomainEvent[];
   readonly revision: number;
 }
@@ -148,4 +233,6 @@ export interface InboxSummary {
   readonly timelineCount: number;
   readonly recordCount: number;
   readonly reportCount: number;
+  readonly deliveredCount: number;
+  readonly projectionCount: number;
 }

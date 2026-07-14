@@ -11,15 +11,22 @@ import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import { stableHash } from "../matches/match-kernel.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
+  DeliveryStatus,
+  InboxProjectionStatus,
   NotificationPriority,
   NotificationStatus,
+  type DeliveryAttemptSnapshot,
+  type DeliveryFailedEvent,
   type DigestReadyEvent,
   type DigestResult,
+  type InboxProjectionSnapshot,
   type InboxSummary,
   type NotificationCreatedEvent,
   type NotificationDomainEvent,
   type NotificationReadEvent,
   type NotificationSnapshot,
+  type ProjectionGapDetectedEvent,
+  type ProjectionRebuiltEvent,
   type RecordEstablishedEvent,
   type RecordSnapshot,
   type ReportArtifactSnapshot,
@@ -386,6 +393,208 @@ export class WorldInbox {
     return succeed(report);
   }
 
+  public rebuildProjection(
+    input: Readonly<{
+      projectionId: string;
+      stream: string;
+      presentSequences: readonly number[];
+      throughSequence?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<InboxProjectionSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (input.projectionId.trim() === "" || input.stream.trim() === "") {
+      return fail(
+        new DomainError("INVALID_PROJECTION", "projectionId e stream obrigatórios."),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const present = new Set(input.presentSequences);
+    let cursor = 0;
+    while (present.has(cursor + 1)) cursor += 1;
+    if (input.throughSequence !== undefined && input.throughSequence > cursor) {
+      const gapEvent: ProjectionGapDetectedEvent = {
+        id: this.eventId(input.worldSeed, `projection-gap:${input.idempotencyKey}`, date.value.toString()),
+        type: "ProjectionGapDetected",
+        gameWorldId: this.state.gameWorldId,
+        projectionId: input.projectionId,
+        stream: input.stream,
+        contiguousThrough: cursor,
+        requested: input.throughSequence,
+        worldDate: date.value.toString(),
+        rulesetVersion: input.rulesetVersion,
+        idempotencyKey: input.idempotencyKey,
+      };
+      this.state = {
+        ...this.state,
+        events: [...this.state.events, gapEvent],
+        revision: this.state.revision + 1,
+      };
+      return fail(
+        new DomainError("PROJECTION_GAP", "Lacuna de sequência bloqueia o checkpoint.", {
+          projectionId: input.projectionId,
+          contiguousThrough: cursor,
+          requested: input.throughSequence,
+        }),
+      );
+    }
+    const targetCursor =
+      input.throughSequence === undefined ? cursor : input.throughSequence;
+    const stateHash = stableHash(
+      `${input.projectionId}|${input.stream}|${targetCursor}`,
+    );
+    const projections = this.state.projections ?? [];
+    const index = projections.findIndex(
+      (projection) => projection.projectionId === input.projectionId,
+    );
+    const existing = index >= 0 ? projections[index]! : null;
+    const checkpoint: InboxProjectionSnapshot = {
+      projectionId: input.projectionId,
+      gameWorldId: this.state.gameWorldId,
+      stream: input.stream,
+      cursor: targetCursor,
+      stateHash,
+      status: InboxProjectionStatus.ACTIVE,
+      updatedOn: date.value.toString(),
+    };
+    if (
+      existing !== null &&
+      existing.cursor === checkpoint.cursor &&
+      existing.stateHash === checkpoint.stateHash
+    ) {
+      return succeed(existing);
+    }
+    const nextProjections =
+      index >= 0
+        ? projections.map((current, position) =>
+            position === index ? checkpoint : current,
+          )
+        : [...projections, checkpoint];
+    const event: ProjectionRebuiltEvent = {
+      id: this.eventId(input.worldSeed, `projection-rebuilt:${input.idempotencyKey}`, date.value.toString()),
+      type: "ProjectionRebuilt",
+      gameWorldId: this.state.gameWorldId,
+      projectionId: input.projectionId,
+      stream: input.stream,
+      cursor: targetCursor,
+      stateHash,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      projections: nextProjections,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(checkpoint);
+  }
+
+  public retryDelivery(
+    input: Readonly<{
+      notificationId: string;
+      channel: string;
+      success: boolean;
+      maxAttempts: number;
+      providerRef?: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<DeliveryAttemptSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const deliveries = this.state.deliveries ?? [];
+    const replay = deliveries.find(
+      (attempt) => attempt.idempotencyKey === input.idempotencyKey,
+    );
+    if (replay !== undefined) return succeed(replay);
+    if (
+      !this.state.notifications.some(({ id }) => id === input.notificationId) ||
+      input.channel.trim() === "" ||
+      !Number.isSafeInteger(input.maxAttempts) ||
+      input.maxAttempts < 1
+    ) {
+      return fail(new DomainError("INVALID_DELIVERY", "Dados de entrega inválidos."));
+    }
+    const forChannel = deliveries.filter(
+      (attempt) =>
+        attempt.notificationId === input.notificationId &&
+        attempt.channel === input.channel,
+    );
+    const latest = forChannel.at(-1) ?? null;
+    if (latest !== null && latest.status === DeliveryStatus.DELIVERED) {
+      return succeed(latest);
+    }
+    if (latest !== null && latest.status === DeliveryStatus.FAILED) {
+      return fail(
+        new DomainError(
+          "DELIVERY_RETRY_EXHAUSTED",
+          "As tentativas de entrega já foram esgotadas.",
+          { notificationId: input.notificationId, channel: input.channel },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const attemptNumber = forChannel.length + 1;
+    let status: DeliveryStatus;
+    if (input.success) {
+      status = DeliveryStatus.DELIVERED;
+    } else if (attemptNumber >= input.maxAttempts) {
+      status = DeliveryStatus.FAILED;
+    } else {
+      status = DeliveryStatus.RETRYING;
+    }
+    const attempt: DeliveryAttemptSnapshot = {
+      id: deterministicUuidV7<"DeliveryAttempt">({
+        worldSeed: input.worldSeed,
+        context: `delivery:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      gameWorldId: this.state.gameWorldId,
+      notificationId: input.notificationId as DeliveryAttemptSnapshot["notificationId"],
+      channel: input.channel,
+      attempt: attemptNumber,
+      status,
+      providerRef: input.providerRef ?? null,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const events =
+      status === DeliveryStatus.FAILED
+        ? [
+            ...this.state.events,
+            {
+              id: this.eventId(input.worldSeed, `delivery-failed:${input.idempotencyKey}`, date.value.toString()),
+              type: "DeliveryFailed",
+              gameWorldId: this.state.gameWorldId,
+              notificationId: attempt.notificationId,
+              channel: input.channel,
+              attempts: attemptNumber,
+              worldDate: date.value.toString(),
+              rulesetVersion: input.rulesetVersion,
+              idempotencyKey: input.idempotencyKey,
+            } satisfies DeliveryFailedEvent,
+          ]
+        : this.state.events;
+    this.state = {
+      ...this.state,
+      deliveries: [...deliveries, attempt],
+      events,
+      revision: this.state.revision + 1,
+    };
+    return succeed(attempt);
+  }
+
   public findNotification(notificationId: string): NotificationSnapshot | null {
     return (
       this.state.notifications.find(({ id }) => id === notificationId) ?? null
@@ -400,6 +609,10 @@ export class WorldInbox {
       timelineCount: this.state.timeline.length,
       recordCount: this.state.records.length,
       reportCount: this.state.reports.length,
+      deliveredCount: (this.state.deliveries ?? []).filter(
+        ({ status }) => status === DeliveryStatus.DELIVERED,
+      ).length,
+      projectionCount: (this.state.projections ?? []).length,
     };
   }
 

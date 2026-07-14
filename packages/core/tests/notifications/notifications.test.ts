@@ -268,4 +268,106 @@ describe("Notifications and history", () => {
       ctx.value.snapshot().events.filter((e) => e.type === "DigestReady"),
     ).toHaveLength(1);
   });
+
+  it("reconstrói projeção por cursor contíguo e detecta gap", () => {
+    const ctx = inbox();
+    const rebuilt = ctx.value.rebuildProjection({
+      projectionId: "inbox-view",
+      stream: "notifications",
+      presentSequences: [1, 2, 3],
+      throughSequence: 3,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "proj:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-03-01",
+    });
+    expect(rebuilt).toMatchObject({ ok: true, value: { cursor: 3, status: "ACTIVE" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "ProjectionRebuilt"),
+    ).toHaveLength(1);
+
+    // gap: sequência ausente antes do alvo bloqueia o checkpoint
+    expect(
+      ctx.value.rebuildProjection({
+        projectionId: "inbox-view",
+        stream: "notifications",
+        presentSequences: [1, 2, 5],
+        throughSequence: 5,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "proj:gap",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-01",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "PROJECTION_GAP" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "ProjectionGapDetected"),
+    ).toHaveLength(1);
+  });
+
+  it("retenta entrega até esgotar e falha as próximas tentativas", () => {
+    const ctx = inbox();
+    const notification = project(ctx, "dk:deliver", "HIGH");
+    if (!notification.ok) throw notification.error;
+    const id = notification.value.id;
+
+    // 1ª falha → RETRYING
+    expect(
+      ctx.value.retryDelivery({
+        notificationId: id,
+        channel: "push",
+        success: false,
+        maxAttempts: 2,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d1",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: true, value: { status: "RETRYING", attempt: 1 } });
+
+    // 2ª falha atinge maxAttempts → FAILED + DeliveryFailed
+    expect(
+      ctx.value.retryDelivery({
+        notificationId: id,
+        channel: "push",
+        success: false,
+        maxAttempts: 2,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d2",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: true, value: { status: "FAILED", attempt: 2 } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "DeliveryFailed"),
+    ).toHaveLength(1);
+
+    // após esgotar, nova tentativa é rejeitada
+    expect(
+      ctx.value.retryDelivery({
+        notificationId: id,
+        channel: "push",
+        success: false,
+        maxAttempts: 2,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d3",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "DELIVERY_RETRY_EXHAUSTED" } });
+
+    // outro canal entregue com sucesso
+    expect(
+      ctx.value.retryDelivery({
+        notificationId: id,
+        channel: "email",
+        success: true,
+        maxAttempts: 2,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d4",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: true, value: { status: "DELIVERED" } });
+    expect(ctx.value.summary().deliveredCount).toBe(1);
+  });
 });
