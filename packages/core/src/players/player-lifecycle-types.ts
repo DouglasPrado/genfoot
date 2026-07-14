@@ -8,6 +8,8 @@ import type {
 
 export type PlayerGenerationEventId = EntityId<"PlayerGenerationEvent">;
 export type PlayerDevelopmentHistoryId = EntityId<"PlayerDevelopmentHistory">;
+export type MedicalCaseId = EntityId<"MedicalCase">;
+export type PlayerLifecycleEventId = EntityId<"PlayerLifecycleEvent">;
 
 export const PlayerCareerStatus = {
   ACTIVE: "ACTIVE",
@@ -111,6 +113,81 @@ export interface PlayerDevelopmentHistoryEntry {
   readonly rulesetVersion: RulesetVersion;
 }
 
+export const MedicalCaseSeverity = {
+  MINOR: "MINOR",
+  MODERATE: "MODERATE",
+  SEVERE: "SEVERE",
+} as const;
+
+export type MedicalCaseSeverity =
+  (typeof MedicalCaseSeverity)[keyof typeof MedicalCaseSeverity];
+
+export const MedicalCaseStatus = {
+  OPEN: "OPEN",
+  RECOVERING: "RECOVERING",
+  CLEARED: "CLEARED",
+} as const;
+
+export type MedicalCaseStatus =
+  (typeof MedicalCaseStatus)[keyof typeof MedicalCaseStatus];
+
+export interface MedicalCaseSnapshot {
+  readonly id: MedicalCaseId;
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly diagnosis: string;
+  readonly severity: MedicalCaseSeverity;
+  readonly status: MedicalCaseStatus;
+  readonly openedOn: string;
+  readonly expectedReturnOn: string;
+  readonly clearedOn: string | null;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+  readonly lastReassessmentKey?: string;
+  readonly version: number;
+}
+
+export interface PlayerInjuredEvent {
+  readonly id: PlayerLifecycleEventId;
+  readonly type: "PlayerInjured";
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly medicalCaseId: MedicalCaseId;
+  readonly severity: MedicalCaseSeverity;
+  readonly diagnosis: string;
+  readonly worldDate: string;
+  readonly expectedReturnOn: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface PlayerClearedEvent {
+  readonly id: PlayerLifecycleEventId;
+  readonly type: "PlayerCleared";
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly medicalCaseId: MedicalCaseId;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface PlayerRetiredEvent {
+  readonly id: PlayerLifecycleEventId;
+  readonly type: "PlayerRetired";
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly reason: string;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export type PlayerLifecycleEvent =
+  | PlayerInjuredEvent
+  | PlayerClearedEvent
+  | PlayerRetiredEvent;
+
 export interface WorldPlayerLifecycleSnapshot {
   readonly gameWorldId: GameWorldId;
   readonly rulesetVersion: RulesetVersion;
@@ -120,6 +197,8 @@ export interface WorldPlayerLifecycleSnapshot {
   readonly developmentHistory: readonly PlayerDevelopmentHistoryEntry[];
   readonly processedDayKeys: readonly string[];
   readonly revision: number;
+  readonly medicalCases?: readonly MedicalCaseSnapshot[];
+  readonly lifecycleEvents?: readonly PlayerLifecycleEvent[];
 }
 
 export interface PlayerLifecycleSummary {
@@ -127,6 +206,8 @@ export interface PlayerLifecycleSummary {
   readonly playerCount: number;
   readonly generationEventCount: number;
   readonly developmentHistoryCount: number;
+  readonly openMedicalCaseCount: number;
+  readonly retiredPlayerCount: number;
   readonly lastProcessedOn: string | null;
 }
 

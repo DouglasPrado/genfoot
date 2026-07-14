@@ -21,6 +21,8 @@ import {
   PlayerAvailability,
   PlayerCareerStatus,
   PlayerGenerationSource,
+  MedicalCaseSeverity,
+  MedicalCaseStatus,
   ScheduledTaskStatus,
   SeasonRolloverPhase,
   SeasonRolloverStatus,
@@ -399,6 +401,76 @@ const playerLifecycleSchema = z.object({
   ),
   processedDayKeys: z.array(z.string().min(1)),
   revision: z.number().int().positive(),
+  medicalCases: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        playerId: identifierSchema,
+        diagnosis: z.string().min(1),
+        severity: z.enum([
+          MedicalCaseSeverity.MINOR,
+          MedicalCaseSeverity.MODERATE,
+          MedicalCaseSeverity.SEVERE,
+        ]),
+        status: z.enum([
+          MedicalCaseStatus.OPEN,
+          MedicalCaseStatus.RECOVERING,
+          MedicalCaseStatus.CLEARED,
+        ]),
+        openedOn: z.string(),
+        expectedReturnOn: z.string(),
+        clearedOn: z.string().nullable(),
+        rulesetVersion: z.string(),
+        idempotencyKey: z.string().min(1),
+        lastReassessmentKey: z.string().min(1).optional(),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  lifecycleEvents: z
+    .array(
+      z.discriminatedUnion("type", [
+        z.object({
+          id: identifierSchema,
+          type: z.literal("PlayerInjured"),
+          gameWorldId: identifierSchema,
+          playerId: identifierSchema,
+          medicalCaseId: identifierSchema,
+          severity: z.enum([
+            MedicalCaseSeverity.MINOR,
+            MedicalCaseSeverity.MODERATE,
+            MedicalCaseSeverity.SEVERE,
+          ]),
+          diagnosis: z.string().min(1),
+          worldDate: z.string(),
+          expectedReturnOn: z.string(),
+          rulesetVersion: z.string(),
+          idempotencyKey: z.string().min(1),
+        }),
+        z.object({
+          id: identifierSchema,
+          type: z.literal("PlayerCleared"),
+          gameWorldId: identifierSchema,
+          playerId: identifierSchema,
+          medicalCaseId: identifierSchema,
+          worldDate: z.string(),
+          rulesetVersion: z.string(),
+          idempotencyKey: z.string().min(1),
+        }),
+        z.object({
+          id: identifierSchema,
+          type: z.literal("PlayerRetired"),
+          gameWorldId: identifierSchema,
+          playerId: identifierSchema,
+          reason: z.string().min(1),
+          worldDate: z.string(),
+          rulesetVersion: z.string(),
+          idempotencyKey: z.string().min(1),
+        }),
+      ]),
+    )
+    .optional(),
 });
 
 const infrastructureProjectSchema = z.object({
