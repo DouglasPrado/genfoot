@@ -1,6 +1,8 @@
 import {
+  ActivateProvisionedWorld,
   AdvanceWorldDays,
   CreateWorld,
+  GenerateWorldGenesis,
   type WorldMutationResult,
 } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
@@ -61,6 +63,47 @@ const handlers: Record<string, CommandHandler> = {
     if (!result.ok) return result;
     return succeed({
       resource: `world:${result.value.world.id}`,
+      mutation: result.value,
+    });
+  },
+
+  "world:genesis": async ({ repository, envelope }) => {
+    if (envelope.worldId === undefined) {
+      return fail(
+        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
+      );
+    }
+    const worldId = parseGameWorldId(envelope.worldId);
+    if (!worldId.ok) return worldId;
+    const result = await new GenerateWorldGenesis(
+      repository,
+      repository,
+      undefined,
+      repository,
+      repository,
+    ).execute(worldId.value);
+    if (!result.ok) return result;
+    return succeed({ resource: `world:${worldId.value}` });
+  },
+
+  "world:activate": async ({ repository, envelope }) => {
+    if (envelope.worldId === undefined) {
+      return fail(
+        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
+      );
+    }
+    const worldId = parseGameWorldId(envelope.worldId);
+    if (!worldId.ok) return worldId;
+    const result = await new ActivateProvisionedWorld(
+      repository,
+      repository,
+      repository,
+      repository,
+      repository,
+    ).execute(worldId.value);
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${worldId.value}`,
       mutation: result.value,
     });
   },
