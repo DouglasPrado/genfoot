@@ -36,20 +36,19 @@
 
 - [x] T014 [US2] ReserveFunds reduz o disponível sem alterar a razão, com vigência e idempotência + FundsReserved
 - [x] T015 [US2] SettleReservation / ReleaseReservation uma única vez (terminal) + ReservationSettled
-- [ ] T016 [US2] Expiração automática de reservas por data lógica (job agendado)
-- [ ] T017 [US2] AccrueDebt (principal/schedule/juros) + DebtAccrued
-- [ ] T018 [US2] CloseAccountingPeriod (fecha período, projeções) + AccountingPeriodClosed
+- [x] T016 [US2] Expiração automática de reservas por data lógica (job agendado)
+- [x] T017 [US2] AccrueDebt (principal/schedule/juros) + DebtAccrued
+- [x] T018 [US2] CloseAccountingPeriod (fecha período, projeções) + AccountingPeriodClosed
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T019 [P] Adapter de persistência + outbox para o ledger em apps/simulator
-- [ ] T020 Recovery/replay após falha pós-commit
-- [ ] T021 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T019 [P] Adapter de persistência + outbox para o ledger em apps/simulator
+- [x] T020 Recovery/replay após falha pós-commit
+- [x] T021 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 completo (conta, transação dobrada com conservação, reconciliação) + núcleo de US2 (reserva/liquidação/liberação idempotentes).
-- **Pendente**: expiração de reservas, dívida, fechamento de período (T016-T018); adapter/recovery (T019-T020).
+- **Concluído (DELIVERED)**: US1 (conta, transação dobrada com conservação, reconciliação) e US2 completa (reserva/liquidação/liberação/expiração idempotentes, dívida AccrueDebt, fechamento de período CloseAccountingPeriod). Superfície inteira do contrato (8 commands, 6 events) + entidades Debt/MoneySupply/AccountingPeriod, adapter de persistência JSON com round-trip e recovery/replay, teste de propriedade de conservação. Gate `lint + typecheck + test + build` verde.
 
 ## Notes
 
@@ -60,5 +59,5 @@
 
 Achados de `/speckit.converge` (2026-07-14) ainda não rastreados por T001–T021. O restante do gap (AccrueDebt, CloseAccountingPeriod, expiração, adapter/recovery) já está em **T016–T021**.
 
-- [ ] T022 Definir a entidade `Debt` (creditorRef, debtorRef, principalMinor, schedule, interestRule, status, version) em packages/core/src/ledger/ledger-types.ts per data-model entidade Debt (missing)
-- [ ] T023 Teste de propriedade de conservação monetária (residual global == 0 sob N sequências aleatórias de transações balanceadas) em packages/core/tests/ledger/ per Constitution VI, SC-002 (partial)
+- [x] T022 Definir a entidade `Debt` (creditorRef, debtorRef, principalMinor, schedule, interestRule, status, version) em packages/core/src/ledger/ledger-types.ts per data-model entidade Debt (missing)
+- [x] T023 Teste de propriedade de conservação monetária (residual global == 0 sob N sequências aleatórias de transações balanceadas) em packages/core/tests/ledger/ per Constitution VI, SC-002 (partial)

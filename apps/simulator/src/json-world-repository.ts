@@ -39,6 +39,8 @@ import {
   type SchedulingRepository,
   type PlayerLifecycleRepository,
   type WorldPlayerLifecycleSnapshot,
+  type LedgerRepository,
+  type WorldLedgerSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -570,6 +572,101 @@ const clubPortfolioSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const ledgerAccountSchema = z.object({
+  id: identifierSchema,
+  gameWorldId: identifierSchema,
+  name: z.string().min(1),
+  type: z.enum([
+    "ASSET",
+    "LIABILITY",
+    "EQUITY",
+    "REVENUE",
+    "EXPENSE",
+    "FAUCET",
+    "SINK",
+  ]),
+  currency: z.string().min(1),
+  normalBalance: z.enum(["DEBIT", "CREDIT"]),
+  balanceMinor: z.number().int(),
+  idempotencyKey: z.string().min(1),
+  version: z.number().int().positive(),
+});
+
+const worldLedgerSchema = z.object({
+  gameWorldId: identifierSchema,
+  baseCurrency: z.string().min(1),
+  rulesetVersion: z.string(),
+  accounts: z.array(ledgerAccountSchema),
+  transactions: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      transactionClass: z.string().min(1),
+      currency: z.string().min(1),
+      occurredOn: z.string(),
+      entries: z.array(
+        z.object({
+          accountId: identifierSchema,
+          direction: z.enum(["DEBIT", "CREDIT"]),
+          amountMinor: z.number().int().positive(),
+          sequence: z.number().int().positive(),
+        }),
+      ),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  reservations: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      accountId: identifierSchema,
+      purpose: z.string(),
+      amountMinor: z.number().int().positive(),
+      status: z.enum(["ACTIVE", "SETTLED", "RELEASED", "EXPIRED"]),
+      expiresOn: z.string(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  debts: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        creditorRef: z.string().min(1),
+        debtorRef: z.string().min(1),
+        currency: z.string().min(1),
+        principalMinor: z.number().int().positive(),
+        outstandingMinor: z.number().int(),
+        scheduleMonths: z.number().int().positive(),
+        interestRateBps: z.number().int(),
+        status: z.enum(["ACTIVE", "SETTLED", "DEFAULTED"]),
+        accruedOn: z.string(),
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  accountingPeriods: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        label: z.string().min(1),
+        opensOn: z.string(),
+        closesOn: z.string(),
+        status: z.enum(["OPEN", "CLOSED"]),
+        closingResidualMinor: z.number().int(),
+        closingSupplyMinor: z.number().int(),
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -605,6 +702,15 @@ const persistedSnapshotSchema = z.union([
     playerLifecycle: playerLifecycleSchema.nullable(),
     clubPortfolio: clubPortfolioSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(7),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -613,6 +719,7 @@ interface LoadedEnvelope {
   readonly scheduler: WorldSchedulerSnapshot | null;
   readonly playerLifecycle: WorldPlayerLifecycleSnapshot | null;
   readonly clubPortfolio: WorldClubPortfolioSnapshot | null;
+  readonly ledger: WorldLedgerSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -621,7 +728,8 @@ export class JsonWorldRepository
     WorldGenesisRepository,
     SchedulingRepository,
     PlayerLifecycleRepository,
-    ClubPortfolioRepository
+    ClubPortfolioRepository,
+    LedgerRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -662,6 +770,7 @@ export class JsonWorldRepository
       scheduler: current?.scheduler ?? null,
       playerLifecycle: current?.playerLifecycle ?? null,
       clubPortfolio: current?.clubPortfolio ?? null,
+      ledger: current?.ledger ?? null,
     });
   }
 
@@ -693,6 +802,7 @@ export class JsonWorldRepository
       scheduler: current.scheduler,
       playerLifecycle: current.playerLifecycle,
       clubPortfolio: current.clubPortfolio,
+      ledger: current.ledger,
     });
   }
 
@@ -843,6 +953,42 @@ export class JsonWorldRepository
     });
   }
 
+  public async findLedgerByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldLedgerSnapshot | null> {
+    return (await this.load(id))?.ledger ?? null;
+  }
+
+  public async saveLedger(
+    ledger: WorldLedgerSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(ledger.gameWorldId, "ledger", async () => {
+      const current = await this.load(ledger.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.ledger !== null) {
+        throw new DomainError("LEDGER_ALREADY_EXISTS", "O ledger já existe.");
+      }
+      if (
+        expectedRevision !== null &&
+        current.ledger?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "LEDGER_REVISION_CONFLICT",
+          "O ledger foi alterado desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.ledger?.revision ?? null,
+          },
+        );
+      }
+      await this.write(ledger.gameWorldId, { ...current, ledger });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -870,7 +1016,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 3 ||
           persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
-          persisted.schemaVersion === 6) &&
+          persisted.schemaVersion === 6 ||
+          persisted.schemaVersion === 7) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -878,22 +1025,36 @@ export class JsonWorldRepository
         (persisted.schemaVersion === 3 ||
           persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
-          persisted.schemaVersion === 6) &&
+          persisted.schemaVersion === 6 ||
+          persisted.schemaVersion === 7) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
       const playerLifecycle =
         (persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
-          persisted.schemaVersion === 6) &&
+          persisted.schemaVersion === 6 ||
+          persisted.schemaVersion === 7) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
       const clubPortfolio =
-        persisted.schemaVersion === 6 && persisted.clubPortfolio !== null
+        (persisted.schemaVersion === 6 || persisted.schemaVersion === 7) &&
+        persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
-      return { world, genesis, scheduler, playerLifecycle, clubPortfolio };
+      const ledger =
+        persisted.schemaVersion === 7 && persisted.ledger !== null
+          ? (persisted.ledger as unknown as WorldLedgerSnapshot)
+          : null;
+      return {
+        world,
+        genesis,
+        scheduler,
+        playerLifecycle,
+        clubPortfolio,
+        ledger,
+      };
     } catch (error: unknown) {
       throw new DomainError(
         "SNAPSHOT_CORRUPTED",
@@ -914,12 +1075,13 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 6,
+        schemaVersion: 7,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
         playerLifecycle: envelope.playerLifecycle,
         clubPortfolio: envelope.clubPortfolio,
+        ledger: envelope.ledger,
       },
       null,
       2,

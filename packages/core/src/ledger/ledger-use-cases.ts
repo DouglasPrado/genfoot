@@ -10,9 +10,11 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { LedgerRepository } from "./ledger-repository.js";
 import type {
+  AccountingPeriodSnapshot,
   EntryDirection,
   LedgerAccountSnapshot,
   LedgerAccountType,
+  LedgerDebtSnapshot,
   LedgerReservationSnapshot,
   LedgerSummary,
   LedgerTransactionSnapshot,
@@ -196,6 +198,69 @@ export class ReconcileWorldLedger {
   ): Promise<Result<MoneySupplySnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (ledger) =>
       ledger.reconcileWorldLedger(input),
+    );
+  }
+}
+
+export class AccrueDebt {
+  public constructor(private readonly repository: LedgerRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      creditorRef: string;
+      debtorRef: string;
+      principalMinor: number;
+      scheduleMonths: number;
+      interestRateBps: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<LedgerDebtSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (ledger) =>
+      ledger.accrueDebt(input),
+    );
+  }
+}
+
+export class CloseAccountingPeriod {
+  public constructor(private readonly repository: LedgerRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      label: string;
+      opensOn: string;
+      closesOn: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<AccountingPeriodSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (ledger) =>
+      ledger.closeAccountingPeriod(input),
+    );
+  }
+}
+
+export class ExpireReservations {
+  public constructor(private readonly repository: LedgerRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      asOf: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<readonly LedgerReservationSnapshot[], DomainError>> {
+    return mutate(this.repository, gameWorldId, (ledger) =>
+      ledger.expireReservations(input),
     );
   }
 }

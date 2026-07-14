@@ -10,12 +10,18 @@ import {
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
+  AccountingPeriodStatus,
+  DebtStatus,
   EntryDirection,
   LedgerAccountType,
   NormalBalance,
   ReservationStatus,
+  type AccountingPeriodClosedEvent,
+  type AccountingPeriodSnapshot,
+  type DebtAccruedEvent,
   type FundsReservedEvent,
   type LedgerAccountSnapshot,
+  type LedgerDebtSnapshot,
   type LedgerDomainEvent,
   type LedgerEntrySnapshot,
   type LedgerReconciledEvent,
@@ -44,6 +50,8 @@ export class WorldLedger {
       accounts: [],
       transactions: [],
       reservations: [],
+      debts: [],
+      accountingPeriods: [],
       events: [],
       revision: 1,
     });
@@ -103,6 +111,32 @@ export class WorldLedger {
       ) {
         return fail(invalidLedger("Reserva inválida."));
       }
+    }
+    const debtIds = new Set<string>();
+    for (const debt of snapshot.debts ?? []) {
+      if (
+        debt.gameWorldId !== snapshot.gameWorldId ||
+        debt.currency !== snapshot.baseCurrency ||
+        debt.principalMinor <= 0 ||
+        debt.outstandingMinor < 0 ||
+        debt.scheduleMonths < 1 ||
+        debt.interestRateBps < 0 ||
+        debtIds.has(debt.id)
+      ) {
+        return fail(invalidLedger("Dívida inválida."));
+      }
+      debtIds.add(debt.id);
+    }
+    const periodIds = new Set<string>();
+    for (const period of snapshot.accountingPeriods ?? []) {
+      if (
+        period.gameWorldId !== snapshot.gameWorldId ||
+        period.opensOn > period.closesOn ||
+        periodIds.has(period.id)
+      ) {
+        return fail(invalidLedger("Período contábil inválido."));
+      }
+      periodIds.add(period.id);
     }
     for (const event of snapshot.events) {
       if (event.gameWorldId !== snapshot.gameWorldId) {
@@ -198,6 +232,21 @@ export class WorldLedger {
     }
     const occurredOn = WorldDate.parse(input.occurredOn);
     if (!occurredOn.ok) return occurredOn;
+    const closedPeriod = (this.state.accountingPeriods ?? []).find(
+      (period) =>
+        period.status === AccountingPeriodStatus.CLOSED &&
+        occurredOn.value.toString() >= period.opensOn &&
+        occurredOn.value.toString() <= period.closesOn,
+    );
+    if (closedPeriod !== undefined) {
+      return fail(
+        new DomainError(
+          "ACCOUNTING_PERIOD_CLOSED",
+          "Não é possível lançar em um período contábil já fechado.",
+          { periodId: closedPeriod.id, occurredOn: occurredOn.value.toString() },
+        ),
+      );
+    }
     let debitTotal = 0;
     let creditTotal = 0;
     const accountsIndex = new Map<string, number>(
@@ -465,6 +514,264 @@ export class WorldLedger {
     return succeed(snapshot);
   }
 
+  public accrueDebt(
+    input: Readonly<{
+      creditorRef: string;
+      debtorRef: string;
+      principalMinor: number;
+      scheduleMonths: number;
+      interestRateBps: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<LedgerDebtSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("DebtAccrued", input.idempotencyKey);
+    if (replay !== undefined) {
+      const debt = (this.state.debts ?? []).find(({ id }) => id === replay.debtId);
+      if (debt !== undefined) return succeed(debt);
+    }
+    if (
+      input.creditorRef.trim() === "" ||
+      input.debtorRef.trim() === "" ||
+      input.creditorRef === input.debtorRef ||
+      !Number.isSafeInteger(input.principalMinor) ||
+      input.principalMinor <= 0 ||
+      !Number.isSafeInteger(input.scheduleMonths) ||
+      input.scheduleMonths < 1 ||
+      !Number.isSafeInteger(input.interestRateBps) ||
+      input.interestRateBps < 0
+    ) {
+      return fail(new DomainError("INVALID_DEBT", "Dados de dívida inválidos."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const timestampMilliseconds = timestampOf(date.value.toString());
+    const debtId = deterministicUuidV7<"LedgerDebt">({
+      worldSeed: input.worldSeed,
+      context: `ledger-debt:${input.idempotencyKey}`,
+      timestampMilliseconds,
+    });
+    // Juros totais previstos = principal × (bps/10000) × (meses/12), inteiro.
+    const interest = Math.round(
+      (input.principalMinor * input.interestRateBps * input.scheduleMonths) /
+        (10000 * 12),
+    );
+    const debt: LedgerDebtSnapshot = {
+      id: debtId,
+      gameWorldId: this.state.gameWorldId,
+      creditorRef: input.creditorRef,
+      debtorRef: input.debtorRef,
+      currency: this.state.baseCurrency,
+      principalMinor: input.principalMinor,
+      outstandingMinor: input.principalMinor + interest,
+      scheduleMonths: input.scheduleMonths,
+      interestRateBps: input.interestRateBps,
+      status: DebtStatus.ACTIVE,
+      accruedOn: date.value.toString(),
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: DebtAccruedEvent = {
+      id: deterministicUuidV7<"LedgerEvent">({
+        worldSeed: input.worldSeed,
+        context: `debt-accrued:${input.idempotencyKey}`,
+        timestampMilliseconds,
+      }),
+      type: "DebtAccrued",
+      gameWorldId: this.state.gameWorldId,
+      debtId,
+      debtorRef: input.debtorRef,
+      creditorRef: input.creditorRef,
+      principalMinor: input.principalMinor,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      debts: [...(this.state.debts ?? []), debt],
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(debt);
+  }
+
+  public closeAccountingPeriod(
+    input: Readonly<{
+      label: string;
+      opensOn: string;
+      closesOn: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<AccountingPeriodSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("AccountingPeriodClosed", input.idempotencyKey);
+    if (replay !== undefined) {
+      const period = (this.state.accountingPeriods ?? []).find(
+        ({ id }) => id === replay.periodId,
+      );
+      if (period !== undefined) return succeed(period);
+    }
+    const opensOn = WorldDate.parse(input.opensOn);
+    if (!opensOn.ok) return opensOn;
+    const closesOn = WorldDate.parse(input.closesOn);
+    if (!closesOn.ok) return closesOn;
+    if (
+      input.label.trim() === "" ||
+      opensOn.value.toString() > closesOn.value.toString()
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_ACCOUNTING_PERIOD",
+          "Rótulo e vigência do período devem ser válidos.",
+        ),
+      );
+    }
+    const overlap = (this.state.accountingPeriods ?? []).some(
+      (period) =>
+        period.status === AccountingPeriodStatus.CLOSED &&
+        period.opensOn <= closesOn.value.toString() &&
+        opensOn.value.toString() <= period.closesOn,
+    );
+    if (overlap) {
+      return fail(
+        new DomainError(
+          "ACCOUNTING_PERIOD_OVERLAP",
+          "Já existe um período fechado sobreposto.",
+        ),
+      );
+    }
+    const residual = this.state.accounts.reduce(
+      (sum, account) => sum + account.balanceMinor,
+      0,
+    );
+    if (residual !== 0) {
+      return fail(
+        new DomainError(
+          "LEDGER_IMBALANCED",
+          "Não é possível fechar um período com residual diferente de zero.",
+          { residualMinor: residual },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const supplyMinor = this.state.accounts
+      .filter((account) => account.type === LedgerAccountType.ASSET)
+      .reduce((sum, account) => sum + this.displayedBalance(account), 0);
+    const periodId = deterministicUuidV7<"LedgerAccountingPeriod">({
+      worldSeed: input.worldSeed,
+      context: `accounting-period:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(closesOn.value.toString()),
+    });
+    const period: AccountingPeriodSnapshot = {
+      id: periodId,
+      gameWorldId: this.state.gameWorldId,
+      label: input.label.trim(),
+      opensOn: opensOn.value.toString(),
+      closesOn: closesOn.value.toString(),
+      status: AccountingPeriodStatus.CLOSED,
+      closingResidualMinor: residual,
+      closingSupplyMinor: supplyMinor,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: AccountingPeriodClosedEvent = {
+      id: deterministicUuidV7<"LedgerEvent">({
+        worldSeed: input.worldSeed,
+        context: `period-closed:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(closesOn.value.toString()),
+      }),
+      type: "AccountingPeriodClosed",
+      gameWorldId: this.state.gameWorldId,
+      periodId,
+      closesOn: closesOn.value.toString(),
+      residualMinor: residual,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      accountingPeriods: [...(this.state.accountingPeriods ?? []), period],
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(period);
+  }
+
+  /**
+   * Expira, na data lógica `asOf`, toda reserva ACTIVE já vencida. Naturalmente
+   * idempotente: reservas já EXPIRED não são reprocessadas. Não altera a razão.
+   */
+  public expireReservations(
+    input: Readonly<{
+      asOf: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<readonly LedgerReservationSnapshot[], DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const asOf = WorldDate.parse(input.asOf);
+    if (!asOf.ok) return asOf;
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const expiring = this.state.reservations.filter(
+      (reservation) =>
+        reservation.status === ReservationStatus.ACTIVE &&
+        reservation.expiresOn < asOf.value.toString(),
+    );
+    if (expiring.length === 0) return succeed([]);
+    const expiredIds = new Set(expiring.map((reservation) => reservation.id));
+    const reservations = this.state.reservations.map((reservation) =>
+      expiredIds.has(reservation.id)
+        ? {
+            ...reservation,
+            status: ReservationStatus.EXPIRED,
+            version: reservation.version + 1,
+          }
+        : reservation,
+    );
+    const timestampMilliseconds = timestampOf(date.value.toString());
+    const events: ReservationSettledEvent[] = expiring.map((reservation) => ({
+      id: deterministicUuidV7<"LedgerEvent">({
+        worldSeed: input.worldSeed,
+        context: `reservation-expired:${input.idempotencyKey}:${reservation.id}`,
+        timestampMilliseconds,
+      }),
+      type: "ReservationSettled",
+      gameWorldId: this.state.gameWorldId,
+      reservationId: reservation.id,
+      outcome: "EXPIRED",
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: `${input.idempotencyKey}:${reservation.id}`,
+    }));
+    this.state = {
+      ...this.state,
+      reservations,
+      events: [...this.state.events, ...events],
+      revision: this.state.revision + 1,
+    };
+    return succeed(
+      reservations.filter((reservation) => expiredIds.has(reservation.id)),
+    );
+  }
+
   public accountBalance(accountId: string): number | null {
     const account = this.state.accounts.find(({ id }) => id === accountId);
     return account === undefined ? null : this.displayedBalance(account);
@@ -489,6 +796,12 @@ export class WorldLedger {
       transactionCount: this.state.transactions.length,
       activeReservationCount: this.state.reservations.filter(
         ({ status }) => status === ReservationStatus.ACTIVE,
+      ).length,
+      activeDebtCount: (this.state.debts ?? []).filter(
+        ({ status }) => status === DebtStatus.ACTIVE,
+      ).length,
+      closedPeriodCount: (this.state.accountingPeriods ?? []).filter(
+        ({ status }) => status === AccountingPeriodStatus.CLOSED,
       ).length,
       residualMinor: this.state.accounts.reduce(
         (sum, account) => sum + account.balanceMinor,

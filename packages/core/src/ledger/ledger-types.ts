@@ -3,6 +3,8 @@ import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 export type LedgerAccountId = EntityId<"LedgerAccount">;
 export type LedgerTransactionId = EntityId<"LedgerTransaction">;
 export type LedgerReservationId = EntityId<"LedgerReservation">;
+export type LedgerDebtId = EntityId<"LedgerDebt">;
+export type LedgerPeriodId = EntityId<"LedgerAccountingPeriod">;
 export type LedgerEventId = EntityId<"LedgerEvent">;
 
 export const LedgerAccountType = {
@@ -37,10 +39,27 @@ export const ReservationStatus = {
   ACTIVE: "ACTIVE",
   SETTLED: "SETTLED",
   RELEASED: "RELEASED",
+  EXPIRED: "EXPIRED",
 } as const;
 
 export type ReservationStatus =
   (typeof ReservationStatus)[keyof typeof ReservationStatus];
+
+export const DebtStatus = {
+  ACTIVE: "ACTIVE",
+  SETTLED: "SETTLED",
+  DEFAULTED: "DEFAULTED",
+} as const;
+
+export type DebtStatus = (typeof DebtStatus)[keyof typeof DebtStatus];
+
+export const AccountingPeriodStatus = {
+  OPEN: "OPEN",
+  CLOSED: "CLOSED",
+} as const;
+
+export type AccountingPeriodStatus =
+  (typeof AccountingPeriodStatus)[keyof typeof AccountingPeriodStatus];
 
 export interface LedgerAccountSnapshot {
   readonly id: LedgerAccountId;
@@ -90,6 +109,35 @@ export interface MoneySupplySnapshot {
   readonly accountCount: number;
 }
 
+export interface LedgerDebtSnapshot {
+  readonly id: LedgerDebtId;
+  readonly gameWorldId: GameWorldId;
+  readonly creditorRef: string;
+  readonly debtorRef: string;
+  readonly currency: string;
+  readonly principalMinor: number;
+  readonly outstandingMinor: number;
+  readonly scheduleMonths: number;
+  readonly interestRateBps: number;
+  readonly status: DebtStatus;
+  readonly accruedOn: string;
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
+export interface AccountingPeriodSnapshot {
+  readonly id: LedgerPeriodId;
+  readonly gameWorldId: GameWorldId;
+  readonly label: string;
+  readonly opensOn: string;
+  readonly closesOn: string;
+  readonly status: AccountingPeriodStatus;
+  readonly closingResidualMinor: number;
+  readonly closingSupplyMinor: number;
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
 export interface TransactionPostedEvent {
   readonly id: LedgerEventId;
   readonly type: "TransactionPosted";
@@ -119,7 +167,32 @@ export interface ReservationSettledEvent {
   readonly type: "ReservationSettled";
   readonly gameWorldId: GameWorldId;
   readonly reservationId: LedgerReservationId;
-  readonly outcome: "SETTLED" | "RELEASED";
+  readonly outcome: "SETTLED" | "RELEASED" | "EXPIRED";
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface DebtAccruedEvent {
+  readonly id: LedgerEventId;
+  readonly type: "DebtAccrued";
+  readonly gameWorldId: GameWorldId;
+  readonly debtId: LedgerDebtId;
+  readonly debtorRef: string;
+  readonly creditorRef: string;
+  readonly principalMinor: number;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface AccountingPeriodClosedEvent {
+  readonly id: LedgerEventId;
+  readonly type: "AccountingPeriodClosed";
+  readonly gameWorldId: GameWorldId;
+  readonly periodId: LedgerPeriodId;
+  readonly closesOn: string;
+  readonly residualMinor: number;
   readonly worldDate: string;
   readonly rulesetVersion: RulesetVersion;
   readonly idempotencyKey: string;
@@ -140,6 +213,8 @@ export type LedgerDomainEvent =
   | TransactionPostedEvent
   | FundsReservedEvent
   | ReservationSettledEvent
+  | DebtAccruedEvent
+  | AccountingPeriodClosedEvent
   | LedgerReconciledEvent;
 
 export interface WorldLedgerSnapshot {
@@ -149,6 +224,8 @@ export interface WorldLedgerSnapshot {
   readonly accounts: readonly LedgerAccountSnapshot[];
   readonly transactions: readonly LedgerTransactionSnapshot[];
   readonly reservations: readonly LedgerReservationSnapshot[];
+  readonly debts?: readonly LedgerDebtSnapshot[];
+  readonly accountingPeriods?: readonly AccountingPeriodSnapshot[];
   readonly events: readonly LedgerDomainEvent[];
   readonly revision: number;
 }
@@ -157,5 +234,7 @@ export interface LedgerSummary {
   readonly accountCount: number;
   readonly transactionCount: number;
   readonly activeReservationCount: number;
+  readonly activeDebtCount: number;
+  readonly closedPeriodCount: number;
   readonly residualMinor: number;
 }

@@ -325,4 +325,174 @@ describe("Economy and ledger", () => {
     expect(value.availableBalance(cashId)).toBe(1000);
     expect(value.summary().activeReservationCount).toBe(0);
   });
+
+  it("registra dívida (AccrueDebt) sem tocar a razão e é idempotente", () => {
+    const { gameWorld, value } = fundedLedger();
+    const input = {
+      creditorRef: "bank:1",
+      debtorRef: "club:1",
+      principalMinor: 10000,
+      scheduleMonths: 24,
+      interestRateBps: 500,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "debt:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    };
+    const debt = value.accrueDebt(input);
+    expect(debt).toMatchObject({
+      ok: true,
+      value: { status: "ACTIVE", principalMinor: 10000, outstandingMinor: 11000 },
+    });
+    // conservação preservada — dívida não é partida na razão
+    expect(value.summary().residualMinor).toBe(0);
+    expect(value.summary().activeDebtCount).toBe(1);
+
+    const revision = value.snapshot().revision;
+    const repeated = value.accrueDebt(input);
+    expect(repeated).toEqual(debt);
+    expect(value.snapshot().revision).toBe(revision);
+
+    expect(
+      value.accrueDebt({
+        ...input,
+        creditorRef: "x",
+        debtorRef: "x",
+        idempotencyKey: "debt:bad",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_DEBT" } });
+  });
+
+  it("fecha período contábil e bloqueia lançamentos dentro dele", () => {
+    const { gameWorld, value, cashId, faucetId } = fundedLedger();
+    const closed = value.closeAccountingPeriod({
+      label: "2026-01",
+      opensOn: "2026-01-01",
+      closesOn: "2026-01-31",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "period:jan",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(closed).toMatchObject({
+      ok: true,
+      value: { status: "CLOSED", closingResidualMinor: 0 },
+    });
+
+    // lançar dentro do período fechado é rejeitado
+    expect(
+      value.postTransaction({
+        transactionClass: "LATE",
+        occurredOn: "2026-01-15",
+        entries: [
+          { accountId: cashId, direction: "DEBIT", amountMinor: 100 },
+          { accountId: faucetId, direction: "CREDIT", amountMinor: 100 },
+        ],
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "tx:late",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-15",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "ACCOUNTING_PERIOD_CLOSED" } });
+
+    // fora do período fechado, lança normalmente
+    expect(
+      value.postTransaction({
+        transactionClass: "FEB",
+        occurredOn: "2026-02-05",
+        entries: [
+          { accountId: cashId, direction: "DEBIT", amountMinor: 100 },
+          { accountId: faucetId, direction: "CREDIT", amountMinor: 100 },
+        ],
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "tx:feb",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-02-05",
+      }),
+    ).toMatchObject({ ok: true });
+
+    // período fechado sobreposto é rejeitado
+    expect(
+      value.closeAccountingPeriod({
+        label: "overlap",
+        opensOn: "2026-01-15",
+        closesOn: "2026-02-15",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "period:ov",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-02-20",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "ACCOUNTING_PERIOD_OVERLAP" } });
+  });
+
+  it("expira reservas vencidas por data lógica, uma única vez", () => {
+    const { gameWorld, value, cashId } = fundedLedger();
+    const reservation = value.reserveFunds({
+      accountId: cashId,
+      purpose: "Folha",
+      amountMinor: 300,
+      expiresOn: "2026-02-01",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "res:exp",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!reservation.ok) throw reservation.error;
+    expect(value.availableBalance(cashId)).toBe(700);
+
+    const expired = value.expireReservations({
+      asOf: "2026-03-01",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "expire:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-03-01",
+    });
+    if (!expired.ok) throw expired.error;
+    expect(expired.value).toHaveLength(1);
+    expect(expired.value[0]!.status).toBe("EXPIRED");
+    expect(value.availableBalance(cashId)).toBe(1000);
+
+    // idempotente: re-rodar não muda nada
+    const revision = value.snapshot().revision;
+    const again = value.expireReservations({
+      asOf: "2026-03-02",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "expire:2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-03-02",
+    });
+    expect(again).toEqual({ ok: true, value: [] });
+    expect(value.snapshot().revision).toBe(revision);
+  });
+
+  it("preserva a conservação sob sequências aleatórias de transações (property)", () => {
+    const { gameWorld, value, cashId, faucetId } = fundedLedger();
+    // gerador determinístico (sem Math.random) para o teste de propriedade
+    let seed = 123456789;
+    const next = (n: number): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % n;
+    };
+    const accounts = [cashId, faucetId];
+    for (let i = 0; i < 60; i += 1) {
+      const amount = 1 + next(500);
+      const first = accounts[next(2)]!;
+      const second = accounts[first === cashId ? 1 : 0]!;
+      const posted = value.postTransaction({
+        transactionClass: "RANDOM",
+        occurredOn: "2026-05-01",
+        entries: [
+          { accountId: first, direction: "DEBIT", amountMinor: amount },
+          { accountId: second, direction: "CREDIT", amountMinor: amount },
+        ],
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: `rnd:${i}`,
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-05-01",
+      });
+      expect(posted.ok).toBe(true);
+      // invariante após cada lançamento: residual global == 0
+      expect(value.summary().residualMinor).toBe(0);
+    }
+  });
 });

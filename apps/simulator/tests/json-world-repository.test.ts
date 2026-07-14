@@ -3,6 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  OpenLedgerAccount,
+  PostTransaction,
+  WorldLedger,
   WorldScheduler,
   SeasonRollover,
   WorldGenesisGenerator,
@@ -22,7 +25,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(6) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(7) });
 
 afterEach(async () => {
   await Promise.all(
@@ -69,7 +72,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(6);
+    expect(file.schemaVersion).toBe(7);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -101,6 +104,137 @@ describe("JsonWorldRepository", () => {
     await expect(
       store.value.savePlayerLifecycle(lifecycle.value.snapshot(), 99),
     ).rejects.toMatchObject({ code: "PLAYER_LIFECYCLE_REVISION_CONFLICT" });
+  });
+
+  it("persiste o ledger C9 com dívida e período fechado (round-trip)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldLedger.initialize(world);
+    if (!created.ok) throw created.error;
+    const ledger = created.value;
+    const cash = ledger.openLedgerAccount({
+      name: "Caixa",
+      type: "ASSET",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "a:cash",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    const faucet = ledger.openLedgerAccount({
+      name: "Faucet",
+      type: "FAUCET",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "a:faucet",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    if (!cash.ok || !faucet.ok) throw new Error("contas");
+    const tx = ledger.postTransaction({
+      transactionClass: "INJ",
+      occurredOn: "2026-01-02",
+      entries: [
+        { accountId: cash.value.id, direction: "DEBIT", amountMinor: 1000 },
+        { accountId: faucet.value.id, direction: "CREDIT", amountMinor: 1000 },
+      ],
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "tx:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!tx.ok) throw tx.error;
+    const debt = ledger.accrueDebt({
+      creditorRef: "bank",
+      debtorRef: "club",
+      principalMinor: 5000,
+      scheduleMonths: 12,
+      interestRateBps: 300,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "d:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!debt.ok) throw debt.error;
+    const period = ledger.closeAccountingPeriod({
+      label: "2026-01",
+      opensOn: "2026-01-01",
+      closesOn: "2026-01-31",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "p:1",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!period.ok) throw period.error;
+
+    await store.value.saveLedger(ledger.snapshot(), null);
+    // round-trip: debts, accountingPeriods e events preservados sem stripping
+    expect(await store.value.findLedgerByWorldId(world.id)).toEqual(
+      ledger.snapshot(),
+    );
+    await expect(
+      store.value.saveLedger(ledger.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "LEDGER_REVISION_CONFLICT" });
+  });
+
+  it("retoma o ledger após restart sem duplicar (recovery/replay)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldLedger.initialize(world);
+    if (!created.ok) throw created.error;
+    await store.value.saveLedger(created.value.snapshot(), null);
+
+    // "Restart": nova instância do repositório sobre o mesmo diretório.
+    const restarted = new JsonWorldRepository(store.directory);
+    const openAccount = new OpenLedgerAccount(restarted);
+    const cash = await openAccount.execute(world.id, {
+      name: "Caixa",
+      type: "ASSET",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "a:cash",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    const faucet = await openAccount.execute(world.id, {
+      name: "Faucet",
+      type: "FAUCET",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "a:faucet",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    if (!cash.ok || !faucet.ok) throw new Error("contas");
+    const post = new PostTransaction(restarted);
+    const input = {
+      transactionClass: "INJ",
+      occurredOn: "2026-01-02",
+      entries: [
+        {
+          accountId: cash.value.id,
+          direction: "DEBIT" as const,
+          amountMinor: 1000,
+        },
+        {
+          accountId: faucet.value.id,
+          direction: "CREDIT" as const,
+          amountMinor: 1000,
+        },
+      ],
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "tx:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    };
+    const first = await post.execute(world.id, input);
+    // resposta perdida → retry da mesma chave contra o estado persistido = efeito único
+    const retry = await post.execute(world.id, input);
+    expect(first).toMatchObject({ ok: true });
+    expect(retry).toEqual(first);
+    const persisted = await restarted.findLedgerByWorldId(world.id);
+    expect(persisted!.transactions).toHaveLength(1);
+    expect(
+      persisted!.accounts.reduce((sum, account) => sum + account.balanceMinor, 0),
+    ).toBe(0);
   });
 
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
@@ -138,7 +272,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {
