@@ -1,50 +1,116 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+- Version change: (template/placeholder) → 1.0.0
+- Ratification: initial adoption on 2026-07-14 (first concrete constitution; previously an unfilled template)
+- Principles defined (7): I. Domínio Puro (Library-First) · II. Test-First (NÃO-NEGOCIÁVEL) ·
+  III. Determinismo & Replay · IV. Owner Único & Isolamento por World ·
+  V. Idempotência & Concorrência Otimista · VI. Conservação Monetária (dinheiro só em C9) ·
+  VII. Contratos Versionados & Fatos Append-Only
+- Added sections: "Restrições de Arquitetura & Qualidade" (Section 2), "Fluxo de Desenvolvimento (SpecKit)" (Section 3), Governance
+- Removed sections: none
+- Templates checked for alignment:
+  ✅ .specify/templates/plan-template.md — "Constitution Check" já genérico; princípios cobrem os gates citados nos plan.md
+  ✅ .specify/templates/spec-template.md — sem seções obrigatórias em conflito
+  ✅ .specify/templates/tasks-template.md — categorização por user story + testes compatível com Test-First
+  ✅ .claude/skills/speckit-*/SKILL.md — sem referências agent-specific desatualizadas exigindo mudança
+  ✅ CLAUDE.md (raiz) — processo alinhado; §8 referencia esta ratificação
+- Deferred TODOs: none
+-->
+
+# Grinta Constitution
+
+Grinta (repo `genfoot`) é um simulador de futebol *headless*, determinístico e auditável, organizado
+em bounded contexts. Esta constituição define os princípios NÃO-NEGOCIÁVEIS que todo código e todo
+fluxo SpecKit devem respeitar. Ela **prevalece** sobre conveniência ou pressa.
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Domínio Puro (Library-First)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Toda a lógica de negócio MUST viver em `packages/core` como domínio puro. O core NÃO MUST importar
+adapters (Prisma/PostgreSQL, JSON, transporte, HTTP, UI). As portas (repository/transport) são
+definidas no core; adapters e consumers dependem dos **contratos versionados**, nunca o contrário.
+**Rationale:** mantém o núcleo testável em isolamento, reusável e livre de infraestrutura, e impede
+que decisões de I/O vazem para as regras do jogo.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Test-First (NÃO-NEGOCIÁVEL)
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+TDD é obrigatório. Nenhuma linha de implementação MUST ser escrita antes de um teste existir, ser
+validado e **FALHAR** (ciclo Red → Green → Refactor). Os testes usam Vitest e cobrem unidade,
+propriedade, contrato, integração e replay. Todo command MUST ter teste de **idempotência** (repetir
+a mesma chave produz um único efeito), de **estado terminal** e de **isolamento por `worldId`**.
+Um "slice" sem sua suíte de testes NÃO conta como implementado.
+**Rationale:** é a única defesa contra "implementar pela metade e declarar pronto".
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. Determinismo & Replay
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Data lógica, seed/stream e `rulesetVersion` MUST ser explícitos e ficar no histórico. É PROIBIDO
+`Date.now()`, `Math.random()` ou qualquer relógio/RNG global dentro do domínio — use `WorldDate`,
+`SeededRandom` e `deterministicUuidV7`. A mesma seed + ruleset MUST produzir os mesmos hashes:
+**online ≡ offline ≡ replay**.
+**Rationale:** reprodutibilidade e auditoria são requisitos de produto (calibração, DR, replay).
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Owner Único & Isolamento por World
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Cada aggregate é o **único escritor** do seu estado. Consumers MUST integrar por IDs, queries,
+commands ou eventos versionados — **sem escrita cruzada** em aggregate alheio. Toda escrita MUST
+carregar `worldId`, `expectedVersion`, chave de idempotência e o ruleset aplicável, e MUST ser
+isolada por mundo.
+**Rationale:** preserva fronteiras de contexto e permite escala/particionamento por `worldId`.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### V. Idempotência & Concorrência Otimista
+
+Todo command MUST ser idempotente por chave (retry seguro = um único efeito). Mutação MUST usar
+concorrência otimista (`expectedVersion`/`revision`), salvando apenas quando a revisão muda. O commit
+local precede a outbox; a integração/efeito cross-context ocorre **após** o commit.
+**Rationale:** retry sem transação distribuída, sem efeitos duplicados.
+
+### VI. Conservação Monetária (dinheiro só em C9)
+
+Dinheiro existe **apenas** no ledger (C9 · Economia), em inteiro/*minor units*, **nunca** float.
+Toda transação MUST ter ao menos duas partidas e soma algébrica **zero** por moeda; o residual global
+do mundo MUST ser zero. Outros contexts referenciam valores/reservas por ID, mas não escrevem a razão.
+**Rationale:** conservação é invariante do universo econômico; float e dono duplo corrompem o jogo.
+
+### VII. Contratos Versionados & Fatos Append-Only
+
+Evolução de contrato é **aditiva** dentro da major; quebra semântica cria nova major. Um evento
+publicado NUNCA é reescrito. O histórico é **append-only** e as projeções são reconstruíveis a partir
+dos fatos.
+**Rationale:** garante compatibilidade de consumers e uma trilha auditável imutável.
+
+## Restrições de Arquitetura & Qualidade
+
+- Monorepo **pnpm + turbo**. Domínio em `packages/core`; apps em `apps/*`; tipos mínimos em
+  `packages/shared`.
+- **Gate obrigatório** — nenhum commit sem tudo verde:
+  `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+- Padrão de aggregate: classe `World<X>`, construtor privado, `static initialize(world)` e
+  `static fromSnapshot(snapshot)` (valida invariantes), métodos de command retornando
+  `Result<T, DomainError>` (`succeed`/`fail`). Casos de uso envolvem a porta de repositório com
+  concorrência otimista.
+- **Definição de PRONTO (barra `DELIVERED`, "reproduced scope"):** uma spec só é `DELIVERED` quando
+  TODOS os commands e events do `contracts/README.md` estão implementados, TODAS as entidades do
+  `data-model.md` existem **e persistem** (adapter real, não só memória), TODAS as user stories têm
+  teste independente verde, a evidência do `quickstart.md` é reproduzida, `/speckit.converge` não
+  retorna novas tarefas e o `tasks.md` está sem `- [ ]`. Um slice é `PARTIAL`, não `DELIVERED`.
+
+## Fluxo de Desenvolvimento (SpecKit)
+
+O SpecKit é a fonte da verdade. Para cada spec, na ordem (ver `CLAUDE.md` §3):
+`/speckit.constitution` (uma vez) → `/speckit.specify` → `/speckit.clarify` → `/speckit.plan` →
+`/speckit.tasks` (cobrindo o ESCOPO INTEIRO) → `/speckit.analyze` → **`/speckit.implement`** (executa
+todas as tarefas, TDD) → `/speckit.converge` (loop até zerar `[ ]`). Só então o `Status` da spec vira
+`DELIVERED`, com `specs/README.md` e o portfolio-completeness atualizados **com evidência**.
+Reporte sempre o estado real (`DELIVERED`/`PARTIAL`/`PLANNED`) — narrativa otimista é violação.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+Esta constituição prevalece sobre outras práticas. Emendas exigem: (a) justificativa escrita no Sync
+Impact Report, (b) atualização dos templates dependentes (`plan`, `spec`, `tasks`) e do `CLAUDE.md`,
+(c) bump de versão semântico. Versionamento: **MAJOR** para remoção/redefinição incompatível de
+princípio; **MINOR** para novo princípio/seção ou expansão material; **PATCH** para clarificações.
+Toda PR/revisão MUST verificar conformidade com estes princípios; complexidade fora deles MUST ser
+justificada ou rejeitada. O `CLAUDE.md` é a guia operacional de runtime.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-07-14 | **Last Amended**: 2026-07-14
