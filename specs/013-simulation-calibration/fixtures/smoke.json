@@ -1,0 +1,32 @@
+{
+  "manifestHash": "smoke-2026-07",
+  "rulesetVersion": "1.0.0",
+  "timestepChances": 30,
+  "expectedRuns": 6,
+  "matchesPerScenario": 500,
+  "scenarios": [
+    { "id": "s1", "seed": "smoke-1", "homeStrength": 70, "awayStrength": 50 },
+    { "id": "s2", "seed": "smoke-2", "homeStrength": 60, "awayStrength": 60 },
+    { "id": "s3", "seed": "smoke-3", "homeStrength": 55, "awayStrength": 65 },
+    { "id": "s4", "seed": "smoke-4", "homeStrength": 80, "awayStrength": 40 },
+    { "id": "s5", "seed": "smoke-5", "homeStrength": 50, "awayStrength": 50 },
+    { "id": "s6", "seed": "smoke-6", "homeStrength": 65, "awayStrength": 58 }
+  ],
+  "bands": [
+    {
+      "bandId": "BS-goals",
+      "metric": "avgTotalGoals",
+      "lo": 6.5,
+      "hi": 9.0,
+      "oracleVersion": "oracle-2026.1"
+    },
+    {
+      "bandId": "BS-home",
+      "metric": "homeWinRate",
+      "lo": 0.4,
+      "hi": 0.8,
+      "oracleVersion": "oracle-2026.1"
+    }
+  ],
+  "invariants": { "maxTotalGoalsPerMatch": 20 }
+}

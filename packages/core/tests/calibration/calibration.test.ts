@@ -96,6 +96,50 @@ describe("Simulation calibration harness", () => {
     ).toMatchObject({ ok: false, error: { code: "RUN_DUPLICATE" } });
   });
 
+  it("escala R-34: agrega métricas sobre N partidas por cenário e permanece reproduzível", () => {
+    const scaled = (): CalibrationManifest => ({
+      ...manifest(WIDE_BANDS),
+      matchesPerScenario: 200,
+    });
+    const first = runCalibrationBatch(scaled());
+    const second = runCalibrationBatch(scaled());
+    if (!first.ok || !second.ok) throw new Error("falhou");
+
+    expect(first.value.runsExecuted).toBe(6);
+    expect(first.value.matchesExecuted).toBe(6 * 200);
+    expect(first.value.scenarioRuns.every((r) => r.matchCount === 200)).toBe(
+      true,
+    );
+    // média sobre todas as partidas, não sobre os 6 cenários
+    const goals = first.value.metrics.find(
+      (m) => m.metricId === "avgTotalGoals",
+    );
+    expect(goals?.value).toBeGreaterThan(0);
+    expect(first.value.reportHash).toBe(second.value.reportHash);
+    expect(first.value.gateResult).toBe("PASS");
+  });
+
+  it("escala R-34 rejeita matchesPerScenario inválido", () => {
+    expect(
+      runCalibrationBatch({ ...manifest(WIDE_BANDS), matchesPerScenario: 0 }),
+    ).toMatchObject({ ok: false, error: { code: "MANIFEST_INVALID" } });
+  });
+
+  it("banda carrega oracleVersion versionado (FR-006)", () => {
+    const bands: CalibrationBand[] = [
+      {
+        bandId: "BS-goals",
+        metric: "avgTotalGoals",
+        lo: 0,
+        hi: 100,
+        oracleVersion: "oracle-2026.1",
+      },
+    ];
+    const report = runCalibrationBatch(manifest(bands));
+    if (!report.ok) throw report.error;
+    expect(report.value.bandEvaluations[0]?.oracleVersion).toBe("oracle-2026.1");
+  });
+
   it("promove somente com todos os gates PASS (decisão conjuntiva)", () => {
     const required = ["G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8"];
     const allPass = required.map((gateId) => ({

@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import {
@@ -29,6 +30,13 @@ import {
   TemporalWindowType,
   createPlayerDayTaskHandler,
   createClubMaintenanceTaskHandler,
+  aggregateBatchReport,
+  appendEvidence,
+  evaluatePromotionGateWithEvidence,
+  recordPromotion,
+  runCalibrationScenario,
+  validateCalibrationManifest,
+  type CalibrationManifest,
   type ClubCommand,
   type ClubCommandBase,
   type InfrastructureFinancingPort,
@@ -46,6 +54,7 @@ import { Command, CommanderError } from "commander";
 import { z } from "zod";
 
 import { JsonWorldRepository } from "./json-world-repository.js";
+import { ValidationArtifactStore } from "./validation-artifact-store.js";
 
 export interface CliIo {
   readonly stdout: (value: string) => void;
@@ -55,7 +64,64 @@ export interface CliIo {
 export interface RunCliOptions {
   readonly cwd?: string;
   readonly dataDirectory?: string;
+  readonly validationDirectory?: string;
   readonly io?: CliIo;
+}
+
+const calibrationBandSchema = z.object({
+  bandId: z.string().min(1),
+  metric: z.string().min(1),
+  lo: z.number(),
+  hi: z.number(),
+  oracleVersion: z.string().min(1).optional(),
+});
+
+const calibrationManifestSchema = z.object({
+  manifestHash: z.string().min(1),
+  rulesetVersion: z.string().min(1),
+  timestepChances: z.number().int().positive(),
+  expectedRuns: z.number().int().nonnegative(),
+  scenarios: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        seed: z.string().min(1),
+        homeStrength: z.number(),
+        awayStrength: z.number(),
+      }),
+    )
+    .min(1),
+  bands: z.array(calibrationBandSchema),
+  invariants: z.object({ maxTotalGoalsPerMatch: z.number() }),
+  matchesPerScenario: z.number().int().positive().optional(),
+});
+
+function parseShard(
+  value: unknown,
+): Result<{ index: number; total: number } | undefined, DomainError> {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value !== "string") {
+    return {
+      ok: false,
+      error: invalidArguments("shard deve ter o formato i/n (ex.: 0/4)."),
+    };
+  }
+  const match = /^(\d+)\/(\d+)$/.exec(value);
+  if (!match) {
+    return {
+      ok: false,
+      error: invalidArguments("shard deve ter o formato i/n (ex.: 0/4)."),
+    };
+  }
+  const index = Number.parseInt(match[1]!, 10);
+  const total = Number.parseInt(match[2]!, 10);
+  if (total < 1 || index < 0 || index >= total) {
+    return {
+      ok: false,
+      error: invalidArguments("shard fora do intervalo (0 ≤ i < n)."),
+    };
+  }
+  return { ok: true, value: { index, total } };
 }
 
 const defaultIo: CliIo = {
@@ -73,6 +139,11 @@ export async function runCli(
     process.env.GRINTA_SIMULATOR_DATA_DIR ??
     resolve(options.cwd ?? process.cwd(), ".grinta/simulator/worlds");
   const repository = new JsonWorldRepository(dataDirectory);
+  const validationDirectory =
+    options.validationDirectory ??
+    process.env.GRINTA_SIMULATOR_VALIDATION_DIR ??
+    resolve(options.cwd ?? process.cwd(), ".grinta/simulator/validation");
+  const validationStore = new ValidationArtifactStore(validationDirectory);
   const program = new Command();
   let exitCode = 0;
 
@@ -1151,6 +1222,210 @@ export async function runCli(
       );
     });
 
+  program
+    .command("validation:run")
+    .description(
+      "Roda um manifesto de calibração e persiste artefatos brutos (shard/resume)",
+    )
+    .requiredOption("--manifest <path>", "Caminho do manifesto JSON")
+    .option("--shard <i/n>", "Executa apenas o shard i de n (partição de seeds)")
+    .option("--resume", "Pula cenários com artefato já persistido")
+    .action(async (raw: Record<string, unknown>) => {
+      let manifest: CalibrationManifest;
+      try {
+        const parsed: unknown = JSON.parse(
+          await readFile(resolve(String(raw.manifest)), "utf8"),
+        );
+        const validated = calibrationManifestSchema.safeParse(parsed);
+        if (!validated.success) {
+          exitCode = writeError(
+            io,
+            new DomainError("MANIFEST_INVALID", validated.error.message),
+          );
+          return;
+        }
+        manifest = validated.data as CalibrationManifest;
+      } catch (error) {
+        exitCode = writeError(
+          io,
+          new DomainError("MANIFEST_INVALID", "Manifesto ilegível.", {
+            cause: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        return;
+      }
+      const structural = validateCalibrationManifest(manifest);
+      if (structural) {
+        exitCode = writeError(io, structural);
+        return;
+      }
+      const shard = parseShard(raw.shard);
+      if (!shard.ok) {
+        exitCode = writeError(io, shard.error);
+        return;
+      }
+      const batchId = manifest.manifestHash;
+      await validationStore.writeManifest(batchId, manifest);
+
+      const selected = manifest.scenarios.filter(
+        (_, index) =>
+          shard.value === undefined ||
+          index % shard.value.total === shard.value.index,
+      );
+      let executed = 0;
+      let skipped = 0;
+      for (const scenario of selected) {
+        if (
+          raw.resume === true &&
+          (await validationStore.hasScenario(batchId, scenario.id))
+        ) {
+          skipped += 1;
+          continue;
+        }
+        const run = runCalibrationScenario(manifest, scenario);
+        await validationStore.writeScenario(batchId, run);
+        executed += 1;
+      }
+      exitCode = writeResultValue(io, {
+        batchId,
+        rulesetVersion: manifest.rulesetVersion,
+        shard: raw.shard ?? "1/1",
+        scenariosSelected: selected.length,
+        scenariosExecuted: executed,
+        scenariosSkipped: skipped,
+        expectedRuns: manifest.expectedRuns,
+      });
+    });
+
+  program
+    .command("validation:report")
+    .description("Agrega artefatos persistidos num relatório reproduzível")
+    .requiredOption("--batch-id <id>")
+    .action(async (raw: Record<string, unknown>) => {
+      const batchId = String(raw.batchId);
+      const manifest = await validationStore.readManifest(batchId);
+      if (!manifest) {
+        exitCode = writeError(
+          io,
+          new DomainError("MANIFEST_INVALID", "Lote sem manifesto.", {
+            batchId,
+          }),
+        );
+        return;
+      }
+      const runs = await validationStore.listScenarios(batchId);
+      const present = new Set(runs.map((run) => run.scenarioId));
+      const missing = manifest.scenarios
+        .map((scenario) => scenario.id)
+        .filter((id) => !present.has(id));
+      if (missing.length > 0) {
+        exitCode = writeError(
+          io,
+          new DomainError(
+            "GATE_INCOMPLETE",
+            "Runs ausentes reprovam o relatório (FR-004).",
+            { missing },
+          ),
+        );
+        return;
+      }
+      const report = aggregateBatchReport(manifest, runs);
+      await validationStore.writeReport(batchId, report);
+      // Evidência efetiva anexada de forma append-only quando o gate passa.
+      if (report.gateResult === "PASS") {
+        const ledger = appendEvidence(await validationStore.readEvidence(), {
+          rulesetVersion: report.rulesetVersion,
+          reportHash: report.reportHash,
+        });
+        await validationStore.writeEvidence(ledger);
+      }
+      exitCode = writeResultValue(io, report);
+    });
+
+  program
+    .command("validation:gate")
+    .description(
+      "Avalia G1–G8 conjuntivo com evidência versionada (staleness = FAIL)",
+    )
+    .requiredOption("--candidate <id>")
+    .requiredOption("--gate-file <path>", "Spec JSON de gates/evidências")
+    .action(async (raw: Record<string, unknown>) => {
+      const spec = await validationStore.readGateSpec(String(raw.gateFile));
+      if (!spec) {
+        exitCode = writeError(
+          io,
+          new DomainError("GATE_INCOMPLETE", "Gate-file ausente ou ilegível."),
+        );
+        return;
+      }
+      const ledger = await validationStore.readEvidence();
+      const decision = evaluatePromotionGateWithEvidence({
+        candidate: String(raw.candidate),
+        currentRulesetVersion: spec.currentRulesetVersion,
+        requiredGateIds: spec.requiredGateIds,
+        gates: spec.gates,
+        ledger,
+        ...(spec.reviewers ? { reviewers: spec.reviewers } : {}),
+      });
+      const log = recordPromotion(
+        await validationStore.readPromotionLog(),
+        decision,
+      );
+      await validationStore.writePromotionLog(log);
+      exitCode = writeResultValue(io, decision);
+    });
+
+  program
+    .command("validation:replay")
+    .description("Reexecuta um cenário e exige 100% de igualdade de hash (FR-007)")
+    .requiredOption("--batch-id <id>")
+    .requiredOption("--scenario <id>")
+    .action(async (raw: Record<string, unknown>) => {
+      const batchId = String(raw.batchId);
+      const manifest = await validationStore.readManifest(batchId);
+      const persisted = await validationStore.readScenario(
+        batchId,
+        String(raw.scenario),
+      );
+      if (!manifest || !persisted) {
+        exitCode = writeError(
+          io,
+          new DomainError("MANIFEST_INVALID", "Lote ou cenário inexistente.", {
+            batchId,
+            scenario: raw.scenario,
+          }),
+        );
+        return;
+      }
+      const scenario = manifest.scenarios.find(
+        (candidate) => candidate.id === persisted.scenarioId,
+      );
+      if (!scenario) {
+        exitCode = writeError(
+          io,
+          new DomainError("MANIFEST_INVALID", "Cenário fora do manifesto."),
+        );
+        return;
+      }
+      const replayed = runCalibrationScenario(manifest, scenario);
+      if (replayed.resultHash !== persisted.resultHash) {
+        exitCode = writeError(
+          io,
+          new DomainError("HASH_MISMATCH", "Replay divergiu do artefato.", {
+            expected: persisted.resultHash,
+            actual: replayed.resultHash,
+          }),
+        );
+        return;
+      }
+      exitCode = writeResultValue(io, {
+        batchId,
+        scenario: persisted.scenarioId,
+        resultHash: replayed.resultHash,
+        reproduced: true,
+      });
+    });
+
   try {
     await program.parseAsync(["node", "grinta-simulator", ...arguments_]);
   } catch (error: unknown) {
@@ -1301,6 +1576,11 @@ function writeResult<T>(io: CliIo, result: Result<T, DomainError>): number {
   return 0;
 }
 
+function writeResultValue(io: CliIo, value: unknown): number {
+  io.stdout(`${JSON.stringify({ ok: true, data: value }, null, 2)}\n`);
+  return 0;
+}
+
 function writeError(io: CliIo, error: DomainError): number {
   io.stderr(
     `${JSON.stringify({ ok: false, error: error.toJSON() }, null, 2)}\n`,
@@ -1310,6 +1590,18 @@ function writeError(io: CliIo, error: DomainError): number {
 
 function errorCode(code: string): number {
   if (code.startsWith("INVALID_")) return 2;
+  if (
+    code === "MANIFEST_INVALID" ||
+    code === "SEED_MISSING" ||
+    code === "RUN_DUPLICATE" ||
+    code === "HASH_MISMATCH" ||
+    code === "GATE_INCOMPLETE" ||
+    code === "EVIDENCE_STALE" ||
+    code === "INVARIANT_VIOLATED" ||
+    code === "BAND_OUTSIDE"
+  ) {
+    return 2;
+  }
   if (code === "WORLD_NOT_FOUND") return 3;
   if (
     code === "WORLD_NOT_ACTIVE" ||

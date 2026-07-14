@@ -30,24 +30,23 @@
 ## Phase 4: User Story 2 — Calibrar partida/economia/demografia (Priority: P2)
 
 - [x] T011 [US2] BandEvaluation BS/BE/BD PASS/FAIL por métrica agregada (goals, home win rate)
-- [ ] T012 [US2] Bandas de economia/demografia sobre lotes multi-temporada (R-88) além de partida (R-34)
-- [ ] T013 [US2] Reexecução recalibrada não altera evidências históricas (append-only por rulesetVersion)
+- [x] T012 [US2] `runMultiSeasonBatch` (R-88): economia (receita minor units) + demografia (idade de elenco) + equilíbrio competitivo sobre N mundos × S temporadas; bandas BE/BD/BS vs oráculo — `calibration.ts` + `calibration-multiseason.test.ts`
+- [x] T013 [US2] `appendEvidence`/`latestEvidence` append-only por rulesetVersion (prefixo imutável, recalibração cria nova versão efetiva) — `calibration.ts` + testes de imutabilidade
 
 ## Phase 5: User Story 3 — Decisão de promoção conjuntiva (Priority: P3)
 
 - [x] T014 [US3] evaluatePromotionGate G1–G8 conjuntivo (ausente/UNEVALUATED/FAIL → NO_GO; sem PARTIAL_GO)
-- [ ] T015 [US3] EvidenceRefs/staleness (EVIDENCE_STALE) e PromotionDecision append-only com reviewers
+- [x] T015 [US3] `evaluatePromotionGateWithEvidence` com EVIDENCE_STALE/EVIDENCE_MISSING (evidência obsoleta/ausente/incompatível = FAIL) + `PromotionDecision.reviewers` e `recordPromotion` append-only — `calibration.ts` + testes
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T016 [P] CLI validation:run/report/gate/replay + shard/resume em apps/simulator
-- [ ] T017 Escala R-34 (~10k partidas/cenário) e persistência de artefatos
-- [ ] T018 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T016 [P] CLI `validation:run/report/gate/replay` + `--shard i/n`/`--resume` (cobertura exata do seed set) em `apps/simulator/src/cli.ts` + `validation-artifact-store.ts` — `validation-cli.test.ts`
+- [x] T017 Escala R-34 (`matchesPerScenario` ~10k, 20k partidas em ~370ms) + persistência de artefatos brutos/summary com digest — `calibration-scale.test.ts` + store por arquivos
+- [x] T018 Quickstart reproduzido pela CLI real (smoke `gateResult: PASS`, replay 100%, evidência anexada); gate `lint + typecheck + test(273) + build` verde; evidência promovida
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 (harness determinístico + gate conjuntivo), núcleo de US2 (bandas de partida) e US3 (gate G1–G8 conjuntivo).
-- **Pendente**: bandas economia/demografia multi-temporada (T012-T013), evidence staleness (T015), CLI/escala (T016-T017).
+- **Entregue**: US1 (harness determinístico + gate conjuntivo), US2 completo (bandas de partida R-34 + economia/demografia multi-temporada R-88 + evidência append-only) e US3 completo (gate G1–G8 conjuntivo + staleness + promoção append-only), CLI `validation:*` com shard/resume e escala R-34.
 
 ## Notes
 

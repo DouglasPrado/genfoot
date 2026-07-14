@@ -1,7 +1,7 @@
 # Feature Specification: Simulação longa, calibração e promoção
 
 **Feature Branch**: `013-simulation-calibration`  
-**Created**: 2026-07-13 | **Status**: PLANNED  
+**Created**: 2026-07-13 | **Status**: DELIVERED  
 **Feature ID**: VAL-001 | **Milestone**: M1 | **Owner**: validação transversal, sem aggregate
 
 **Input**: Executar lotes R-34/R-88, horizontes longos, bandas BS/BE/BD, invariantes e gate G1–G8.
