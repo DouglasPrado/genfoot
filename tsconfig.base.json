@@ -17,7 +17,9 @@
     "paths": {
       "@grinta/core": ["packages/core/src/index.ts"],
       "@grinta/persistence": ["packages/persistence/src/index.ts"],
-      "@grinta/shared": ["packages/shared/src/index.ts"]
+      "@grinta/shared": ["packages/shared/src/index.ts"],
+      "@grinta/design-system": ["packages/design-system/src/index.ts"],
+      "@grinta/api-client": ["packages/api-client/src/index.ts"]
     }
   }
 }
