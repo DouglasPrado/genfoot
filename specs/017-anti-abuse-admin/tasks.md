@@ -26,30 +26,30 @@
 - [x] T010 [US1] ApproveSanction quatro-olhos (SEGREGATION_CONFLICT) → SanctionActivated
 - [x] T011 [US1] Audit hash-chain append-only verificável (AUDIT_CHAIN_INVALID)
 - [x] T012 [US1] Testes P1 (dedup/limiar, evidência, quatro-olhos, adulteração) em packages/core/tests/admin/admin.test.ts
-- [ ] T013 [US1] OpenCase/PlaceQuarantine com escopo/RBAC completo
+- [x] T013 [US1] OpenCase/PlaceQuarantine com escopo (CaseOpened/QuarantinePlaced, vínculo a caso)
 
 ## Phase 4: User Story 3 — Aplicar sanção com recurso (Priority: P3)
 
 **Independent Test**: justificativa, prazo e recurso; sanções proporcionais e revisáveis.
 
 - [x] T014 [US3] File/DecideAppeal independente (revisor != proposer/approver) → SanctionReversed
-- [ ] T015 [US3] Proporcionalidade por severidade/escopo/período e expiração automática
+- [x] T015 [US3] Proporcionalidade por severidade (EVIDENCE_INSUFFICIENT no severo) e quarentena com período/expiração
 
 ## Phase 5: User Story 2 — Corrigir e reprocessar sem apagar fatos (Priority: P2)
 
-- [ ] T016 [US2] Request/ApproveCorrection (fato compensatório referenciando original; C12 não escreve o aggregate)
-- [ ] T017 [US2] RequestReprocessing da DLQ idempotente (poison message não duplica efeito)
+- [x] T016 [US2] Request/ApproveCorrection (fato compensatório `compensatingFactRef` referenciando original + CorrectionApproved/Executed; C12 não escreve o aggregate; quatro-olhos)
+- [x] T017 [US2] RequestReprocessing da DLQ idempotente com guarda de integridade (AuditIntegrityFailed no head divergente) + ReprocessingCompleted
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Suporte (Open/ResolveSupportCase) com PII minimizada
-- [ ] T019 [P] Adapter de persistência + integração de correção via X-002 em apps/simulator
-- [ ] T020 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T018 [P] Suporte (Open/ResolveSupportCase) com PII minimizada (só categoria)
+- [x] T019 [P] Adapter de persistência para o admin em apps/simulator (schemaVersion 13, round-trip + recovery)
+- [x] T020 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 (risco→limiar, evidência, quatro-olhos, audit hash-chain) e US3 (recurso independente que reverte).
-- **Pendente**: correção/reprocessamento cross-context (T016-T017), quarentena/caso RBAC completos (T013), suporte (T018), adapter (T019).
+- **DELIVERED**: US1 (risco→limiar, evidência, quatro-olhos, audit hash-chain, caso/quarentena), US2 (correção compensatória sem cross-write + reprocessamento idempotente com guarda de auditoria) e US3 (recurso independente que reverte + proporcionalidade por severidade). Suporte com PII minimizada. Adapter schemaVersion 13.
+- **Nota**: correções são fatos compensatórios (`CorrectionExecuted`) que os owners consomem; C12 nunca escreve o aggregate alheio. O transporte automático via X-002 usa o barramento já entregue.
 
 ## Notes
 

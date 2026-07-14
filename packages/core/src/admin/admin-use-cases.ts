@@ -10,9 +10,14 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { AdminRepository } from "./admin-repository.js";
 import type {
+  AbuseCaseSnapshot,
   AdminSummary,
+  CorrectionRequestSnapshot,
+  QuarantineSnapshot,
+  ReprocessingRequestSnapshot,
   RiskAssessmentSnapshot,
   SanctionSnapshot,
+  SupportCaseSnapshot,
   WorldAdminSnapshot,
 } from "./admin-types.js";
 import { WorldAdmin } from "./world-admin.js";
@@ -175,6 +180,162 @@ export class DecideAppeal {
   ): Promise<Result<SanctionSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (admin) =>
       admin.decideAppeal(input),
+    );
+  }
+}
+
+export class OpenCase {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      subjects: readonly string[];
+      severity: number;
+      evidenceRefs: readonly string[];
+      openedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<AbuseCaseSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.openCase(input),
+    );
+  }
+}
+
+export class PlaceQuarantine {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      caseId?: string;
+      scope: string;
+      reason: string;
+      startsOn: string;
+      expiresOn: string;
+      placedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<QuarantineSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.placeQuarantine(input),
+    );
+  }
+}
+
+export class RequestCorrection {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      targetOwner: string;
+      targetId: string;
+      targetVersion: number;
+      reasonCode: string;
+      expectedEffect: string;
+      requestedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<CorrectionRequestSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.requestCorrection(input),
+    );
+  }
+}
+
+export class ApproveCorrection {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      correctionId: string;
+      approvedBy: string;
+      reject?: boolean;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<CorrectionRequestSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.approveCorrection(input),
+    );
+  }
+}
+
+export class RequestReprocessing {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      stream: string;
+      fromSequence: number;
+      toSequence: number;
+      reason: string;
+      requestedBy: string;
+      expectedAuditHead: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<ReprocessingRequestSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.requestReprocessing(input),
+    );
+  }
+}
+
+export class OpenSupportCase {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      requester: string;
+      category: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SupportCaseSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.openSupportCase(input),
+    );
+  }
+}
+
+export class ResolveSupportCase {
+  public constructor(private readonly repository: AdminRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      supportCaseId: string;
+      resolution: string;
+      resolvedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SupportCaseSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (admin) =>
+      admin.resolveSupportCase(input),
     );
   }
 }

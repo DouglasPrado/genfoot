@@ -273,4 +273,190 @@ describe("Anti-abuse and admin", () => {
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.sanctions).toHaveLength(1);
   });
+
+  it("abre caso e coloca quarentena com escopo", () => {
+    const ctx = admin();
+    const abuseCase = ctx.value.openCase({
+      subjects: [SUBJECT],
+      severity: 75,
+      evidenceRefs: ["ev:1"],
+      openedBy: "mod:A",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "case:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-05",
+    });
+    expect(abuseCase).toMatchObject({ ok: true, value: { status: "OPEN" } });
+    if (!abuseCase.ok) throw abuseCase.error;
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "CaseOpened"),
+    ).toHaveLength(1);
+
+    const quarantine = ctx.value.placeQuarantine({
+      caseId: abuseCase.value.id,
+      scope: SUBJECT,
+      reason: "collusion",
+      startsOn: "2026-02-05",
+      expiresOn: "2026-02-12",
+      placedBy: "mod:A",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "quar:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-05",
+    });
+    expect(quarantine).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "QuarantinePlaced"),
+    ).toHaveLength(1);
+    // quarentena com caso inexistente é rejeitada
+    expect(
+      ctx.value.placeQuarantine({
+        caseId: newGameWorldId(),
+        scope: SUBJECT,
+        reason: "x",
+        startsOn: "2026-02-05",
+        expiresOn: "2026-02-12",
+        placedBy: "mod:A",
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "quar:bad",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-02-05",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "CASE_NOT_FOUND" } });
+  });
+
+  it("solicita e aprova correção compensatória com quatro-olhos", () => {
+    const ctx = admin();
+    const correction = ctx.value.requestCorrection({
+      targetOwner: "C9",
+      targetId: "ledger-tx:9",
+      targetVersion: 3,
+      reasonCode: "DOUBLE_POST",
+      expectedEffect: "reverse-entry",
+      requestedBy: "mod:A",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "corr:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-05",
+    });
+    expect(correction).toMatchObject({ ok: true, value: { status: "REQUESTED" } });
+    if (!correction.ok) throw correction.error;
+
+    // o mesmo autor não aprova (segregação)
+    expect(
+      ctx.value.approveCorrection({
+        correctionId: correction.value.id,
+        approvedBy: "mod:A",
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "corr:1:self",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-02-06",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SEGREGATION_CONFLICT" } });
+
+    const approved = ctx.value.approveCorrection({
+      correctionId: correction.value.id,
+      approvedBy: "mod:B",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "corr:1:approve",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-06",
+    });
+    expect(approved).toMatchObject({ ok: true, value: { status: "EXECUTED" } });
+    expect(approved.ok && approved.value.compensatingFactRef).not.toBeNull();
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "CorrectionApproved"),
+    ).toHaveLength(1);
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "CorrectionExecuted"),
+    ).toHaveLength(1);
+  });
+
+  it("reprocessa a DLQ com guarda de integridade de auditoria e idempotência", () => {
+    const ctx = admin();
+    // registra um sinal para ter uma cadeia de auditoria não vazia
+    const first = signal(ctx, "d1", 10);
+    if (!first.ok) throw first.error;
+    const head = ctx.value.auditHead();
+
+    // head divergente → AuditIntegrityFailed + aborta
+    expect(
+      ctx.value.requestReprocessing({
+        stream: "ledger",
+        fromSequence: 1,
+        toSequence: 5,
+        reason: "poison-message",
+        requestedBy: "ops:A",
+        expectedAuditHead: "WRONG",
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "rep:bad",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-02-06",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "AUDIT_CHAIN_INVALID" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "AuditIntegrityFailed"),
+    ).toHaveLength(1);
+
+    const reprocessed = ctx.value.requestReprocessing({
+      stream: "ledger",
+      fromSequence: 1,
+      toSequence: 5,
+      reason: "poison-message",
+      requestedBy: "ops:A",
+      expectedAuditHead: head,
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "rep:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-06",
+    });
+    expect(reprocessed).toMatchObject({ ok: true, value: { status: "COMPLETED" } });
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "ReprocessingCompleted"),
+    ).toHaveLength(1);
+
+    // retry idempotente (poison message não duplica)
+    const revision = ctx.value.snapshot().revision;
+    const retry = ctx.value.requestReprocessing({
+      stream: "ledger",
+      fromSequence: 1,
+      toSequence: 5,
+      reason: "poison-message",
+      requestedBy: "ops:A",
+      expectedAuditHead: ctx.value.auditHead(),
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "rep:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-06",
+    });
+    expect(retry).toMatchObject({ ok: true });
+    expect(ctx.value.snapshot().revision).toBe(revision);
+  });
+
+  it("abre e resolve caso de suporte com PII minimizada", () => {
+    const ctx = admin();
+    const supportCase = ctx.value.openSupportCase({
+      requester: "account:z",
+      category: "PAYMENT",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "sup:1",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-05",
+    });
+    expect(supportCase).toMatchObject({ ok: true, value: { status: "OPEN" } });
+    if (!supportCase.ok) throw supportCase.error;
+
+    const resolved = ctx.value.resolveSupportCase({
+      supportCaseId: supportCase.value.id,
+      resolution: "refunded",
+      resolvedBy: "support:A",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "sup:1:resolve",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-02-06",
+    });
+    expect(resolved).toMatchObject({ ok: true, value: { status: "RESOLVED" } });
+    // audit chain permanece íntegra após todo o fluxo
+    expect(ctx.value.verifyAuditChain()).toBe(true);
+  });
 });

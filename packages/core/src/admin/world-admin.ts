@@ -12,16 +12,32 @@ import { stableHash } from "../matches/match-kernel.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
   AppealStatus,
+  CaseStatus,
+  CorrectionStatus,
+  QuarantineStatus,
+  ReprocessingStatus,
   SanctionStatus,
+  SupportStatus,
+  type AbuseCaseSnapshot,
   type AdminDomainEvent,
   type AdminSummary,
   type AuditEventSnapshot,
+  type AuditIntegrityFailedEvent,
+  type CaseOpenedEvent,
+  type CorrectionApprovedEvent,
+  type CorrectionExecutedEvent,
+  type CorrectionRequestSnapshot,
+  type QuarantinePlacedEvent,
+  type QuarantineSnapshot,
+  type ReprocessingCompletedEvent,
+  type ReprocessingRequestSnapshot,
   type RiskAssessmentSnapshot,
   type RiskSignalSnapshot,
   type RiskThresholdReachedEvent,
   type SanctionActivatedEvent,
   type SanctionReversedEvent,
   type SanctionSnapshot,
+  type SupportCaseSnapshot,
   type WorldAdminSnapshot,
 } from "./admin-types.js";
 
@@ -396,6 +412,518 @@ export class WorldAdmin {
     return succeed(decided);
   }
 
+  public openCase(
+    input: Readonly<{
+      subjects: readonly string[];
+      severity: number;
+      evidenceRefs: readonly string[];
+      openedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<AbuseCaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const cases = this.state.cases ?? [];
+    const existing = cases.find(
+      (abuseCase) => abuseCase.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (
+      input.subjects.length === 0 ||
+      input.openedBy.trim() === "" ||
+      !clampable(input.severity)
+    ) {
+      return fail(new DomainError("INVALID_CASE", "Dados do caso inválidos."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const caseId = deterministicUuidV7<"AbuseCase">({
+      worldSeed: input.worldSeed,
+      context: `abuse-case:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const abuseCase: AbuseCaseSnapshot = {
+      id: caseId,
+      gameWorldId: this.state.gameWorldId,
+      subjects: [...input.subjects],
+      severity: input.severity,
+      status: CaseStatus.OPEN,
+      evidenceRefs: [...input.evidenceRefs],
+      openedBy: input.openedBy,
+      openedOn: date.value.toString(),
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: CaseOpenedEvent = {
+      id: this.eventId(input.worldSeed, `case-opened:${input.idempotencyKey}`, date.value.toString()),
+      type: "CaseOpened",
+      gameWorldId: this.state.gameWorldId,
+      caseId,
+      severity: input.severity,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      cases: [...cases, abuseCase],
+      auditChain: this.appendAudit(input.openedBy, "OPEN_CASE", caseId),
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(abuseCase);
+  }
+
+  public placeQuarantine(
+    input: Readonly<{
+      caseId?: string;
+      scope: string;
+      reason: string;
+      startsOn: string;
+      expiresOn: string;
+      placedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<QuarantineSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const quarantines = this.state.quarantines ?? [];
+    const existing = quarantines.find(
+      (quarantine) => quarantine.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (input.scope.trim() === "" || input.placedBy.trim() === "") {
+      return fail(new DomainError("INVALID_QUARANTINE", "Escopo/autor inválidos."));
+    }
+    if (
+      input.caseId !== undefined &&
+      !(this.state.cases ?? []).some(({ id }) => id === input.caseId)
+    ) {
+      return fail(
+        new DomainError("CASE_NOT_FOUND", "Caso vinculado não encontrado.", {
+          caseId: input.caseId,
+        }),
+      );
+    }
+    const startsOn = WorldDate.parse(input.startsOn);
+    if (!startsOn.ok) return startsOn;
+    const expiresOn = WorldDate.parse(input.expiresOn);
+    if (!expiresOn.ok) return expiresOn;
+    if (expiresOn.value.toString() < startsOn.value.toString()) {
+      return fail(new DomainError("INVALID_QUARANTINE", "Período inválido."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const quarantineId = deterministicUuidV7<"Quarantine">({
+      worldSeed: input.worldSeed,
+      context: `quarantine:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const quarantine: QuarantineSnapshot = {
+      id: quarantineId,
+      gameWorldId: this.state.gameWorldId,
+      caseId: (input.caseId as QuarantineSnapshot["caseId"]) ?? null,
+      scope: input.scope,
+      reason: input.reason,
+      status: QuarantineStatus.ACTIVE,
+      startsOn: startsOn.value.toString(),
+      expiresOn: expiresOn.value.toString(),
+      placedBy: input.placedBy,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: QuarantinePlacedEvent = {
+      id: this.eventId(input.worldSeed, `quarantine-placed:${input.idempotencyKey}`, date.value.toString()),
+      type: "QuarantinePlaced",
+      gameWorldId: this.state.gameWorldId,
+      quarantineId,
+      scope: input.scope,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      quarantines: [...quarantines, quarantine],
+      auditChain: this.appendAudit(input.placedBy, "PLACE_QUARANTINE", quarantineId),
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(quarantine);
+  }
+
+  public requestCorrection(
+    input: Readonly<{
+      targetOwner: string;
+      targetId: string;
+      targetVersion: number;
+      reasonCode: string;
+      expectedEffect: string;
+      requestedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<CorrectionRequestSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const corrections = this.state.corrections ?? [];
+    const existing = corrections.find(
+      (correction) => correction.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (
+      input.targetOwner.trim() === "" ||
+      input.targetId.trim() === "" ||
+      input.reasonCode.trim() === "" ||
+      input.requestedBy.trim() === "" ||
+      !Number.isSafeInteger(input.targetVersion) ||
+      input.targetVersion < 1
+    ) {
+      return fail(new DomainError("INVALID_CORRECTION", "Dados da correção inválidos."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const correctionId = deterministicUuidV7<"CorrectionRequest">({
+      worldSeed: input.worldSeed,
+      context: `correction:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const correction: CorrectionRequestSnapshot = {
+      id: correctionId,
+      gameWorldId: this.state.gameWorldId,
+      targetOwner: input.targetOwner,
+      targetId: input.targetId,
+      targetVersion: input.targetVersion,
+      reasonCode: input.reasonCode,
+      expectedEffect: input.expectedEffect,
+      requestedBy: input.requestedBy,
+      approvedBy: null,
+      status: CorrectionStatus.REQUESTED,
+      compensatingFactRef: null,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    this.state = {
+      ...this.state,
+      corrections: [...corrections, correction],
+      auditChain: this.appendAudit(input.requestedBy, "REQUEST_CORRECTION", correctionId),
+      revision: this.state.revision + 1,
+    };
+    return succeed(correction);
+  }
+
+  public approveCorrection(
+    input: Readonly<{
+      correctionId: string;
+      approvedBy: string;
+      reject?: boolean;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<CorrectionRequestSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const corrections = this.state.corrections ?? [];
+    const index = corrections.findIndex(({ id }) => id === input.correctionId);
+    if (index < 0) {
+      return fail(
+        new DomainError("CORRECTION_NOT_FOUND", "Correção não encontrada.", {
+          correctionId: input.correctionId,
+        }),
+      );
+    }
+    const correction = corrections[index]!;
+    if (
+      correction.status === CorrectionStatus.EXECUTED ||
+      correction.status === CorrectionStatus.REJECTED
+    ) {
+      return succeed(correction);
+    }
+    if (correction.status !== CorrectionStatus.REQUESTED) {
+      return fail(
+        new DomainError("CORRECTION_TERMINAL", "Correção não está pendente.", {
+          correctionId: correction.id,
+        }),
+      );
+    }
+    if (input.approvedBy.trim() === "" || input.approvedBy === correction.requestedBy) {
+      return fail(
+        new DomainError(
+          "SEGREGATION_CONFLICT",
+          "A aprovação da correção exige um segundo revisor.",
+          { correctionId: correction.id },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const corrections2 = [...corrections];
+    if (input.reject === true) {
+      const rejected: CorrectionRequestSnapshot = {
+        ...correction,
+        approvedBy: input.approvedBy,
+        status: CorrectionStatus.REJECTED,
+        version: correction.version + 1,
+      };
+      corrections2[index] = rejected;
+      this.state = {
+        ...this.state,
+        corrections: corrections2,
+        auditChain: this.appendAudit(input.approvedBy, "REJECT_CORRECTION", correction.id),
+        revision: this.state.revision + 1,
+      };
+      return succeed(rejected);
+    }
+    // Aprovação publica o fato compensatório (referência) para o owner aplicar.
+    const compensatingFactRef = stableHash(
+      `${correction.targetOwner}|${correction.targetId}|${correction.targetVersion}|${correction.reasonCode}`,
+    );
+    const executed: CorrectionRequestSnapshot = {
+      ...correction,
+      approvedBy: input.approvedBy,
+      status: CorrectionStatus.EXECUTED,
+      compensatingFactRef,
+      version: correction.version + 1,
+    };
+    corrections2[index] = executed;
+    const approvedEvent: CorrectionApprovedEvent = {
+      id: this.eventId(input.worldSeed, `correction-approved:${input.idempotencyKey}`, date.value.toString()),
+      type: "CorrectionApproved",
+      gameWorldId: this.state.gameWorldId,
+      correctionId: correction.id,
+      targetOwner: correction.targetOwner,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const executedEvent: CorrectionExecutedEvent = {
+      id: this.eventId(input.worldSeed, `correction-executed:${input.idempotencyKey}`, date.value.toString()),
+      type: "CorrectionExecuted",
+      gameWorldId: this.state.gameWorldId,
+      correctionId: correction.id,
+      targetOwner: correction.targetOwner,
+      compensatingFactRef,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      corrections: corrections2,
+      auditChain: this.appendAudit(input.approvedBy, "APPROVE_CORRECTION", correction.id),
+      events: [...this.state.events, approvedEvent, executedEvent],
+      revision: this.state.revision + 1,
+    };
+    return succeed(executed);
+  }
+
+  public requestReprocessing(
+    input: Readonly<{
+      stream: string;
+      fromSequence: number;
+      toSequence: number;
+      reason: string;
+      requestedBy: string;
+      expectedAuditHead: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<ReprocessingRequestSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const reprocessings = this.state.reprocessings ?? [];
+    const existing = reprocessings.find(
+      (request) => request.idempotencyKey === input.idempotencyKey,
+    );
+    // idempotência: poison message reprocessada não duplica efeito
+    if (existing !== undefined) return succeed(existing);
+    if (
+      input.stream.trim() === "" ||
+      !Number.isSafeInteger(input.fromSequence) ||
+      input.fromSequence < 1 ||
+      !Number.isSafeInteger(input.toSequence) ||
+      input.toSequence < input.fromSequence
+    ) {
+      return fail(new DomainError("INVALID_REPROCESSING", "Intervalo inválido."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    // guarda de integridade: o head de auditoria precisa bater antes de reprocessar
+    const actualHead = this.auditHead();
+    if (input.expectedAuditHead !== actualHead) {
+      const failure: AuditIntegrityFailedEvent = {
+        id: this.eventId(input.worldSeed, `audit-integrity-failed:${input.idempotencyKey}`, date.value.toString()),
+        type: "AuditIntegrityFailed",
+        gameWorldId: this.state.gameWorldId,
+        expectedHead: input.expectedAuditHead,
+        actualHead,
+        worldDate: date.value.toString(),
+        rulesetVersion: input.rulesetVersion,
+        idempotencyKey: input.idempotencyKey,
+      };
+      this.state = {
+        ...this.state,
+        events: [...this.state.events, failure],
+        revision: this.state.revision + 1,
+      };
+      return fail(
+        new DomainError(
+          "AUDIT_CHAIN_INVALID",
+          "O head da cadeia de auditoria não confere; reprocessamento abortado.",
+          { expectedHead: input.expectedAuditHead, actualHead },
+        ),
+      );
+    }
+    const reprocessingId = deterministicUuidV7<"ReprocessingRequest">({
+      worldSeed: input.worldSeed,
+      context: `reprocessing:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const request: ReprocessingRequestSnapshot = {
+      id: reprocessingId,
+      gameWorldId: this.state.gameWorldId,
+      stream: input.stream,
+      fromSequence: input.fromSequence,
+      toSequence: input.toSequence,
+      reason: input.reason,
+      status: ReprocessingStatus.COMPLETED,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: ReprocessingCompletedEvent = {
+      id: this.eventId(input.worldSeed, `reprocessing-completed:${input.idempotencyKey}`, date.value.toString()),
+      type: "ReprocessingCompleted",
+      gameWorldId: this.state.gameWorldId,
+      reprocessingId,
+      stream: input.stream,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      reprocessings: [...reprocessings, request],
+      auditChain: this.appendAudit(input.requestedBy, "REQUEST_REPROCESSING", reprocessingId),
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(request);
+  }
+
+  public openSupportCase(
+    input: Readonly<{
+      requester: string;
+      category: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<SupportCaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const supportCases = this.state.supportCases ?? [];
+    const existing = supportCases.find(
+      (supportCase) => supportCase.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (input.requester.trim() === "" || input.category.trim() === "") {
+      return fail(new DomainError("INVALID_SUPPORT_CASE", "Requester/category inválidos."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const supportId = deterministicUuidV7<"SupportCase">({
+      worldSeed: input.worldSeed,
+      context: `support-case:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    // PII minimizada: só a categoria é retida, nunca o conteúdo bruto.
+    const supportCase: SupportCaseSnapshot = {
+      id: supportId,
+      gameWorldId: this.state.gameWorldId,
+      requester: input.requester,
+      category: input.category,
+      status: SupportStatus.OPEN,
+      resolution: null,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    this.state = {
+      ...this.state,
+      supportCases: [...supportCases, supportCase],
+      auditChain: this.appendAudit(input.requester, "OPEN_SUPPORT_CASE", supportId),
+      revision: this.state.revision + 1,
+    };
+    return succeed(supportCase);
+  }
+
+  public resolveSupportCase(
+    input: Readonly<{
+      supportCaseId: string;
+      resolution: string;
+      resolvedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<SupportCaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const supportCases = this.state.supportCases ?? [];
+    const index = supportCases.findIndex(({ id }) => id === input.supportCaseId);
+    if (index < 0) {
+      return fail(
+        new DomainError("SUPPORT_CASE_NOT_FOUND", "Caso de suporte não encontrado.", {
+          supportCaseId: input.supportCaseId,
+        }),
+      );
+    }
+    const supportCase = supportCases[index]!;
+    if (supportCase.status === SupportStatus.RESOLVED) return succeed(supportCase);
+    if (input.resolution.trim() === "" || input.resolvedBy.trim() === "") {
+      return fail(new DomainError("INVALID_SUPPORT_CASE", "Resolução inválida."));
+    }
+    const resolved: SupportCaseSnapshot = {
+      ...supportCase,
+      status: SupportStatus.RESOLVED,
+      resolution: input.resolution,
+      version: supportCase.version + 1,
+    };
+    const next = [...supportCases];
+    next[index] = resolved;
+    this.state = {
+      ...this.state,
+      supportCases: next,
+      auditChain: this.appendAudit(input.resolvedBy, "RESOLVE_SUPPORT_CASE", supportCase.id),
+      revision: this.state.revision + 1,
+    };
+    return succeed(resolved);
+  }
+
+  public auditHead(): string {
+    return this.state.auditChain.at(-1)?.eventHash ?? "GENESIS";
+  }
+
   public verifyAuditChain(): boolean {
     return verifyChain(this.state.auditChain);
   }
@@ -422,6 +950,15 @@ export class WorldAdmin {
       flaggedSubjectCount: this.state.assessments.filter((a) => a.flagged).length,
       activeSanctionCount: this.state.sanctions.filter(
         ({ status }) => status === SanctionStatus.ACTIVE,
+      ).length,
+      openCaseCount: (this.state.cases ?? []).filter(
+        ({ status }) => status !== CaseStatus.CLOSED,
+      ).length,
+      activeQuarantineCount: (this.state.quarantines ?? []).filter(
+        ({ status }) => status === QuarantineStatus.ACTIVE,
+      ).length,
+      executedCorrectionCount: (this.state.corrections ?? []).filter(
+        ({ status }) => status === CorrectionStatus.EXECUTED,
       ).length,
       auditChainLength: this.state.auditChain.length,
     };

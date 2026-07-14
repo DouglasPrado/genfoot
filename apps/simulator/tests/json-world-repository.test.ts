@@ -5,10 +5,12 @@ import { join } from "node:path";
 import {
   AdvanceSagaStep,
   AdvanceTransferStep,
+  ApproveCorrection,
   CheckpointMatch,
   OpenLedgerAccount,
   PostTransaction,
   RecordOfficialResult,
+  WorldAdmin,
   WorldCompetitions,
   WorldEventing,
   WorldIdentity,
@@ -42,7 +44,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(12) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(13) });
 
 afterEach(async () => {
   await Promise.all(
@@ -89,7 +91,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(12);
+    expect(file.schemaVersion).toBe(13);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -669,6 +671,80 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "IDENTITY_REVISION_CONFLICT" });
   });
 
+  it("persiste o admin C12 com caso, correção e audit chain (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldAdmin.initialize(world);
+    if (!created.ok) throw created.error;
+    const admin = created.value;
+    const abuseCase = admin.openCase({
+      subjects: ["account:x"],
+      severity: 80,
+      evidenceRefs: ["ev:1"],
+      openedBy: "mod-a",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "case:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!abuseCase.ok) throw abuseCase.error;
+    admin.placeQuarantine({
+      caseId: abuseCase.value.id,
+      scope: "account:x",
+      reason: "abuse",
+      startsOn: "2026-01-05",
+      expiresOn: "2026-01-12",
+      placedBy: "mod-a",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "quar:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    const correction = admin.requestCorrection({
+      targetOwner: "C9",
+      targetId: "ledger-tx:9",
+      targetVersion: 3,
+      reasonCode: "DOUBLE_POST",
+      expectedEffect: "reverse-entry",
+      requestedBy: "mod-a",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "corr:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-06",
+    });
+    if (!correction.ok) throw correction.error;
+
+    await store.value.saveAdmin(admin.snapshot(), null);
+    // round-trip: cases, quarantines, corrections, auditChain e events preservados
+    expect(await store.value.findAdminByWorldId(world.id)).toEqual(
+      admin.snapshot(),
+    );
+
+    // recovery: aprovar a correção após restart (quatro-olhos) = efeito único no retry
+    const restarted = new JsonWorldRepository(store.directory);
+    const approve = new ApproveCorrection(restarted);
+    const approveInput = {
+      correctionId: correction.value.id,
+      approvedBy: "mod-b",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "corr:1:approve",
+      worldSeed: world.seed,
+      worldDate: "2026-01-07",
+    };
+    const first = await approve.execute(world.id, approveInput);
+    const retry = await approve.execute(world.id, approveInput);
+    expect(first).toMatchObject({ ok: true, value: { status: "EXECUTED" } });
+    expect(retry).toEqual(first);
+    const reloaded = await restarted.findAdminByWorldId(world.id);
+    expect(
+      reloaded!.corrections!.filter((c) => c.status === "EXECUTED"),
+    ).toHaveLength(1);
+    await expect(
+      store.value.saveAdmin(admin.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "ADMIN_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -704,7 +780,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(12);
+    expect(migrated.schemaVersion).toBe(13);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {
