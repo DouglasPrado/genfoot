@@ -20,6 +20,7 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
   beforeAll(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apihp-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
+    process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

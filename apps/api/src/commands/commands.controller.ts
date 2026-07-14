@@ -1,9 +1,19 @@
 import { randomUUID } from "node:crypto";
 
-import { Body, Controller, Get, Inject, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Inject,
+  Post,
+  Req,
+} from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { JsonWorldRepository } from "@grinta/persistence";
+import type { Request } from "express";
 
+import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { registeredQueryTypes } from "../queries/query-registry.js";
 
 import { ApiException } from "../common/standard-error.js";
@@ -72,7 +82,10 @@ export class CommandsController {
     },
   })
   @Post()
-  async submit(@Body() body: unknown): Promise<CommandResponse> {
+  async submit(
+    @Body() body: unknown,
+    @Req() request: Request & AuthenticatedRequest,
+  ): Promise<CommandResponse> {
     const parsed = commandEnvelopeSchema.safeParse(body);
     if (!parsed.success) {
       throw new ApiException({
@@ -102,6 +115,27 @@ export class CommandsController {
         correlationId: envelope.correlationId,
         resource: replay.resource ?? null,
       };
+    }
+
+    // RBAC: comandos de administração exigem papel admin (SoD — FR-012).
+    if (
+      envelope.commandType.startsWith("admin:") &&
+      request.session?.role !== "admin"
+    ) {
+      throw new ApiException(
+        {
+          code: "FORBIDDEN",
+          messageKey: "error.auth.adminRequired",
+          correlationId: envelope.correlationId,
+          retryable: false,
+          fieldErrors: [
+            { field: "commandType", messageKey: envelope.commandType },
+          ],
+          blockingReason: "FORBIDDEN",
+          recoveryAction: null,
+        },
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const handler = resolveCommandHandler(envelope.commandType);

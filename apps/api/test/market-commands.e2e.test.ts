@@ -30,6 +30,7 @@ describe("API market commands (e2e)", () => {
   beforeAll(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apim-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
+    process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

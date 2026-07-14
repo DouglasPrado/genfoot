@@ -24,7 +24,9 @@ export function configureSwagger(app: INestApplication): void {
         "commands, queries e realtime versionados. Domínio em @grinta/core.",
     )
     .setVersion("v1")
+    .addBearerAuth()
     .addTag("health", "Saúde e versão de contrato")
+    .addTag("auth", "Emissão de sessão (Bearer token)")
     .addTag("commands", "Command endpoint (envelope idempotente)")
     .addTag("queries", "Queries versionadas (envelope asOf/projectionVersion)")
     .build();

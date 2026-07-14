@@ -7,6 +7,7 @@ export const API_INFO = "API_INFO";
 export const WORLD_REPOSITORY = "WORLD_REPOSITORY";
 export const IDEMPOTENCY_STORE = "IDEMPOTENCY_STORE";
 export const REALTIME_PUBLISHER = "REALTIME_PUBLISHER";
+export const SESSION_STORE = "SESSION_STORE";
 
 export interface ApiInfo {
   readonly contractVersion: string;
