@@ -1,7 +1,7 @@
 # Feature Specification: Partida e runtime
 
 **Feature ID**: BC-008 · **Directory**: `specs/008-match-runtime` · **Created**: 2026-07-13  
-**Status**: PLANNED · **Milestone**: M1 · **Owner**: C8 · Partida/Runtime
+**Status**: DELIVERED · **Milestone**: M1 · **Owner**: C8 · Partida/Runtime
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre

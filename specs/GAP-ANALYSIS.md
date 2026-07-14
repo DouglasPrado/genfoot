@@ -12,7 +12,7 @@
 | 005 player/dev | 3/8 | 4/6 | GeneratePlayer, ApplyDailyDevelopment, SetTrainingDirection, GenerateYouthCohort, PromoteYouth |
 | 006 staff | 5/5 | 4/4 | superfície ok; faltam queries/adapter/US2 integração C3 |
 | 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
-| 008 match | 4/8 | 3/5 | SubmitMatchCommand, AdvanceMatchTicks, CheckpointMatch, ResumeMatch (US2 ao vivo) |
+| 008 match ✅ **DELIVERED** | 8/8 | 5/5 | — (US2 ao vivo: command log/ticks/checkpoint/resume + adapter; commit `f14fa55`) |
 | 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
 | 010 eventing/sagas | 3/9 | 2/6 | StartSaga, ClaimSaga, AdvanceSagaStep, CompensateSaga, RebuildProjection, ResumeRealtimeStream |
 | 011 market | ~8/16 | 5/12 | toda a SAGA de transferência (Start/Advance/Compensate) + empréstimos + PublishListing + CancelNegotiation |
@@ -27,9 +27,9 @@
 ## Buracos grandes por tema
 
 1. **Sagas cross-context (X-002 + C6 + C1):** `StartSaga/Claim/AdvanceStep/Compensate` não existem → transferência (SAGA-01) e onboarding (SAGA-03) **não rodam de ponta a ponta**.
-2. **Partida ao vivo (C8 US2):** só `finalize`. Faltam ticks, command log, checkpoints, resume.
-3. **Competição (C7 US2):** resultado oficial → standings → homologação (o miolo da liga).
-4. **Ledger (C9):** dívida e fechamento de período.
+2. ~~**Partida ao vivo (C8 US2):**~~ ✅ entregue — command log/ticks/checkpoint/resume + adapter (commit `f14fa55`).
+3. ~~**Competição (C7 US2):**~~ ✅ entregue — resultado oficial → standings → homologação.
+4. ~~**Ledger (C9):**~~ ✅ entregue — dívida e fechamento de período.
 5. **Identidade (C1):** conta/registro/sessão de verdade.
 6. **Admin (C12):** caso/quarentena/correção/reprocessamento/suporte.
 7. **Plataforma/Clientes:** só kernels de lógica; sem telemetria/IaC/apps.
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-`C9 ledger` → `C7 standings/homologação` → `C8 partida ao vivo` → `X-002 saga runner` (aí os golden paths viram jornadas reais) → C6 transferência/empréstimo → C1 conta/sessão → C12/C10/C11 → adapters → apps.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → **`X-002 saga runner`** (aí os golden paths viram jornadas reais) → C6 transferência/empréstimo → C1 conta/sessão → C12/C10/C11 → adapters → apps.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).
