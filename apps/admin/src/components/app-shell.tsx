@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Grinta<span className="text-primary">.</span>Control
           </span>
         </div>
-        <nav className="flex-1 p-2">
+        <nav className="flex-1 p-2" aria-label="Navegação principal">
           {NAV.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -44,7 +44,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`mb-1 flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors ${
+                aria-current={active ? "page" : undefined}
+                className={`mb-1 flex items-center gap-3 rounded-sm px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   active
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"

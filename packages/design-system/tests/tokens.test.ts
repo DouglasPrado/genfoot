@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   color,
+  commandRisk,
+  requiresConfirmation,
   riskColor,
   riskLevel,
   commandStatusColor,
@@ -36,5 +38,18 @@ describe("design-system tokens", () => {
     expect(commandStatusColor("APPLIED")).toBe(color.success);
     expect(commandStatusColor("REJECTED")).toBe(color.danger);
     expect(commandStatusColor("UNKNOWN_RECOVERING")).toBe(color.warning);
+  });
+
+  it("classifica risco de command e exige confirmação (T017)", () => {
+    expect(commandRisk("competition:homologate")).toBe("irreversible");
+    expect(commandRisk("admin:place-quarantine")).toBe("irreversible");
+    expect(commandRisk("admin:record-risk")).toBe("high");
+    expect(commandRisk("ledger:post-transaction")).toBe("high");
+    expect(commandRisk("world:advance-days")).toBe("medium");
+    expect(commandRisk("club:command")).toBe("low");
+
+    expect(requiresConfirmation("competition:homologate")).toBe(true);
+    expect(requiresConfirmation("admin:record-risk")).toBe(true);
+    expect(requiresConfirmation("world:advance-days")).toBe(false);
   });
 });

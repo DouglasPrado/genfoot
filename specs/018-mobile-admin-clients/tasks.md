@@ -35,12 +35,12 @@
 
 ## Phase 5: User Story 3 — Operar o mundo com segurança no admin (Priority: P3)
 
-- [ ] T016 [US3] Admin Next.js com RBAC, reautenticação e quatro-olhos (reusa C12)
-- [ ] T017 [US3] Confirmação por risco e acessibilidade (AccessibilityProfile não muda regra)
+- [x] T016 [US3] Admin Next.js (`apps/admin`) com RBAC (guard global + admin:* → 403; não-admin bloqueado de /anti-abuso), **reautenticação** (step-up: reemite token admin com a chave antes de admin:*) e **quatro-olhos** (painel SoD propor→aprovar; backend recusa o mesmo ator) — reusa C12
+- [x] T017 [US3] Confirmação **proporcional ao risco** (`commandRisk`/`requiresConfirmation` no design-system + ConfirmDialog p/ high/irreversible) e **acessibilidade** (aria-current/aria-label na nav, focus rings, sr-only, prefers-reduced-motion); AccessibilityProfile não muda regra
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Cache de query com scope/version imutável
+- [x] T018 [P] Cache de query com scope/version imutável (`QueryCache` em `@grinta/api-client`: segregado por scopeKey, monotônico por projectionVersion, `clearScope` na troca) + testes
 - [ ] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
 
 ## Implementation Strategy

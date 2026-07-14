@@ -1,11 +1,24 @@
 "use client";
 
-import { GrintaApiError } from "@grinta/api-client";
-import { CornerDownLeft } from "lucide-react";
+import { GrintaApiError, type GrintaClient } from "@grinta/api-client";
+import {
+  commandRisk,
+  requiresConfirmation,
+  type CommandRisk,
+} from "@grinta/design-system";
+import { CornerDownLeft, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useSession } from "@/lib/session";
 
 interface LogLine {
@@ -19,10 +32,17 @@ function newKey(): string {
   return `con-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const RISK_TONE: Record<CommandRisk, "neutral" | "warn" | "danger"> = {
+  low: "neutral",
+  medium: "neutral",
+  high: "warn",
+  irreversible: "danger",
+};
+
 /**
- * Console de commands: terminal do operador. Digita commandType + payload JSON,
- * dispara pela API (idempotente) e registra ACCEPTED/REJECTED/erro no log mono.
- * Cliente não-autoritativo — a verdade fica no servidor.
+ * Console de commands: terminal do operador. Comandos de alto risco/irreversíveis
+ * exigem confirmação proporcional (T017); comandos admin:* exigem reautenticação
+ * (step-up com a chave, T016). Cliente não-autoritativo — a verdade fica no servidor.
  */
 export function CommandConsole({
   worldId,
@@ -31,12 +51,15 @@ export function CommandConsole({
   worldId: string;
   commandTypes: readonly string[];
 }) {
-  const { api } = useSession();
+  const { api, session, stepUp } = useSession();
   const [commandType, setCommandType] = useState("world:advance-days");
   const [payload, setPayload] = useState('{ "days": 1 }');
   const [expectedVersion, setExpectedVersion] = useState("");
   const [log, setLog] = useState<LogLine[]>([]);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reauthKey, setReauthKey] = useState("");
+  const [reauthError, setReauthError] = useState<string | null>(null);
   const counter = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -49,27 +72,31 @@ export function CommandConsole({
     setLog((l) => [...l, { id: counter.current, command, ok, text }]);
   }
 
-  async function run() {
-    setBusy(true);
-    let parsedPayload: Record<string, unknown> = {};
+  function parsePayload(): Record<string, unknown> | null {
     try {
-      parsedPayload = payload.trim()
+      return payload.trim()
         ? (JSON.parse(payload) as Record<string, unknown>)
         : {};
     } catch {
+      return null;
+    }
+  }
+
+  async function execute(client: GrintaClient) {
+    setBusy(true);
+    const parsed = parsePayload();
+    if (parsed === null) {
       append(commandType, false, "payload JSON inválido");
       setBusy(false);
       return;
     }
     try {
-      const response = await api.command({
+      const response = await client.command({
         commandType,
         worldId,
-        payload: parsedPayload,
+        payload: parsed,
         idempotencyKey: newKey(),
-        ...(expectedVersion
-          ? { expectedVersion: Number(expectedVersion) }
-          : {}),
+        ...(expectedVersion ? { expectedVersion: Number(expectedVersion) } : {}),
       });
       append(
         commandType,
@@ -88,6 +115,47 @@ export function CommandConsole({
       setBusy(false);
     }
   }
+
+  function run() {
+    if (parsePayload() === null) {
+      append(commandType, false, "payload JSON inválido");
+      return;
+    }
+    if (requiresConfirmation(commandType)) {
+      setReauthKey("");
+      setReauthError(null);
+      setConfirmOpen(true);
+      return;
+    }
+    void execute(api);
+  }
+
+  const needsReauth =
+    commandType.startsWith("admin:") && session?.role === "admin";
+
+  async function confirmAndRun() {
+    if (needsReauth) {
+      if (!reauthKey) {
+        setReauthError("Digite a chave admin para reautenticar.");
+        return;
+      }
+      try {
+        const stepped = await stepUp(reauthKey);
+        setConfirmOpen(false);
+        await execute(stepped);
+        return;
+      } catch (err) {
+        setReauthError(
+          err instanceof GrintaApiError ? err.standard.code : "reauth falhou",
+        );
+        return;
+      }
+    }
+    setConfirmOpen(false);
+    await execute(api);
+  }
+
+  const risk = commandRisk(commandType);
 
   return (
     <div className="flex h-full flex-col">
@@ -116,13 +184,19 @@ export function CommandConsole({
       </div>
 
       <div className="mt-3 space-y-2">
-        <Input
-          list="command-types"
-          value={commandType}
-          onChange={(e) => setCommandType(e.target.value)}
-          className="mono"
-          placeholder="commandType"
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            list="command-types"
+            value={commandType}
+            onChange={(e) => setCommandType(e.target.value)}
+            className="mono"
+            placeholder="commandType"
+            aria-label="Tipo de command"
+          />
+          {risk !== "low" && risk !== "medium" ? (
+            <Badge tone={RISK_TONE[risk]}>{risk}</Badge>
+          ) : null}
+        </div>
         <datalist id="command-types">
           {commandTypes.map((type) => (
             <option key={type} value={type} />
@@ -134,12 +208,14 @@ export function CommandConsole({
             onChange={(e) => setPayload(e.target.value)}
             className="mono"
             placeholder='{ "days": 1 }'
+            aria-label="Payload JSON"
           />
           <Input
             value={expectedVersion}
             onChange={(e) => setExpectedVersion(e.target.value)}
             className="mono"
             placeholder="expVersion"
+            aria-label="expectedVersion"
           />
         </div>
         <Button className="w-full" onClick={run} disabled={busy}>
@@ -147,6 +223,47 @@ export function CommandConsole({
           {busy ? "Executando…" : "Disparar command"}
         </Button>
       </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldAlert className="size-5 text-danger" />
+            <DialogTitle>Confirmar comando {risk}</DialogTitle>
+          </div>
+          <DialogDescription>
+            <span className="mono text-foreground">{commandType}</span> é{" "}
+            {risk === "irreversible" ? "irreversível" : "de alto risco"}. A
+            autoridade é do backend; confirme para prosseguir.
+          </DialogDescription>
+
+          {needsReauth ? (
+            <div className="mt-4 space-y-1.5">
+              <Label htmlFor="reauth">Reautenticação — chave admin</Label>
+              <Input
+                id="reauth"
+                type="password"
+                value={reauthKey}
+                onChange={(e) => setReauthKey(e.target.value)}
+                className="mono"
+                autoFocus
+              />
+            </div>
+          ) : null}
+
+          {reauthError ? (
+            <p className="mono mt-2 text-xs text-danger">{reauthError}</p>
+          ) : null}
+
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="danger" onClick={confirmAndRun} disabled={busy}>
+              Confirmar e disparar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

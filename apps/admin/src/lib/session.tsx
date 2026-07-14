@@ -1,6 +1,11 @@
 "use client";
 
-import { createClient, type GrintaClient, type Role } from "@grinta/api-client";
+import {
+  createClient,
+  GrintaApiError,
+  type GrintaClient,
+  type Role,
+} from "@grinta/api-client";
 import {
   createContext,
   useCallback,
@@ -33,6 +38,9 @@ interface SessionContextValue {
     adminKey?: string;
   }): Promise<void>;
   logout(): void;
+  /** Reautenticação (step-up): reemite um token admin com a chave e devolve um
+   *  client efêmero para uma única ação sensível, sem trocar a sessão. */
+  stepUp(adminKey: string): Promise<GrintaClient>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -84,9 +92,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  const stepUp = useCallback<SessionContextValue["stepUp"]>(
+    async (adminKey) => {
+      const anon = createClient({ baseUrl: BASE_URL });
+      const subject = session?.subject ?? "operador";
+      try {
+        const issued = await anon.session({ subject, role: "admin", adminKey });
+        return anon.withToken(issued.token);
+      } catch (err) {
+        if (err instanceof GrintaApiError) throw err;
+        throw new Error("Falha na reautenticação.");
+      }
+    },
+    [session],
+  );
+
   const value = useMemo(
-    () => ({ session, hydrated, api, login, logout }),
-    [session, hydrated, api, login, logout],
+    () => ({ session, hydrated, api, login, logout, stepUp }),
+    [session, hydrated, api, login, logout, stepUp],
   );
 
   return (
