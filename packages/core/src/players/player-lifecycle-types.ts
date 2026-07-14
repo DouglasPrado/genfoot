@@ -82,6 +82,8 @@ export interface PlayerLifecycleSnapshot {
   readonly currentAbility: number;
   readonly potentialAbility: number;
   readonly dynamicState: PlayerDynamicState;
+  readonly trainingFocus?: PlayerAttributeCode;
+  readonly youthProspect?: boolean;
   readonly lastProcessedOn: string;
   readonly version: number;
 }
@@ -183,10 +185,35 @@ export interface PlayerRetiredEvent {
   readonly idempotencyKey: string;
 }
 
+export interface PlayerDevelopedEvent {
+  readonly id: PlayerLifecycleEventId;
+  readonly type: "PlayerDeveloped";
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly attributeCode: PlayerAttributeCode;
+  readonly previousValue: number;
+  readonly nextValue: number;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface YouthPromotedEvent {
+  readonly id: PlayerLifecycleEventId;
+  readonly type: "YouthPromoted";
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: PlayerId;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type PlayerLifecycleEvent =
   | PlayerInjuredEvent
   | PlayerClearedEvent
-  | PlayerRetiredEvent;
+  | PlayerRetiredEvent
+  | PlayerDevelopedEvent
+  | YouthPromotedEvent;
 
 export interface WorldPlayerLifecycleSnapshot {
   readonly gameWorldId: GameWorldId;

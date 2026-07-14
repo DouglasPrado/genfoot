@@ -21,6 +21,7 @@ import {
   WorldNarrative,
   WorldScheduler,
   WorldStaff,
+  ApplyDailyDevelopment,
   CancelPromise,
   EndStaffContract,
   JoinWorld,
@@ -976,6 +977,80 @@ describe("JsonWorldRepository", () => {
     await expect(
       store.value.saveStaff(staff.snapshot(), 99),
     ).rejects.toMatchObject({ code: "STAFF_REVISION_CONFLICT" });
+  });
+
+  it("persiste C4 com geração/desenvolvimento/youth (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    const genesis = new WorldGenesisGenerator().generate(world);
+    await store.value.save(world, null);
+    await store.value.saveGenesis(genesis, world.version);
+    const created = WorldPlayerLifecycle.fromGenesis(world, genesis);
+    if (!created.ok) throw created.error;
+    const lifecycle = created.value;
+    const prospect = {
+      firstName: "Novo",
+      lastName: "Talento",
+      birthDate: "2008-05-01",
+      nationality: "BR",
+      primaryPosition: "ST" as const,
+      dominantFoot: "RIGHT" as const,
+      attributes: { technical: 55, physical: 50, mental: 48, goalkeeping: 20 },
+      potentialAbility: 88,
+      seasonNumber: 2,
+    };
+    const generated = lifecycle.generatePlayer({
+      prospect,
+      source: "SCOUT_FOUND",
+      worldDate: "2026-02-01",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "gen:1",
+      worldSeed: world.seed,
+    });
+    if (!generated.ok) throw generated.error;
+    const focus = lifecycle.setTrainingDirection({
+      playerId: generated.value.id,
+      focus: "technical",
+      rulesetVersion: world.rulesetVersion,
+    });
+    if (!focus.ok) throw focus.error;
+    const developed = lifecycle.applyDailyDevelopment({
+      playerId: generated.value.id,
+      worldDate: "2026-02-02",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "dev:1",
+      worldSeed: world.seed,
+    });
+    if (!developed.ok) throw developed.error;
+
+    await store.value.savePlayerLifecycle(lifecycle.snapshot(), null);
+    // round-trip: trainingFocus, youthProspect e lifecycleEvents (PlayerDeveloped) preservados
+    expect(await store.value.findPlayerLifecycleByWorldId(world.id)).toEqual(
+      lifecycle.snapshot(),
+    );
+
+    // recovery: retry do mesmo desenvolvimento após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const develop = new ApplyDailyDevelopment(restarted);
+    const devInput = {
+      playerId: generated.value.id,
+      worldDate: "2026-02-02",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "dev:1",
+      worldSeed: world.seed,
+    };
+    const first = await develop.execute(world.id, devInput);
+    const retry = await develop.execute(world.id, devInput);
+    expect(first).toMatchObject({ ok: true });
+    expect(retry).toEqual(first);
+    const reloaded = await restarted.findPlayerLifecycleByWorldId(world.id);
+    const reloadedPlayer = reloaded!.players.find(
+      (p) => p.id === generated.value.id,
+    )!;
+    expect(reloadedPlayer.trainingFocus).toBe("technical");
+    expect(
+      reloaded!.lifecycleEvents!.filter((e) => e.type === "PlayerDeveloped"),
+    ).toHaveLength(1);
   });
 
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {

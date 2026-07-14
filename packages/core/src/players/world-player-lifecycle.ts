@@ -9,24 +9,54 @@ import {
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
-import type { WorldGenesisSnapshot } from "../genesis/genesis-types.js";
+import type {
+  DominantFoot,
+  PlayerPosition,
+  WorldGenesisSnapshot,
+} from "../genesis/genesis-types.js";
 import { Player } from "./player.js";
 import {
   MedicalCaseStatus,
   PlayerAvailability,
   PlayerCareerStatus,
+  PlayerGenerationSource,
   type MedicalCaseSeverity,
   type MedicalCaseSnapshot,
+  type PersonLifecycleSnapshot,
   type PlayerAttributeCode,
+  type PlayerAttributeGroups,
   type PlayerClearedEvent,
+  type PlayerDevelopedEvent,
   type PlayerDevelopmentHistoryEntry,
+  type PlayerGeneratedEvent,
   type PlayerInjuredEvent,
   type PlayerLifecycleSummary,
   type PlayerInspection,
   type PlayerLifecycleSnapshot,
   type PlayerRetiredEvent,
   type WorldPlayerLifecycleSnapshot,
+  type YouthPromotedEvent,
 } from "./player-lifecycle-types.js";
+
+export interface ProspectSpec {
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly birthDate: string;
+  readonly nationality: string;
+  readonly primaryPosition: PlayerPosition;
+  readonly secondaryPosition?: PlayerPosition;
+  readonly dominantFoot: DominantFoot;
+  readonly attributes: PlayerAttributeGroups;
+  readonly potentialAbility: number;
+  readonly seasonNumber: number;
+}
+
+const VALID_FOCUS: readonly PlayerAttributeCode[] = [
+  "technical",
+  "physical",
+  "mental",
+  "goalkeeping",
+];
 
 export class WorldPlayerLifecycle {
   private constructor(private state: WorldPlayerLifecycleSnapshot) {}
@@ -579,6 +609,410 @@ export class WorldPlayerLifecycle {
     return succeed(retired);
   }
 
+  public generatePlayer(
+    input: Readonly<{
+      prospect: ProspectSpec;
+      source: PlayerGenerationSource;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<PlayerLifecycleSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const existing = this.state.generationEvents.find(
+      (event) => event.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) {
+      const player = this.findPlayer(existing.playerId);
+      if (player !== null) return succeed(player);
+    }
+    const built = this.buildGeneratedPlayer({
+      prospect: input.prospect,
+      source: input.source,
+      youthProspect: false,
+      worldDate: input.worldDate,
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+      worldSeed: input.worldSeed,
+    });
+    if (!built.ok) return built;
+    this.state = {
+      ...this.state,
+      persons: [...this.state.persons, built.value.person],
+      players: [...this.state.players, built.value.player],
+      generationEvents: [...this.state.generationEvents, built.value.event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(built.value.player);
+  }
+
+  public setTrainingDirection(
+    input: Readonly<{
+      playerId: string;
+      focus: PlayerAttributeCode;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<PlayerLifecycleSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const index = this.state.players.findIndex(
+      ({ id }) => id === input.playerId,
+    );
+    if (index < 0) return fail(playerNotFound(input.playerId));
+    const current = this.state.players[index]!;
+    if (current.careerStatus === PlayerCareerStatus.RETIRED) {
+      return fail(
+        new DomainError("PLAYER_ALREADY_RETIRED", "Jogador já aposentado.", {
+          playerId: current.id,
+        }),
+      );
+    }
+    if (!VALID_FOCUS.includes(input.focus)) {
+      return fail(new DomainError("INVALID_TRAINING_FOCUS", "Foco inválido."));
+    }
+    if (current.trainingFocus === input.focus) return succeed(current);
+    const updated: PlayerLifecycleSnapshot = {
+      ...current,
+      trainingFocus: input.focus,
+      version: current.version + 1,
+    };
+    const players = [...this.state.players];
+    players[index] = updated;
+    this.state = { ...this.state, players, revision: this.state.revision + 1 };
+    return succeed(updated);
+  }
+
+  public applyDailyDevelopment(
+    input: Readonly<{
+      playerId: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<PlayerLifecycleSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const events = this.state.lifecycleEvents ?? [];
+    const replay = events.find(
+      (event): event is PlayerDevelopedEvent =>
+        event.type === "PlayerDeveloped" &&
+        event.idempotencyKey === input.idempotencyKey,
+    );
+    if (replay !== undefined) {
+      const player = this.findPlayer(replay.playerId);
+      if (player !== null) return succeed(player);
+    }
+    const index = this.state.players.findIndex(
+      ({ id }) => id === input.playerId,
+    );
+    if (index < 0) return fail(playerNotFound(input.playerId));
+    const current = this.state.players[index]!;
+    if (current.careerStatus === PlayerCareerStatus.RETIRED) {
+      return fail(
+        new DomainError("PLAYER_ALREADY_RETIRED", "Jogador já aposentado.", {
+          playerId: current.id,
+        }),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const attributeCode =
+      current.trainingFocus ?? defaultFocus(current.primaryPosition);
+    const previousValue = current.attributes[attributeCode];
+    const historyId = deterministicUuidV7<"PlayerDevelopmentHistory">({
+      worldSeed: input.worldSeed,
+      context: `develop:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    if (this.state.developmentHistory.some(({ id }) => id === historyId)) {
+      return succeed(current);
+    }
+    const player = Player.fromSnapshot(current);
+    if (!player.ok) return player;
+    const changed = player.value.applyAttributeChange({
+      historyId,
+      attributeCode,
+      requestedValue: previousValue + 2,
+      cause: "DAILY_TRAINING",
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+    });
+    if (!changed.ok) return changed;
+    if (changed.value === null) {
+      // no potencial esgotado o desenvolvimento é um no-op silencioso
+      return succeed(current);
+    }
+    const updated = player.value.snapshot();
+    const players = [...this.state.players];
+    players[index] = updated;
+    const event: PlayerDevelopedEvent = {
+      id: deterministicUuidV7<"PlayerLifecycleEvent">({
+        worldSeed: input.worldSeed,
+        context: `developed:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      type: "PlayerDeveloped",
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.id,
+      attributeCode,
+      previousValue: changed.value.previousValue,
+      nextValue: changed.value.nextValue,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      players,
+      developmentHistory: [...this.state.developmentHistory, changed.value],
+      lifecycleEvents: [...events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(updated);
+  }
+
+  public generateYouthCohort(
+    input: Readonly<{
+      prospects: readonly ProspectSpec[];
+      seasonNumber: number;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<readonly PlayerLifecycleSnapshot[], DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (input.prospects.length === 0) {
+      return fail(
+        new DomainError("INVALID_YOUTH_COHORT", "A coorte precisa de prospectos."),
+      );
+    }
+    const cohortKeys = input.prospects.map(
+      (_, position) => `${input.idempotencyKey}:${position}`,
+    );
+    const already = this.state.generationEvents.filter((event) =>
+      cohortKeys.includes(event.idempotencyKey),
+    );
+    if (already.length === input.prospects.length) {
+      return succeed(
+        already
+          .map((event) => this.findPlayer(event.playerId))
+          .filter((player): player is PlayerLifecycleSnapshot => player !== null),
+      );
+    }
+    const persons = [...this.state.persons];
+    const players = [...this.state.players];
+    const generationEvents = [...this.state.generationEvents];
+    const created: PlayerLifecycleSnapshot[] = [];
+    for (let position = 0; position < input.prospects.length; position += 1) {
+      const built = this.buildGeneratedPlayer({
+        prospect: input.prospects[position]!,
+        source: PlayerGenerationSource.YOUTH_ACADEMY,
+        youthProspect: true,
+        worldDate: input.worldDate,
+        rulesetVersion: input.rulesetVersion,
+        idempotencyKey: cohortKeys[position]!,
+        worldSeed: input.worldSeed,
+      });
+      if (!built.ok) return built;
+      persons.push(built.value.person);
+      players.push(built.value.player);
+      generationEvents.push(built.value.event);
+      created.push(built.value.player);
+    }
+    this.state = {
+      ...this.state,
+      persons,
+      players,
+      generationEvents,
+      revision: this.state.revision + 1,
+    };
+    return succeed(created);
+  }
+
+  public promoteYouth(
+    input: Readonly<{
+      playerId: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<PlayerLifecycleSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const events = this.state.lifecycleEvents ?? [];
+    const replay = events.find(
+      (event): event is YouthPromotedEvent =>
+        event.type === "YouthPromoted" &&
+        event.idempotencyKey === input.idempotencyKey,
+    );
+    if (replay !== undefined) {
+      const player = this.findPlayer(replay.playerId);
+      if (player !== null) return succeed(player);
+    }
+    const index = this.state.players.findIndex(
+      ({ id }) => id === input.playerId,
+    );
+    if (index < 0) return fail(playerNotFound(input.playerId));
+    const current = this.state.players[index]!;
+    if (current.youthProspect !== true) {
+      return fail(
+        new DomainError(
+          "PLAYER_NOT_YOUTH",
+          "Somente prospectos da base podem ser promovidos.",
+          { playerId: current.id },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const promoted: PlayerLifecycleSnapshot = {
+      ...current,
+      youthProspect: false,
+      careerStatus: PlayerCareerStatus.ACTIVE,
+      availability: PlayerAvailability.AVAILABLE,
+      version: current.version + 1,
+    };
+    const players = [...this.state.players];
+    players[index] = promoted;
+    const event: YouthPromotedEvent = {
+      id: deterministicUuidV7<"PlayerLifecycleEvent">({
+        worldSeed: input.worldSeed,
+        context: `youth-promoted:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      type: "YouthPromoted",
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.id,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      players,
+      lifecycleEvents: [...events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(promoted);
+  }
+
+  private buildGeneratedPlayer(
+    input: Readonly<{
+      prospect: ProspectSpec;
+      source: PlayerGenerationSource;
+      youthProspect: boolean;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<
+    {
+      person: PersonLifecycleSnapshot;
+      player: PlayerLifecycleSnapshot;
+      event: PlayerGeneratedEvent;
+    },
+    DomainError
+  > {
+    const prospect = input.prospect;
+    if (
+      prospect.firstName.trim() === "" ||
+      prospect.lastName.trim() === "" ||
+      !validGenScore(prospect.potentialAbility) ||
+      !Object.values(prospect.attributes).every(validGenScore)
+    ) {
+      return fail(
+        new DomainError("INVALID_PLAYER_GENERATION", "Dados do prospecto inválidos."),
+      );
+    }
+    const birthDate = WorldDate.parse(prospect.birthDate);
+    if (!birthDate.ok) return birthDate;
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const timestampMilliseconds = timestampOf(date.value.toString());
+    const personId = deterministicUuidV7<"Person">({
+      worldSeed: input.worldSeed,
+      context: `person:${input.idempotencyKey}`,
+      timestampMilliseconds,
+    });
+    const playerId = deterministicUuidV7<"Player">({
+      worldSeed: input.worldSeed,
+      context: `player:${input.idempotencyKey}`,
+      timestampMilliseconds,
+    });
+    const attrs = prospect.attributes;
+    const mean = Math.round(
+      (attrs.technical + attrs.physical + attrs.mental + attrs.goalkeeping) / 4,
+    );
+    const currentAbility = Math.max(0, Math.min(prospect.potentialAbility, mean));
+    const person: PersonLifecycleSnapshot = {
+      id: personId,
+      gameWorldId: this.state.gameWorldId,
+      firstName: prospect.firstName.trim(),
+      lastName: prospect.lastName.trim(),
+      birthDate: birthDate.value.toString(),
+      nationality: prospect.nationality,
+      version: 1,
+    };
+    const playerSnapshot: PlayerLifecycleSnapshot = {
+      id: playerId,
+      gameWorldId: this.state.gameWorldId,
+      personId,
+      primaryPosition: prospect.primaryPosition,
+      ...(prospect.secondaryPosition !== undefined
+        ? { secondaryPosition: prospect.secondaryPosition }
+        : {}),
+      dominantFoot: prospect.dominantFoot,
+      careerStatus: PlayerCareerStatus.ACTIVE,
+      availability: PlayerAvailability.AVAILABLE,
+      generationSource: input.source,
+      generatedAtSeasonNumber: prospect.seasonNumber,
+      attributes: attrs,
+      currentAbility,
+      potentialAbility: prospect.potentialAbility,
+      dynamicState: {
+        morale: 50,
+        confidence: 50,
+        happiness: 50,
+        fatigue: 0,
+        matchSharpness: 0,
+      },
+      ...(input.youthProspect ? { youthProspect: true } : {}),
+      lastProcessedOn: date.value.toString(),
+      version: 1,
+    };
+    const validated = Player.fromSnapshot(playerSnapshot);
+    if (!validated.ok) return validated;
+    const event: PlayerGeneratedEvent = {
+      id: deterministicUuidV7<"PlayerGenerationEvent">({
+        worldSeed: input.worldSeed,
+        context: `player-generated:${input.idempotencyKey}`,
+        timestampMilliseconds,
+      }),
+      type: "PlayerGenerated",
+      gameWorldId: this.state.gameWorldId,
+      playerId,
+      personId,
+      source: input.source,
+      seasonNumber: prospect.seasonNumber,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    return succeed({ person, player: playerSnapshot, event });
+  }
+
   public findPlayer(playerId: string): PlayerLifecycleSnapshot | null {
     return this.state.players.find(({ id }) => id === playerId) ?? null;
   }
@@ -630,6 +1064,18 @@ function rulesetMismatch(): DomainError {
     "RULESET_VERSION_MISMATCH",
     "O command usa um ruleset diferente do lifecycle.",
   );
+}
+
+function timestampOf(worldDate: string): number {
+  return Date.parse(`${worldDate}T00:00:00.000Z`);
+}
+
+function validGenScore(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0 && value <= 100;
+}
+
+function defaultFocus(position: PlayerPosition): PlayerAttributeCode {
+  return position === "GK" ? "goalkeeping" : "technical";
 }
 
 function playerNotFound(playerId: string): DomainError {

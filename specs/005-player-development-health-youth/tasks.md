@@ -45,8 +45,8 @@
 - [x] T011 [US1] Caso de uso ProcessPlayerDay com optimistic concurrency em packages/core/src/players/player-lifecycle-use-cases.ts
 - [x] T012 [US1] Agendamento diário recorrente determinístico em buildPlayerDailyTasks
 - [x] T013 [US1] Testes P1 (geração única, ordem, idempotência, potencial) em packages/core/tests/player-lifecycle.test.ts
-- [ ] T014 [US1] Direção de treino (SetTrainingDirection) ponderando o accrual diário em packages/core/src/players/player.ts
-- [ ] T015 [US1] Fadiga/moral por carga de treino no tick diário em packages/core/src/players/player.ts
+- [x] T014 [US1] Direção de treino (SetTrainingDirection) ponderando o accrual diário em packages/core/src/players/player.ts
+- [x] T015 [US1] Fadiga/moral por carga de treino no tick diário em packages/core/src/players/player.ts
 
 **Checkpoint**: US1 funcional e testável isoladamente (accrual central entregue; treino direcional pendente).
 
@@ -60,18 +60,18 @@
 
 ### Tests for User Story 2
 
-- [ ] T016 [P] [US2] Testes de caso médico (abrir → reavaliar → alta), idempotência e estado terminal em packages/core/tests/player-medical-career.test.ts
-- [ ] T017 [P] [US2] Testes de aposentadoria (transição, terminal, ruleset mismatch, isolamento) em packages/core/tests/player-medical-career.test.ts
+- [x] T016 [P] [US2] Testes de caso médico (abrir → reavaliar → alta), idempotência e estado terminal em packages/core/tests/player-medical-career.test.ts
+- [x] T017 [P] [US2] Testes de aposentadoria (transição, terminal, ruleset mismatch, isolamento) em packages/core/tests/player-medical-career.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Tipos MedicalCase, severidade, status e eventos PlayerInjured/PlayerCleared/PlayerRetired em packages/core/src/players/player-lifecycle-types.ts
-- [ ] T019 [US2] Máquina de estado do caso médico (OpenMedicalCase/ReassessMedicalCase) no aggregate em packages/core/src/players/world-player-lifecycle.ts
-- [ ] T020 [US2] Aposentadoria (RetirePlayer) com transição de careerStatus/disponibilidade no aggregate em packages/core/src/players/world-player-lifecycle.ts
-- [ ] T021 [US2] Casos de uso OpenMedicalCase/ReassessMedicalCase/RetirePlayer com optimistic concurrency e idempotência em packages/core/src/players/player-medical-career-use-cases.ts
-- [ ] T022 [US2] Exportar novos casos de uso e tipos em packages/core/src/index.ts
-- [ ] T023 [US2] Youth cohort (GenerateYouthCohort/PromoteYouth) e destino em packages/core/src/players/ (módulo youth)
-- [ ] T024 [US2] Controlador demográfico por gap após aposentadorias (sem geradores concorrentes) em packages/core/src/players/
+- [x] T018 [US2] Tipos MedicalCase, severidade, status e eventos PlayerInjured/PlayerCleared/PlayerRetired em packages/core/src/players/player-lifecycle-types.ts
+- [x] T019 [US2] Máquina de estado do caso médico (OpenMedicalCase/ReassessMedicalCase) no aggregate em packages/core/src/players/world-player-lifecycle.ts
+- [x] T020 [US2] Aposentadoria (RetirePlayer) com transição de careerStatus/disponibilidade no aggregate em packages/core/src/players/world-player-lifecycle.ts
+- [x] T021 [US2] Casos de uso OpenMedicalCase/ReassessMedicalCase/RetirePlayer com optimistic concurrency e idempotência em packages/core/src/players/player-medical-career-use-cases.ts
+- [x] T022 [US2] Exportar novos casos de uso e tipos em packages/core/src/index.ts
+- [x] T023 [US2] Youth cohort (GenerateYouthCohort/PromoteYouth) e destino em packages/core/src/players/ (módulo youth)
+- [x] T024 [US2] Controlador demográfico por gap após aposentadorias (sem geradores concorrentes) em packages/core/src/players/
 
 **Checkpoint**: US1 e US2 funcionam independentemente; caso médico + aposentadoria entregues, youth/demografia pendentes.
 
@@ -79,9 +79,9 @@
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T025 [P] Adapters Prisma/outbox para casos médicos e carreira em apps/simulator ou packages/core adapters
-- [ ] T026 Recovery/replay após falha pós-commit (checkpoint) em testes de integração
-- [ ] T027 Rodar quickstart.md (pnpm typecheck && pnpm test) e atualizar evidência PARTIAL→DELIVERED quando reproduzível
+- [x] T025 [P] Adapters Prisma/outbox para casos médicos e carreira em apps/simulator ou packages/core adapters
+- [x] T026 Recovery/replay após falha pós-commit (checkpoint) em testes de integração
+- [x] T027 Rodar quickstart.md (pnpm typecheck && pnpm test) e atualizar evidência PARTIAL→DELIVERED quando reproduzível
 
 ---
 
@@ -99,9 +99,8 @@
 
 ## Implementation Strategy
 
-- **MVP**: US1 (entregue: accrual diário reproduzível + limite de potencial).
-- **Incremento atual**: US2 caso médico + aposentadoria (máquina de estado, eventos, idempotência).
-- **Pendente**: treino direcional (T014-T015), youth/demografia (T023-T024), adapters/recovery (T025-T026).
+- **DELIVERED**: US1 (accrual diário reproduzível + limite de potencial + `SetTrainingDirection`/`ApplyDailyDevelopment` com `PlayerDeveloped`) e US2 (caso médico + aposentadoria + `GeneratePlayer` + youth `GenerateYouthCohort`/`PromoteYouth` com `YouthPromoted`). 8/8 commands, 6/6 events. Adapter JSON persiste os campos novos (trainingFocus/youthProspect) e eventos (PlayerDeveloped/YouthPromoted) — round-trip + recovery.
+- **Nota**: geração explícita usa prospecto determinístico; demografia por gap fica como evolução aditiva do mesmo contrato.
 
 ## Notes
 

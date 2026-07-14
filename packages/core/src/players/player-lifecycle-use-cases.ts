@@ -5,6 +5,7 @@ import {
   succeed,
   type GameWorldId,
   type Result,
+  type RulesetVersion,
 } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
@@ -13,11 +14,17 @@ import type { ScheduledTaskHandler } from "../scheduling/scheduling-types.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { PlayerLifecycleRepository } from "./player-lifecycle-repository.js";
 import type {
+  PlayerAttributeCode,
+  PlayerGenerationSource,
   PlayerInspection,
+  PlayerLifecycleSnapshot,
   PlayerLifecycleSummary,
   WorldPlayerLifecycleSnapshot,
 } from "./player-lifecycle-types.js";
-import { WorldPlayerLifecycle } from "./world-player-lifecycle.js";
+import {
+  WorldPlayerLifecycle,
+  type ProspectSpec,
+} from "./world-player-lifecycle.js";
 
 export class InitializePlayerLifecycle {
   public constructor(private readonly repository: PlayerLifecycleRepository) {}
@@ -59,6 +66,120 @@ export class ProcessPlayerDay {
       );
     }
     return succeed(loaded.value.summary());
+  }
+}
+
+async function mutateLifecycle<T>(
+  repository: PlayerLifecycleRepository,
+  gameWorldId: GameWorldId,
+  apply: (lifecycle: WorldPlayerLifecycle) => Result<T, DomainError>,
+): Promise<Result<T, DomainError>> {
+  const loaded = await loadLifecycle(repository, gameWorldId);
+  if (!loaded.ok) return loaded;
+  const expectedRevision = loaded.value.snapshot().revision;
+  const result = apply(loaded.value);
+  if (!result.ok) return result;
+  if (loaded.value.snapshot().revision !== expectedRevision) {
+    await repository.savePlayerLifecycle(
+      loaded.value.snapshot(),
+      expectedRevision,
+    );
+  }
+  return result;
+}
+
+export class GeneratePlayer {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      prospect: ProspectSpec;
+      source: PlayerGenerationSource;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Promise<Result<PlayerLifecycleSnapshot, DomainError>> {
+    return mutateLifecycle(this.repository, gameWorldId, (lifecycle) =>
+      lifecycle.generatePlayer(input),
+    );
+  }
+}
+
+export class SetTrainingDirection {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      playerId: string;
+      focus: PlayerAttributeCode;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<PlayerLifecycleSnapshot, DomainError>> {
+    return mutateLifecycle(this.repository, gameWorldId, (lifecycle) =>
+      lifecycle.setTrainingDirection(input),
+    );
+  }
+}
+
+export class ApplyDailyDevelopment {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      playerId: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Promise<Result<PlayerLifecycleSnapshot, DomainError>> {
+    return mutateLifecycle(this.repository, gameWorldId, (lifecycle) =>
+      lifecycle.applyDailyDevelopment(input),
+    );
+  }
+}
+
+export class GenerateYouthCohort {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      prospects: readonly ProspectSpec[];
+      seasonNumber: number;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Promise<Result<readonly PlayerLifecycleSnapshot[], DomainError>> {
+    return mutateLifecycle(this.repository, gameWorldId, (lifecycle) =>
+      lifecycle.generateYouthCohort(input),
+    );
+  }
+}
+
+export class PromoteYouth {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      playerId: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Promise<Result<PlayerLifecycleSnapshot, DomainError>> {
+    return mutateLifecycle(this.repository, gameWorldId, (lifecycle) =>
+      lifecycle.promoteYouth(input),
+    );
   }
 }
 
