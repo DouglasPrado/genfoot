@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -23,6 +24,8 @@ export interface AdminSession {
 
 interface SessionContextValue {
   readonly session: AdminSession | null;
+  /** false até o localStorage ser lido no cliente (evita mismatch de hidratação). */
+  readonly hydrated: boolean;
   readonly api: GrintaClient;
   login(input: {
     subject: string;
@@ -45,7 +48,15 @@ function loadStored(): AdminSession | null {
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AdminSession | null>(loadStored);
+  // Inicia null no servidor E no primeiro render do cliente; o localStorage é
+  // lido só após o mount, evitando o mismatch de hidratação.
+  const [session, setSession] = useState<AdminSession | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setSession(loadStored());
+    setHydrated(true);
+  }, []);
 
   const api = useMemo(
     () =>
@@ -74,8 +85,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, api, login, logout }),
-    [session, api, login, logout],
+    () => ({ session, hydrated, api, login, logout }),
+    [session, hydrated, api, login, logout],
   );
 
   return (

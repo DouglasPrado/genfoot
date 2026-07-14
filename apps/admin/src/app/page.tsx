@@ -6,12 +6,12 @@ import { useEffect } from "react";
 import { useSession } from "@/lib/session";
 
 export default function Home() {
-  const { session } = useSession();
+  const { session, hydrated } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(session ? "/worlds" : "/login");
-  }, [session, router]);
+    if (hydrated) router.replace(session ? "/worlds" : "/login");
+  }, [hydrated, session, router]);
 
   return null;
 }

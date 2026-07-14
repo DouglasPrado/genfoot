@@ -16,15 +16,16 @@ const NAV = [
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { session, logout } = useSession();
+  const { session, hydrated, logout } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (session === null) router.replace("/login");
-  }, [session, router]);
+    if (hydrated && session === null) router.replace("/login");
+  }, [hydrated, session, router]);
 
-  if (session === null) return null;
+  // Até hidratar, render consistente com o servidor (null) — sem mismatch.
+  if (!hydrated || session === null) return null;
 
   return (
     <div className="grid min-h-screen grid-cols-[220px_1fr]">
