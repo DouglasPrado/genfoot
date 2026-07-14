@@ -16,6 +16,7 @@
     "baseUrl": ".",
     "paths": {
       "@grinta/core": ["packages/core/src/index.ts"],
+      "@grinta/persistence": ["packages/persistence/src/index.ts"],
       "@grinta/shared": ["packages/shared/src/index.ts"]
     }
   }

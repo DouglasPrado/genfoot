@@ -42,6 +42,7 @@ import {
   type InfrastructureFinancingPort,
   type InfrastructureLicensingPort,
 } from "@grinta/core";
+import { JsonWorldRepository } from "@grinta/persistence";
 import {
   DomainError,
   WorldDate,
@@ -53,7 +54,6 @@ import {
 import { Command, CommanderError } from "commander";
 import { z } from "zod";
 
-import { JsonWorldRepository } from "./json-world-repository.js";
 import { ValidationArtifactStore } from "./validation-artifact-store.js";
 
 export interface CliIo {

@@ -1,26 +1,28 @@
 {
-  "name": "@grinta/simulator",
+  "name": "@grinta/persistence",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "grinta-simulator": "./dist/bin.js"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsup src/bin.ts --format esm --clean",
-    "dev": "tsx src/bin.ts",
+    "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@grinta/core": "workspace:*",
-    "@grinta/persistence": "workspace:*",
     "@grinta/shared": "workspace:*",
-    "commander": "^14.0.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
     "tsup": "^8.5.0",
-    "tsx": "^4.20.3",
     "typescript": "5.7.3"
   }
 }

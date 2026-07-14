@@ -8,6 +8,9 @@ export default defineConfig({
       "@grinta/core": fileURLToPath(
         new URL("./packages/core/src/index.ts", import.meta.url),
       ),
+      "@grinta/persistence": fileURLToPath(
+        new URL("./packages/persistence/src/index.ts", import.meta.url),
+      ),
       "@grinta/shared": fileURLToPath(
         new URL("./packages/shared/src/index.ts", import.meta.url),
       ),
@@ -17,6 +20,7 @@ export default defineConfig({
     include: [
       "packages/**/*.test.ts",
       "apps/simulator/**/*.test.ts",
+      "apps/api/**/*.test.ts",
       "scripts/roadmap/**/*.test.ts",
     ],
     coverage: {
