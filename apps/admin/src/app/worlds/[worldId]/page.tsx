@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { CommandConsole } from "@/components/command-console";
-import { ContextPulse } from "@/components/context-pulse";
+import { ContextInspector } from "@/components/context-inspector";
+import { ContextPulse, type ContextName } from "@/components/context-pulse";
+import { QuickActions } from "@/components/quick-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSession } from "@/lib/session";
@@ -35,6 +37,8 @@ export default function WorldDetailPage() {
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
   const [commandTypes, setCommandTypes] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ContextName>("club");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -55,7 +59,11 @@ export default function WorldDetailPage() {
     return () => {
       alive = false;
     };
-  }, [api, worldId]);
+  }, [api, worldId, refreshKey]);
+
+  function refresh() {
+    setRefreshKey((k) => k + 1);
+  }
 
   return (
     <AppShell>
@@ -79,10 +87,13 @@ export default function WorldDetailPage() {
 
         {snapshot ? (
           <Card>
-            <CardContent className="grid grid-cols-3 gap-6">
-              <Stat label="Data lógica" value={snapshot.currentDate} />
-              <Stat label="Status" value={snapshot.status} />
-              <Stat label="Revisão" value={`v${snapshot.version}`} />
+            <CardContent className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex gap-8">
+                <Stat label="Data lógica" value={snapshot.currentDate} />
+                <Stat label="Status" value={snapshot.status} />
+                <Stat label="Revisão" value={`v${snapshot.version}`} />
+              </div>
+              <QuickActions worldId={worldId} onDone={refresh} />
             </CardContent>
           </Card>
         ) : null}
@@ -91,11 +102,23 @@ export default function WorldDetailPage() {
           <CardHeader>
             <CardTitle>Pulso dos contextos</CardTitle>
             <span className="mono text-[11px] text-muted-foreground">
-              live = inicializado · dormant = ainda não criado
+              clique para inspecionar · live = inicializado
             </span>
           </CardHeader>
-          <CardContent>
-            <ContextPulse worldId={worldId} />
+          <CardContent className="space-y-4">
+            <ContextPulse
+              worldId={worldId}
+              selected={selected}
+              onSelect={setSelected}
+              refreshKey={refreshKey}
+            />
+            <div className="rounded-sm border border-border bg-background p-4">
+              <ContextInspector
+                worldId={worldId}
+                context={selected}
+                refreshKey={refreshKey}
+              />
+            </div>
           </CardContent>
         </Card>
 

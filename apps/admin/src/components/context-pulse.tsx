@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useSession } from "@/lib/session";
 
-const CONTEXTS = [
+export const CONTEXTS = [
   "club",
   "competitions",
   "matches",
@@ -21,6 +21,8 @@ const CONTEXTS = [
   "scheduler",
 ] as const;
 
+export type ContextName = (typeof CONTEXTS)[number];
+
 type Status = "live" | "dormant" | "checking";
 
 /**
@@ -28,7 +30,17 @@ type Status = "live" | "dormant" | "checking";
  * criado). É a leitura de sala de controle — de relance, o operador vê a saúde
  * dos 14 bounded contexts.
  */
-export function ContextPulse({ worldId }: { worldId: string }) {
+export function ContextPulse({
+  worldId,
+  selected,
+  onSelect,
+  refreshKey = 0,
+}: {
+  worldId: string;
+  selected?: ContextName;
+  onSelect?: (context: ContextName) => void;
+  refreshKey?: number;
+}) {
   const { api } = useSession();
   const [status, setStatus] = useState<Record<string, Status>>({});
 
@@ -48,20 +60,25 @@ export function ContextPulse({ worldId }: { worldId: string }) {
     return () => {
       alive = false;
     };
-  }, [api, worldId]);
+  }, [api, worldId, refreshKey]);
 
   return (
     <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:grid-cols-7">
       {CONTEXTS.map((context) => {
         const state = status[context] ?? "checking";
         const live = state === "live";
+        const isSelected = selected === context;
         return (
-          <div
+          <button
             key={context}
-            className={`flex items-center gap-2 rounded-sm border px-2.5 py-2 ${
-              live
-                ? "border-primary/30 bg-primary/5"
-                : "border-border bg-surface-2"
+            type="button"
+            onClick={() => onSelect?.(context)}
+            className={`flex items-center gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors ${
+              isSelected
+                ? "border-primary bg-primary/15"
+                : live
+                  ? "border-primary/30 bg-primary/5 hover:border-primary/60"
+                  : "border-border bg-surface-2 hover:border-muted-foreground/40"
             }`}
           >
             <span
@@ -80,7 +97,7 @@ export function ContextPulse({ worldId }: { worldId: string }) {
             >
               {context}
             </span>
-          </div>
+          </button>
         );
       })}
     </div>
