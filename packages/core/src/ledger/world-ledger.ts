@@ -514,8 +514,12 @@ export class WorldLedger {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
+    // O replay só vale para a MESMA reserva: settle e release compartilham o
+    // evento ReservationSettled, então a chave sozinha não distingue a operação
+    // nem o alvo. Casar por reservationId evita retornar a reserva errada quando
+    // uma chave é reutilizada para outra reserva.
     const replay = this.findEvent("ReservationSettled", input.idempotencyKey);
-    if (replay !== undefined) {
+    if (replay !== undefined && replay.reservationId === input.reservationId) {
       const reservation = this.state.reservations.find(
         ({ id }) => id === replay.reservationId,
       );

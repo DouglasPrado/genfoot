@@ -275,4 +275,54 @@ describe("Economy and ledger", () => {
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.transactions).toHaveLength(2);
   });
+
+  it("não confunde settle e release ao reutilizar a chave em reservas distintas", () => {
+    const { gameWorld, value, cashId } = fundedLedger();
+    const a = value.reserveFunds({
+      accountId: cashId,
+      purpose: "A",
+      amountMinor: 300,
+      expiresOn: "2026-02-01",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "res:a",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    const b = value.reserveFunds({
+      accountId: cashId,
+      purpose: "B",
+      amountMinor: 200,
+      expiresOn: "2026-02-01",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "res:b",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!a.ok || !b.ok) throw new Error("reservas");
+
+    const settledA = value.settleReservation({
+      reservationId: a.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "shared-key",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-10",
+    });
+    expect(settledA).toMatchObject({ ok: true, value: { status: "SETTLED" } });
+
+    // Mesma chave, mas RELEASE de OUTRA reserva: B deve ser liberada de fato.
+    const releasedB = value.releaseReservation({
+      reservationId: b.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "shared-key",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-10",
+    });
+    expect(releasedB).toMatchObject({
+      ok: true,
+      value: { id: b.value.id, status: "RELEASED" },
+    });
+    // Ambas encerradas → disponível volta ao saldo pleno; nenhuma confusão de alvo.
+    expect(value.availableBalance(cashId)).toBe(1000);
+    expect(value.summary().activeReservationCount).toBe(0);
+  });
 });

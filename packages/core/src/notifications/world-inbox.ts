@@ -207,6 +207,15 @@ export class WorldInbox {
         notification.createdOn <= to.value.toString(),
     );
     const itemIds = items.map((notification) => notification.id);
+    // Idempotência: um digest já construído com esta chave não gera novo efeito.
+    const alreadyBuilt = this.state.events.some(
+      (candidate) =>
+        candidate.type === "DigestReady" &&
+        candidate.idempotencyKey === input.idempotencyKey,
+    );
+    if (alreadyBuilt) {
+      return succeed({ recipientScope: input.recipientScope, itemIds });
+    }
     const event: DigestReadyEvent = {
       id: this.eventId(input.worldSeed, `digest:${input.idempotencyKey}`, date.value.toString()),
       type: "DigestReady",

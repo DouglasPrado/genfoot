@@ -245,4 +245,27 @@ describe("Notifications and history", () => {
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.notifications).toHaveLength(1);
   });
+
+  it("gera digest idempotente por chave (sem evento/revisão duplicados)", () => {
+    const ctx = inbox();
+    project(ctx, "d1", "NORMAL");
+    const args = {
+      recipientScope: "manager:club-1",
+      fromOn: "2026-01-01",
+      toOn: "2026-12-31",
+      rulesetVersion: ctx.gameWorld.rulesetVersion,
+      idempotencyKey: "digest:once",
+      worldSeed: ctx.gameWorld.seed,
+      worldDate: "2026-03-05",
+    };
+    const first = ctx.value.buildDigest(args);
+    const revision = ctx.value.snapshot().revision;
+    const repeated = ctx.value.buildDigest(args);
+
+    expect(first).toEqual(repeated);
+    expect(ctx.value.snapshot().revision).toBe(revision);
+    expect(
+      ctx.value.snapshot().events.filter((e) => e.type === "DigestReady"),
+    ).toHaveLength(1);
+  });
 });
