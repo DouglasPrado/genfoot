@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **11 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C1, C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. **Todos os bounded contexts de domínio (C1, C3–C12) estão entregues**, além do concern X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta. Restam **PARTIAL** BC-004 (player-dev) e algum resíduo, e os `PLANNED` (VAL-001 calibração, X-001 automação, X-003/OPS clientes/plataforma e os 16 golden paths).
+> **Conclusão (atualizada):** **11 specs** atingiram a barra `DELIVERED` de verdade na reconciliação evidenciada ("reproduced scope" + adapter + gate verde): FND-001, C1, C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; 12 contextos persistem no adapter JSON (schemaVersion 16). Ainda **PARTIAL** (evidência parcial): C2 (world/seasons), C3 (club/squad), C4 (player-dev) — o README de specs os marca DELIVERED mas a reconciliação em `001-.../validation/portfolio-completeness.md` mantém PARTIAL até fechar a evidência. `PLANNED`: VAL-001 (calibração), X-001 (automação), X-003/OPS (clientes/plataforma) e os 16 golden paths E2E.
 
 ## Cobertura por spec
 
