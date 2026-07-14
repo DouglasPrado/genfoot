@@ -55,3 +55,10 @@
 
 - Valores em inteiro (minor units); float monetário proibido.
 - Toda escrita carrega `worldId`, `expectedVersion`/revisão, chave idempotente e ruleset; fatos append-only; conservação monetária invariante.
+
+## Phase 6: Convergence
+
+Achados de `/speckit.converge` (2026-07-14) ainda não rastreados por T001–T021. O restante do gap (AccrueDebt, CloseAccountingPeriod, expiração, adapter/recovery) já está em **T016–T021**.
+
+- [ ] T022 Definir a entidade `Debt` (creditorRef, debtorRef, principalMinor, schedule, interestRule, status, version) em packages/core/src/ledger/ledger-types.ts per data-model entidade Debt (missing)
+- [ ] T023 Teste de propriedade de conservação monetária (residual global == 0 sob N sequências aleatórias de transações balanceadas) em packages/core/tests/ledger/ per Constitution VI, SC-002 (partial)
