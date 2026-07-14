@@ -12,6 +12,12 @@ export const API_PREFIX = "api/v1";
 export async function createApp(): Promise<INestApplication> {
   const app = await NestFactory.create(AppModule, { logger: false });
   app.setGlobalPrefix(API_PREFIX);
+  // Clientes (admin Next.js, mobile Expo) rodam em outra origem.
+  app.enableCors({
+    origin: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["content-type", "authorization", "x-correlation-id"],
+  });
   return app;
 }
 
