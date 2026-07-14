@@ -24,7 +24,12 @@ import {
   CloseAccountingPeriod,
   CompensateSaga,
   CompensateTransfer,
+  AbortInfrastructureProject,
   AdvanceMatchTicks,
+  AdvanceScheduledWorldDays,
+  AdvanceWorldDayCommand,
+  BootstrapWorldScheduler,
+  CancelScheduledTask,
   CheckpointMatch,
   ConsumeEvent,
   CreateAutomationRule,
@@ -49,11 +54,27 @@ import {
   GenerateReport,
   GenerateWorldGenesis,
   GenerateYouthCohort,
+  GetDecisionExplanation,
   HomologateCompetition,
   InitializeLedger,
   InitializeMarket,
   InspectWorld,
   JoinWorld,
+  ProcessDueWorldTasks,
+  RegisterTemporalWindow,
+  ResumeInfrastructureProject,
+  ResumeSeasonRollover,
+  ResumeWorldScheduler,
+  ScheduleWorldTask,
+  ScheduleWorldTasks,
+  RetryScheduledTask,
+  SEASON_ROLLOVER_STEPS,
+  StartInfrastructureProject,
+  StartSeasonRollover,
+  createClubMaintenanceTaskHandler,
+  createPlayerDayTaskHandler,
+  type InfrastructureFinancingPort,
+  type InfrastructureLicensingPort,
   MakePublicPromise,
   MarkNotificationRead,
   OfferStaffContract,
@@ -239,6 +260,132 @@ function wc(
   };
 }
 
+// --- Portas/handlers sintéticos (adapter) para os use cases com dependências ---
+const API_WORKER = "api-worker";
+const nowMs = (): number => Date.now();
+
+function financingPort(): InfrastructureFinancingPort {
+  return {
+    reserve: (context) =>
+      Promise.resolve({ reservationRef: `api:${context.idempotencyKey}:reservation` }),
+    disburseMilestone: (context) =>
+      Promise.resolve({ disbursementRef: `api:${context.idempotencyKey}:disbursement` }),
+    releaseRemainder: (context) =>
+      Promise.resolve({ releaseFactRef: `api:${context.idempotencyKey}:release` }),
+  };
+}
+
+function licensingPort(): InfrastructureLicensingPort {
+  return {
+    inspect: (context) =>
+      Promise.resolve({ approved: true, inspectionRef: `api:${context.idempotencyKey}:license` }),
+  };
+}
+
+function taskHandlers(repository: CommandContext["repository"]) {
+  return {
+    "players:process-day": createPlayerDayTaskHandler(repository),
+    "clubs:process-day": createClubMaintenanceTaskHandler(repository),
+  };
+}
+
+function rolloverHandlers() {
+  return Object.fromEntries(
+    SEASON_ROLLOVER_STEPS.map((stepId) => [
+      stepId,
+      () =>
+        Promise.resolve({
+          status: "COMPLETED" as const,
+          evidence: { source: "api" },
+        }),
+    ]),
+  );
+}
+
+function rolloverVerifier() {
+  return () =>
+    Promise.resolve({
+      standingsConsistent: true,
+      ledgerBalanced: true,
+      populationInBand: true,
+      evidence: { source: "api" },
+    });
+}
+
+/** Use case com shape `execute(input)` (input carrega o gameWorldId). */
+interface SingleInputUseCase {
+  execute(input: never): Promise<Result<unknown, DomainError>>;
+}
+
+/** Factory para use cases `execute(input)` — injeta gameWorldId + contexto. */
+function wc1(
+  build: (repository: CommandContext["repository"]) => SingleInputUseCase,
+  resourceKind = "world",
+): CommandHandler {
+  return async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const payload =
+      typeof envelope.payload === "object" && envelope.payload !== null
+        ? (envelope.payload as Record<string, unknown>)
+        : {};
+    const input = {
+      ...payload,
+      gameWorldId: world.value.worldId,
+      idempotencyKey: envelope.idempotencyKey,
+      rulesetVersion: world.value.snapshot.rulesetVersion,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+    };
+    try {
+      const result = await build(repository).execute(input as never);
+      if (!result.ok) return result;
+      return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
+    } catch (error) {
+      return fail(
+        new DomainError(
+          "COMMAND_EXECUTION_FAILED",
+          error instanceof Error ? error.message : "Falha ao executar command.",
+        ),
+      );
+    }
+  };
+}
+
+/** Executa um caso de uso e converte exceções em REJECTED (nunca 500). */
+async function guardRun(
+  run: () => Promise<Result<unknown, DomainError>>,
+  resource: string,
+): Promise<Result<CommandOutcome, DomainError>> {
+  try {
+    const result = await run();
+    if (!result.ok) return result;
+    return succeed({ resource });
+  } catch (error) {
+    return fail(
+      new DomainError(
+        "COMMAND_EXECUTION_FAILED",
+        error instanceof Error ? error.message : "Falha ao executar command.",
+      ),
+    );
+  }
+}
+
+function requireString(
+  payload: unknown,
+  field: string,
+): Result<string, DomainError> {
+  const value =
+    typeof payload === "object" && payload !== null
+      ? (payload as Record<string, unknown>)[field]
+      : undefined;
+  return typeof value === "string"
+    ? succeed(value)
+    : fail(
+        new DomainError("COMMAND_PAYLOAD_INVALID", `${field} é obrigatório.`),
+      );
+}
+
 const handlers: Record<string, CommandHandler> = {
   "world:create": async ({ repository, envelope }) => {
     const parsed = createWorldPayload.safeParse(envelope.payload);
@@ -354,6 +501,207 @@ const handlers: Record<string, CommandHandler> = {
     );
     if (!result.ok) return result;
     return succeed({ resource: `ledger:${world.value.worldId}` });
+  },
+
+  // Infraestrutura de estádio (SAGA-04) — portas sintéticas de financiamento/licença
+  "infrastructure:start": wc1(
+    (r) => new StartInfrastructureProject(r),
+    "infrastructure",
+  ),
+  "infrastructure:resume": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const projectId = requireString(envelope.payload, "projectId");
+    if (!projectId.ok) return projectId;
+    return guardRun(
+      () =>
+        new ResumeInfrastructureProject(
+          repository,
+          financingPort(),
+          licensingPort(),
+          API_WORKER,
+          nowMs,
+        ).execute(
+          world.value.worldId,
+          projectId.value,
+          world.value.snapshot.currentDate,
+        ),
+      `infrastructure:${projectId.value}`,
+    );
+  },
+  "infrastructure:abort": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const projectId = requireString(envelope.payload, "projectId");
+    if (!projectId.ok) return projectId;
+    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
+    const reason =
+      typeof payload.reason === "string" ? payload.reason : "aborted-via-api";
+    return guardRun(
+      () =>
+        new AbortInfrastructureProject(
+          repository,
+          financingPort(),
+          API_WORKER,
+          nowMs,
+        ).execute(world.value.worldId, projectId.value, reason),
+      `infrastructure:${projectId.value}`,
+    );
+  },
+
+  // Scheduler do mundo (C2)
+  "scheduler:bootstrap": wc1(
+    (r) => new BootstrapWorldScheduler(r),
+    "scheduler",
+  ),
+  "scheduler:cancel-task": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const taskId = requireString(envelope.payload, "taskId");
+    if (!taskId.ok) return taskId;
+    return guardRun(
+      () =>
+        new CancelScheduledTask(repository).execute(
+          world.value.worldId,
+          taskId.value,
+        ),
+      `scheduler:${world.value.worldId}`,
+    );
+  },
+  "scheduler:retry-task": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const taskId = requireString(envelope.payload, "taskId");
+    if (!taskId.ok) return taskId;
+    return guardRun(
+      () =>
+        new RetryScheduledTask(repository).execute(
+          world.value.worldId,
+          taskId.value,
+        ),
+      `scheduler:${world.value.worldId}`,
+    );
+  },
+  "scheduler:schedule-tasks": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const inputs = (envelope.payload as Record<string, unknown> | undefined)
+      ?.inputs;
+    if (!Array.isArray(inputs)) {
+      return fail(
+        new DomainError("COMMAND_PAYLOAD_INVALID", "inputs[] é obrigatório."),
+      );
+    }
+    return guardRun(
+      () =>
+        new ScheduleWorldTasks(repository).execute(
+          world.value.worldId,
+          inputs as never,
+        ),
+      `scheduler:${world.value.worldId}`,
+    );
+  },
+  "scheduler:resume": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    return guardRun(
+      () =>
+        new ResumeWorldScheduler(
+          repository,
+          repository,
+          taskHandlers(repository),
+          API_WORKER,
+          nowMs,
+        ).execute(world.value.worldId),
+      `scheduler:${world.value.worldId}`,
+    );
+  },
+  "scheduler:process-due": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const on = WorldDate.parse(world.value.snapshot.currentDate);
+    if (!on.ok) return on;
+    return guardRun(
+      () =>
+        new ProcessDueWorldTasks(repository, taskHandlers(repository)).execute(
+          world.value.worldId,
+          on.value,
+        ),
+      `scheduler:${world.value.worldId}`,
+    );
+  },
+  "scheduler:advance-days": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
+    const days = typeof payload.days === "number" ? payload.days : 1;
+    return guardRun(
+      () =>
+        new AdvanceScheduledWorldDays(
+          repository,
+          repository,
+          taskHandlers(repository),
+          API_WORKER,
+          nowMs,
+        ).execute(world.value.worldId, days),
+      `world:${world.value.worldId}`,
+    );
+  },
+  "world:advance-day": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
+    const input = {
+      ...payload,
+      idempotencyKey: envelope.idempotencyKey,
+      rulesetVersion: world.value.snapshot.rulesetVersion,
+    };
+    return guardRun(
+      () =>
+        new AdvanceWorldDayCommand(
+          repository,
+          repository,
+          taskHandlers(repository),
+          API_WORKER,
+          nowMs,
+        ).execute(world.value.worldId, input as never),
+      `world:${world.value.worldId}`,
+    );
+  },
+
+  // Virada de temporada (SAGA-02) — resume com handlers/verifier sintéticos
+  "season:rollover:resume": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const rolloverId = requireString(envelope.payload, "rolloverId");
+    if (!rolloverId.ok) return rolloverId;
+    return guardRun(
+      () =>
+        new ResumeSeasonRollover(
+          repository,
+          rolloverHandlers() as never,
+          rolloverVerifier() as never,
+          API_WORKER,
+          nowMs,
+        ).execute(world.value.worldId, rolloverId.value),
+      `rollover:${rolloverId.value}`,
+    );
+  },
+
+  // Explicação de decisão de automação (X-001)
+  "automation:get-explanation": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const decisionId = requireString(envelope.payload, "decisionId");
+    if (!decisionId.ok) return decisionId;
+    return guardRun(
+      () =>
+        new GetDecisionExplanation(repository).execute(
+          world.value.worldId,
+          decisionId.value,
+        ),
+      `decision:${decisionId.value}`,
+    );
   },
 
   "market:publish-listing": async ({ repository, envelope }) => {
@@ -510,6 +858,11 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "eventing:compensate-saga": wc((r) => new CompensateSaga(r), "eventing"),
   "eventing:rebuild-projection": wc((r) => new RebuildProjection(r), "eventing"),
   "eventing:resume-realtime": wc((r) => new ResumeRealtimeStream(r), "eventing"),
+
+  // Scheduler + temporada — shape uniforme (C2 / SAGA-02)
+  "scheduler:schedule-task": wc((r) => new ScheduleWorldTask(r), "scheduler"),
+  "scheduler:register-window": wc((r) => new RegisterTemporalWindow(r), "scheduler"),
+  "season:rollover:start": wc((r) => new StartSeasonRollover(r), "rollover"),
 
   // Partida ao vivo (C8)
   "match:create-manifest": wc((r) => new CreateMatchManifest(r), "match"),
