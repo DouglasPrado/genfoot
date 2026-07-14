@@ -190,4 +190,20 @@ export class InspectStaff {
     const loaded = await loadStaff(this.repository, gameWorldId);
     return loaded.ok ? succeed(loaded.value.summary()) : loaded;
   }
+
+  public async listContracts(
+    gameWorldId: GameWorldId,
+    input: Readonly<{ clubId?: string; afterId?: string; limit: number }>,
+  ): Promise<
+    Result<
+      {
+        items: readonly StaffContractSnapshot[];
+        nextCursor: string | null;
+      },
+      DomainError
+    >
+  > {
+    const loaded = await loadStaff(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.listContracts(input)) : loaded;
+  }
 }

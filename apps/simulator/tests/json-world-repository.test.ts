@@ -20,7 +20,9 @@ import {
   WorldMatches,
   WorldNarrative,
   WorldScheduler,
+  WorldStaff,
   CancelPromise,
+  EndStaffContract,
   JoinWorld,
   RetryDelivery,
   SeasonRollover,
@@ -37,6 +39,8 @@ import {
   type MatchClubRef,
   type MatchFixtureRef,
   type NarrativeClubRef,
+  type StaffClubRef,
+  type StaffDepartmentRef,
 } from "@grinta/core";
 import {
   newEntityId,
@@ -49,7 +53,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(15) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(16) });
 
 afterEach(async () => {
   await Promise.all(
@@ -96,7 +100,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(15);
+    expect(file.schemaVersion).toBe(16);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -884,6 +888,96 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "INBOX_REVISION_CONFLICT" });
   });
 
+  it("persiste o staff C5 com contrato e alocação (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldStaff.initialize(world);
+    if (!created.ok) throw created.error;
+    const staff = created.value;
+    const club = "019f0000-0000-7000-8000-0000000000c1" as StaffClubRef;
+    const member = staff.createStaffMember({
+      firstName: "Ana",
+      lastName: "Treinadora",
+      role: "HEAD_COACH",
+      capabilities: {
+        coaching: 70,
+        fitness: 40,
+        medical: 30,
+        scouting: 50,
+        management: 55,
+      },
+      reputation: 72,
+      worldDate: "2026-01-01",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "staff:1",
+      worldSeed: world.seed,
+    });
+    if (!member.ok) throw member.error;
+    const offered = staff.offerStaffContract({
+      staffId: member.value.id,
+      clubId: club,
+      role: "HEAD_COACH",
+      startOn: "2026-01-01",
+      endOn: "2026-12-31",
+      compensationRef: "comp:1",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "offer:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    if (!offered.ok) throw offered.error;
+    const accepted = staff.acceptStaffContract({
+      contractId: offered.value.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "accept:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!accepted.ok) throw accepted.error;
+    const assigned = staff.assignStaff({
+      contractId: accepted.value.id,
+      departmentRef:
+        "019f0000-0000-7000-8000-0000000000d9" as StaffDepartmentRef,
+      workload: 80,
+      startOn: "2026-01-03",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "assign:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!assigned.ok) throw assigned.error;
+
+    await store.value.saveStaff(staff.snapshot(), null);
+    // round-trip: members, contracts, assignments e events preservados
+    expect(await store.value.findStaffByWorldId(world.id)).toEqual(
+      staff.snapshot(),
+    );
+
+    // recovery: encerrar o contrato após restart = efeito único no retry
+    const restarted = new JsonWorldRepository(store.directory);
+    const end = new EndStaffContract(restarted);
+    const endInput = {
+      contractId: accepted.value.id,
+      endedOn: "2026-06-30",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "end:1",
+      worldSeed: world.seed,
+      worldDate: "2026-06-30",
+    };
+    const first = await end.execute(world.id, endInput);
+    const retry = await end.execute(world.id, endInput);
+    expect(first).toMatchObject({ ok: true, value: { status: "ENDED" } });
+    expect(retry).toEqual(first);
+    const reloaded = await restarted.findStaffByWorldId(world.id);
+    expect(
+      reloaded!.contracts.filter((c) => c.status === "ENDED"),
+    ).toHaveLength(1);
+    await expect(
+      store.value.saveStaff(staff.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "STAFF_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -919,7 +1013,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(15);
+    expect(migrated.schemaVersion).toBe(16);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

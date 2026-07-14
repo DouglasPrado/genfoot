@@ -57,6 +57,8 @@ import {
   type WorldNarrativeSnapshot,
   type InboxRepository,
   type WorldInboxSnapshot,
+  type StaffRepository,
+  type WorldStaffSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -1482,6 +1484,72 @@ const worldInboxSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const staffRoleSchema = z.enum([
+  "HEAD_COACH",
+  "ASSISTANT_COACH",
+  "FITNESS_COACH",
+  "GOALKEEPING_COACH",
+  "PHYSIO",
+  "SCOUT",
+  "DIRECTOR_OF_FOOTBALL",
+]);
+
+const worldStaffSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  members: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      role: staffRoleSchema,
+      capabilities: z.object({
+        coaching: z.number().int(),
+        fitness: z.number().int(),
+        medical: z.number().int(),
+        scouting: z.number().int(),
+        management: z.number().int(),
+      }),
+      reputation: z.number().int(),
+      availability: z.enum(["AVAILABLE", "ASSIGNED", "UNAVAILABLE"]),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  contracts: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      staffId: identifierSchema,
+      clubId: identifierSchema,
+      role: staffRoleSchema,
+      status: z.enum(["OFFERED", "ACTIVE", "ENDED"]),
+      startOn: z.string(),
+      endOn: z.string(),
+      compensationRef: z.string(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  assignments: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      contractId: identifierSchema,
+      staffId: identifierSchema,
+      departmentRef: identifierSchema,
+      workload: z.number().int(),
+      startOn: z.string(),
+      endOn: z.string().nullable(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -1634,6 +1702,24 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     narrative: worldNarrativeSchema.nullable(),
     inbox: worldInboxSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(16),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+    matches: worldMatchesSchema.nullable(),
+    eventing: worldEventingSchema.nullable(),
+    market: worldMarketSchema.nullable(),
+    identity: worldIdentitySchema.nullable(),
+    admin: worldAdminSchema.nullable(),
+    narrative: worldNarrativeSchema.nullable(),
+    inbox: worldInboxSchema.nullable(),
+    staff: worldStaffSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -1651,6 +1737,7 @@ interface LoadedEnvelope {
   readonly admin: WorldAdminSnapshot | null;
   readonly narrative: WorldNarrativeSnapshot | null;
   readonly inbox: WorldInboxSnapshot | null;
+  readonly staff: WorldStaffSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -1668,7 +1755,8 @@ export class JsonWorldRepository
     IdentityRepository,
     AdminRepository,
     NarrativeRepository,
-    InboxRepository
+    InboxRepository,
+    StaffRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -1718,6 +1806,7 @@ export class JsonWorldRepository
       admin: current?.admin ?? null,
       narrative: current?.narrative ?? null,
       inbox: current?.inbox ?? null,
+      staff: current?.staff ?? null,
     });
   }
 
@@ -1758,6 +1847,7 @@ export class JsonWorldRepository
       admin: current.admin,
       narrative: current.narrative,
       inbox: current.inbox,
+      staff: current.staff,
     });
   }
 
@@ -2251,6 +2341,42 @@ export class JsonWorldRepository
     });
   }
 
+  public async findStaffByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldStaffSnapshot | null> {
+    return (await this.load(id))?.staff ?? null;
+  }
+
+  public async saveStaff(
+    staff: WorldStaffSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(staff.gameWorldId, "staff", async () => {
+      const current = await this.load(staff.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.staff !== null) {
+        throw new DomainError("STAFF_ALREADY_EXISTS", "O staff já existe.");
+      }
+      if (
+        expectedRevision !== null &&
+        current.staff?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "STAFF_REVISION_CONFLICT",
+          "O staff foi alterado desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.staff?.revision ?? null,
+          },
+        );
+      }
+      await this.write(staff.gameWorldId, { ...current, staff });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -2287,7 +2413,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -2304,7 +2431,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
@@ -2320,7 +2448,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
@@ -2334,7 +2463,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
@@ -2347,7 +2477,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.ledger !== null
           ? (persisted.ledger as unknown as WorldLedgerSnapshot)
           : null;
@@ -2359,7 +2490,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.competitions !== null
           ? (persisted.competitions as unknown as WorldCompetitionsSnapshot)
           : null;
@@ -2370,7 +2502,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.matches !== null
           ? (persisted.matches as unknown as WorldMatchesSnapshot)
           : null;
@@ -2380,7 +2513,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.eventing !== null
           ? (persisted.eventing as unknown as WorldEventingSnapshot)
           : null;
@@ -2389,7 +2523,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.market !== null
           ? (persisted.market as unknown as WorldMarketSnapshot)
           : null;
@@ -2397,25 +2532,34 @@ export class JsonWorldRepository
         (persisted.schemaVersion === 12 ||
           persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.identity !== null
           ? (persisted.identity as unknown as WorldIdentitySnapshot)
           : null;
       const admin =
         (persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15) &&
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.admin !== null
           ? (persisted.admin as unknown as WorldAdminSnapshot)
           : null;
       const narrative =
-        (persisted.schemaVersion === 14 || persisted.schemaVersion === 15) &&
+        (persisted.schemaVersion === 14 ||
+          persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16) &&
         persisted.narrative !== null
           ? (persisted.narrative as unknown as WorldNarrativeSnapshot)
           : null;
       const inbox =
-        persisted.schemaVersion === 15 && persisted.inbox !== null
+        (persisted.schemaVersion === 15 || persisted.schemaVersion === 16) &&
+        persisted.inbox !== null
           ? (persisted.inbox as unknown as WorldInboxSnapshot)
+          : null;
+      const staff =
+        persisted.schemaVersion === 16 && persisted.staff !== null
+          ? (persisted.staff as unknown as WorldStaffSnapshot)
           : null;
       return {
         world,
@@ -2432,6 +2576,7 @@ export class JsonWorldRepository
         admin,
         narrative,
         inbox,
+        staff,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -2453,7 +2598,7 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 15,
+        schemaVersion: 16,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
@@ -2468,6 +2613,7 @@ export class JsonWorldRepository
         admin: envelope.admin,
         narrative: envelope.narrative,
         inbox: envelope.inbox,
+        staff: envelope.staff,
       },
       null,
       2,

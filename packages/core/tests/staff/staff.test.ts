@@ -350,4 +350,28 @@ describe("Staff bounded context", () => {
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.members).toHaveLength(1);
   });
+
+  it("consulta capacidade as-of sem escrita e pagina contratos por cursor", () => {
+    const { gameWorld, value } = staff();
+    const coach = createHeadCoach(value, gameWorld, "cap");
+    const contract = activeContract(value, gameWorld, coach.id, "cap");
+    expect(contract.status).toBe("ACTIVE");
+
+    // capability é read-only (não muda a revisão) e as-of do contrato ativo
+    const revision = value.snapshot().revision;
+    const capability = value.capability(coach.id, date("2026-06-01"));
+    expect(capability).toMatchObject({ role: "HEAD_COACH", clubId: CLUB });
+    expect(capability!.score).toBeGreaterThan(0);
+    expect(value.snapshot().revision).toBe(revision);
+
+    // fora da vigência não há capacidade
+    expect(value.capability(coach.id, date("2027-06-01"))).toBeNull();
+
+    // query cursor-based por clube, paginada
+    const firstPage = value.listContracts({ clubId: CLUB, limit: 1 });
+    expect(firstPage.items).toHaveLength(1);
+    const cursor = firstPage.nextCursor;
+    // com um único contrato, não há próxima página
+    expect(cursor).toBeNull();
+  });
 });

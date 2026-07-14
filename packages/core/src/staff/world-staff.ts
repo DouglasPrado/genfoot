@@ -581,6 +581,26 @@ export class WorldStaff {
     return this.state.contracts.find(({ id }) => id === contractId) ?? null;
   }
 
+  /** Query cursor-based (read-only, as-of) para C4/C6/C8 sem escrita cruzada. */
+  public listContracts(
+    input: Readonly<{ clubId?: string; afterId?: string; limit: number }>,
+  ): { items: readonly StaffContractSnapshot[]; nextCursor: string | null } {
+    const limit = Math.max(1, Math.min(200, input.limit));
+    const ordered = [...this.state.contracts]
+      .filter((contract) =>
+        input.clubId === undefined ? true : contract.clubId === input.clubId,
+      )
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const start =
+      input.afterId === undefined
+        ? 0
+        : ordered.findIndex(({ id }) => id === input.afterId) + 1;
+    const page = ordered.slice(start, start + limit);
+    const nextCursor =
+      start + limit < ordered.length ? (page.at(-1)?.id ?? null) : null;
+    return { items: page, nextCursor };
+  }
+
   public findMember(staffId: string): StaffMemberSnapshot | null {
     return this.state.members.find(({ id }) => id === staffId) ?? null;
   }

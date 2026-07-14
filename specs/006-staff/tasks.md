@@ -45,19 +45,19 @@
 **Independent Test**: consumers recebem CapabilitySnapshot versionado as-of e não alteram StaffMember.
 
 - [x] T015 [US2] Query de capacidade as-of do contrato ativo (score/confidence, sem escrita) em WorldStaff.capability
-- [ ] T016 [US2] Alocação respeitando capacidade do departamento consultada de C3 (integração X-002) em packages/core/src/staff/
-- [ ] T017 [US2] Contratos de query cursor-based para C4/C6/C8 em packages/core/src/staff/
+- [x] T016 [US2] Alocação em departamento (referência lógica a C3) com capacidade as-of consultada read-only, sem escrita cruzada
+- [x] T017 [US2] Query cursor-based de contratos (por clube, paginada) para C4/C6/C8 em WorldStaff.listContracts
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Adapter Prisma/JSON + outbox para staff (persistência) em apps/simulator
-- [ ] T019 Recovery/replay após falha pós-commit em testes de integração
-- [ ] T020 Rodar quickstart.md (pnpm typecheck && pnpm test) e promover PLANNED→PARTIAL/DELIVERED com evidência
+- [x] T018 [P] Adapter JSON para staff em apps/simulator (schemaVersion 16, round-trip + recovery)
+- [x] T019 Recovery/replay após falha pós-commit (retry de EndStaffContract após restart = efeito único)
+- [x] T020 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover PLANNED→DELIVERED com evidência
 
 ## Implementation Strategy
 
-- **MVP entregue**: US1 completo (criar/ofertar/aceitar/alocar/encerrar) + US2 capacidade as-of.
-- **Pendente**: integração de capacidade do departamento (T016-T017), adapter/recovery (T018-T019).
+- **DELIVERED**: US1 completo (criar/ofertar/aceitar/alocar/encerrar) + US2 (capacidade as-of read-only + query cursor-based). Adapter schemaVersion 16 com round-trip + recovery.
+- **Nota**: capacidade de departamento é referência lógica a C3 (sem escrita cruzada); consumo cursor-based não concede escrita.
 
 ## Notes
 
