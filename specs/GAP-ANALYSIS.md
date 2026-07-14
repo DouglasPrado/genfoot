@@ -13,7 +13,7 @@
 | 006 staff | 5/5 | 4/4 | superfície ok; faltam queries/adapter/US2 integração C3 |
 | 007 competitions | 3/6 | 3/5 | RecordOfficialResult, ApplyDiscipline, HomologateCompetition (toda a US2) |
 | 008 match | 4/8 | 3/5 | SubmitMatchCommand, AdvanceMatchTicks, CheckpointMatch, ResumeMatch (US2 ao vivo) |
-| 009 ledger | 6/8 | 4/6 | AccrueDebt, CloseAccountingPeriod; entidades Debt/MoneySupply parciais |
+| 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
 | 010 eventing/sagas | 3/9 | 2/6 | StartSaga, ClaimSaga, AdvanceSagaStep, CompensateSaga, RebuildProjection, ResumeRealtimeStream |
 | 011 market | ~8/16 | 5/12 | toda a SAGA de transferência (Start/Advance/Compensate) + empréstimos + PublishListing + CancelNegotiation |
 | 012 automation | 6/6 | 5/5 | superfície ok; faltam precedência humana, knowledge filter, adapter |

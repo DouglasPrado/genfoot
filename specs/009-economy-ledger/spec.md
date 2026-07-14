@@ -1,7 +1,7 @@
 # Feature Specification: Economia e ledger
 
 **Feature ID**: BC-009 · **Directory**: `specs/009-economy-ledger` · **Created**: 2026-07-13  
-**Status**: PLANNED · **Milestone**: M1 · **Owner**: C9 · Economia/Ledger
+**Status**: DELIVERED · **Milestone**: M1 · **Owner**: C9 · Economia/Ledger
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre

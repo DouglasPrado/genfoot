@@ -16,7 +16,7 @@
 | Duplicate packet IDs       | PASS — 0 duplicates                                                  |
 | Unresolved markers         | PASS — 0 occurrences                                                 |
 | Open checklist items       | PASS — 0 unchecked items                                             |
-| Status reconciliation      | PASS — 1 DELIVERED, 10 PARTIAL, 23 PLANNED                           |
+| Status reconciliation      | PASS — 2 DELIVERED, 10 PARTIAL, 22 PLANNED                           |
 
 Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, one Markdown contract under `contracts/`, and `checklists/requirements.md`. Identity, status and milestone were compared with `feature-index.yaml`.
 
@@ -31,7 +31,7 @@ Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`
 | BC-005  | `specs/006-staff`                           | PLANNED   | 7/7       | PASS      | 0       |
 | BC-007  | `specs/007-competitions-calendar`           | PARTIAL   | 7/7       | PASS      | 0       |
 | BC-008  | `specs/008-match-runtime`                   | PLANNED   | 7/7       | PASS      | 0       |
-| BC-009  | `specs/009-economy-ledger`                  | PLANNED   | 7/7       | PASS      | 0       |
+| BC-009  | `specs/009-economy-ledger`                  | DELIVERED | 7/7       | PASS      | 0       |
 | X-002   | `specs/010-eventing-sagas-projections`      | PARTIAL   | 7/7       | PASS      | 0       |
 | BC-006  | `specs/011-market-scouting-contracts`       | PLANNED   | 7/7       | PASS      | 0       |
 | X-001   | `specs/012-automation-ai`                   | PLANNED   | 7/7       | PASS      | 0       |
