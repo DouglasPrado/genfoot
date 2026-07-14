@@ -6,6 +6,9 @@ import {
   CreateWorld,
   ExecuteClubCommand,
   GenerateWorldGenesis,
+  InitializeMarket,
+  InspectWorld,
+  PublishListing,
   type ClubCommand,
   type WorldMutationResult,
 } from "@grinta/core";
@@ -58,6 +61,29 @@ const clubCommandPayload = z.object({
   rulesetVersion: z.string().default("1.0.0"),
   command: z.record(z.unknown()),
 });
+
+const publishListingPayload = z.object({
+  playerId: z.string().min(1),
+  sellerClubId: z.string().min(1),
+  askingFeeMinor: z.number().int().nonnegative(),
+  rulesetVersion: z.string().default("1.0.0"),
+});
+
+async function loadWorld(
+  repository: CommandContext["repository"],
+  rawWorldId: string | undefined,
+) {
+  if (rawWorldId === undefined) {
+    return fail(
+      new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
+    );
+  }
+  const worldId = parseGameWorldId(rawWorldId);
+  if (!worldId.ok) return worldId;
+  const world = await new InspectWorld(repository).execute(worldId.value);
+  if (!world.ok) return world;
+  return succeed({ worldId: worldId.value, snapshot: world.value });
+}
 
 const handlers: Record<string, CommandHandler> = {
   "world:create": async ({ repository, envelope }) => {
@@ -154,6 +180,40 @@ const handlers: Record<string, CommandHandler> = {
     const result = await new ExecuteClubCommand(repository).execute(command);
     if (!result.ok) return result;
     return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  "market:initialize": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const result = await new InitializeMarket(repository).execute(
+      world.value.snapshot,
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `market:${world.value.worldId}` });
+  },
+
+  "market:publish-listing": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = publishListingPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
+    if (!ruleset.ok) return ruleset;
+    const input = {
+      playerId: parsed.data.playerId,
+      sellerClubId: parsed.data.sellerClubId,
+      askingFeeMinor: parsed.data.askingFeeMinor,
+      rulesetVersion: ruleset.value,
+      idempotencyKey: envelope.idempotencyKey,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+    } as Parameters<PublishListing["execute"]>[1];
+    const result = await new PublishListing(repository).execute(
+      world.value.worldId,
+      input,
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `listing:${parsed.data.playerId}` });
   },
 
   "world:advance-days": async ({ repository, envelope }) => {
