@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão:** ~52% dos commands e ~60% dos events implementados; ~151 tarefas `[ ]` pendentes. Nenhuma spec atingiu a barra `DELIVERED` ("reproduced scope"). O que existe hoje é um **esqueleto funcional e testado (slice P1/P2)** por contexto — um começo, não a entrega.
+> **Conclusão (atualizada):** **5 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C7, C8, C9 e X-002 (eventing). O restante segue como **PARTIAL** (slice P1/P2) ou `PLANNED`. Próximo alvo: C6 (transferência/empréstimo) dirigindo a saga de X-002.
 
 ## Cobertura por spec
 
@@ -14,7 +14,7 @@
 | 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
 | 008 match ✅ **DELIVERED** | 8/8 | 5/5 | — (US2 ao vivo: command log/ticks/checkpoint/resume + adapter; commit `f14fa55`) |
 | 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
-| 010 eventing/sagas | 3/9 | 2/6 | StartSaga, ClaimSaga, AdvanceSagaStep, CompensateSaga, RebuildProjection, ResumeRealtimeStream |
+| 010 eventing/sagas ✅ **DELIVERED** | 9/9 | 6/6 | — (US2: sagas duráveis/projeções/realtime + adapter; commit `caa338a`) |
 | 011 market | ~8/16 | 5/12 | toda a SAGA de transferência (Start/Advance/Compensate) + empréstimos + PublishListing + CancelNegotiation |
 | 012 automation | 6/6 | 5/5 | superfície ok; faltam precedência humana, knowledge filter, adapter |
 | 014 identity | 7/10 | 5/7 | RegisterAccount, JoinWorld, Refresh/RevokeSessionFamily reais + credenciais |
@@ -26,7 +26,7 @@
 
 ## Buracos grandes por tema
 
-1. **Sagas cross-context (X-002 + C6 + C1):** `StartSaga/Claim/AdvanceStep/Compensate` não existem → transferência (SAGA-01) e onboarding (SAGA-03) **não rodam de ponta a ponta**.
+1. **Sagas cross-context:** ✅ a **máquina durável** (X-002: `StartSaga/Claim/AdvanceStep/Compensate` com lease/fencing) está pronta e parametrizável. Faltam os **owners de negócio** que dirigem os passos: C6 (transferência SAGA-01) e C1 (onboarding SAGA-03).
 2. ~~**Partida ao vivo (C8 US2):**~~ ✅ entregue — command log/ticks/checkpoint/resume + adapter (commit `f14fa55`).
 3. ~~**Competição (C7 US2):**~~ ✅ entregue — resultado oficial → standings → homologação.
 4. ~~**Ledger (C9):**~~ ✅ entregue — dívida e fechamento de período.
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → **`X-002 saga runner`** (aí os golden paths viram jornadas reais) → C6 transferência/empréstimo → C1 conta/sessão → C12/C10/C11 → adapters → apps.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → **`C6 transferência/empréstimo`** (dirige SAGA-01 sobre a máquina de X-002) → C1 conta/sessão → C12/C10/C11 → adapters → apps.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).

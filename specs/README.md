@@ -16,7 +16,7 @@ Status is evidence-based: `DELIVERED` covers only reproduced scope, `PARTIAL` se
 | BC-007  | [Competitions and calendar](007-competitions-calendar/spec.md)                      | DELIVERED | M1        |
 | BC-008  | [Match runtime](008-match-runtime/spec.md)                                          | DELIVERED | M1        |
 | BC-009  | [Economy and ledger](009-economy-ledger/spec.md)                                    | DELIVERED | M1        |
-| X-002   | [Eventing, sagas and projections](010-eventing-sagas-projections/spec.md)           | PARTIAL   | M2        |
+| X-002   | [Eventing, sagas and projections](010-eventing-sagas-projections/spec.md)           | DELIVERED | M2        |
 | BC-006  | [Market, scouting and contracts](011-market-scouting-contracts/spec.md)             | PLANNED   | M1        |
 | X-001   | [Automation and AI](012-automation-ai/spec.md)                                      | PLANNED   | M1        |
 | VAL-001 | [Simulation and calibration](013-simulation-calibration/spec.md)                    | PLANNED   | M1        |
@@ -52,6 +52,6 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 
 ## Portfolio totals
 
-- 34 child features: 4 delivered, 8 partial, 22 planned.
+- 34 child features: 5 delivered, 7 partial, 22 planned.
 - 12 bounded contexts, 3 canonical concerns and 16 golden paths.
 - Every child packet includes specification, plan, research, data model, quickstart, contract and validated requirements checklist.

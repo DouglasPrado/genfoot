@@ -1,7 +1,7 @@
 # Feature Specification: Eventing, sagas, projeções e realtime
 
 **Feature ID**: X-002 · **Directory**: `specs/010-eventing-sagas-projections` · **Created**: 2026-07-13  
-**Status**: PARTIAL · **Milestone**: M2 · **Owner**: Concern · Eventing/Projeção
+**Status**: DELIVERED · **Milestone**: M2 · **Owner**: Concern · Eventing/Projeção
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre
