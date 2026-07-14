@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **10 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C1, C6, C7, C8, C9, C10, C11, C12 e X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; C12 corrige/reprocessa sem cross-write com audit hash-chain; C10/C11 reagem aos fatos oficiais (narrativa, inbox/relatórios/entrega). O restante segue como **PARTIAL** (slice P1/P2) ou `PLANNED`. Próximo alvo: C5 (staff) ou os golden paths.
+> **Conclusão (atualizada):** **11 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C1, C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. **Todos os bounded contexts de domínio (C1, C3–C12) estão entregues**, além do concern X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta. Restam **PARTIAL** BC-004 (player-dev) e algum resíduo, e os `PLANNED` (VAL-001 calibração, X-001 automação, X-003/OPS clientes/plataforma e os 16 golden paths).
 
 ## Cobertura por spec
 
@@ -10,7 +10,7 @@
 |------|:---:|:---:|---|
 | 004 club/squad | 7/10 | 6/14 | infra-project propose/resume/abort; metade dos eventos |
 | 005 player/dev | 3/8 | 4/6 | GeneratePlayer, ApplyDailyDevelopment, SetTrainingDirection, GenerateYouthCohort, PromoteYouth |
-| 006 staff | 5/5 | 4/4 | superfície ok; faltam queries/adapter/US2 integração C3 |
+| 006 staff ✅ **DELIVERED** | 5/5 | 4/4 | — (contratos/alocação + capacidade as-of + query cursor + adapter; commit `1f19763`) |
 | 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
 | 008 match ✅ **DELIVERED** | 8/8 | 5/5 | — (US2 ao vivo: command log/ticks/checkpoint/resume + adapter; commit `f14fa55`) |
 | 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → **C5 staff** → apps/plataforma.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → **golden paths E2E (GP-001…016) + VAL-001/X-001/apps**.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).

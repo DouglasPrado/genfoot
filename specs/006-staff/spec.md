@@ -1,7 +1,7 @@
 # Feature Specification: Staff
 
 **Feature ID**: BC-005 · **Directory**: `specs/006-staff` · **Created**: 2026-07-13  
-**Status**: PLANNED · **Milestone**: M1 · **Owner**: C5 · Staff · **Input**: catálogo e fontes canônicas.
+**Status**: DELIVERED · **Milestone**: M1 · **Owner**: C5 · Staff · **Input**: catálogo e fontes canônicas.
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre
