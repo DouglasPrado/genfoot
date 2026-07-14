@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { Body, Controller, Inject, Post } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Post } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { JsonWorldRepository } from "@grinta/persistence";
+
+import { registeredQueryTypes } from "../queries/query-registry.js";
 
 import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
@@ -16,7 +18,10 @@ import {
   commandEnvelopeSchema,
   type CommandResponse,
 } from "./command-contract.js";
-import { resolveCommandHandler } from "./command-registry.js";
+import {
+  registeredCommandTypes,
+  resolveCommandHandler,
+} from "./command-registry.js";
 
 @ApiTags("commands")
 @Controller("commands")
@@ -28,11 +33,32 @@ export class CommandsController {
   ) {}
 
   @ApiOperation({
+    summary: "Catálogo de commands e queries disponíveis",
+    description:
+      "Lista os commandTypes e queryTypes registrados para descoberta pelo cliente.",
+  })
+  @Get("catalog")
+  catalog(): {
+    commands: readonly string[];
+    queries: readonly string[];
+    commandCount: number;
+  } {
+    const commands = registeredCommandTypes();
+    return {
+      commands,
+      queries: registeredQueryTypes(),
+      commandCount: commands.length,
+    };
+  }
+
+  @ApiOperation({
     summary: "Envia um command (envelope idempotente)",
     description:
       "commandType roteia para o caso de uso. Resposta: ACCEPTED | " +
-      "ALREADY_APPLIED | REJECTED. Tipos: world:create/genesis/activate/" +
-      "advance-days, club:command, market:initialize/publish-listing.",
+      "ALREADY_APPLIED | REJECTED. 127 tipos em 17 contextos (world, club, " +
+      "market, ledger, infrastructure, scheduler, season, automation, staff, " +
+      "competition, player, narrative, inbox, admin, identity, eventing, match). " +
+      "Veja GET /commands/catalog.",
   })
   @ApiBody({
     schema: {

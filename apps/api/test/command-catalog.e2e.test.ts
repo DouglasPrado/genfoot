@@ -57,8 +57,20 @@ describe("API command catalog integrity (e2e)", () => {
     await rm(dataDirectory, { recursive: true, force: true });
   });
 
-  it("expõe um catálogo amplo de commands (>= 80 tipos)", () => {
-    expect(registeredCommandTypes().length).toBeGreaterThanOrEqual(80);
+  it("expõe um catálogo amplo de commands (>= 120 tipos)", () => {
+    expect(registeredCommandTypes().length).toBeGreaterThanOrEqual(120);
+  });
+
+  it("GET /commands/catalog lista commands e queries para descoberta", async () => {
+    const response = await request(app.getHttpServer()).get(
+      "/api/v1/commands/catalog",
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.commandCount).toBeGreaterThanOrEqual(120);
+    expect(response.body.queries.length).toBe(14);
+    expect(response.body.commands).toContain("infrastructure:start");
+    expect(response.body.commands).toContain("scheduler:resume");
+    expect(response.body.commands).toContain("match:submit-command");
   });
 
   it("todo command registrado é alcançável e devolve um CommandResponse válido (nunca 500)", async () => {
