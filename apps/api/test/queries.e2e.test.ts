@@ -107,6 +107,16 @@ describe("API query catalog (e2e)", () => {
     },
   );
 
+  it("envelope de query carrega paginação (limit/offset)", async () => {
+    const response = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/club?limit=10&offset=0`,
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.pagination.limit).toBe(10);
+    expect(response.body.pagination.offset).toBe(0);
+    expect(typeof response.body.pagination.hasMore).toBe("boolean");
+  });
+
   it("queryType desconhecido → 400 QUERY_UNKNOWN", async () => {
     const response = await request(app.getHttpServer()).get(
       `/api/v1/worlds/${worldId}/naoexiste`,
