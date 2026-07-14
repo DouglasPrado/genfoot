@@ -3,6 +3,7 @@
 import {
   createClient,
   GrintaApiError,
+  QueryCache,
   type GrintaClient,
   type Role,
 } from "@grinta/api-client";
@@ -32,6 +33,8 @@ interface SessionContextValue {
   /** false até o localStorage ser lido no cliente (evita mismatch de hidratação). */
   readonly hydrated: boolean;
   readonly api: GrintaClient;
+  /** Cache de query segregado por escopo (FR-009), limpo no logout. */
+  readonly cache: QueryCache;
   login(input: {
     subject: string;
     role: Role;
@@ -60,6 +63,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // lido só após o mount, evitando o mismatch de hidratação.
   const [session, setSession] = useState<AdminSession | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [cache] = useState(() => new QueryCache());
 
   useEffect(() => {
     setSession(loadStored());
@@ -89,8 +93,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setSession(null);
+    cache.clear(); // revalida na troca de escopo/sessão (FR-009)
     window.localStorage.removeItem(STORAGE_KEY);
-  }, []);
+  }, [cache]);
 
   const stepUp = useCallback<SessionContextValue["stepUp"]>(
     async (adminKey) => {
@@ -108,8 +113,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ session, hydrated, api, login, logout, stepUp }),
-    [session, hydrated, api, login, logout, stepUp],
+    () => ({ session, hydrated, api, cache, login, logout, stepUp }),
+    [session, hydrated, api, cache, login, logout, stepUp],
   );
 
   return (

@@ -97,31 +97,47 @@ export function ContextInspector({
   context: ContextName;
   refreshKey?: number;
 }) {
-  const { api } = useSession();
+  const { api, cache } = useSession();
   const [data, setData] = useState<unknown>(null);
   const [state, setState] = useState<"loading" | "ok" | "dormant" | "error">(
     "loading",
   );
+  const [fromCache, setFromCache] = useState(false);
   const [raw, setRaw] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    setState("loading");
+    // stale-while-revalidate: mostra o cache do escopo na hora, revalida depois.
+    const cached = cache.get(worldId, context);
+    if (cached) {
+      setData(cached.data);
+      setState("ok");
+      setFromCache(true);
+    } else {
+      setState("loading");
+    }
     api
       .query(worldId, context)
       .then((envelope) => {
         if (!alive) return;
+        cache.put(worldId, context, envelope);
         setData(envelope.data);
         setState("ok");
+        setFromCache(false);
       })
       .catch((err) => {
         if (!alive) return;
-        setState(err instanceof GrintaApiError && err.status === 404 ? "dormant" : "error");
+        if (cached) return; // mantém o cache se a revalidação falhar
+        setState(
+          err instanceof GrintaApiError && err.status === 404
+            ? "dormant"
+            : "error",
+        );
       });
     return () => {
       alive = false;
     };
-  }, [api, worldId, context, refreshKey]);
+  }, [api, cache, worldId, context, refreshKey]);
 
   if (state === "loading") {
     return <p className="mono text-xs text-muted-foreground">carregando {context}…</p>;
@@ -148,7 +164,14 @@ export function ContextInspector({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="font-heading text-sm text-foreground">{context}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-heading text-sm text-foreground">{context}</span>
+          {fromCache ? (
+            <span className="mono text-[10px] text-muted-foreground">
+              cache · revalidando…
+            </span>
+          ) : null}
+        </div>
         <Button variant="ghost" size="sm" onClick={() => setRaw((r) => !r)}>
           {raw ? "Ver resumo" : "Ver JSON"}
         </Button>
