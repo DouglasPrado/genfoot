@@ -2,6 +2,7 @@ import "reflect-metadata";
 
 import { NestFactory } from "@nestjs/core";
 import type { INestApplication } from "@nestjs/common";
+import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 
 import { AppModule } from "./app.module.js";
 
@@ -14,8 +15,28 @@ export async function createApp(): Promise<INestApplication> {
   return app;
 }
 
+/** Publica o Swagger/OpenAPI em /docs (JSON em /docs-json). */
+export function configureSwagger(app: INestApplication): void {
+  const config = new DocumentBuilder()
+    .setTitle("Grinta API")
+    .setDescription(
+      "API oficial do Grinta (X-003). Clientes não-autoritativos consomem " +
+        "commands, queries e realtime versionados. Domínio em @grinta/core.",
+    )
+    .setVersion("v1")
+    .addTag("health", "Saúde e versão de contrato")
+    .addTag("commands", "Command endpoint (envelope idempotente)")
+    .addTag("queries", "Queries versionadas (envelope asOf/projectionVersion)")
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup("docs", app, document, {
+    jsonDocumentUrl: "docs-json",
+  });
+}
+
 export async function bootstrap(port: number): Promise<void> {
   const app = await createApp();
+  configureSwagger(app);
   await app.listen(port);
 }
 

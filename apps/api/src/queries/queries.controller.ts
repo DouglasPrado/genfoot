@@ -1,5 +1,6 @@
 import { Controller, Get, Inject, Param } from "@nestjs/common";
 import { HttpStatus } from "@nestjs/common";
+import { ApiOperation, ApiParam, ApiTags } from "@nestjs/swagger";
 import { InspectWorld } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import { parseGameWorldId } from "@grinta/shared";
@@ -20,12 +21,15 @@ export interface QueryEnvelope<T> {
   readonly scope: Record<string, string>;
 }
 
+@ApiTags("queries")
 @Controller("worlds")
 export class QueriesController {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly repository: JsonWorldRepository,
   ) {}
 
+  @ApiOperation({ summary: "Snapshot do mundo (envelope de query)" })
+  @ApiParam({ name: "worldId", description: "UUID do mundo" })
   @Get(":worldId")
   async world(
     @Param("worldId") worldIdRaw: string,
@@ -67,6 +71,14 @@ export class QueriesController {
     };
   }
 
+  @ApiOperation({
+    summary: "Query versionada por contexto",
+    description:
+      "queryType: club, competitions, matches, market, ledger, players, " +
+      "staff, narrative, inbox, admin, automation, eventing, identity, scheduler.",
+  })
+  @ApiParam({ name: "worldId", description: "UUID do mundo" })
+  @ApiParam({ name: "queryType", description: "Contexto a consultar" })
   @Get(":worldId/:queryType")
   async query(
     @Param("worldId") worldIdRaw: string,

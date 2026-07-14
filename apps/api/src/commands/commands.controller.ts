@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { Body, Controller, Inject, Post } from "@nestjs/common";
+import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { JsonWorldRepository } from "@grinta/persistence";
 
 import { ApiException } from "../common/standard-error.js";
@@ -17,6 +18,7 @@ import {
 } from "./command-contract.js";
 import { resolveCommandHandler } from "./command-registry.js";
 
+@ApiTags("commands")
 @Controller("commands")
 export class CommandsController {
   constructor(
@@ -25,6 +27,24 @@ export class CommandsController {
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
   ) {}
 
+  @ApiOperation({
+    summary: "Envia um command (envelope idempotente)",
+    description:
+      "commandType roteia para o caso de uso. Resposta: ACCEPTED | " +
+      "ALREADY_APPLIED | REJECTED. Tipos: world:create/genesis/activate/" +
+      "advance-days, club:command, market:initialize/publish-listing.",
+  })
+  @ApiBody({
+    schema: {
+      example: {
+        contractVersion: "v1",
+        commandType: "world:create",
+        payload: { seed: "meu-mundo", startDate: "2026-01-01" },
+        idempotencyKey: "create-1",
+        correlationId: "corr-1",
+      },
+    },
+  })
   @Post()
   async submit(@Body() body: unknown): Promise<CommandResponse> {
     const parsed = commandEnvelopeSchema.safeParse(body);
