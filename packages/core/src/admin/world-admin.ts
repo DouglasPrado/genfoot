@@ -332,7 +332,7 @@ export class WorldAdmin {
       auditChain: this.appendAudit(input.appellant, "FILE_APPEAL", sanction.id),
       revision: this.state.revision + 1,
     };
-    return succeed(sanctions[index]!);
+    return succeed(sanctions[index]);
   }
 
   public decideAppeal(

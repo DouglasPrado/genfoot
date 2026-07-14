@@ -9,10 +9,11 @@ import {
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
+import type {
+  MatchOutcome} from "./narrative-types.js";
 import {
   CrisisStatus,
   FanbaseSegment,
-  MatchOutcome,
   PromiseStatus,
   type ClubFanbaseSnapshot,
   type NarrativeClubRef,
@@ -84,8 +85,8 @@ export class WorldNarrative {
     input: Readonly<{
       factId: string;
       clubId: NarrativeClubRef;
-      outcome: (typeof MatchOutcome)[keyof typeof MatchOutcome];
-      expected: (typeof MatchOutcome)[keyof typeof MatchOutcome];
+      outcome: MatchOutcome;
+      expected: MatchOutcome;
       rulesetVersion: RulesetVersion;
       idempotencyKey: string;
       worldSeed: string;

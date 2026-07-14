@@ -1,7 +1,6 @@
 import {
   DomainError,
   fail,
-  succeed,
   type GameWorldId,
   type Result,
   type RulesetVersion,

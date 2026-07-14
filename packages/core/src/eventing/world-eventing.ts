@@ -11,7 +11,6 @@ import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
   InboxStatus,
-  type EventingDomainEvent,
   type EventingSummary,
   type InboxRecordSnapshot,
   type MessageDeadLetteredEvent,

@@ -12,8 +12,6 @@ import {
   type CompetitionClubRef,
   type CompetitionSeasonRef,
   type GameWorldSnapshot,
-  type MatchClubRef,
-  type MatchFixtureRef,
 } from "../../src/index.js";
 
 // GP-007 · Match journey — convergência C7 (fixture) + C8 (runtime). Uma fixture
@@ -92,9 +90,9 @@ describe("GP-007 Match journey (convergence)", () => {
     if (!matchesR.ok) throw matchesR.error;
     const matches = matchesR.value;
     const manifest = matches.createMatchManifest({
-      fixtureRef: fixture.id as unknown as MatchFixtureRef,
-      homeClubId: fixture.homeClubId as unknown as MatchClubRef,
-      awayClubId: fixture.awayClubId as unknown as MatchClubRef,
+      fixtureRef: fixture.id,
+      homeClubId: fixture.homeClubId,
+      awayClubId: fixture.awayClubId,
       kickoffOn: fixture.kickoffOn,
       seed: gameWorld.seed,
       engineBuild: "kernel@1",
