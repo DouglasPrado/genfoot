@@ -8,6 +8,7 @@ import { CommandConsole } from "@/components/command-console";
 import { ContextInspector } from "@/components/context-inspector";
 import { ContextPulse, type ContextName } from "@/components/context-pulse";
 import { QuickActions } from "@/components/quick-actions";
+import { RealtimeFeed } from "@/components/realtime-feed";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSession } from "@/lib/session";
@@ -97,6 +98,18 @@ export default function WorldDetailPage() {
             </CardContent>
           </Card>
         ) : null}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Feed de tempo real</CardTitle>
+            <span className="mono text-[11px] text-muted-foreground">
+              Socket.IO · gateway com handshake
+            </span>
+          </CardHeader>
+          <CardContent>
+            <RealtimeFeed worldId={worldId} />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
