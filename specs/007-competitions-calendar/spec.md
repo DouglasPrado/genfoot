@@ -1,7 +1,7 @@
 # Feature Specification: Competições e calendário
 
 **Feature ID**: BC-007 · **Directory**: `specs/007-competitions-calendar` · **Created**: 2026-07-13  
-**Status**: PARTIAL · **Milestone**: M1 · **Owner**: C7 · Competição/Calendário · **Input**: catálogo e fontes canônicas.
+**Status**: DELIVERED · **Milestone**: M1 · **Owner**: C7 · Competição/Calendário · **Input**: catálogo e fontes canônicas.
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre

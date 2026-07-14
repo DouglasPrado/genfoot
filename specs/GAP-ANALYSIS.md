@@ -11,7 +11,7 @@
 | 004 club/squad | 7/10 | 6/14 | infra-project propose/resume/abort; metade dos eventos |
 | 005 player/dev | 3/8 | 4/6 | GeneratePlayer, ApplyDailyDevelopment, SetTrainingDirection, GenerateYouthCohort, PromoteYouth |
 | 006 staff | 5/5 | 4/4 | superfície ok; faltam queries/adapter/US2 integração C3 |
-| 007 competitions | 3/6 | 3/5 | RecordOfficialResult, ApplyDiscipline, HomologateCompetition (toda a US2) |
+| 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
 | 008 match | 4/8 | 3/5 | SubmitMatchCommand, AdvanceMatchTicks, CheckpointMatch, ResumeMatch (US2 ao vivo) |
 | 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
 | 010 eventing/sagas | 3/9 | 2/6 | StartSaga, ClaimSaga, AdvanceSagaStep, CompensateSaga, RebuildProjection, ResumeRealtimeStream |
