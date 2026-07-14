@@ -27,16 +27,25 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
 
-    const created = await request(app.getHttpServer())
-      .post("/api/v1/commands")
-      .send({
-        contractVersion: "v1",
-        commandType: "world:create",
-        payload: { seed: "hp-seed", startDate: "2026-01-01" },
-        idempotencyKey: "hp-create",
-        correlationId: "corr-hp",
-      });
+    const send = (commandType: string, key: string, payload: Record<string, unknown> = {}) =>
+      request(app.getHttpServer())
+        .post("/api/v1/commands")
+        .send({
+          contractVersion: "v1",
+          commandType,
+          worldId: commandType === "world:create" ? undefined : worldId,
+          idempotencyKey: key,
+          correlationId: "corr-hp",
+          payload,
+        });
+
+    const created = await send("world:create", "hp-create", {
+      seed: "hp-seed",
+      startDate: "2026-01-01",
+    });
     worldId = String(created.body.resource).slice("world:".length);
+    await send("world:genesis", "hp-gen");
+    await send("world:activate", "hp-act");
   });
 
   afterAll(async () => {
@@ -76,5 +85,38 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
       `/api/v1/worlds/${worldId}/ledger`,
     );
     expect(query.status).toBe(200);
+  });
+
+  it("os inicializadores de contexto <ctx>:initialize destravam suas queries (404→200)", async () => {
+    const contexts: [string, string][] = [
+      ["competition:initialize", "competitions"],
+      ["match:initialize", "matches"],
+      ["staff:initialize", "staff"],
+      ["narrative:initialize", "narrative"],
+      ["inbox:initialize", "inbox"],
+      ["admin:initialize", "admin"],
+      ["automation:initialize", "automation"],
+      ["identity:initialize", "identity"],
+      ["eventing:initialize", "eventing"],
+      ["market:initialize", "market"],
+    ];
+    for (const [commandType, queryType] of contexts) {
+      const init = await request(app.getHttpServer())
+        .post("/api/v1/commands")
+        .send({
+          contractVersion: "v1",
+          commandType,
+          worldId,
+          idempotencyKey: `hp-init-${queryType}`,
+          correlationId: "corr-hp",
+          payload: {},
+        });
+      expect(init.body.status, `${commandType}`).toBe("ACCEPTED");
+
+      const query = await request(app.getHttpServer()).get(
+        `/api/v1/worlds/${worldId}/${queryType}`,
+      );
+      expect(query.status, `query ${queryType}`).toBe(200);
+    }
   });
 });

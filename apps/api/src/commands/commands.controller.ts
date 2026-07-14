@@ -118,7 +118,23 @@ export class CommandsController {
     }
 
     const commandId = randomUUID();
-    const result = await handler({ repository: this.repository, envelope });
+    let result;
+    try {
+      result = await handler({ repository: this.repository, envelope });
+    } catch (error) {
+      // Rede de segurança: nenhum command derruba a API com 500. Qualquer
+      // exceção do domínio/adapter vira REJECTED com correlationId preservado.
+      return {
+        commandId,
+        status: "REJECTED",
+        correlationId: envelope.correlationId,
+        error: {
+          code: "COMMAND_EXECUTION_FAILED",
+          messageKey:
+            error instanceof Error ? error.message : "Falha ao executar command.",
+        },
+      };
+    }
     if (!result.ok) {
       return {
         commandId,

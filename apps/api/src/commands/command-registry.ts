@@ -56,8 +56,17 @@ import {
   GenerateYouthCohort,
   GetDecisionExplanation,
   HomologateCompetition,
+  InitializeAdmin,
+  InitializeAutomation,
+  InitializeCompetitions,
+  InitializeEventing,
+  InitializeIdentity,
+  InitializeInbox,
   InitializeLedger,
   InitializeMarket,
+  InitializeMatches,
+  InitializeNarrative,
+  InitializeStaff,
   InspectWorld,
   JoinWorld,
   ProcessDueWorldTasks,
@@ -317,6 +326,26 @@ interface SingleInputUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
 
+/** Inicializador de contexto com shape `execute(worldSnapshot)`. */
+interface WorldSnapshotUseCase {
+  execute(world: never): Promise<Result<unknown, DomainError>>;
+}
+
+/** Factory para inicializadores de contexto `<ctx>:initialize`. */
+function wInit(
+  build: (repository: CommandContext["repository"]) => WorldSnapshotUseCase,
+  resourceKind: string,
+): CommandHandler {
+  return async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    return guardRun(
+      () => build(repository).execute(world.value.snapshot as never),
+      `${resourceKind}:${world.value.worldId}`,
+    );
+  };
+}
+
 /** Factory para use cases `execute(input)` — injeta gameWorldId + contexto. */
 function wc1(
   build: (repository: CommandContext["repository"]) => SingleInputUseCase,
@@ -502,6 +531,17 @@ const handlers: Record<string, CommandHandler> = {
     if (!result.ok) return result;
     return succeed({ resource: `ledger:${world.value.worldId}` });
   },
+
+  // Inicializadores de contexto (execute(worldSnapshot))
+  "competition:initialize": wInit((r) => new InitializeCompetitions(r), "competitions"),
+  "match:initialize": wInit((r) => new InitializeMatches(r), "matches"),
+  "staff:initialize": wInit((r) => new InitializeStaff(r), "staff"),
+  "narrative:initialize": wInit((r) => new InitializeNarrative(r), "narrative"),
+  "inbox:initialize": wInit((r) => new InitializeInbox(r), "inbox"),
+  "admin:initialize": wInit((r) => new InitializeAdmin(r), "admin"),
+  "automation:initialize": wInit((r) => new InitializeAutomation(r), "automation"),
+  "identity:initialize": wInit((r) => new InitializeIdentity(r), "identity"),
+  "eventing:initialize": wInit((r) => new InitializeEventing(r), "eventing"),
 
   // Infraestrutura de estádio (SAGA-04) — portas sintéticas de financiamento/licença
   "infrastructure:start": wc1(
