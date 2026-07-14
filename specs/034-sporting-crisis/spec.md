@@ -1,6 +1,6 @@
 # Feature Specification: Crise esportiva
 
-**ID**: GP-015 | **Slug**: `sporting-crisis` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-015 | **Slug**: `sporting-crisis` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: fluxo multicontexto; owners C3/C8/C10/C11 preservados | **Contributors**: X-001, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/034-sporting-crisis`
 

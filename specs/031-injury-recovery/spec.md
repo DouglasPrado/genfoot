@@ -1,6 +1,6 @@
 # Feature Specification: Lesão e recuperação
 
-**ID**: GP-012 | **Slug**: `injury-recovery` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-012 | **Slug**: `injury-recovery` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-004 | **Contributors**: BC-005, BC-008, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/031-injury-recovery`
 

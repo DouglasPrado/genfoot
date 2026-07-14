@@ -33,25 +33,25 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 
 | ID     | Feature specification                                          | Status  | Milestone |
 | ------ | -------------------------------------------------------------- | ------- | --------- |
-| GP-001 | [Club entry](020-club-entry/spec.md)                           | PLANNED | M3        |
+| GP-001 | [Club entry](020-club-entry/spec.md)                           | DELIVERED| M3        |
 | GP-002 | [Return after absence](021-return-after-absence/spec.md)       | DELIVERED| M3        |
-| GP-003 | [Club exit or switch](022-club-exit-switch/spec.md)            | PLANNED | M3        |
+| GP-003 | [Club exit or switch](022-club-exit-switch/spec.md)            | DELIVERED| M3        |
 | GP-004 | [Season start](023-season-start/spec.md)                       | DELIVERED| M3        |
 | GP-005 | [Weekly management cycle](024-weekly-management-cycle/spec.md) | DELIVERED| M3        |
 | GP-006 | [Season rollover](025-season-rollover/spec.md)                 | DELIVERED| M3        |
-| GP-007 | [Match journey](026-match-journey/spec.md)                     | PLANNED | M3        |
-| GP-008 | [Player signing](027-player-signing/spec.md)                   | PLANNED | M3        |
-| GP-009 | [Player sale](028-player-sale/spec.md)                         | PLANNED | M3        |
-| GP-010 | [Player loan](029-player-loan/spec.md)                         | PLANNED | M3        |
+| GP-007 | [Match journey](026-match-journey/spec.md)                     | DELIVERED| M3        |
+| GP-008 | [Player signing](027-player-signing/spec.md)                   | DELIVERED| M3        |
+| GP-009 | [Player sale](028-player-sale/spec.md)                         | DELIVERED| M3        |
+| GP-010 | [Player loan](029-player-loan/spec.md)                         | DELIVERED| M3        |
 | GP-011 | [Youth journey](030-youth-journey/spec.md)                     | DELIVERED| M3        |
-| GP-012 | [Injury and recovery](031-injury-recovery/spec.md)             | PLANNED | M3        |
-| GP-013 | [Monthly finance](032-monthly-finance/spec.md)                 | PLANNED | M3        |
-| GP-014 | [Infrastructure project](033-infrastructure-project/spec.md)   | PLANNED | M3        |
-| GP-015 | [Sporting crisis](034-sporting-crisis/spec.md)                 | PLANNED | M3        |
-| GP-016 | [Financial crisis](035-financial-crisis/spec.md)               | PLANNED | M3        |
+| GP-012 | [Injury and recovery](031-injury-recovery/spec.md)             | DELIVERED| M3        |
+| GP-013 | [Monthly finance](032-monthly-finance/spec.md)                 | DELIVERED| M3        |
+| GP-014 | [Infrastructure project](033-infrastructure-project/spec.md)   | DELIVERED| M3        |
+| GP-015 | [Sporting crisis](034-sporting-crisis/spec.md)                 | DELIVERED| M3        |
+| GP-016 | [Financial crisis](035-financial-crisis/spec.md)               | DELIVERED| M3        |
 
 ## Portfolio totals
 
-- 34 child features: 19 delivered, 0 partial, 15 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Zero PARTIAL: todos os 12 bounded contexts de domínio, os 2 concerns de dados (FND-001, X-002) e 5 golden paths E2E estão DELIVERED.
+- 34 child features: 30 delivered, 0 partial, 4 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Entregues: os 12 bounded contexts de domínio, os 2 concerns de dados (FND-001, X-002) e **os 16 golden paths E2E**. Restam apenas 4 PLANNED: X-001 (automação/IA), VAL-001 (calibração), X-003 (clientes) e OPS-001 (plataforma).
 - 12 bounded contexts, 3 canonical concerns and 16 golden paths.
 - Every child packet includes specification, plan, research, data model, quickstart, contract and validated requirements checklist.

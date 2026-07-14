@@ -1,6 +1,6 @@
 # Feature Specification: Venda de jogador
 
-**ID**: GP-009 | **Slug**: `player-sale` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-009 | **Slug**: `player-sale` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-006 Mercado/Contratos | **Contributors**: BC-003, BC-009, X-002, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/028-player-sale`
 

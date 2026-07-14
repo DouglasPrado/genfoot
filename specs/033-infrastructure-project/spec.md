@@ -1,6 +1,6 @@
 # Feature Specification: Projeto de infraestrutura
 
-**ID**: GP-014 | **Slug**: `infrastructure-project` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-014 | **Slug**: `infrastructure-project` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-003 | **Contributors**: BC-009, BC-012, X-002, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/033-infrastructure-project`
 

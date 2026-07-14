@@ -3,7 +3,7 @@
 **Feature ID**: GP-003  
 **Directory**: `specs/022-club-exit-switch`  
 **Milestone**: M3  
-**Status**: PLANNED  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C1 encerra/ativa controle e cooldown; C11 preserva histórico; C12 audita risco; X-001 garante continuidade; X-003 apresenta

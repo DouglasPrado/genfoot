@@ -3,7 +3,7 @@
 **Feature ID**: GP-008  
 **Directory**: `specs/027-player-signing`  
 **Milestone**: M3  
-**Status**: PLANNED  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C6 possui scouting/negociação/contrato; C4 exame; C7 inscrição; C9 reserva/liquidação; X-002 orquestra SAGA-01; X-003 apresenta

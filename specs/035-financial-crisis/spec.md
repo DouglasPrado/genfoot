@@ -1,6 +1,6 @@
 # Feature Specification: Crise financeira
 
-**ID**: GP-016 | **Slug**: `financial-crisis` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-016 | **Slug**: `financial-crisis` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: fluxo multicontexto; C9 possui finanças | **Contributors**: C3, C10, C11, C12, X-001, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/035-financial-crisis`
 

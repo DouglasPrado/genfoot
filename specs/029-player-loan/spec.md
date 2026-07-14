@@ -1,6 +1,6 @@
 # Feature Specification: Empréstimo de jogador
 
-**ID**: GP-010 | **Slug**: `player-loan` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-010 | **Slug**: `player-loan` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-006 | **Contributors**: BC-004, BC-007, BC-009, X-002, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/029-player-loan`
 

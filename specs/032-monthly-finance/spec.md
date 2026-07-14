@@ -1,6 +1,6 @@
 # Feature Specification: Ciclo financeiro mensal
 
-**ID**: GP-013 | **Slug**: `monthly-finance` | **Milestone**: M3 | **Status**: PLANNED  
+**ID**: GP-013 | **Slug**: `monthly-finance` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-009 | **Contributors**: BC-003, BC-006, BC-011, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/032-monthly-finance`
 

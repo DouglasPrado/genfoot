@@ -3,7 +3,7 @@
 **Feature ID**: GP-001  
 **Directory**: `specs/020-club-entry`  
 **Milestone**: M3  
-**Status**: PLANNED  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C1 controla conta, reserva e vínculo; C3 conserva o clube; C12 avalia risco; X-003 apenas apresenta

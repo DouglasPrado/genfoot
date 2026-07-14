@@ -3,7 +3,7 @@
 **Feature ID**: GP-007  
 **Directory**: `specs/026-match-journey`  
 **Milestone**: M3  
-**Status**: PLANNED  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C8 possui runtime/resultado; C4 possui saúde/desenvolvimento; C5 staff; C7 elegibilidade/homologação; concerns só decidem, transportam e apresentam
