@@ -1,8 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import {
   ActivateProvisionedWorld,
   AdvanceWorldDays,
   CreateWorld,
+  ExecuteClubCommand,
   GenerateWorldGenesis,
+  type ClubCommand,
   type WorldMutationResult,
 } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
@@ -45,6 +49,14 @@ const createWorldPayload = z.object({
 
 const advanceDaysPayload = z.object({
   days: z.number().int().positive(),
+});
+
+const clubCommandPayload = z.object({
+  clubId: z.string().uuid(),
+  actorId: z.string().min(1),
+  occurredAt: z.string(),
+  rulesetVersion: z.string().default("1.0.0"),
+  command: z.record(z.unknown()),
 });
 
 const handlers: Record<string, CommandHandler> = {
@@ -106,6 +118,42 @@ const handlers: Record<string, CommandHandler> = {
       resource: `world:${worldId.value}`,
       mutation: result.value,
     });
+  },
+
+  "club:command": async ({ repository, envelope }) => {
+    if (envelope.worldId === undefined) {
+      return fail(
+        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
+      );
+    }
+    if (envelope.expectedVersion === undefined) {
+      return fail(
+        new DomainError(
+          "COMMAND_PAYLOAD_INVALID",
+          "expectedVersion é obrigatório para club:command.",
+        ),
+      );
+    }
+    const worldId = parseGameWorldId(envelope.worldId);
+    if (!worldId.ok) return worldId;
+    const parsed = clubCommandPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
+    if (!ruleset.ok) return ruleset;
+    const command = {
+      commandId: randomUUID(),
+      idempotencyKey: envelope.idempotencyKey,
+      gameWorldId: worldId.value,
+      clubId: parsed.data.clubId as ClubCommand["clubId"],
+      expectedVersion: envelope.expectedVersion,
+      occurredAt: parsed.data.occurredAt,
+      rulesetVersion: ruleset.value,
+      actorId: parsed.data.actorId,
+      ...parsed.data.command,
+    } as ClubCommand;
+    const result = await new ExecuteClubCommand(repository).execute(command);
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   "world:advance-days": async ({ repository, envelope }) => {
