@@ -1,6 +1,6 @@
 # Feature Specification: Identidade, conta e controle de clube
 
-**Feature Branch**: `014-identity-club-control` | **Created**: 2026-07-13 | **Status**: PLANNED  
+**Feature Branch**: `014-identity-club-control` | **Created**: 2026-07-13 | **Status**: DELIVERED  
 **Feature ID**: BC-001 | **Milestone**: M2 | **Owner**: C1 Identidade/Conta
 
 **Input**: Entregar conta, sessão, participação no mundo, reserva, onboarding, controle, abandono/troca e cooldown.

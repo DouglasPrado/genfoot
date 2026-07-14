@@ -16,7 +16,7 @@
 | Duplicate packet IDs       | PASS — 0 duplicates                                                  |
 | Unresolved markers         | PASS — 0 occurrences                                                 |
 | Open checklist items       | PASS — 0 unchecked items                                             |
-| Status reconciliation      | PASS — 6 DELIVERED, 6 PARTIAL, 22 PLANNED                           |
+| Status reconciliation      | PASS — 7 DELIVERED, 5 PARTIAL, 22 PLANNED                           |
 
 Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, one Markdown contract under `contracts/`, and `checklists/requirements.md`. Identity, status and milestone were compared with `feature-index.yaml`.
 
@@ -36,7 +36,7 @@ Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`
 | BC-006  | `specs/011-market-scouting-contracts`       | DELIVERED | 7/7       | PASS      | 0       |
 | X-001   | `specs/012-automation-ai`                   | PLANNED   | 7/7       | PASS      | 0       |
 | VAL-001 | `specs/013-simulation-calibration`          | PLANNED   | 7/7       | PASS      | 0       |
-| BC-001  | `specs/014-identity-club-control`           | PLANNED   | 7/7       | PASS      | 0       |
+| BC-001  | `specs/014-identity-club-control`           | DELIVERED | 7/7       | PASS      | 0       |
 | BC-010  | `specs/015-supporters-narrative`            | PLANNED   | 7/7       | PASS      | 0       |
 | BC-011  | `specs/016-notifications-history`           | PLANNED   | 7/7       | PASS      | 0       |
 | BC-012  | `specs/017-anti-abuse-admin`                | PLANNED   | 7/7       | PASS      | 0       |
