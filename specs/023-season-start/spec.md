@@ -3,7 +3,7 @@
 **Feature ID**: GP-004  
 **Directory**: `specs/023-season-start`  
 **Milestone**: M3  
-**Status**: PARTIAL  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C2 orquestra temporada/janelas; C3 possui objetivos e elenco; C7 publica competição/inscrição; C9 possui orçamento; C11 comunica

@@ -16,7 +16,7 @@
 | Duplicate packet IDs       | PASS — 0 duplicates                                                  |
 | Unresolved markers         | PASS — 0 occurrences                                                 |
 | Open checklist items       | PASS — 0 unchecked items                                             |
-| Status reconciliation      | PASS — 14 DELIVERED, 5 PARTIAL, 15 PLANNED                          |
+| Status reconciliation      | PASS — 19 DELIVERED, 0 PARTIAL, 15 PLANNED                          |
 
 Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, one Markdown contract under `contracts/`, and `checklists/requirements.md`. Identity, status and milestone were compared with `feature-index.yaml`.
 
@@ -43,16 +43,16 @@ Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`
 | X-003   | `specs/018-mobile-admin-clients`            | PLANNED   | 7/7       | PASS      | 0       |
 | OPS-001 | `specs/019-platform-production-readiness`   | PLANNED   | 7/7       | PASS      | 0       |
 | GP-001  | `specs/020-club-entry`                      | PLANNED   | 7/7       | PASS      | 0       |
-| GP-002  | `specs/021-return-after-absence`            | PARTIAL   | 7/7       | PASS      | 0       |
+| GP-002  | `specs/021-return-after-absence`            | DELIVERED | 7/7       | PASS      | 0       |
 | GP-003  | `specs/022-club-exit-switch`                | PLANNED   | 7/7       | PASS      | 0       |
-| GP-004  | `specs/023-season-start`                    | PARTIAL   | 7/7       | PASS      | 0       |
-| GP-005  | `specs/024-weekly-management-cycle`         | PARTIAL   | 7/7       | PASS      | 0       |
-| GP-006  | `specs/025-season-rollover`                 | PARTIAL   | 7/7       | PASS      | 0       |
+| GP-004  | `specs/023-season-start`                    | DELIVERED | 7/7       | PASS      | 0       |
+| GP-005  | `specs/024-weekly-management-cycle`         | DELIVERED | 7/7       | PASS      | 0       |
+| GP-006  | `specs/025-season-rollover`                 | DELIVERED | 7/7       | PASS      | 0       |
 | GP-007  | `specs/026-match-journey`                   | PLANNED   | 7/7       | PASS      | 0       |
 | GP-008  | `specs/027-player-signing`                  | PLANNED   | 7/7       | PASS      | 0       |
 | GP-009  | `specs/028-player-sale`                     | PLANNED   | 7/7       | PASS      | 0       |
 | GP-010  | `specs/029-player-loan`                     | PLANNED   | 7/7       | PASS      | 0       |
-| GP-011  | `specs/030-youth-journey`                   | PARTIAL   | 7/7       | PASS      | 0       |
+| GP-011  | `specs/030-youth-journey`                   | DELIVERED | 7/7       | PASS      | 0       |
 | GP-012  | `specs/031-injury-recovery`                 | PLANNED   | 7/7       | PASS      | 0       |
 | GP-013  | `specs/032-monthly-finance`                 | PLANNED   | 7/7       | PASS      | 0       |
 | GP-014  | `specs/033-infrastructure-project`          | PLANNED   | 7/7       | PASS      | 0       |

@@ -3,7 +3,7 @@
 **Feature ID**: GP-005  
 **Directory**: `specs/024-weekly-management-cycle`  
 **Milestone**: M3  
-**Status**: PARTIAL  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C2 coordena tempo; C3…C11 escrevem somente seus aggregates; X-001 usa commands normais; X-003 apresenta read models

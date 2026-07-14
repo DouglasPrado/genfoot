@@ -34,16 +34,16 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 | ID     | Feature specification                                          | Status  | Milestone |
 | ------ | -------------------------------------------------------------- | ------- | --------- |
 | GP-001 | [Club entry](020-club-entry/spec.md)                           | PLANNED | M3        |
-| GP-002 | [Return after absence](021-return-after-absence/spec.md)       | PARTIAL | M3        |
+| GP-002 | [Return after absence](021-return-after-absence/spec.md)       | DELIVERED| M3        |
 | GP-003 | [Club exit or switch](022-club-exit-switch/spec.md)            | PLANNED | M3        |
-| GP-004 | [Season start](023-season-start/spec.md)                       | PARTIAL | M3        |
-| GP-005 | [Weekly management cycle](024-weekly-management-cycle/spec.md) | PARTIAL | M3        |
-| GP-006 | [Season rollover](025-season-rollover/spec.md)                 | PARTIAL | M3        |
+| GP-004 | [Season start](023-season-start/spec.md)                       | DELIVERED| M3        |
+| GP-005 | [Weekly management cycle](024-weekly-management-cycle/spec.md) | DELIVERED| M3        |
+| GP-006 | [Season rollover](025-season-rollover/spec.md)                 | DELIVERED| M3        |
 | GP-007 | [Match journey](026-match-journey/spec.md)                     | PLANNED | M3        |
 | GP-008 | [Player signing](027-player-signing/spec.md)                   | PLANNED | M3        |
 | GP-009 | [Player sale](028-player-sale/spec.md)                         | PLANNED | M3        |
 | GP-010 | [Player loan](029-player-loan/spec.md)                         | PLANNED | M3        |
-| GP-011 | [Youth journey](030-youth-journey/spec.md)                     | PARTIAL | M3        |
+| GP-011 | [Youth journey](030-youth-journey/spec.md)                     | DELIVERED| M3        |
 | GP-012 | [Injury and recovery](031-injury-recovery/spec.md)             | PLANNED | M3        |
 | GP-013 | [Monthly finance](032-monthly-finance/spec.md)                 | PLANNED | M3        |
 | GP-014 | [Infrastructure project](033-infrastructure-project/spec.md)   | PLANNED | M3        |
@@ -52,6 +52,6 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 
 ## Portfolio totals
 
-- 34 child features: 14 delivered, 5 partial, 15 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Os 5 PARTIAL são golden paths (GP-002/004/005/006/011).
+- 34 child features: 19 delivered, 0 partial, 15 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Zero PARTIAL: todos os 12 bounded contexts de domínio, os 2 concerns de dados (FND-001, X-002) e 5 golden paths E2E estão DELIVERED.
 - 12 bounded contexts, 3 canonical concerns and 16 golden paths.
 - Every child packet includes specification, plan, research, data model, quickstart, contract and validated requirements checklist.

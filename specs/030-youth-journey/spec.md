@@ -1,6 +1,6 @@
 # Feature Specification: Jornada de um jovem
 
-**ID**: GP-011 | **Slug**: `youth-journey` | **Milestone**: M3 | **Status**: PARTIAL  
+**ID**: GP-011 | **Slug**: `youth-journey` | **Milestone**: M3 | **Status**: DELIVERED  
 **Owner**: BC-004 | **Contributors**: BC-003, BC-005, BC-006, X-003  
 **Created**: 2026-07-13 | **Directory**: `specs/030-youth-journey`
 

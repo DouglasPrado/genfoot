@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **14 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada: FND-001, C2 (world/seasons), C3 (club/squad), C4 (player-dev), C5 (staff), C6, C7, C8, C9, C10, C11, C12, C1 e X-002 — ou seja, **todos os 12 bounded contexts de domínio + os 2 concerns de dados (FND-001, X-002)**. Reconciliação atual: **14 DELIVERED / 5 PARTIAL / 15 PLANNED**. Os **5 PARTIAL** são golden paths E2E que já rodam parcial (GP-002/004/005/006/011). `PLANNED`: VAL-001 (calibração), X-001 (automação), X-003/OPS (clientes/plataforma) e os demais 11 golden paths.
+> **Conclusão (atualizada):** **19 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada e **não resta nenhum PARTIAL**. Entregues: os 12 bounded contexts de domínio (C1, C3–C12) + os 2 concerns de dados (FND-001 kernel, X-002 eventing) + 5 golden paths E2E (GP-002/004/005/006/011). Reconciliação atual: **19 DELIVERED / 0 PARTIAL / 15 PLANNED**. Todo o domínio persiste no adapter JSON (schemaVersion 16) com round-trip + recovery; as sagas SAGA-01/02/03 e a SAGA-04 de obras rodam de ponta a ponta. `PLANNED` restante: VAL-001 (calibração), X-001 (automação), X-003/OPS (clientes/plataforma) e 11 golden paths (GP-001/003/007/008/009/010/012/013/014/015/016) — todos sobre contextos já entregues.
 
 ## Cobertura por spec
 
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → ~~`C4 player-dev`~~ ✅ → **golden paths E2E (GP-001…016) + VAL-001/X-001/apps**.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → ~~`C4 player-dev`~~ ✅ → ~~`C2/C3 reconciliação`~~ ✅ → ~~`5 golden paths PARTIAL`~~ ✅ → **11 golden paths PLANNED + VAL-001/X-001/apps**.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).

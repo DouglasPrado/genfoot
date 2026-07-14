@@ -3,7 +3,7 @@
 **Feature ID**: GP-002  
 **Directory**: `specs/021-return-after-absence`  
 **Milestone**: M3  
-**Status**: PARTIAL  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C2 possui relógio e catch-up; C11 possui resumo/notificações; X-001 emite decisões normais; X-003 apenas apresenta

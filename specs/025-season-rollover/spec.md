@@ -3,7 +3,7 @@
 **Feature ID**: GP-006  
 **Directory**: `specs/025-season-rollover`  
 **Milestone**: M3  
-**Status**: PARTIAL  
+**Status**: DELIVERED  
 **Date**: 2026-07-13  
 **Input**: catálogo mestre, source map e golden path canônico  
 **Ownership**: C2 orquestra SAGA-02; C4/C6/C7/C9/C11 escrevem seus estados; C8 fornece resultados; X-002 entrega/checkpointa
