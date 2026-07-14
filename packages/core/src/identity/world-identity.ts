@@ -581,13 +581,15 @@ export class WorldIdentity {
   }
 
   private clubIsTaken(clubId: string): boolean {
-    const reserved = this.state.reservations.some(
+    // A vaga está ocupada por uma reserva ainda retida (HELD) ou por um controle
+    // ativo. Uma reserva CONFIRMED cujo controle já encerrou não bloqueia — a saída
+    // libera a vaga para handover.
+    const held = this.state.reservations.some(
       (reservation) =>
         reservation.clubId === clubId &&
-        (reservation.status === ClubReservationStatus.HELD ||
-          reservation.status === ClubReservationStatus.CONFIRMED),
+        reservation.status === ClubReservationStatus.HELD,
     );
-    return reserved || this.hasActiveControl(clubId);
+    return held || this.hasActiveControl(clubId);
   }
 
   private hasActiveControl(clubId: string): boolean {
