@@ -33,6 +33,9 @@ import {
   resolveCommandHandler,
 } from "./command-registry.js";
 
+/** Versões de contrato suportadas (FR-014). Aditivo dentro da major. */
+const SUPPORTED_CONTRACT_VERSIONS = new Set(["v1"]);
+
 @ApiTags("commands")
 @Controller("commands")
 export class CommandsController {
@@ -106,6 +109,21 @@ export class CommandsController {
       });
     }
     const envelope = parsed.data;
+
+    // FR-014: upgrade incompatível de contrato é bloqueado com recuperação segura.
+    if (!SUPPORTED_CONTRACT_VERSIONS.has(envelope.contractVersion)) {
+      throw new ApiException({
+        code: "CONTRACT_INCOMPATIBLE",
+        messageKey: "error.contract.incompatible",
+        correlationId: envelope.correlationId,
+        retryable: false,
+        fieldErrors: [
+          { field: "contractVersion", messageKey: envelope.contractVersion },
+        ],
+        blockingReason: "CONTRACT_INCOMPATIBLE",
+        recoveryAction: "UPGRADE_CLIENT",
+      });
+    }
 
     const replay = this.idempotency.get(envelope.idempotencyKey);
     if (replay) {

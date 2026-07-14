@@ -128,6 +128,20 @@ describe("API command/query transport (e2e)", () => {
     expect(response.body.fieldErrors.length).toBeGreaterThan(0);
   });
 
+  it("contractVersion incompatível → 400 CONTRACT_INCOMPATIBLE (FR-014)", async () => {
+    const response = await request(app.getHttpServer())
+      .post("/api/v1/commands")
+      .send(
+        envelope({
+          contractVersion: "v99",
+          idempotencyKey: "bad-contract",
+        }),
+      );
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe("CONTRACT_INCOMPATIBLE");
+    expect(response.body.recoveryAction).toBe("UPGRADE_CLIENT");
+  });
+
   it("query de mundo inexistente → 404 erro-padrão NOT_FOUND", async () => {
     const response = await request(app.getHttpServer()).get(
       "/api/v1/worlds/00000000-0000-7000-8000-000000000000",
