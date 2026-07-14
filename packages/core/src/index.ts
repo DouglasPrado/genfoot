@@ -69,6 +69,8 @@ export * from "./admin/admin-use-cases.js";
 export * from "./admin/world-admin.js";
 export * from "./clients/clients-types.js";
 export * from "./clients/clients-runtime.js";
+export * from "./platform/platform-types.js";
+export * from "./platform/platform.js";
 export * from "./players/player.js";
 export * from "./players/world-player-lifecycle.js";
 export * from "./scheduling/scheduling-repository.js";
