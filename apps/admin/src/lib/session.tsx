@@ -10,8 +10,9 @@ import {
   type ReactNode,
 } from "react";
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+// Vazio = same-origin: as chamadas vão para /api/v1/* na própria origem e o
+// Next.js as reescreve para a API (sem CORS). Override direto via env se preciso.
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 const STORAGE_KEY = "grinta.admin.session";
 
 export interface AdminSession {
