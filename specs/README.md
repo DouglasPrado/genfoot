@@ -52,6 +52,6 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 
 ## Portfolio totals
 
-- 34 child features: 13 delivered, 6 partial, 15 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`).
+- 34 child features: 14 delivered, 5 partial, 15 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Os 5 PARTIAL são golden paths (GP-002/004/005/006/011).
 - 12 bounded contexts, 3 canonical concerns and 16 golden paths.
 - Every child packet includes specification, plan, research, data model, quickstart, contract and validated requirements checklist.

@@ -2,13 +2,13 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **12 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada ("reproduced scope" + adapter + gate verde): FND-001, C1, C4 (player-dev), C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; 12 contextos persistem no adapter JSON (schemaVersion 16). Reconciliação atual: **12 DELIVERED / 7 PARTIAL / 15 PLANNED** (corrigi a linha que estava dessincronizada da própria tabela). Ainda **PARTIAL**: C2 (world/seasons), C3 (club/squad) — marcados DELIVERED no índice do README mas mantidos PARTIAL na reconciliação até fechar evidência — e 5 golden paths (GP-002/004/005/006/011) que já rodam parcial. `PLANNED`: VAL-001, X-001, X-003/OPS e os demais golden paths E2E.
+> **Conclusão (atualizada):** **14 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada: FND-001, C2 (world/seasons), C3 (club/squad), C4 (player-dev), C5 (staff), C6, C7, C8, C9, C10, C11, C12, C1 e X-002 — ou seja, **todos os 12 bounded contexts de domínio + os 2 concerns de dados (FND-001, X-002)**. Reconciliação atual: **14 DELIVERED / 5 PARTIAL / 15 PLANNED**. Os **5 PARTIAL** são golden paths E2E que já rodam parcial (GP-002/004/005/006/011). `PLANNED`: VAL-001 (calibração), X-001 (automação), X-003/OPS (clientes/plataforma) e os demais 11 golden paths.
 
 ## Cobertura por spec
 
 | Spec | Commands impl/total | Events impl/total | Faltando (destaque) |
 |------|:---:|:---:|---|
-| 004 club/squad | 7/10 | 6/14 | infra-project propose/resume/abort; metade dos eventos |
+| 004 club/squad ✅ **DELIVERED** | 10/10 | 14/14 | — (SAGA-04 infra + 8 eventos de obra/manutenção + adapter; commit `5d74f07`) |
 | 005 player/dev ✅ **DELIVERED** | 8/8 | 6/6 | — (geração/treino/desenvolvimento/youth + médico/aposentadoria + adapter; commit `c26b933`) |
 | 006 staff ✅ **DELIVERED** | 5/5 | 4/4 | — (contratos/alocação + capacidade as-of + query cursor + adapter; commit `1f19763`) |
 | 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
