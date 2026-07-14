@@ -1,6 +1,6 @@
 # Feature Specification: Notificações, relatórios e memória
 
-**Feature Branch**: `016-notifications-history` | **Created**: 2026-07-13 | **Status**: PLANNED  
+**Feature Branch**: `016-notifications-history` | **Created**: 2026-07-13 | **Status**: DELIVERED  
 **Feature ID**: BC-011 | **Milestone**: M2 | **Owner**: C11 Notificação/Relatório
 
 **Input**: Entregar inbox, threads, entrega/digest, timeline, records, estatísticas e relatórios reconstruíveis.
