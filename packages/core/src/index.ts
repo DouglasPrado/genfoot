@@ -19,6 +19,7 @@ export * from "./genesis/world-genesis-validator.js";
 export * from "./players/player-lifecycle-repository.js";
 export * from "./players/player-lifecycle-types.js";
 export * from "./players/player-lifecycle-use-cases.js";
+export * from "./players/player-medical-career-use-cases.js";
 export * from "./players/player.js";
 export * from "./players/world-player-lifecycle.js";
 export * from "./scheduling/scheduling-repository.js";

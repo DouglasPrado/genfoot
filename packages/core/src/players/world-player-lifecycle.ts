@@ -11,13 +11,21 @@ import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { WorldGenesisSnapshot } from "../genesis/genesis-types.js";
 import { Player } from "./player.js";
-import type {
-  PlayerAttributeCode,
-  PlayerDevelopmentHistoryEntry,
-  PlayerLifecycleSummary,
-  PlayerInspection,
-  PlayerLifecycleSnapshot,
-  WorldPlayerLifecycleSnapshot,
+import {
+  MedicalCaseStatus,
+  PlayerAvailability,
+  PlayerCareerStatus,
+  type MedicalCaseSeverity,
+  type MedicalCaseSnapshot,
+  type PlayerAttributeCode,
+  type PlayerClearedEvent,
+  type PlayerDevelopmentHistoryEntry,
+  type PlayerInjuredEvent,
+  type PlayerLifecycleSummary,
+  type PlayerInspection,
+  type PlayerLifecycleSnapshot,
+  type PlayerRetiredEvent,
+  type WorldPlayerLifecycleSnapshot,
 } from "./player-lifecycle-types.js";
 
 export class WorldPlayerLifecycle {
@@ -76,6 +84,8 @@ export class WorldPlayerLifecycle {
       developmentHistory: [],
       processedDayKeys: [],
       revision: 1,
+      medicalCases: [],
+      lifecycleEvents: [],
     };
     return WorldPlayerLifecycle.fromSnapshot(snapshot);
   }
@@ -144,6 +154,28 @@ export class WorldPlayerLifecycle {
         history.previousValue === history.nextValue
       ) {
         return fail(invalidLifecycle("Histórico de evolução inválido."));
+      }
+    }
+    const caseIds = new Set<string>();
+    for (const medicalCase of snapshot.medicalCases ?? []) {
+      if (
+        medicalCase.gameWorldId !== snapshot.gameWorldId ||
+        !playerIds.has(medicalCase.playerId) ||
+        medicalCase.diagnosis.trim() === "" ||
+        caseIds.has(medicalCase.id) ||
+        !Number.isSafeInteger(medicalCase.version) ||
+        medicalCase.version < 1
+      ) {
+        return fail(invalidLifecycle("Caso médico inválido."));
+      }
+      caseIds.add(medicalCase.id);
+    }
+    for (const event of snapshot.lifecycleEvents ?? []) {
+      if (
+        event.gameWorldId !== snapshot.gameWorldId ||
+        !playerIds.has(event.playerId)
+      ) {
+        return fail(invalidLifecycle("Evento de ciclo de vida inválido."));
       }
     }
     return succeed(new WorldPlayerLifecycle(snapshot));
@@ -230,6 +262,323 @@ export class WorldPlayerLifecycle {
     return changed;
   }
 
+  public openMedicalCase(
+    input: Readonly<{
+      playerId: string;
+      diagnosis: string;
+      severity: MedicalCaseSeverity;
+      expectedReturnOn: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<MedicalCaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const cases = this.state.medicalCases ?? [];
+    const existing = cases.find(
+      (medicalCase) => medicalCase.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (input.diagnosis.trim() === "") {
+      return fail(
+        new DomainError("INVALID_MEDICAL_CASE", "Diagnóstico obrigatório."),
+      );
+    }
+    const openedDate = WorldDate.parse(input.worldDate);
+    if (!openedDate.ok) return openedDate;
+    const returnDate = WorldDate.parse(input.expectedReturnOn);
+    if (!returnDate.ok) return returnDate;
+    if (returnDate.value.toString() < openedDate.value.toString()) {
+      return fail(
+        new DomainError(
+          "INVALID_MEDICAL_CASE",
+          "O retorno não pode ser anterior à abertura.",
+        ),
+      );
+    }
+    const index = this.state.players.findIndex(
+      ({ id }) => id === input.playerId,
+    );
+    if (index < 0) return fail(playerNotFound(input.playerId));
+    const current = this.state.players[index]!;
+    if (current.careerStatus === PlayerCareerStatus.RETIRED) {
+      return fail(
+        new DomainError(
+          "PLAYER_RETIRED",
+          "Jogador aposentado não abre caso médico.",
+          { playerId: input.playerId },
+        ),
+      );
+    }
+    if (current.availability === PlayerAvailability.INJURED) {
+      return fail(
+        new DomainError(
+          "PLAYER_ALREADY_INJURED",
+          "Jogador já possui um caso médico aberto.",
+          { playerId: input.playerId },
+        ),
+      );
+    }
+    const timestampMilliseconds = Date.parse(
+      `${openedDate.value.toString()}T00:00:00.000Z`,
+    );
+    const caseId = deterministicUuidV7<"MedicalCase">({
+      worldSeed: input.worldSeed,
+      context: `medical:${input.idempotencyKey}`,
+      timestampMilliseconds,
+    });
+    const eventId = deterministicUuidV7<"PlayerLifecycleEvent">({
+      worldSeed: input.worldSeed,
+      context: `injured:${input.idempotencyKey}`,
+      timestampMilliseconds,
+    });
+    const medicalCase: MedicalCaseSnapshot = {
+      id: caseId,
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.id,
+      diagnosis: input.diagnosis.trim(),
+      severity: input.severity,
+      status: MedicalCaseStatus.OPEN,
+      openedOn: openedDate.value.toString(),
+      expectedReturnOn: returnDate.value.toString(),
+      clearedOn: null,
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: PlayerInjuredEvent = {
+      id: eventId,
+      type: "PlayerInjured",
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.id,
+      medicalCaseId: caseId,
+      severity: input.severity,
+      diagnosis: medicalCase.diagnosis,
+      worldDate: openedDate.value.toString(),
+      expectedReturnOn: returnDate.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const players = [...this.state.players];
+    players[index] = {
+      ...current,
+      availability: PlayerAvailability.INJURED,
+      version: current.version + 1,
+    };
+    this.state = {
+      ...this.state,
+      players,
+      medicalCases: [...cases, medicalCase],
+      lifecycleEvents: [...(this.state.lifecycleEvents ?? []), event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(medicalCase);
+  }
+
+  public reassessMedicalCase(
+    input: Readonly<{
+      medicalCaseId: string;
+      outcome: "CLEAR" | "EXTEND";
+      worldDate: string;
+      newExpectedReturnOn?: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<MedicalCaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const cases = this.state.medicalCases ?? [];
+    const index = cases.findIndex(({ id }) => id === input.medicalCaseId);
+    if (index < 0) {
+      return fail(
+        new DomainError(
+          "MEDICAL_CASE_NOT_FOUND",
+          "Caso médico não encontrado.",
+          { medicalCaseId: input.medicalCaseId },
+        ),
+      );
+    }
+    const current = cases[index]!;
+    if (current.lastReassessmentKey === input.idempotencyKey) {
+      return succeed(current);
+    }
+    if (current.status === MedicalCaseStatus.CLEARED) {
+      return fail(
+        new DomainError(
+          "MEDICAL_CASE_TERMINAL",
+          "Caso médico já encerrado não aceita reavaliação.",
+          { medicalCaseId: current.id },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    if (input.outcome === "EXTEND") {
+      if (input.newExpectedReturnOn === undefined) {
+        return fail(
+          new DomainError(
+            "INVALID_MEDICAL_CASE",
+            "A extensão exige uma nova data de retorno.",
+          ),
+        );
+      }
+      const newReturn = WorldDate.parse(input.newExpectedReturnOn);
+      if (!newReturn.ok) return newReturn;
+      if (newReturn.value.toString() < date.value.toString()) {
+        return fail(
+          new DomainError(
+            "INVALID_MEDICAL_CASE",
+            "O novo retorno não pode ser anterior à reavaliação.",
+          ),
+        );
+      }
+      const updated: MedicalCaseSnapshot = {
+        ...current,
+        status: MedicalCaseStatus.RECOVERING,
+        expectedReturnOn: newReturn.value.toString(),
+        lastReassessmentKey: input.idempotencyKey,
+        version: current.version + 1,
+      };
+      const nextCases = [...cases];
+      nextCases[index] = updated;
+      this.state = {
+        ...this.state,
+        medicalCases: nextCases,
+        revision: this.state.revision + 1,
+      };
+      return succeed(updated);
+    }
+    const playerIndex = this.state.players.findIndex(
+      ({ id }) => id === current.playerId,
+    );
+    if (playerIndex < 0) return fail(playerNotFound(current.playerId));
+    const player = this.state.players[playerIndex]!;
+    const eventId = deterministicUuidV7<"PlayerLifecycleEvent">({
+      worldSeed: input.worldSeed,
+      context: `cleared:${input.idempotencyKey}`,
+      timestampMilliseconds: Date.parse(
+        `${date.value.toString()}T00:00:00.000Z`,
+      ),
+    });
+    const updated: MedicalCaseSnapshot = {
+      ...current,
+      status: MedicalCaseStatus.CLEARED,
+      clearedOn: date.value.toString(),
+      lastReassessmentKey: input.idempotencyKey,
+      version: current.version + 1,
+    };
+    const nextCases = [...cases];
+    nextCases[index] = updated;
+    const players = [...this.state.players];
+    players[playerIndex] =
+      player.careerStatus === PlayerCareerStatus.RETIRED
+        ? player
+        : {
+            ...player,
+            availability: PlayerAvailability.AVAILABLE,
+            version: player.version + 1,
+          };
+    const event: PlayerClearedEvent = {
+      id: eventId,
+      type: "PlayerCleared",
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.playerId,
+      medicalCaseId: current.id,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      players,
+      medicalCases: nextCases,
+      lifecycleEvents: [...(this.state.lifecycleEvents ?? []), event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(updated);
+  }
+
+  public retirePlayer(
+    input: Readonly<{
+      playerId: string;
+      reason: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+    }>,
+  ): Result<PlayerLifecycleSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const events = this.state.lifecycleEvents ?? [];
+    const existing = events.find(
+      (event): event is PlayerRetiredEvent =>
+        event.type === "PlayerRetired" &&
+        event.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) {
+      const retired = this.findPlayer(existing.playerId);
+      if (retired !== null) return succeed(retired);
+    }
+    if (input.reason.trim() === "") {
+      return fail(
+        new DomainError("INVALID_RETIREMENT", "O motivo é obrigatório."),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const index = this.state.players.findIndex(
+      ({ id }) => id === input.playerId,
+    );
+    if (index < 0) return fail(playerNotFound(input.playerId));
+    const current = this.state.players[index]!;
+    if (current.careerStatus === PlayerCareerStatus.RETIRED) {
+      return fail(
+        new DomainError("PLAYER_ALREADY_RETIRED", "Jogador já aposentado.", {
+          playerId: input.playerId,
+        }),
+      );
+    }
+    const eventId = deterministicUuidV7<"PlayerLifecycleEvent">({
+      worldSeed: input.worldSeed,
+      context: `retired:${input.idempotencyKey}`,
+      timestampMilliseconds: Date.parse(
+        `${date.value.toString()}T00:00:00.000Z`,
+      ),
+    });
+    const retired: PlayerLifecycleSnapshot = {
+      ...current,
+      careerStatus: PlayerCareerStatus.RETIRED,
+      availability: PlayerAvailability.UNAVAILABLE,
+      version: current.version + 1,
+    };
+    const players = [...this.state.players];
+    players[index] = retired;
+    const event: PlayerRetiredEvent = {
+      id: eventId,
+      type: "PlayerRetired",
+      gameWorldId: this.state.gameWorldId,
+      playerId: current.id,
+      reason: input.reason.trim(),
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      players,
+      lifecycleEvents: [...events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(retired);
+  }
+
   public findPlayer(playerId: string): PlayerLifecycleSnapshot | null {
     return this.state.players.find(({ id }) => id === playerId) ?? null;
   }
@@ -254,6 +603,12 @@ export class WorldPlayerLifecycle {
       playerCount: this.state.players.length,
       generationEventCount: this.state.generationEvents.length,
       developmentHistoryCount: this.state.developmentHistory.length,
+      openMedicalCaseCount: (this.state.medicalCases ?? []).filter(
+        ({ status }) => status !== MedicalCaseStatus.CLEARED,
+      ).length,
+      retiredPlayerCount: this.state.players.filter(
+        ({ careerStatus }) => careerStatus === PlayerCareerStatus.RETIRED,
+      ).length,
       lastProcessedOn:
         dates.length === 0
           ? null
@@ -268,6 +623,19 @@ export class WorldPlayerLifecycle {
 
 function invalidLifecycle(message: string): DomainError {
   return new DomainError("INVALID_PLAYER_LIFECYCLE", message);
+}
+
+function rulesetMismatch(): DomainError {
+  return new DomainError(
+    "RULESET_VERSION_MISMATCH",
+    "O command usa um ruleset diferente do lifecycle.",
+  );
+}
+
+function playerNotFound(playerId: string): DomainError {
+  return new DomainError("PLAYER_NOT_FOUND", "Jogador não encontrado.", {
+    playerId,
+  });
 }
 
 function ageOn(birthDate: string, worldDate: string): number {
