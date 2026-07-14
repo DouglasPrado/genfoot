@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **30 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada e **não resta nenhum PARTIAL**. Entregues: os 12 bounded contexts de domínio (C1, C3–C12) + os 2 concerns de dados (FND-001 kernel, X-002 eventing) + **os 16 golden paths E2E** (jornadas de convergência sobre os contextos entregues). Reconciliação atual: **30 DELIVERED / 0 PARTIAL / 4 PLANNED**. Todo o domínio persiste no adapter JSON (schemaVersion 16) com round-trip + recovery; as sagas SAGA-01/02/03 e a SAGA-04 de obras rodam de ponta a ponta. `PLANNED` restante (4): **X-001** (automação/IA), **VAL-001** (calibração), **X-003** (clientes mobile/admin) e **OPS-001** (plataforma/produção).
+> **Conclusão (atualizada):** **31 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada e **não resta nenhum PARTIAL**. Entregues: os 12 bounded contexts de domínio (C1, C3–C12) + os 3 concerns (FND-001 kernel, X-002 eventing, **X-001 automação/IA**) + **os 16 golden paths E2E**. Reconciliação atual: **31 DELIVERED / 0 PARTIAL / 3 PLANNED**. Todo o domínio persiste no adapter JSON (schemaVersion 17) com round-trip + recovery; as sagas SAGA-01/02/03 e a SAGA-04 de obras rodam de ponta a ponta; a automação decide por seedStream com precedência humana, escopo de risco e filtro de conhecimento. `PLANNED` restante (3): **VAL-001** (calibração), **X-003** (clientes mobile/admin) e **OPS-001** (plataforma/produção).
 
 ## Cobertura por spec
 
@@ -16,7 +16,7 @@
 | 009 ledger ✅ **DELIVERED** | 8/8 | 6/6 | — (contrato completo + adapter + property test; commit `88540c9`) |
 | 010 eventing/sagas ✅ **DELIVERED** | 9/9 | 6/6 | — (US2: sagas duráveis/projeções/realtime + adapter; commit `caa338a`) |
 | 011 market ✅ **DELIVERED** | 14/14 | 12/12 | — (SAGA-01 transferência + empréstimos + listing/cancel + adapter; commit `ed5f0cd`) |
-| 012 automation | 6/6 | 5/5 | superfície ok; faltam precedência humana, knowledge filter, adapter |
+| 012 automation ✅ **DELIVERED** | 6/6 | 5/5 | — (precedência humana + risco + explicação + knowledge filter + adapter schemaVersion 17) |
 | 014 identity ✅ **DELIVERED** | 10/10 | 7/7 | — (conta/sessão/credencial + SAGA-03 onboarding + adapter; commit `3f57ebf`) |
 | 015 narrative ✅ **DELIVERED** | 5/5 | 8/8 | — (conversa/mídia/promessa/crise/rivalidade + adapter; commit `764c330`) |
 | 016 notifications ✅ **DELIVERED** | 5/5 | 8/8 | — (inbox/digest/relatório/projeção/entrega + adapter; commit `3e2f896`) |
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → ~~`C4 player-dev`~~ ✅ → ~~`C2/C3 reconciliação`~~ ✅ → ~~`16 golden paths E2E`~~ ✅ → **X-001 automação → VAL-001 calibração → X-003 clientes → OPS-001 plataforma**.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → ~~`C4 player-dev`~~ ✅ → ~~`C2/C3 reconciliação`~~ ✅ → ~~`16 golden paths E2E`~~ ✅ → ~~`X-001 automação`~~ ✅ → **VAL-001 calibração → X-003 clientes → OPS-001 plataforma**.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).
