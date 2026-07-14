@@ -47,6 +47,8 @@ import {
   type WorldMatchesSnapshot,
   type EventingRepository,
   type WorldEventingSnapshot,
+  type MarketRepository,
+  type WorldMarketSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -922,6 +924,159 @@ const worldEventingSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const offerTermsSchema = z.object({
+  feeMinor: z.number().int().nonnegative(),
+  wageMinor: z.number().int().nonnegative(),
+  contractYears: z.number().int().positive(),
+});
+
+const playerContractSchema = z.object({
+  id: identifierSchema,
+  gameWorldId: identifierSchema,
+  personId: identifierSchema,
+  playerId: identifierSchema,
+  clubId: identifierSchema,
+  feeMinor: z.number().int().nonnegative(),
+  wageMinor: z.number().int().nonnegative(),
+  startsOn: z.string(),
+  endsOn: z.string(),
+  kind: z.enum(["PERMANENT", "LOAN"]),
+  status: z.enum(["PENDING", "ACTIVE", "TERMINATED"]),
+  idempotencyKey: z.string().min(1),
+  version: z.number().int().positive(),
+});
+
+const worldMarketSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  scoutingReports: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      playerId: identifierSchema,
+      observerClubId: identifierSchema,
+      observations: z.array(z.string()),
+      confidence: z.number().int(),
+      validUntil: z.string(),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  negotiations: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      playerId: identifierSchema,
+      buyerClubId: identifierSchema,
+      sellerClubId: identifierSchema,
+      status: z.enum([
+        "OPEN",
+        "OFFERED",
+        "COUNTERED",
+        "ACCEPTED",
+        "CANCELLED",
+        "EXPIRED",
+      ]),
+      currentVersion: z.number().int().nonnegative(),
+      offers: z.array(
+        z.object({
+          version: z.number().int().positive(),
+          createdByClubId: identifierSchema,
+          terms: offerTermsSchema,
+          expiresOn: z.string(),
+        }),
+      ),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  contracts: z.array(playerContractSchema),
+  links: z.array(
+    z.object({
+      playerId: identifierSchema,
+      clubId: identifierSchema,
+      kind: z.enum(["PERMANENT", "LOAN"]),
+      contractId: identifierSchema,
+      effectiveStart: z.string(),
+      effectiveEnd: z.string(),
+      status: z.enum(["ACTIVE", "ENDED"]),
+    }),
+  ),
+  listings: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        playerId: identifierSchema,
+        sellerClubId: identifierSchema,
+        askingFeeMinor: z.number().int().nonnegative(),
+        status: z.enum(["ACTIVE", "WITHDRAWN", "MATCHED"]),
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  transfers: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        negotiationId: identifierSchema,
+        sagaId: z.string().min(1),
+        playerId: identifierSchema,
+        personId: identifierSchema,
+        fromClubId: identifierSchema,
+        toClubId: identifierSchema,
+        feeMinor: z.number().int().nonnegative(),
+        wageMinor: z.number().int().nonnegative(),
+        startsOn: z.string(),
+        endsOn: z.string(),
+        status: z.enum([
+          "DRAFT",
+          "RUNNING",
+          "COMPLETED",
+          "COMPENSATING",
+          "COMPENSATED",
+          "FAILED",
+        ]),
+        currentStep: z.number().int().nonnegative(),
+        steps: z.array(
+          z.object({
+            index: z.number().int().nonnegative(),
+            name: z.string().min(1),
+            status: z.enum(["PENDING", "DONE", "COMPENSATED"]),
+            checkpointHash: z.string().min(1).nullable(),
+          }),
+        ),
+        fencingToken: z.number().int().nonnegative(),
+        contractId: identifierSchema.nullable(),
+        processedStepKeys: z.array(z.string()),
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  loans: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        playerId: identifierSchema,
+        personId: identifierSchema,
+        originClubId: identifierSchema,
+        destinationClubId: identifierSchema,
+        startsOn: z.string(),
+        endsOn: z.string(),
+        optionFeeMinor: z.number().int().nonnegative().nullable(),
+        status: z.enum(["AGREED", "ACTIVE", "RETURNED", "PURCHASED", "TERMINATED"]),
+        contractId: identifierSchema,
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -999,6 +1154,19 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(11),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+    matches: worldMatchesSchema.nullable(),
+    eventing: worldEventingSchema.nullable(),
+    market: worldMarketSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -1011,6 +1179,7 @@ interface LoadedEnvelope {
   readonly competitions: WorldCompetitionsSnapshot | null;
   readonly matches: WorldMatchesSnapshot | null;
   readonly eventing: WorldEventingSnapshot | null;
+  readonly market: WorldMarketSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -1023,7 +1192,8 @@ export class JsonWorldRepository
     LedgerRepository,
     CompetitionRepository,
     MatchRepository,
-    EventingRepository
+    EventingRepository,
+    MarketRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -1068,6 +1238,7 @@ export class JsonWorldRepository
       competitions: current?.competitions ?? null,
       matches: current?.matches ?? null,
       eventing: current?.eventing ?? null,
+      market: current?.market ?? null,
     });
   }
 
@@ -1103,6 +1274,7 @@ export class JsonWorldRepository
       competitions: current.competitions,
       matches: current.matches,
       eventing: current.eventing,
+      market: current.market,
     });
   }
 
@@ -1410,6 +1582,42 @@ export class JsonWorldRepository
     });
   }
 
+  public async findMarketByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldMarketSnapshot | null> {
+    return (await this.load(id))?.market ?? null;
+  }
+
+  public async saveMarket(
+    market: WorldMarketSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(market.gameWorldId, "market", async () => {
+      const current = await this.load(market.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.market !== null) {
+        throw new DomainError("MARKET_ALREADY_EXISTS", "O mercado já existe.");
+      }
+      if (
+        expectedRevision !== null &&
+        current.market?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "MARKET_REVISION_CONFLICT",
+          "O mercado foi alterado desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.market?.revision ?? null,
+          },
+        );
+      }
+      await this.write(market.gameWorldId, { ...current, market });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -1441,7 +1649,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 7 ||
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -1453,7 +1662,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 7 ||
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
@@ -1464,7 +1674,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 7 ||
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
@@ -1473,7 +1684,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 7 ||
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
@@ -1481,25 +1693,34 @@ export class JsonWorldRepository
         (persisted.schemaVersion === 7 ||
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.ledger !== null
           ? (persisted.ledger as unknown as WorldLedgerSnapshot)
           : null;
       const competitions =
         (persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
-          persisted.schemaVersion === 10) &&
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.competitions !== null
           ? (persisted.competitions as unknown as WorldCompetitionsSnapshot)
           : null;
       const matches =
-        (persisted.schemaVersion === 9 || persisted.schemaVersion === 10) &&
+        (persisted.schemaVersion === 9 ||
+          persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11) &&
         persisted.matches !== null
           ? (persisted.matches as unknown as WorldMatchesSnapshot)
           : null;
       const eventing =
-        persisted.schemaVersion === 10 && persisted.eventing !== null
+        (persisted.schemaVersion === 10 || persisted.schemaVersion === 11) &&
+        persisted.eventing !== null
           ? (persisted.eventing as unknown as WorldEventingSnapshot)
+          : null;
+      const market =
+        persisted.schemaVersion === 11 && persisted.market !== null
+          ? (persisted.market as unknown as WorldMarketSnapshot)
           : null;
       return {
         world,
@@ -1511,6 +1732,7 @@ export class JsonWorldRepository
         competitions,
         matches,
         eventing,
+        market,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -1532,7 +1754,7 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 10,
+        schemaVersion: 11,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
@@ -1542,6 +1764,7 @@ export class JsonWorldRepository
         competitions: envelope.competitions,
         matches: envelope.matches,
         eventing: envelope.eventing,
+        market: envelope.market,
       },
       null,
       2,

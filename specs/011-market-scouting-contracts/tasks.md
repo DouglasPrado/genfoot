@@ -32,22 +32,22 @@
 
 - [x] T012 [US1] ActivateContract + PlayerClubLink único incompatível (PLAYER_LINK_CONFLICT) + PlayerContractActivated/PlayerClubLinkChanged
 - [x] T013 [US1] TerminateContract encerra vínculo (ENDED) e libera o jogador
-- [ ] T014 [US1] StartTransfer/AdvanceTransferStep/CompensateTransfer (SAGA-01) integrando C9 reserve/settle/release e C7 registration via X-002
-- [ ] T015 [US1] Casos de uso da saga com fencing token e compensação idempotente
+- [x] T014 [US1] StartTransfer/AdvanceTransferStep/CompensateTransfer (SAGA-01) com fencing + TransferStarted/Completed/Compensated; integração C9 reserve/settle/release + X-002 saga provada em teste de golden path
+- [x] T015 [US1] Casos de uso da saga com fencing token (SAGA_FENCED) e compensação idempotente
 
 ## Phase 5: User Story 3 — Empréstimo determinístico (Priority: P3)
 
-- [ ] T016 [US3] StartLoan/ExerciseLoanOption/ReturnLoanedPlayer (retorno/compra exatamente uma vez) + LoanActivated/LoanReturned/LoanPurchased
+- [x] T016 [US3] StartLoan/ExerciseLoanOption/ReturnLoanedPlayer (retorno/compra exatamente uma vez) + LoanActivated/LoanReturned/LoanPurchased
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T017 [P] Adapter de persistência + outbox para o mercado em apps/simulator
-- [ ] T018 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T017 [P] Adapter de persistência para o mercado em apps/simulator (schemaVersion 11, round-trip + recovery)
+- [x] T018 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US2 completo (scouting + negociação versionada com stale/expiração) e núcleo de US1 (ativação de contrato + vínculo único + término).
-- **Pendente**: SAGA-01 de transferência cross-context (C9/C7 via X-002), empréstimos (T014-T016); adapter (T017).
+- **DELIVERED**: US2 (scouting + negociação versionada + listing/cancel) + US1 (ativação/término de contrato + SAGA-01 de transferência com fencing e compensação) + US3 (empréstimo com retorno/compra exatamente uma vez) + adapter (schemaVersion 11). Golden path SAGA-01 coordena C6 + C9 (reserve/settle/release) + X-002 (saga durável) com conservação monetária (residual 0).
+- **Nota**: `PublishListing`/`SearchMarketListings` cobrem a superfície de mercado; a busca/scouting profundos evoluem sob o mesmo contrato aditivo.
 
 ## Notes
 

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   AdvanceSagaStep,
+  AdvanceTransferStep,
   CheckpointMatch,
   OpenLedgerAccount,
   PostTransaction,
@@ -11,6 +12,7 @@ import {
   WorldCompetitions,
   WorldEventing,
   WorldLedger,
+  WorldMarket,
   WorldMatches,
   WorldScheduler,
   SeasonRollover,
@@ -21,6 +23,9 @@ import {
   type CompetitionClubRef,
   type CompetitionSeasonRef,
   type GameWorldSnapshot,
+  type MarketClubRef,
+  type MarketPersonRef,
+  type MarketPlayerRef,
   type MatchClubRef,
   type MatchFixtureRef,
 } from "@grinta/core";
@@ -35,7 +40,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(10) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(11) });
 
 afterEach(async () => {
   await Promise.all(
@@ -82,7 +87,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(10);
+    expect(file.schemaVersion).toBe(11);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -505,6 +510,100 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "EVENTING_REVISION_CONFLICT" });
   });
 
+  it("persiste o mercado C6 com transferência ao vivo (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldMarket.initialize(world);
+    if (!created.ok) throw created.error;
+    const market = created.value;
+    const player = "019f0000-0000-7000-8000-0000000000d1" as MarketPlayerRef;
+    const person = "019f0000-0000-7000-8000-0000000000e1" as MarketPersonRef;
+    const buyer = "019f0000-0000-7000-8000-0000000000b1" as MarketClubRef;
+    const seller = "019f0000-0000-7000-8000-0000000000b2" as MarketClubRef;
+    const negotiation = market.openNegotiation({
+      playerId: player,
+      buyerClubId: buyer,
+      sellerClubId: seller,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "neg:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!negotiation.ok) throw negotiation.error;
+    const offer = market.submitOffer({
+      negotiationId: negotiation.value.id,
+      createdByClubId: buyer,
+      feeMinor: 1_000_000,
+      wageMinor: 20_000,
+      contractYears: 3,
+      expiresOn: "2026-02-01",
+      expectedVersion: 0,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "off:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-06",
+    });
+    if (!offer.ok) throw offer.error;
+    const accepted = market.acceptOffer({
+      negotiationId: negotiation.value.id,
+      version: 1,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "acc:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-07",
+    });
+    if (!accepted.ok) throw accepted.error;
+    const transfer = market.startTransfer({
+      negotiationId: negotiation.value.id,
+      sagaId: "saga-1",
+      personId: person,
+      wageMinor: 20_000,
+      startsOn: "2026-02-01",
+      endsOn: "2029-06-30",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "tr:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-08",
+    });
+    if (!transfer.ok) throw transfer.error;
+    const step0 = market.advanceTransferStep({
+      transferId: transfer.value.id,
+      fencingToken: 1,
+      checkpointHash: "reserve-ok",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "tr:1:s0",
+      worldSeed: world.seed,
+      worldDate: "2026-01-08",
+    });
+    if (!step0.ok) throw step0.error;
+
+    await store.value.saveMarket(market.snapshot(), null);
+    // round-trip: negotiations/offers, transfers (steps/processedStepKeys) e events preservados
+    expect(await store.value.findMarketByWorldId(world.id)).toEqual(
+      market.snapshot(),
+    );
+
+    // recovery: retry do mesmo passo da saga após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const advance = new AdvanceTransferStep(restarted);
+    const retry = await advance.execute(world.id, {
+      transferId: transfer.value.id,
+      fencingToken: 1,
+      checkpointHash: "reserve-ok",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "tr:1:s0",
+      worldSeed: world.seed,
+      worldDate: "2026-01-08",
+    });
+    expect(retry).toMatchObject({ ok: true });
+    const reloaded = await restarted.findMarketByWorldId(world.id);
+    expect(reloaded!.transfers![0]!.currentStep).toBe(1);
+    await expect(
+      store.value.saveMarket(market.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "MARKET_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -540,7 +639,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(10);
+    expect(migrated.schemaVersion).toBe(11);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

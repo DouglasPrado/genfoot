@@ -11,13 +11,24 @@ import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
   ContractStatus,
+  ListingStatus,
   LinkStatus,
+  LoanStatus,
   NegotiationStatus,
+  PlayerLinkKind,
+  TransferStatus,
+  TransferStepStatus,
+  type LoanActivatedEvent,
+  type LoanAgreementSnapshot,
+  type LoanPurchasedEvent,
+  type LoanReturnedEvent,
   type MarketClubRef,
   type MarketDomainEvent,
+  type MarketListingSnapshot,
   type MarketPersonRef,
   type MarketPlayerRef,
   type MarketSummary,
+  type NegotiationExpiredEvent,
   type NegotiationSnapshot,
   type OfferAcceptedEvent,
   type OfferSnapshot,
@@ -26,13 +37,18 @@ import {
   type PlayerClubLinkSnapshot,
   type PlayerContractActivatedEvent,
   type PlayerContractSnapshot,
-  type PlayerLinkKind,
   type ScoutingReportProducedEvent,
   type ScoutingReportSnapshot,
+  type TransferAgreementSnapshot,
+  type TransferCompensatedEvent,
+  type TransferCompletedEvent,
+  type TransferStartedEvent,
+  type TransferStepSnapshot,
   type WorldMarketSnapshot,
 } from "./market-types.js";
 
 const MIN_SCOUTING_CAPACITY = 20;
+const TRANSFER_STEPS = ["reserve", "register", "settle"] as const;
 
 export class WorldMarket {
   private constructor(private state: WorldMarketSnapshot) {}
@@ -95,6 +111,42 @@ export class WorldMarket {
       if (event.gameWorldId !== snapshot.gameWorldId) {
         return fail(invalidMarket("Evento de mercado inválido."));
       }
+    }
+    const listingIds = new Set<string>();
+    for (const listing of snapshot.listings ?? []) {
+      if (
+        listing.gameWorldId !== snapshot.gameWorldId ||
+        listingIds.has(listing.id) ||
+        listing.askingFeeMinor < 0
+      ) {
+        return fail(invalidMarket("Listing inválida."));
+      }
+      listingIds.add(listing.id);
+    }
+    const transferIds = new Set<string>();
+    for (const transfer of snapshot.transfers ?? []) {
+      if (
+        transfer.gameWorldId !== snapshot.gameWorldId ||
+        transferIds.has(transfer.id) ||
+        transfer.steps.length === 0 ||
+        transfer.currentStep < 0 ||
+        transfer.currentStep > transfer.steps.length ||
+        (transfer.contractId !== null && !contractIds.has(transfer.contractId))
+      ) {
+        return fail(invalidMarket("Transferência inválida."));
+      }
+      transferIds.add(transfer.id);
+    }
+    const loanIds = new Set<string>();
+    for (const loan of snapshot.loans ?? []) {
+      if (
+        loan.gameWorldId !== snapshot.gameWorldId ||
+        loanIds.has(loan.id) ||
+        !contractIds.has(loan.contractId)
+      ) {
+        return fail(invalidMarket("Empréstimo inválido."));
+      }
+      loanIds.add(loan.id);
     }
     return succeed(new WorldMarket(snapshot));
   }
@@ -590,6 +642,581 @@ export class WorldMarket {
     return succeed(terminated);
   }
 
+  public publishListing(
+    input: Readonly<{
+      playerId: MarketPlayerRef;
+      sellerClubId: MarketClubRef;
+      askingFeeMinor: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<MarketListingSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const listings = this.state.listings ?? [];
+    const existing = listings.find(
+      (listing) => listing.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (
+      !Number.isSafeInteger(input.askingFeeMinor) ||
+      input.askingFeeMinor < 0
+    ) {
+      return fail(new DomainError("INVALID_LISTING", "Preço de venda inválido."));
+    }
+    const activeConflict = listings.some(
+      (listing) =>
+        listing.playerId === input.playerId &&
+        listing.status === ListingStatus.ACTIVE,
+    );
+    if (activeConflict) {
+      return fail(
+        new DomainError(
+          "PLAYER_LINK_CONFLICT",
+          "Já existe uma listing ativa para o jogador.",
+          { playerId: input.playerId },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const listing: MarketListingSnapshot = {
+      id: deterministicUuidV7<"MarketListing">({
+        worldSeed: input.worldSeed,
+        context: `listing:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      gameWorldId: this.state.gameWorldId,
+      playerId: input.playerId,
+      sellerClubId: input.sellerClubId,
+      askingFeeMinor: input.askingFeeMinor,
+      status: ListingStatus.ACTIVE,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    this.state = {
+      ...this.state,
+      listings: [...listings, listing],
+      revision: this.state.revision + 1,
+    };
+    return succeed(listing);
+  }
+
+  public cancelNegotiation(
+    input: Readonly<{
+      negotiationId: string;
+      expired?: boolean;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<NegotiationSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("NegotiationExpired", input.idempotencyKey);
+    if (replay !== undefined) {
+      const negotiation = this.state.negotiations.find(
+        ({ id }) => id === replay.negotiationId,
+      );
+      if (negotiation !== undefined) return succeed(negotiation);
+    }
+    const index = this.state.negotiations.findIndex(
+      ({ id }) => id === input.negotiationId,
+    );
+    if (index < 0) return fail(negotiationNotFound(input.negotiationId));
+    const negotiation = this.state.negotiations[index]!;
+    if (isTerminal(negotiation.status)) {
+      return fail(
+        new DomainError(
+          "NEGOTIATION_TERMINAL",
+          "A negociação já foi encerrada.",
+          { negotiationId: negotiation.id },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const outcome = input.expired === true ? "EXPIRED" : "CANCELLED";
+    const updated: NegotiationSnapshot = {
+      ...negotiation,
+      status:
+        outcome === "EXPIRED"
+          ? NegotiationStatus.EXPIRED
+          : NegotiationStatus.CANCELLED,
+    };
+    const negotiations = [...this.state.negotiations];
+    negotiations[index] = updated;
+    const event: NegotiationExpiredEvent = {
+      id: this.eventId(input.worldSeed, `negotiation-expired:${input.idempotencyKey}`, date.value.toString()),
+      type: "NegotiationExpired",
+      gameWorldId: this.state.gameWorldId,
+      negotiationId: negotiation.id,
+      outcome,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      negotiations,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(updated);
+  }
+
+  public startTransfer(
+    input: Readonly<{
+      negotiationId: string;
+      sagaId: string;
+      personId: MarketPersonRef;
+      wageMinor: number;
+      startsOn: string;
+      endsOn: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<TransferAgreementSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const transfers = this.state.transfers ?? [];
+    const existing = transfers.find(
+      (transfer) => transfer.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    const negotiation = this.state.negotiations.find(
+      ({ id }) => id === input.negotiationId,
+    );
+    if (negotiation === undefined) {
+      return fail(negotiationNotFound(input.negotiationId));
+    }
+    if (negotiation.status !== NegotiationStatus.ACCEPTED) {
+      return fail(
+        new DomainError(
+          "NEGOTIATION_NOT_ACCEPTED",
+          "A transferência exige uma negociação aceita.",
+          { negotiationId: negotiation.id, status: negotiation.status },
+        ),
+      );
+    }
+    const acceptedOffer = negotiation.offers.find(
+      (offer) => offer.version === negotiation.currentVersion,
+    )!;
+    const startsOn = WorldDate.parse(input.startsOn);
+    if (!startsOn.ok) return startsOn;
+    const endsOn = WorldDate.parse(input.endsOn);
+    if (!endsOn.ok) return endsOn;
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    if (
+      startsOn.value.toString() > endsOn.value.toString() ||
+      !Number.isSafeInteger(input.wageMinor) ||
+      input.wageMinor < 0 ||
+      input.sagaId.trim() === ""
+    ) {
+      return fail(new DomainError("INVALID_TRANSFER", "Termos da transferência inválidos."));
+    }
+    const transferId = deterministicUuidV7<"TransferAgreement">({
+      worldSeed: input.worldSeed,
+      context: `transfer:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const steps: TransferStepSnapshot[] = TRANSFER_STEPS.map((name, index) => ({
+      index,
+      name,
+      status: TransferStepStatus.PENDING,
+      checkpointHash: null,
+    }));
+    const transfer: TransferAgreementSnapshot = {
+      id: transferId,
+      gameWorldId: this.state.gameWorldId,
+      negotiationId: negotiation.id,
+      sagaId: input.sagaId,
+      playerId: negotiation.playerId,
+      personId: input.personId,
+      fromClubId: negotiation.sellerClubId,
+      toClubId: negotiation.buyerClubId,
+      feeMinor: acceptedOffer.terms.feeMinor,
+      wageMinor: input.wageMinor,
+      startsOn: startsOn.value.toString(),
+      endsOn: endsOn.value.toString(),
+      status: TransferStatus.RUNNING,
+      currentStep: 0,
+      steps,
+      fencingToken: 1,
+      contractId: null,
+      processedStepKeys: [],
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: TransferStartedEvent = {
+      id: this.eventId(input.worldSeed, `transfer-started:${input.idempotencyKey}`, date.value.toString()),
+      type: "TransferStarted",
+      gameWorldId: this.state.gameWorldId,
+      transferId,
+      negotiationId: negotiation.id,
+      playerId: negotiation.playerId,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      transfers: [...transfers, transfer],
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(transfer);
+  }
+
+  public advanceTransferStep(
+    input: Readonly<{
+      transferId: string;
+      fencingToken: number;
+      checkpointHash: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<TransferAgreementSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const transfers = this.state.transfers ?? [];
+    const index = transfers.findIndex(({ id }) => id === input.transferId);
+    if (index < 0) return fail(transferNotFound(input.transferId));
+    const transfer = transfers[index]!;
+    if (transfer.processedStepKeys.includes(input.idempotencyKey)) {
+      return succeed(transfer);
+    }
+    if (transfer.status !== TransferStatus.RUNNING) {
+      return fail(transferTerminal(transfer.id));
+    }
+    if (input.fencingToken !== transfer.fencingToken) {
+      return fail(
+        new DomainError("SAGA_FENCED", "Fencing token da transferência obsoleto.", {
+          transferId: transfer.id,
+          expected: transfer.fencingToken,
+          received: input.fencingToken,
+        }),
+      );
+    }
+    if (input.checkpointHash.trim() === "") {
+      return fail(new DomainError("INVALID_TRANSFER", "checkpointHash é obrigatório."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const stepIndex = transfer.currentStep;
+    const steps = transfer.steps.map((step) =>
+      step.index === stepIndex
+        ? { ...step, status: TransferStepStatus.DONE, checkpointHash: input.checkpointHash }
+        : step,
+    );
+    const nextStep = stepIndex + 1;
+    const completed = nextStep >= steps.length;
+    if (!completed) {
+      const advanced: TransferAgreementSnapshot = {
+        ...transfer,
+        steps,
+        currentStep: nextStep,
+        processedStepKeys: [...transfer.processedStepKeys, input.idempotencyKey],
+        version: transfer.version + 1,
+      };
+      this.replaceTransfer(index, advanced);
+      this.state = { ...this.state, revision: this.state.revision + 1 };
+      return succeed(advanced);
+    }
+    // etapa final: liquida criando contrato + vínculo permanente único
+    const conflict = this.state.links.some(
+      (link) =>
+        link.status === LinkStatus.ACTIVE &&
+        link.playerId === transfer.playerId &&
+        link.effectiveStart <= transfer.endsOn &&
+        transfer.startsOn <= link.effectiveEnd,
+    );
+    if (conflict) {
+      return fail(
+        new DomainError(
+          "PLAYER_LINK_CONFLICT",
+          "Já existe um vínculo ativo incompatível para o jogador.",
+          { playerId: transfer.playerId },
+        ),
+      );
+    }
+    const built = this.buildContractAndLink({
+      personId: transfer.personId,
+      playerId: transfer.playerId,
+      clubId: transfer.toClubId,
+      feeMinor: transfer.feeMinor,
+      wageMinor: transfer.wageMinor,
+      startsOn: transfer.startsOn,
+      endsOn: transfer.endsOn,
+      kind: PlayerLinkKind.PERMANENT,
+      idempotencyKey: `${input.idempotencyKey}:contract`,
+      worldSeed: input.worldSeed,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+    });
+    const settled: TransferAgreementSnapshot = {
+      ...transfer,
+      steps,
+      currentStep: steps.length,
+      status: TransferStatus.COMPLETED,
+      contractId: built.contract.id,
+      processedStepKeys: [...transfer.processedStepKeys, input.idempotencyKey],
+      version: transfer.version + 1,
+    };
+    this.replaceTransfer(index, settled);
+    const completedEvent: TransferCompletedEvent = {
+      id: this.eventId(input.worldSeed, `transfer-completed:${input.idempotencyKey}`, date.value.toString()),
+      type: "TransferCompleted",
+      gameWorldId: this.state.gameWorldId,
+      transferId: transfer.id,
+      playerId: transfer.playerId,
+      toClubId: transfer.toClubId,
+      contractId: built.contract.id,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      contracts: [...this.state.contracts, built.contract],
+      links: [...this.state.links, built.link],
+      events: [...this.state.events, ...built.events, completedEvent],
+      revision: this.state.revision + 1,
+    };
+    return succeed(settled);
+  }
+
+  public compensateTransfer(
+    input: Readonly<{
+      transferId: string;
+      fencingToken: number;
+      reason: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<TransferAgreementSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("TransferCompensated", input.idempotencyKey);
+    if (replay !== undefined) {
+      const found = (this.state.transfers ?? []).find(
+        ({ id }) => id === replay.transferId,
+      );
+      if (found !== undefined) return succeed(found);
+    }
+    const transfers = this.state.transfers ?? [];
+    const index = transfers.findIndex(({ id }) => id === input.transferId);
+    if (index < 0) return fail(transferNotFound(input.transferId));
+    const transfer = transfers[index]!;
+    if (
+      transfer.status === TransferStatus.COMPLETED ||
+      transfer.status === TransferStatus.COMPENSATED
+    ) {
+      return fail(transferTerminal(transfer.id));
+    }
+    if (input.fencingToken !== transfer.fencingToken) {
+      return fail(
+        new DomainError("SAGA_FENCED", "Fencing token da transferência obsoleto.", {
+          transferId: transfer.id,
+        }),
+      );
+    }
+    if (input.reason.trim() === "") {
+      return fail(new DomainError("INVALID_TRANSFER", "reason é obrigatório."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const steps = transfer.steps.map((step) =>
+      step.status === TransferStepStatus.DONE
+        ? { ...step, status: TransferStepStatus.COMPENSATED }
+        : step,
+    );
+    const compensated: TransferAgreementSnapshot = {
+      ...transfer,
+      steps,
+      status: TransferStatus.COMPENSATED,
+      version: transfer.version + 1,
+    };
+    this.replaceTransfer(index, compensated);
+    const event: TransferCompensatedEvent = {
+      id: this.eventId(input.worldSeed, `transfer-compensated:${input.idempotencyKey}`, date.value.toString()),
+      type: "TransferCompensated",
+      gameWorldId: this.state.gameWorldId,
+      transferId: transfer.id,
+      reason: input.reason,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(compensated);
+  }
+
+  public startLoan(
+    input: Readonly<{
+      playerId: MarketPlayerRef;
+      personId: MarketPersonRef;
+      originClubId: MarketClubRef;
+      destinationClubId: MarketClubRef;
+      startsOn: string;
+      endsOn: string;
+      wageMinor: number;
+      optionFeeMinor?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<LoanAgreementSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const loans = this.state.loans ?? [];
+    const existing = loans.find(
+      (loan) => loan.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (input.originClubId === input.destinationClubId) {
+      return fail(new DomainError("INVALID_LOAN", "Origem e destino devem diferir."));
+    }
+    const startsOn = WorldDate.parse(input.startsOn);
+    if (!startsOn.ok) return startsOn;
+    const endsOn = WorldDate.parse(input.endsOn);
+    if (!endsOn.ok) return endsOn;
+    if (
+      startsOn.value.toString() > endsOn.value.toString() ||
+      !Number.isSafeInteger(input.wageMinor) ||
+      input.wageMinor < 0 ||
+      (input.optionFeeMinor !== undefined &&
+        (!Number.isSafeInteger(input.optionFeeMinor) || input.optionFeeMinor < 0))
+    ) {
+      return fail(new DomainError("INVALID_LOAN", "Datas ou valores inválidos."));
+    }
+    const conflict = this.state.links.some(
+      (link) =>
+        link.status === LinkStatus.ACTIVE &&
+        link.playerId === input.playerId &&
+        link.effectiveStart <= endsOn.value.toString() &&
+        startsOn.value.toString() <= link.effectiveEnd,
+    );
+    if (conflict) {
+      return fail(
+        new DomainError(
+          "PLAYER_LINK_CONFLICT",
+          "Já existe um vínculo ativo incompatível para o jogador.",
+          { playerId: input.playerId },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const built = this.buildContractAndLink({
+      personId: input.personId,
+      playerId: input.playerId,
+      clubId: input.destinationClubId,
+      feeMinor: 0,
+      wageMinor: input.wageMinor,
+      startsOn: startsOn.value.toString(),
+      endsOn: endsOn.value.toString(),
+      kind: PlayerLinkKind.LOAN,
+      idempotencyKey: `${input.idempotencyKey}:contract`,
+      worldSeed: input.worldSeed,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+    });
+    const loanId = deterministicUuidV7<"LoanAgreement">({
+      worldSeed: input.worldSeed,
+      context: `loan:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const loan: LoanAgreementSnapshot = {
+      id: loanId,
+      gameWorldId: this.state.gameWorldId,
+      playerId: input.playerId,
+      personId: input.personId,
+      originClubId: input.originClubId,
+      destinationClubId: input.destinationClubId,
+      startsOn: startsOn.value.toString(),
+      endsOn: endsOn.value.toString(),
+      optionFeeMinor: input.optionFeeMinor ?? null,
+      status: LoanStatus.ACTIVE,
+      contractId: built.contract.id,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: LoanActivatedEvent = {
+      id: this.eventId(input.worldSeed, `loan-activated:${input.idempotencyKey}`, date.value.toString()),
+      type: "LoanActivated",
+      gameWorldId: this.state.gameWorldId,
+      loanId,
+      playerId: input.playerId,
+      destinationClubId: input.destinationClubId,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      contracts: [...this.state.contracts, built.contract],
+      links: [...this.state.links, built.link],
+      loans: [...loans, loan],
+      events: [...this.state.events, ...built.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(loan);
+  }
+
+  public returnLoanedPlayer(
+    input: Readonly<{
+      loanId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<LoanAgreementSnapshot, DomainError> {
+    return this.settleLoan(input, "RETURN");
+  }
+
+  public exerciseLoanOption(
+    input: Readonly<{
+      loanId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<LoanAgreementSnapshot, DomainError> {
+    return this.settleLoan(input, "PURCHASE");
+  }
+
+  public findTransfer(transferId: string): TransferAgreementSnapshot | null {
+    return (this.state.transfers ?? []).find(({ id }) => id === transferId) ?? null;
+  }
+
+  public findLoan(loanId: string): LoanAgreementSnapshot | null {
+    return (this.state.loans ?? []).find(({ id }) => id === loanId) ?? null;
+  }
+
   public findNegotiation(negotiationId: string): NegotiationSnapshot | null {
     return (
       this.state.negotiations.find(({ id }) => id === negotiationId) ?? null
@@ -615,6 +1242,15 @@ export class WorldMarket {
       ).length,
       activeLinkCount: this.state.links.filter(
         ({ status }) => status === LinkStatus.ACTIVE,
+      ).length,
+      activeListingCount: (this.state.listings ?? []).filter(
+        ({ status }) => status === ListingStatus.ACTIVE,
+      ).length,
+      completedTransferCount: (this.state.transfers ?? []).filter(
+        ({ status }) => status === TransferStatus.COMPLETED,
+      ).length,
+      activeLoanCount: (this.state.loans ?? []).filter(
+        ({ status }) => status === LoanStatus.ACTIVE,
       ).length,
     };
   }
@@ -643,6 +1279,231 @@ export class WorldMarket {
       (event): event is Extract<MarketDomainEvent, { type: T }> =>
         event.type === type && event.idempotencyKey === idempotencyKey,
     );
+  }
+
+  private replaceTransfer(
+    index: number,
+    transfer: TransferAgreementSnapshot,
+  ): void {
+    const transfers = [...(this.state.transfers ?? [])];
+    transfers[index] = transfer;
+    this.state = { ...this.state, transfers };
+  }
+
+  private buildContractAndLink(
+    input: Readonly<{
+      personId: MarketPersonRef;
+      playerId: MarketPlayerRef;
+      clubId: MarketClubRef;
+      feeMinor: number;
+      wageMinor: number;
+      startsOn: string;
+      endsOn: string;
+      kind: PlayerLinkKind;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): {
+    contract: PlayerContractSnapshot;
+    link: PlayerClubLinkSnapshot;
+    events: MarketDomainEvent[];
+  } {
+    const contractId = deterministicUuidV7<"PlayerContract">({
+      worldSeed: input.worldSeed,
+      context: `player-contract:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(input.startsOn),
+    });
+    const contract: PlayerContractSnapshot = {
+      id: contractId,
+      gameWorldId: this.state.gameWorldId,
+      personId: input.personId,
+      playerId: input.playerId,
+      clubId: input.clubId,
+      feeMinor: input.feeMinor,
+      wageMinor: input.wageMinor,
+      startsOn: input.startsOn,
+      endsOn: input.endsOn,
+      kind: input.kind,
+      status: ContractStatus.ACTIVE,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const link: PlayerClubLinkSnapshot = {
+      playerId: input.playerId,
+      clubId: input.clubId,
+      kind: input.kind,
+      contractId,
+      effectiveStart: input.startsOn,
+      effectiveEnd: input.endsOn,
+      status: LinkStatus.ACTIVE,
+    };
+    const contractEvent: PlayerContractActivatedEvent = {
+      id: this.eventId(input.worldSeed, `contract-activated:${input.idempotencyKey}`, input.worldDate),
+      type: "PlayerContractActivated",
+      gameWorldId: this.state.gameWorldId,
+      contractId,
+      playerId: input.playerId,
+      clubId: input.clubId,
+      worldDate: input.worldDate,
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const linkEvent: PlayerClubLinkChangedEvent = {
+      id: this.eventId(input.worldSeed, `link-activated:${input.idempotencyKey}`, input.worldDate),
+      type: "PlayerClubLinkChanged",
+      gameWorldId: this.state.gameWorldId,
+      playerId: input.playerId,
+      clubId: input.clubId,
+      status: LinkStatus.ACTIVE,
+      worldDate: input.worldDate,
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    return { contract, link, events: [contractEvent, linkEvent] };
+  }
+
+  private settleLoan(
+    input: Readonly<{
+      loanId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+    mode: "RETURN" | "PURCHASE",
+  ): Result<LoanAgreementSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const loans = this.state.loans ?? [];
+    const index = loans.findIndex(({ id }) => id === input.loanId);
+    if (index < 0) {
+      return fail(
+        new DomainError("LOAN_NOT_FOUND", "Empréstimo não encontrado.", {
+          loanId: input.loanId,
+        }),
+      );
+    }
+    const loan = loans[index]!;
+    if (loan.status !== LoanStatus.ACTIVE) {
+      // retorno/compra exatamente uma vez: estado terminal repetido é efeito único
+      if (
+        (mode === "RETURN" && loan.status === LoanStatus.RETURNED) ||
+        (mode === "PURCHASE" && loan.status === LoanStatus.PURCHASED)
+      ) {
+        return succeed(loan);
+      }
+      return fail(
+        new DomainError("LOAN_TERMINAL", "O empréstimo já foi encerrado.", {
+          loanId: loan.id,
+          status: loan.status,
+        }),
+      );
+    }
+    if (mode === "PURCHASE" && loan.optionFeeMinor === null) {
+      return fail(
+        new DomainError(
+          "LOAN_OPTION_UNAVAILABLE",
+          "Este empréstimo não tem opção de compra.",
+          { loanId: loan.id },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const links = this.state.links.map((link) =>
+      link.contractId === loan.contractId && link.status === LinkStatus.ACTIVE
+        ? { ...link, status: LinkStatus.ENDED, effectiveEnd: date.value.toString() }
+        : link,
+    );
+    const contracts = this.state.contracts.map((contract) =>
+      contract.id === loan.contractId && contract.status === ContractStatus.ACTIVE
+        ? { ...contract, status: ContractStatus.TERMINATED, version: contract.version + 1 }
+        : contract,
+    );
+    const endLinkEvent: PlayerClubLinkChangedEvent = {
+      id: this.eventId(input.worldSeed, `loan-link-ended:${input.idempotencyKey}`, date.value.toString()),
+      type: "PlayerClubLinkChanged",
+      gameWorldId: this.state.gameWorldId,
+      playerId: loan.playerId,
+      clubId: loan.destinationClubId,
+      status: LinkStatus.ENDED,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: `${input.idempotencyKey}:end`,
+    };
+    if (mode === "RETURN") {
+      const returned: LoanAgreementSnapshot = {
+        ...loan,
+        status: LoanStatus.RETURNED,
+        version: loan.version + 1,
+      };
+      const nextLoans = [...loans];
+      nextLoans[index] = returned;
+      const event: LoanReturnedEvent = {
+        id: this.eventId(input.worldSeed, `loan-returned:${input.idempotencyKey}`, date.value.toString()),
+        type: "LoanReturned",
+        gameWorldId: this.state.gameWorldId,
+        loanId: loan.id,
+        playerId: loan.playerId,
+        worldDate: date.value.toString(),
+        rulesetVersion: input.rulesetVersion,
+        idempotencyKey: input.idempotencyKey,
+      };
+      this.state = {
+        ...this.state,
+        contracts,
+        links,
+        loans: nextLoans,
+        events: [...this.state.events, endLinkEvent, event],
+        revision: this.state.revision + 1,
+      };
+      return succeed(returned);
+    }
+    // PURCHASE: encerra empréstimo e cria vínculo permanente no destino
+    const built = this.buildContractAndLink({
+      personId: loan.personId,
+      playerId: loan.playerId,
+      clubId: loan.destinationClubId,
+      feeMinor: loan.optionFeeMinor ?? 0,
+      wageMinor: 0,
+      startsOn: date.value.toString(),
+      endsOn: loan.endsOn,
+      kind: PlayerLinkKind.PERMANENT,
+      idempotencyKey: `${input.idempotencyKey}:contract`,
+      worldSeed: input.worldSeed,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+    });
+    const purchased: LoanAgreementSnapshot = {
+      ...loan,
+      status: LoanStatus.PURCHASED,
+      version: loan.version + 1,
+    };
+    const nextLoans = [...loans];
+    nextLoans[index] = purchased;
+    const event: LoanPurchasedEvent = {
+      id: this.eventId(input.worldSeed, `loan-purchased:${input.idempotencyKey}`, date.value.toString()),
+      type: "LoanPurchased",
+      gameWorldId: this.state.gameWorldId,
+      loanId: loan.id,
+      playerId: loan.playerId,
+      destinationClubId: loan.destinationClubId,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      contracts: [...contracts, built.contract],
+      links: [...links, built.link],
+      loans: nextLoans,
+      events: [...this.state.events, endLinkEvent, ...built.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(purchased);
   }
 }
 
@@ -676,6 +1537,20 @@ function negotiationNotFound(negotiationId: string): DomainError {
   return new DomainError("NEGOTIATION_NOT_FOUND", "Negociação não encontrada.", {
     negotiationId,
   });
+}
+
+function transferNotFound(transferId: string): DomainError {
+  return new DomainError("TRANSFER_NOT_FOUND", "Transferência não encontrada.", {
+    transferId,
+  });
+}
+
+function transferTerminal(transferId: string): DomainError {
+  return new DomainError(
+    "TRANSFER_TERMINAL",
+    "A transferência já está em estado terminal.",
+    { transferId },
+  );
 }
 
 function timestampOf(worldDate: string): number {

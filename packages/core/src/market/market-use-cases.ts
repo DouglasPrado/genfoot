@@ -10,7 +10,9 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { MarketRepository } from "./market-repository.js";
 import type {
+  LoanAgreementSnapshot,
   MarketClubRef,
+  MarketListingSnapshot,
   MarketPersonRef,
   MarketPlayerRef,
   MarketSummary,
@@ -18,6 +20,7 @@ import type {
   PlayerContractSnapshot,
   PlayerLinkKind,
   ScoutingReportSnapshot,
+  TransferAgreementSnapshot,
   WorldMarketSnapshot,
 } from "./market-types.js";
 import { WorldMarket } from "./world-market.js";
@@ -204,6 +207,177 @@ export class TerminateContract {
   ): Promise<Result<PlayerContractSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (market) =>
       market.terminateContract(input),
+    );
+  }
+}
+
+export class PublishListing {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      playerId: MarketPlayerRef;
+      sellerClubId: MarketClubRef;
+      askingFeeMinor: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<MarketListingSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.publishListing(input),
+    );
+  }
+}
+
+export class CancelNegotiation {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      negotiationId: string;
+      expired?: boolean;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<NegotiationSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.cancelNegotiation(input),
+    );
+  }
+}
+
+export class StartTransfer {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      negotiationId: string;
+      sagaId: string;
+      personId: MarketPersonRef;
+      wageMinor: number;
+      startsOn: string;
+      endsOn: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<TransferAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.startTransfer(input),
+    );
+  }
+}
+
+export class AdvanceTransferStep {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      transferId: string;
+      fencingToken: number;
+      checkpointHash: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<TransferAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.advanceTransferStep(input),
+    );
+  }
+}
+
+export class CompensateTransfer {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      transferId: string;
+      fencingToken: number;
+      reason: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<TransferAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.compensateTransfer(input),
+    );
+  }
+}
+
+export class StartLoan {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      playerId: MarketPlayerRef;
+      personId: MarketPersonRef;
+      originClubId: MarketClubRef;
+      destinationClubId: MarketClubRef;
+      startsOn: string;
+      endsOn: string;
+      wageMinor: number;
+      optionFeeMinor?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<LoanAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.startLoan(input),
+    );
+  }
+}
+
+export class ExerciseLoanOption {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      loanId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<LoanAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.exerciseLoanOption(input),
+    );
+  }
+}
+
+export class ReturnLoanedPlayer {
+  public constructor(private readonly repository: MarketRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      loanId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<LoanAgreementSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (market) =>
+      market.returnLoanedPlayer(input),
     );
   }
 }

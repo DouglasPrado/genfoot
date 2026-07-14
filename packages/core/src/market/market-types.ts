@@ -3,6 +3,9 @@ import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 export type ScoutingReportId = EntityId<"ScoutingReport">;
 export type NegotiationId = EntityId<"Negotiation">;
 export type PlayerContractId = EntityId<"PlayerContract">;
+export type MarketListingId = EntityId<"MarketListing">;
+export type TransferAgreementId = EntityId<"TransferAgreement">;
+export type LoanAgreementId = EntityId<"LoanAgreement">;
 export type MarketEventId = EntityId<"MarketEvent">;
 export type MarketPlayerRef = EntityId<"Player">;
 export type MarketPersonRef = EntityId<"Person">;
@@ -43,6 +46,46 @@ export const LinkStatus = {
 } as const;
 
 export type LinkStatus = (typeof LinkStatus)[keyof typeof LinkStatus];
+
+export const ListingStatus = {
+  ACTIVE: "ACTIVE",
+  WITHDRAWN: "WITHDRAWN",
+  MATCHED: "MATCHED",
+} as const;
+
+export type ListingStatus =
+  (typeof ListingStatus)[keyof typeof ListingStatus];
+
+export const TransferStatus = {
+  DRAFT: "DRAFT",
+  RUNNING: "RUNNING",
+  COMPLETED: "COMPLETED",
+  COMPENSATING: "COMPENSATING",
+  COMPENSATED: "COMPENSATED",
+  FAILED: "FAILED",
+} as const;
+
+export type TransferStatus =
+  (typeof TransferStatus)[keyof typeof TransferStatus];
+
+export const TransferStepStatus = {
+  PENDING: "PENDING",
+  DONE: "DONE",
+  COMPENSATED: "COMPENSATED",
+} as const;
+
+export type TransferStepStatus =
+  (typeof TransferStepStatus)[keyof typeof TransferStepStatus];
+
+export const LoanStatus = {
+  AGREED: "AGREED",
+  ACTIVE: "ACTIVE",
+  RETURNED: "RETURNED",
+  PURCHASED: "PURCHASED",
+  TERMINATED: "TERMINATED",
+} as const;
+
+export type LoanStatus = (typeof LoanStatus)[keyof typeof LoanStatus];
 
 export interface ScoutingReportSnapshot {
   readonly id: ScoutingReportId;
@@ -106,6 +149,63 @@ export interface PlayerClubLinkSnapshot {
   readonly status: LinkStatus;
 }
 
+export interface MarketListingSnapshot {
+  readonly id: MarketListingId;
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: MarketPlayerRef;
+  readonly sellerClubId: MarketClubRef;
+  readonly askingFeeMinor: number;
+  readonly status: ListingStatus;
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
+export interface TransferStepSnapshot {
+  readonly index: number;
+  readonly name: string;
+  readonly status: TransferStepStatus;
+  readonly checkpointHash: string | null;
+}
+
+export interface TransferAgreementSnapshot {
+  readonly id: TransferAgreementId;
+  readonly gameWorldId: GameWorldId;
+  readonly negotiationId: NegotiationId;
+  readonly sagaId: string;
+  readonly playerId: MarketPlayerRef;
+  readonly personId: MarketPersonRef;
+  readonly fromClubId: MarketClubRef;
+  readonly toClubId: MarketClubRef;
+  readonly feeMinor: number;
+  readonly wageMinor: number;
+  readonly startsOn: string;
+  readonly endsOn: string;
+  readonly status: TransferStatus;
+  readonly currentStep: number;
+  readonly steps: readonly TransferStepSnapshot[];
+  readonly fencingToken: number;
+  readonly contractId: PlayerContractId | null;
+  readonly processedStepKeys: readonly string[];
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
+export interface LoanAgreementSnapshot {
+  readonly id: LoanAgreementId;
+  readonly gameWorldId: GameWorldId;
+  readonly playerId: MarketPlayerRef;
+  readonly personId: MarketPersonRef;
+  readonly originClubId: MarketClubRef;
+  readonly destinationClubId: MarketClubRef;
+  readonly startsOn: string;
+  readonly endsOn: string;
+  readonly optionFeeMinor: number | null;
+  readonly status: LoanStatus;
+  readonly contractId: PlayerContractId;
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
 export interface ScoutingReportProducedEvent {
   readonly id: MarketEventId;
   readonly type: "ScoutingReportProduced";
@@ -164,12 +264,101 @@ export interface PlayerClubLinkChangedEvent {
   readonly idempotencyKey: string;
 }
 
+export interface NegotiationExpiredEvent {
+  readonly id: MarketEventId;
+  readonly type: "NegotiationExpired";
+  readonly gameWorldId: GameWorldId;
+  readonly negotiationId: NegotiationId;
+  readonly outcome: "EXPIRED" | "CANCELLED";
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface TransferStartedEvent {
+  readonly id: MarketEventId;
+  readonly type: "TransferStarted";
+  readonly gameWorldId: GameWorldId;
+  readonly transferId: TransferAgreementId;
+  readonly negotiationId: NegotiationId;
+  readonly playerId: MarketPlayerRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface TransferCompletedEvent {
+  readonly id: MarketEventId;
+  readonly type: "TransferCompleted";
+  readonly gameWorldId: GameWorldId;
+  readonly transferId: TransferAgreementId;
+  readonly playerId: MarketPlayerRef;
+  readonly toClubId: MarketClubRef;
+  readonly contractId: PlayerContractId;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface TransferCompensatedEvent {
+  readonly id: MarketEventId;
+  readonly type: "TransferCompensated";
+  readonly gameWorldId: GameWorldId;
+  readonly transferId: TransferAgreementId;
+  readonly reason: string;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface LoanActivatedEvent {
+  readonly id: MarketEventId;
+  readonly type: "LoanActivated";
+  readonly gameWorldId: GameWorldId;
+  readonly loanId: LoanAgreementId;
+  readonly playerId: MarketPlayerRef;
+  readonly destinationClubId: MarketClubRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface LoanReturnedEvent {
+  readonly id: MarketEventId;
+  readonly type: "LoanReturned";
+  readonly gameWorldId: GameWorldId;
+  readonly loanId: LoanAgreementId;
+  readonly playerId: MarketPlayerRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface LoanPurchasedEvent {
+  readonly id: MarketEventId;
+  readonly type: "LoanPurchased";
+  readonly gameWorldId: GameWorldId;
+  readonly loanId: LoanAgreementId;
+  readonly playerId: MarketPlayerRef;
+  readonly destinationClubId: MarketClubRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type MarketDomainEvent =
   | ScoutingReportProducedEvent
   | OfferSubmittedEvent
   | OfferAcceptedEvent
+  | NegotiationExpiredEvent
   | PlayerContractActivatedEvent
-  | PlayerClubLinkChangedEvent;
+  | PlayerClubLinkChangedEvent
+  | TransferStartedEvent
+  | TransferCompletedEvent
+  | TransferCompensatedEvent
+  | LoanActivatedEvent
+  | LoanReturnedEvent
+  | LoanPurchasedEvent;
 
 export interface WorldMarketSnapshot {
   readonly gameWorldId: GameWorldId;
@@ -178,6 +367,9 @@ export interface WorldMarketSnapshot {
   readonly negotiations: readonly NegotiationSnapshot[];
   readonly contracts: readonly PlayerContractSnapshot[];
   readonly links: readonly PlayerClubLinkSnapshot[];
+  readonly listings?: readonly MarketListingSnapshot[];
+  readonly transfers?: readonly TransferAgreementSnapshot[];
+  readonly loans?: readonly LoanAgreementSnapshot[];
   readonly events: readonly MarketDomainEvent[];
   readonly revision: number;
 }
@@ -187,4 +379,7 @@ export interface MarketSummary {
   readonly openNegotiationCount: number;
   readonly activeContractCount: number;
   readonly activeLinkCount: number;
+  readonly activeListingCount: number;
+  readonly completedTransferCount: number;
+  readonly activeLoanCount: number;
 }

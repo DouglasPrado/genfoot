@@ -311,6 +311,287 @@ describe("Market, scouting and contracts", () => {
     ).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
   });
 
+  function acceptedNegotiation(
+    value: WorldMarket,
+    gameWorld: GameWorldSnapshot,
+    key = "neg:t",
+  ) {
+    const negotiation = value.openNegotiation({
+      playerId: PLAYER,
+      buyerClubId: BUYER,
+      sellerClubId: SELLER,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: key,
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!negotiation.ok) throw negotiation.error;
+    const offer = value.submitOffer({
+      negotiationId: negotiation.value.id,
+      createdByClubId: BUYER,
+      feeMinor: 1_000_000,
+      wageMinor: 20_000,
+      contractYears: 3,
+      expiresOn: "2026-02-01",
+      expectedVersion: 0,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: `${key}:offer`,
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-06",
+    });
+    if (!offer.ok) throw offer.error;
+    const accepted = value.acceptOffer({
+      negotiationId: negotiation.value.id,
+      version: 1,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: `${key}:accept`,
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-07",
+    });
+    if (!accepted.ok) throw accepted.error;
+    return negotiation.value;
+  }
+
+  it("executa a SAGA-01 de transferência: start → 3 passos → vínculo único", () => {
+    const { gameWorld, value } = market();
+    const negotiation = acceptedNegotiation(value, gameWorld);
+    const transfer = value.startTransfer({
+      negotiationId: negotiation.id,
+      sagaId: "saga-1",
+      personId: PERSON,
+      wageMinor: 20_000,
+      startsOn: "2026-02-01",
+      endsOn: "2029-06-30",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "tr:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-08",
+    });
+    expect(transfer).toMatchObject({
+      ok: true,
+      value: { status: "RUNNING", currentStep: 0 },
+    });
+    if (!transfer.ok) throw transfer.error;
+
+    // fencing obsoleto rejeitado
+    expect(
+      value.advanceTransferStep({
+        transferId: transfer.value.id,
+        fencingToken: 99,
+        checkpointHash: "x",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "tr:1:bad",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-08",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SAGA_FENCED" } });
+
+    const steps = ["reserve", "register", "settle"];
+    let last = transfer.value;
+    steps.forEach((label, index) => {
+      const advanced = value.advanceTransferStep({
+        transferId: transfer.value.id,
+        fencingToken: 1,
+        checkpointHash: `${label}-ok`,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: `tr:1:s${index}`,
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-08",
+      });
+      if (!advanced.ok) throw advanced.error;
+      last = advanced.value;
+    });
+    expect(last.status).toBe("COMPLETED");
+    expect(value.activeLinkFor(PLAYER)!.clubId).toBe(BUYER);
+    expect(
+      value.snapshot().events.filter((e) => e.type === "TransferCompleted"),
+    ).toHaveLength(1);
+
+    // retry do passo final (resposta perdida) = efeito único
+    const revision = value.snapshot().revision;
+    const retry = value.advanceTransferStep({
+      transferId: transfer.value.id,
+      fencingToken: 1,
+      checkpointHash: "settle-ok",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "tr:1:s2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-08",
+    });
+    expect(retry).toMatchObject({ ok: true, value: { status: "COMPLETED" } });
+    expect(value.snapshot().revision).toBe(revision);
+  });
+
+  it("compensa a transferência após falha e rejeita terminal", () => {
+    const { gameWorld, value } = market();
+    const negotiation = acceptedNegotiation(value, gameWorld);
+    const transfer = value.startTransfer({
+      negotiationId: negotiation.id,
+      sagaId: "saga-2",
+      personId: PERSON,
+      wageMinor: 20_000,
+      startsOn: "2026-02-01",
+      endsOn: "2029-06-30",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "tr:2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-08",
+    });
+    if (!transfer.ok) throw transfer.error;
+    const step0 = value.advanceTransferStep({
+      transferId: transfer.value.id,
+      fencingToken: 1,
+      checkpointHash: "reserve-ok",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "tr:2:s0",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-08",
+    });
+    if (!step0.ok) throw step0.error;
+
+    const compensated = value.compensateTransfer({
+      transferId: transfer.value.id,
+      fencingToken: 1,
+      reason: "settle-failed",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "tr:2:comp",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-09",
+    });
+    expect(compensated).toMatchObject({ ok: true, value: { status: "COMPENSATED" } });
+    expect(value.activeLinkFor(PLAYER)).toBeNull();
+    expect(
+      value.advanceTransferStep({
+        transferId: transfer.value.id,
+        fencingToken: 1,
+        checkpointHash: "x",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "tr:2:after",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-09",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "TRANSFER_TERMINAL" } });
+  });
+
+  it("empresta e retorna/compra o jogador exatamente uma vez", () => {
+    const { gameWorld, value } = market();
+    const loan = value.startLoan({
+      playerId: PLAYER,
+      personId: PERSON,
+      originClubId: SELLER,
+      destinationClubId: BUYER,
+      startsOn: "2026-02-01",
+      endsOn: "2026-12-31",
+      wageMinor: 10_000,
+      optionFeeMinor: 500_000,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "loan:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-20",
+    });
+    expect(loan).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+    if (!loan.ok) throw loan.error;
+    expect(value.activeLinkFor(PLAYER)!.kind).toBe("LOAN");
+
+    const returned = value.returnLoanedPlayer({
+      loanId: loan.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "loan:1:return",
+      worldSeed: gameWorld.seed,
+      worldDate: "2027-01-01",
+    });
+    expect(returned).toMatchObject({ ok: true, value: { status: "RETURNED" } });
+    expect(value.activeLinkFor(PLAYER)).toBeNull();
+
+    // retorno repetido = efeito único
+    const revision = value.snapshot().revision;
+    const again = value.returnLoanedPlayer({
+      loanId: loan.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "loan:1:return:again",
+      worldSeed: gameWorld.seed,
+      worldDate: "2027-01-02",
+    });
+    expect(again).toMatchObject({ ok: true, value: { status: "RETURNED" } });
+    expect(value.snapshot().revision).toBe(revision);
+
+    // outro empréstimo pode ser comprado (opção) → vínculo permanente
+    const loan2 = value.startLoan({
+      playerId: PLAYER,
+      personId: PERSON,
+      originClubId: SELLER,
+      destinationClubId: BUYER,
+      startsOn: "2027-02-01",
+      endsOn: "2027-12-31",
+      wageMinor: 10_000,
+      optionFeeMinor: 800_000,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "loan:2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2027-01-20",
+    });
+    if (!loan2.ok) throw loan2.error;
+    const purchased = value.exerciseLoanOption({
+      loanId: loan2.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "loan:2:buy",
+      worldSeed: gameWorld.seed,
+      worldDate: "2027-06-01",
+    });
+    expect(purchased).toMatchObject({ ok: true, value: { status: "PURCHASED" } });
+    expect(value.activeLinkFor(PLAYER)!.kind).toBe("PERMANENT");
+    expect(
+      value.snapshot().events.filter((e) => e.type === "LoanPurchased"),
+    ).toHaveLength(1);
+  });
+
+  it("publica listing única e cancela negociação com evento", () => {
+    const { gameWorld, value } = market();
+    const listing = value.publishListing({
+      playerId: PLAYER,
+      sellerClubId: SELLER,
+      askingFeeMinor: 2_000_000,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "list:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-04",
+    });
+    expect(listing).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+    expect(
+      value.publishListing({
+        playerId: PLAYER,
+        sellerClubId: SELLER,
+        askingFeeMinor: 3_000_000,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "list:dup",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-04",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "PLAYER_LINK_CONFLICT" } });
+
+    const negotiation = openNegotiation(value, gameWorld);
+    const cancelled = value.cancelNegotiation({
+      negotiationId: negotiation.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "cancel:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-09",
+    });
+    expect(cancelled).toMatchObject({ ok: true, value: { status: "CANCELLED" } });
+    expect(
+      value.snapshot().events.filter((e) => e.type === "NegotiationExpired"),
+    ).toHaveLength(1);
+    expect(
+      value.cancelNegotiation({
+        negotiationId: negotiation.id,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "cancel:again",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-10",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "NEGOTIATION_TERMINAL" } });
+  });
+
   it("ativa contrato idempotente via caso de uso", async () => {
     const { gameWorld, value } = market();
     const repository = new MemoryMarketRepository();
