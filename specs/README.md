@@ -19,7 +19,7 @@ Status is evidence-based: `DELIVERED` covers only reproduced scope, `PARTIAL` se
 | X-002   | [Eventing, sagas and projections](010-eventing-sagas-projections/spec.md)           | DELIVERED | M2        |
 | BC-006  | [Market, scouting and contracts](011-market-scouting-contracts/spec.md)             | DELIVERED | M1        |
 | X-001   | [Automation and AI](012-automation-ai/spec.md)                                      | DELIVERED | M1        |
-| VAL-001 | [Simulation and calibration](013-simulation-calibration/spec.md)                    | PLANNED   | M1        |
+| VAL-001 | [Simulation and calibration](013-simulation-calibration/spec.md)                    | DELIVERED | M1        |
 | BC-001  | [Identity and club control](014-identity-club-control/spec.md)                      | DELIVERED | M2        |
 | BC-010  | [Supporters and narrative](015-supporters-narrative/spec.md)                        | DELIVERED | M2        |
 | BC-011  | [Notifications and history](016-notifications-history/spec.md)                      | DELIVERED | M2        |
@@ -52,6 +52,6 @@ Golden paths are M3 convergence tests. They cross bounded contexts without takin
 
 ## Portfolio totals
 
-- 34 child features: 31 delivered, 0 partial, 3 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Entregues: os 12 bounded contexts de domínio, os 3 concerns (FND-001 kernel, X-002 eventing, X-001 automação) e **os 16 golden paths E2E**. Restam apenas 3 PLANNED: VAL-001 (calibração), X-003 (clientes) e OPS-001 (plataforma/produção).
+- 34 child features: 32 delivered, 0 partial, 2 planned (reconciliação evidenciada em `001-.../validation/portfolio-completeness.md`). Entregues: os 12 bounded contexts de domínio, os 4 concerns (FND-001 kernel, X-002 eventing, X-001 automação, **VAL-001 calibração**) e **os 16 golden paths E2E**. Restam apenas 2 PLANNED: X-003 (clientes) e OPS-001 (plataforma/produção).
 - 12 bounded contexts, 3 canonical concerns and 16 golden paths.
 - Every child packet includes specification, plan, research, data model, quickstart, contract and validated requirements checklist.
