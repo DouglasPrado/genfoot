@@ -308,4 +308,122 @@ describe("Automation and decision AI", () => {
     expect(repeated).toEqual(firstRun);
     expect(repository.snapshot.revision).toBe(revision);
   });
+
+  it("recua sob precedência humana e bloqueia conhecimento oculto", () => {
+    const ctx = activeRule("precedencia");
+    // precedência humana: decisão humana recente conflitante bloqueia a automação
+    expect(
+      ctx.value.evaluateDecision({
+        ruleId: ctx.ruleId,
+        asOf: "2026-03-01",
+        seedStream: "s",
+        options: OPTIONS,
+        factors: ["forma"],
+        humanPrecedenceActive: true,
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d:human",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-01",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "HUMAN_PRECEDENCE" } });
+    // filtro de conhecimento: um fator oculto não autorizado é recusado
+    expect(
+      ctx.value.evaluateDecision({
+        ruleId: ctx.ruleId,
+        asOf: "2026-03-01",
+        seedStream: "s",
+        options: OPTIONS,
+        factors: ["HIDDEN:potencial-oculto"],
+        rulesetVersion: ctx.gameWorld.rulesetVersion,
+        idempotencyKey: "d:hidden",
+        worldSeed: ctx.gameWorld.seed,
+        worldDate: "2026-03-01",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "KNOWLEDGE_FORBIDDEN" } });
+  });
+
+  it("auto-executa só baixo risco; alto risco vira proposta pendente + explicação", () => {
+    const gameWorld = world("risco");
+    const created = WorldAutomation.initialize(gameWorld);
+    if (!created.ok) throw created.error;
+    const value = created.value;
+    const rule = value.createAutomationRule({
+      controllerId: CONTROLLER,
+      scope: "STRATEGIC",
+      trigger: "TRANSFER_WINDOW",
+      action: "BUY_STAR",
+      risk: 85,
+      priority: 1,
+      validFrom: "2026-01-01",
+      validUntil: "2026-12-31",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "rule:risk",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-01",
+    });
+    if (!rule.ok) throw rule.error;
+    value.activateAutomationRule({
+      ruleId: rule.value.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "act:risk",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-02",
+    });
+    const decision = value.evaluateDecision({
+      ruleId: rule.value.id,
+      asOf: "2026-03-01",
+      seedStream: "strategic",
+      options: OPTIONS,
+      factors: ["orçamento", "HIDDEN:info-privada"],
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "d:risk",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-03-01",
+    });
+    // o fator oculto barra a decisão de alto risco
+    expect(decision).toMatchObject({ ok: false, error: { code: "KNOWLEDGE_FORBIDDEN" } });
+
+    // agora sem conhecimento oculto: a decisão é proposta
+    const ok = value.evaluateDecision({
+      ruleId: rule.value.id,
+      asOf: "2026-03-01",
+      seedStream: "strategic",
+      options: OPTIONS,
+      factors: ["orçamento"],
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "d:risk2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-03-01",
+    });
+    if (!ok.ok) throw ok.error;
+
+    // auto-execução de alto risco é bloqueada → permanece pendente
+    expect(
+      value.executeDecisionProposal({
+        decisionId: ok.value.id,
+        accept: true,
+        auto: true,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "exec:auto",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-03-02",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "HIGH_RISK_REQUIRES_APPROVAL" } });
+
+    // com aprovação humana (auto=false) a proposta é submetida
+    const human = value.executeDecisionProposal({
+      decisionId: ok.value.id,
+      accept: true,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "exec:human",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-03-02",
+    });
+    expect(human).toMatchObject({ ok: true, value: { status: "SUBMITTED" } });
+
+    // GetDecisionExplanation não revela conhecimento oculto
+    const explanation = value.explainDecision(ok.value.id);
+    expect(explanation!.factors).toEqual(["orçamento"]);
+    expect(explanation!.chosenCommand).toBe(ok.value.chosenCommand);
+  });
 });

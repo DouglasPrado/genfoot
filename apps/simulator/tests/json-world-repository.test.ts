@@ -21,9 +21,11 @@ import {
   WorldNarrative,
   WorldScheduler,
   WorldStaff,
+  WorldAutomation,
   ApplyDailyDevelopment,
   CancelPromise,
   EndStaffContract,
+  ExecuteDecisionProposal,
   JoinWorld,
   RetryDelivery,
   SeasonRollover,
@@ -31,6 +33,7 @@ import {
   WorldPlayerLifecycle,
   WorldStatus,
   buildClubPortfolioFromGenesis,
+  type AutomationControllerRef,
   type CompetitionClubRef,
   type CompetitionSeasonRef,
   type GameWorldSnapshot,
@@ -54,7 +57,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(16) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(17) });
 
 afterEach(async () => {
   await Promise.all(
@@ -101,7 +104,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(16);
+    expect(file.schemaVersion).toBe(17);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -1053,6 +1056,81 @@ describe("JsonWorldRepository", () => {
     ).toHaveLength(1);
   });
 
+  it("persiste a automação X-001 com regra e proposta (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldAutomation.initialize(world);
+    if (!created.ok) throw created.error;
+    const automation = created.value;
+    const controller =
+      "019f0000-0000-7000-8000-0000000000c7" as AutomationControllerRef;
+    const rule = automation.createAutomationRule({
+      controllerId: controller,
+      scope: "SQUAD",
+      trigger: "MATCHDAY",
+      action: "SET_LINEUP",
+      risk: 20,
+      priority: 1,
+      validFrom: "2026-01-01",
+      validUntil: "2026-12-31",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "rule:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-01",
+    });
+    if (!rule.ok) throw rule.error;
+    automation.activateAutomationRule({
+      ruleId: rule.value.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "act:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    const decision = automation.evaluateDecision({
+      ruleId: rule.value.id,
+      asOf: "2026-03-01",
+      seedStream: "squad",
+      options: [
+        { commandDraft: "A", score: 50 },
+        { commandDraft: "B", score: 80 },
+      ],
+      factors: ["forma"],
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "dec:1",
+      worldSeed: world.seed,
+      worldDate: "2026-03-01",
+    });
+    if (!decision.ok) throw decision.error;
+
+    await store.value.saveAutomation(automation.snapshot(), null);
+    // round-trip: rules, proposals (com alternatives) e events preservados
+    expect(await store.value.findAutomationByWorldId(world.id)).toEqual(
+      automation.snapshot(),
+    );
+
+    // recovery: submeter a decisão após restart = efeito único no retry
+    const restarted = new JsonWorldRepository(store.directory);
+    const execute = new ExecuteDecisionProposal(restarted);
+    const execInput = {
+      decisionId: decision.value.id,
+      accept: true,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "exec:1",
+      worldSeed: world.seed,
+      worldDate: "2026-03-02",
+    };
+    const first = await execute.execute(world.id, execInput);
+    const retry = await execute.execute(world.id, execInput);
+    expect(first).toMatchObject({ ok: true, value: { status: "SUBMITTED" } });
+    expect(retry).toEqual(first);
+    const reloaded = await restarted.findAutomationByWorldId(world.id);
+    expect(reloaded!.executions).toHaveLength(1);
+    await expect(
+      store.value.saveAutomation(automation.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "AUTOMATION_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -1088,7 +1166,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(16);
+    expect(migrated.schemaVersion).toBe(17);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

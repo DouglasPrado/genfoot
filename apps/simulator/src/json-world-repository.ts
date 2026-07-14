@@ -2708,13 +2708,20 @@ export class JsonWorldRepository
           ? (persisted.narrative as unknown as WorldNarrativeSnapshot)
           : null;
       const inbox =
-        (persisted.schemaVersion === 15 || persisted.schemaVersion === 16) &&
+        (persisted.schemaVersion === 15 ||
+          persisted.schemaVersion === 16 ||
+          persisted.schemaVersion === 17) &&
         persisted.inbox !== null
           ? (persisted.inbox as unknown as WorldInboxSnapshot)
           : null;
       const staff =
-        persisted.schemaVersion === 16 && persisted.staff !== null
+        (persisted.schemaVersion === 16 || persisted.schemaVersion === 17) &&
+        persisted.staff !== null
           ? (persisted.staff as unknown as WorldStaffSnapshot)
+          : null;
+      const automation =
+        persisted.schemaVersion === 17 && persisted.automation !== null
+          ? (persisted.automation as unknown as WorldAutomationSnapshot)
           : null;
       return {
         world,
@@ -2732,6 +2739,7 @@ export class JsonWorldRepository
         narrative,
         inbox,
         staff,
+        automation,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -2753,7 +2761,7 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 16,
+        schemaVersion: 17,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
@@ -2769,6 +2777,7 @@ export class JsonWorldRepository
         narrative: envelope.narrative,
         inbox: envelope.inbox,
         staff: envelope.staff,
+        automation: envelope.automation,
       },
       null,
       2,

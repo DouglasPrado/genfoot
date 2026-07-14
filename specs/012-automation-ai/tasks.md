@@ -34,18 +34,18 @@
 
 - [x] T012 [US2] Ciclo da regra: Create/Activate/Suspend/Revoke (DRAFT→ACTIVE→SUSPENDED→REVOKED) + AutomationRuleActivated
 - [x] T013 [US2] Desativação na troca de controle (AutomationDisabledOnControlChange) idempotente
-- [ ] T014 [US2] Precedência humana explícita (bloquear automação quando há decisão humana conflitante recente)
-- [ ] T015 [US2] Escopo/risco: aplicar apenas ações de baixo risco automaticamente; alto risco vira proposta pendente
+- [x] T014 [US2] Precedência humana explícita (bloquear automação quando há decisão humana conflitante recente)
+- [x] T015 [US2] Escopo/risco: aplicar apenas ações de baixo risco automaticamente; alto risco vira proposta pendente
 
 ## Phase 5: User Story 3 — Explicar decisões (Priority: P3)
 
-- [ ] T016 [US3] GetDecisionExplanation para Strategic/Squad/Match/Narrative sem revelar conhecimento oculto
-- [ ] T017 [US3] Filtro KNOWLEDGE_FORBIDDEN sobre projeções (só fatos autorizados entram na decisão)
+- [x] T016 [US3] GetDecisionExplanation para Strategic/Squad/Match/Narrative sem revelar conhecimento oculto
+- [x] T017 [US3] Filtro KNOWLEDGE_FORBIDDEN sobre projeções (só fatos autorizados entram na decisão)
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Adapter de persistência + submissão dos commands via owners (revalidação) em apps/simulator
-- [ ] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T018 [P] Adapter de persistência + submissão dos commands via owners (revalidação) em apps/simulator
+- [x] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
 
 ## Implementation Strategy
 
