@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US2] Retomada de jornada interrompida com diagnóstico e compensação auditável
-- [ ] T003 [US1] Reconciliação de pendências herdadas (C11) e re-sincronização de snapshot no retorno
-- [ ] T004 Integração realtime real (X-002 sequence/resume token)
+- [x] T002 [US2] Retomada de jornada interrompida com diagnóstico e compensação auditável
+- [x] T003 [US1] Reconciliação de pendências herdadas (C11) e re-sincronização de snapshot no retorno
+- [x] T004 Integração realtime real (X-002 sequence/resume token)
 
 ## Notes
 

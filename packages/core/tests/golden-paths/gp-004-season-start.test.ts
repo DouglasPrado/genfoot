@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   GameWorld,
   WorldCompetitions,
+  WorldEventing,
   type CompetitionClubRef,
   type CompetitionSeasonRef,
   type GameWorldSnapshot,
@@ -99,5 +100,65 @@ describe("GP-004 Season start (convergence)", () => {
     });
     expect(repeated).toEqual(fixtures);
     expect(competitions.snapshot().revision).toBe(revision);
+  });
+
+  it("orquestra o arranque via X-002: publica fatos e reconstrói a projeção", () => {
+    const gameWorld = world();
+    const ruleset = gameWorld.rulesetVersion;
+    const competitionsR = WorldCompetitions.initialize(gameWorld);
+    if (!competitionsR.ok) throw competitionsR.error;
+    const competitions = competitionsR.value;
+    const edition = competitions.createCompetitionEdition({
+      seasonRef: SEASON,
+      name: "Liga 2026",
+      formatVersion: "league-double-rr@1",
+      maxParticipants: 4,
+      startOn: "2026-02-01",
+      roundIntervalDays: 7,
+      worldDate: "2026-01-15",
+      rulesetVersion: ruleset,
+      idempotencyKey: "edition:x",
+      worldSeed: gameWorld.seed,
+    });
+    if (!edition.ok) throw edition.error;
+
+    // X-002: os fatos oficiais do arranque entram no outbox sequenciado por stream.
+    const eventingR = WorldEventing.initialize(gameWorld);
+    if (!eventingR.ok) throw eventingR.error;
+    const eventing = eventingR.value;
+    const published = eventing.publishOutboxBatch({
+      stream: "competitions",
+      messages: [
+        { eventType: "SeasonStarted", payloadHash: `edition:${edition.value.id}`, occurredOn: "2026-02-01" },
+        { eventType: "SeasonDue", payloadHash: "round:1", occurredOn: "2026-02-01" },
+      ],
+      rulesetVersion: ruleset,
+      idempotencyKey: "season-start:batch",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!published.ok) throw published.error;
+    expect(published.value.map((m) => m.sequence)).toEqual([1, 2]);
+
+    // Projeção reconstruível do calendário a partir do event log (cursor contíguo).
+    const projection = eventing.rebuildProjection({
+      projectionId: "season-calendar",
+      stream: "competitions",
+      rulesetVersion: ruleset,
+      idempotencyKey: "proj:season",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(projection).toMatchObject({ ok: true, value: { cursor: 2 } });
+
+    // Cliente pode retomar o realtime do arranque por resume token.
+    const resume = eventing.resumeRealtimeStream({
+      audience: "web",
+      stream: "competitions",
+      fromSequence: 1,
+      expiresOn: "2026-03-01",
+      rulesetVersion: ruleset,
+    });
+    expect(resume).toMatchObject({ ok: true, value: { lastSequence: 1 } });
   });
 });

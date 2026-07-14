@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Homologação da temporada anterior (C7) antes do rollover + promoção/rebaixamento definitivos
-- [ ] T003 [US1] Rollover do scheduler (C2) e arquivamento de records/timeline (C11)
-- [ ] T004 Orquestração via X-002 (SAGA de rollover)
+- [x] T002 [US1] Homologação da temporada anterior (C7) antes do rollover + promoção/rebaixamento definitivos
+- [x] T003 [US1] Rollover do scheduler (C2) e arquivamento de records/timeline (C11)
+- [x] T004 Orquestração via X-002 (SAGA de rollover)
 
 ## Notes
 

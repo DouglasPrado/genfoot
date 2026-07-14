@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Integração com o scheduler (C2) avançando o relógio até o kickoff da temporada
-- [ ] T003 [US1] Objetivos de clube (C3) e inscrição/elegibilidade (C7) no arranque
-- [ ] T004 Orquestração via X-002 (jobs recorrentes de rodada)
+- [x] T002 [US1] Integração com o scheduler (C2) avançando o relógio até o kickoff da temporada
+- [x] T003 [US1] Objetivos de clube (C3) e inscrição/elegibilidade (C7) no arranque
+- [x] T004 Orquestração via X-002 (jobs recorrentes de rodada)
 
 ## Notes
 

@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Treino/staff (C5) influenciando o accrual diário e a preparação do jogo
-- [ ] T003 [US1] Encadeamento com fixtures da rodada (C7) e resultado oficial (C8)
-- [ ] T004 Orquestração via X-002 (jobs recorrentes) e adapters
+- [x] T002 [US1] Treino/staff (C5) influenciando o accrual diário e a preparação do jogo
+- [x] T003 [US1] Encadeamento com fixtures da rodada (C7) e resultado oficial (C8)
+- [x] T004 Orquestração via X-002 (jobs recorrentes) e adapters
 
 ## Notes
 

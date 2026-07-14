@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   classifyRealtimeEvent,
   GameWorld,
+  WorldEventing,
   WorldIdentity,
+  WorldInbox,
   type GameWorldSnapshot,
   type IdentityAccountRef,
   type IdentityClubRef,
@@ -110,5 +112,88 @@ describe("GP-002 Return after absence (convergence)", () => {
     expect(classifyRealtimeEvent(41, 42).result).toBe("APPLIED");
     expect(classifyRealtimeEvent(42, 42).result).toBe("DUPLICATE");
     expect(classifyRealtimeEvent(42, 50).result).toBe("GAP");
+  });
+
+  it("retoma o realtime por resume token (X-002) e reconcilia pendências (C11)", () => {
+    const gameWorld = world();
+    const ruleset = gameWorld.rulesetVersion;
+
+    // X-002: enquanto ausente, fatos entraram no stream do gestor.
+    const eventingR = WorldEventing.initialize(gameWorld);
+    if (!eventingR.ok) throw eventingR.error;
+    const eventing = eventingR.value;
+    const published = eventing.publishOutboxBatch({
+      stream: "manager:club-1",
+      messages: [
+        { eventType: "MatchFinished", payloadHash: "m1", occurredOn: "2026-06-10" },
+        { eventType: "PromiseBroken", payloadHash: "p1", occurredOn: "2026-06-12" },
+      ],
+      rulesetVersion: ruleset,
+      idempotencyKey: "absence:batch",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-06-12",
+    });
+    if (!published.ok) throw published.error;
+
+    // No retorno, o cliente retoma por sequence/resume token (recupera o gap).
+    const resume = eventing.resumeRealtimeStream({
+      audience: "manager:1",
+      stream: "manager:club-1",
+      fromSequence: 1,
+      expiresOn: "2026-09-01",
+      rulesetVersion: ruleset,
+    });
+    if (!resume.ok) throw resume.error;
+    expect(resume.value.resumeToken).toMatch(/^[0-9a-f]{16}$/);
+    // retomada idempotente devolve o mesmo cursor/token.
+    const again = eventing.resumeRealtimeStream({
+      audience: "manager:1",
+      stream: "manager:club-1",
+      fromSequence: 1,
+      expiresOn: "2026-09-01",
+      rulesetVersion: ruleset,
+    });
+    expect(again).toEqual(resume);
+    // retomar além do publicado é rejeitado (gap).
+    expect(
+      eventing.resumeRealtimeStream({
+        audience: "manager:1",
+        stream: "manager:club-1",
+        fromSequence: 9,
+        expiresOn: "2026-09-01",
+        rulesetVersion: ruleset,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SEQUENCE_GAP" } });
+
+    // C11: as pendências herdadas são reconciliadas sem duplicar (dedup por chave).
+    const inboxR = WorldInbox.initialize(gameWorld);
+    if (!inboxR.ok) throw inboxR.error;
+    const inbox = inboxR.value;
+    const first = inbox.projectNotification({
+      dedupKey: "inherited:promise-broken",
+      recipientScope: "manager:club-1",
+      category: "RETURN",
+      priority: "HIGH",
+      sourceRef: "p1",
+      rulesetVersion: ruleset,
+      idempotencyKey: "return:notif",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-08-01",
+    });
+    if (!first.ok) throw first.error;
+    const revision = inbox.snapshot().revision;
+    const duplicate = inbox.projectNotification({
+      dedupKey: "inherited:promise-broken",
+      recipientScope: "manager:club-1",
+      category: "RETURN",
+      priority: "HIGH",
+      sourceRef: "p1",
+      rulesetVersion: ruleset,
+      idempotencyKey: "return:notif:dup",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-08-01",
+    });
+    expect(duplicate).toMatchObject({ ok: true, value: { id: first.value.id } });
+    expect(inbox.snapshot().revision).toBe(revision);
   });
 });

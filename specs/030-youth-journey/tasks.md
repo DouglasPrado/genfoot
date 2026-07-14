@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] YouthCohort/PromoteYouth reais (C4 BC-004 US2) gerando o jogador da base
-- [ ] T003 [US1] Reação da torcida à estreia da base (C10) e notificação (C11)
-- [ ] T004 Controlador demográfico por gap após aposentadorias
+- [x] T002 [US1] YouthCohort/PromoteYouth reais (C4 BC-004 US2) gerando o jogador da base
+- [x] T003 [US1] Reação da torcida à estreia da base (C10) e notificação (C11)
+- [x] T004 Controlador demográfico por gap após aposentadorias
 
 ## Notes
 
