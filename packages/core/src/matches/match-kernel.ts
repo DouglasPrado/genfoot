@@ -18,49 +18,124 @@ export interface MatchKernelOutput {
 }
 
 /**
- * Núcleo determinístico e puro da partida: mesma manifest + matchId produz
+ * Intenção tática aplicada ao timestep canônico a partir do seu `tick` (inclusive).
+ * Ajusta a força de um lado por um delta limitado, sem alterar a contagem de sorteios
+ * do RNG por chance (mantém a âncora determinística de online ≡ offline ≡ replay).
+ */
+export interface KernelCommand {
+  readonly tick: number;
+  readonly matchSequence: number;
+  readonly side: "HOME" | "AWAY";
+  readonly delta: number;
+  readonly payloadHash: string;
+}
+
+export interface MatchKernelProgress {
+  readonly homeGoals: number;
+  readonly awayGoals: number;
+  readonly homeShots: number;
+  readonly awayShots: number;
+  readonly rngCursor: number;
+}
+
+/**
+ * Avança o timestep canônico até `tickLimit` chances (0..timestepChances), aplicando o
+ * command log em ordem. É puro e determinístico: a execução incremental (tick a tick) e a
+ * offline (limite total de uma vez) consomem exatamente os mesmos sorteios e convergem para
+ * o mesmo estado — base de online ≡ offline ≡ replay e do resume por checkpoint.
+ */
+export function simulateUpTo(
+  matchId: string,
+  manifest: SimulationManifest,
+  tickLimit: number,
+  commands: readonly KernelCommand[] = [],
+): MatchKernelProgress {
+  const rng = new SeededRandom({
+    worldSeed: manifest.seed,
+    context: `match:${matchId}:kernel`,
+  });
+  const limit = Math.max(0, Math.min(tickLimit, manifest.timestepChances));
+  const sorted = [...commands].sort(
+    (a, b) => a.tick - b.tick || a.matchSequence - b.matchSequence,
+  );
+  let homeGoals = 0;
+  let awayGoals = 0;
+  let homeShots = 0;
+  let awayShots = 0;
+  let rngCursor = 0;
+  let homeMod = 0;
+  let awayMod = 0;
+  let cursor = 0;
+  for (let chance = 0; chance < limit; chance += 1) {
+    while (cursor < sorted.length && sorted[cursor]!.tick === chance) {
+      const command = sorted[cursor]!;
+      if (command.side === "HOME") homeMod += command.delta;
+      else awayMod += command.delta;
+      cursor += 1;
+    }
+    const homeAdjusted = Math.max(
+      1,
+      manifest.homeStrength + HOME_ADVANTAGE + homeMod,
+    );
+    const away = Math.max(1, manifest.awayStrength + awayMod);
+    const total = homeAdjusted + away;
+    const attacker = rng.nextInt(0, total);
+    rngCursor += 1;
+    if (attacker < homeAdjusted) {
+      homeShots += 1;
+      const roll = rng.nextInt(0, 100);
+      rngCursor += 1;
+      if (roll < conversion(homeAdjusted, away)) homeGoals += 1;
+    } else {
+      awayShots += 1;
+      const roll = rng.nextInt(0, 100);
+      rngCursor += 1;
+      if (roll < conversion(away, homeAdjusted)) awayGoals += 1;
+    }
+  }
+  return { homeGoals, awayGoals, homeShots, awayShots, rngCursor };
+}
+
+/**
+ * Núcleo determinístico e puro da partida: mesma manifest + matchId + command log produz
  * sempre a mesma saída (online ≡ offline ≡ replay). Não faz E/S nem usa relógio.
  */
 export function simulateMatch(
   matchId: string,
   manifest: SimulationManifest,
+  commands: readonly KernelCommand[] = [],
 ): MatchKernelOutput {
-  const rng = new SeededRandom({
-    worldSeed: manifest.seed,
-    context: `match:${matchId}:kernel`,
-  });
+  const progress = simulateUpTo(
+    matchId,
+    manifest,
+    manifest.timestepChances,
+    commands,
+  );
   const homeAdjusted = manifest.homeStrength + HOME_ADVANTAGE;
   const total = homeAdjusted + manifest.awayStrength;
-  let homeGoals = 0;
-  let awayGoals = 0;
-  let homeShots = 0;
-  let awayShots = 0;
-  for (let chance = 0; chance < manifest.timestepChances; chance += 1) {
-    const attacker = rng.nextInt(0, total);
-    if (attacker < homeAdjusted) {
-      homeShots += 1;
-      if (rng.nextInt(0, 100) < conversion(homeAdjusted, manifest.awayStrength)) {
-        homeGoals += 1;
-      }
-    } else {
-      awayShots += 1;
-      if (rng.nextInt(0, 100) < conversion(manifest.awayStrength, homeAdjusted)) {
-        awayGoals += 1;
-      }
-    }
-  }
   const homePossession = Math.round((homeAdjusted / total) * 100);
+  const commandsDigest =
+    commands.length === 0
+      ? ""
+      : `|cmd:${stableHash(
+          [...commands]
+            .sort((a, b) => a.tick - b.tick || a.matchSequence - b.matchSequence)
+            .map(
+              (c) => `${c.tick}:${c.matchSequence}:${c.side}:${c.delta}:${c.payloadHash}`,
+            )
+            .join(","),
+        )}`;
   const resultHash = stableHash(
-    `${matchId}|${manifest.inputHash}|${homeGoals}-${awayGoals}`,
+    `${matchId}|${manifest.inputHash}|${progress.homeGoals}-${progress.awayGoals}${commandsDigest}`,
   );
   const statsHash = stableHash(
-    `${matchId}|${manifest.inputHash}|${homeShots}|${awayShots}|${homePossession}`,
+    `${matchId}|${manifest.inputHash}|${progress.homeShots}|${progress.awayShots}|${homePossession}${commandsDigest}`,
   );
   return {
-    homeGoals,
-    awayGoals,
-    homeShots,
-    awayShots,
+    homeGoals: progress.homeGoals,
+    awayGoals: progress.awayGoals,
+    homeShots: progress.homeShots,
+    awayShots: progress.awayShots,
     homePossession,
     resultHash,
     statsHash,

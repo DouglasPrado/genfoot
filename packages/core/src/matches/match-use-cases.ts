@@ -11,6 +11,7 @@ import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { MatchRepository } from "./match-repository.js";
 import type {
   MatchClubRef,
+  MatchCommandLogEntry,
   MatchFixtureRef,
   MatchSnapshot,
   MatchSummary,
@@ -130,6 +131,85 @@ export class FinalizeMatch {
   ): Promise<Result<MatchSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (matches) =>
       matches.finalizeMatch(input),
+    );
+  }
+}
+
+export class SubmitMatchCommand {
+  public constructor(private readonly repository: MatchRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      matchId: string;
+      actor: string;
+      commandType: string;
+      side: string;
+      delta: number;
+      payloadHash: string;
+      expectedSequence: number;
+      rulesetVersion: RulesetVersion;
+      commandId: string;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<MatchCommandLogEntry, DomainError>> {
+    return mutate(this.repository, gameWorldId, (matches) =>
+      matches.submitMatchCommand(input),
+    );
+  }
+}
+
+export class AdvanceMatchTicks {
+  public constructor(private readonly repository: MatchRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      matchId: string;
+      ticks: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<MatchSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (matches) =>
+      matches.advanceMatchTicks(input),
+    );
+  }
+}
+
+export class CheckpointMatch {
+  public constructor(private readonly repository: MatchRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      matchId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<MatchSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (matches) =>
+      matches.checkpointMatch(input),
+    );
+  }
+}
+
+export class ResumeMatch {
+  public constructor(private readonly repository: MatchRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      matchId: string;
+      checkpointTick: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<MatchSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (matches) =>
+      matches.resumeMatch(input),
     );
   }
 }

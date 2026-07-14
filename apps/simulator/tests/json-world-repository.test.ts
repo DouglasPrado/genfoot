@@ -3,11 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  CheckpointMatch,
   OpenLedgerAccount,
   PostTransaction,
   RecordOfficialResult,
   WorldCompetitions,
   WorldLedger,
+  WorldMatches,
   WorldScheduler,
   SeasonRollover,
   WorldGenesisGenerator,
@@ -17,6 +19,8 @@ import {
   type CompetitionClubRef,
   type CompetitionSeasonRef,
   type GameWorldSnapshot,
+  type MatchClubRef,
+  type MatchFixtureRef,
 } from "@grinta/core";
 import {
   newEntityId,
@@ -29,7 +33,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(8) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(9) });
 
 afterEach(async () => {
   await Promise.all(
@@ -76,7 +80,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(8);
+    expect(file.schemaVersion).toBe(9);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -327,6 +331,93 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "COMPETITIONS_REVISION_CONFLICT" });
   });
 
+  it("persiste a partida C8 ao vivo com command log e checkpoint (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldMatches.initialize(world);
+    if (!created.ok) throw created.error;
+    const matches = created.value;
+    const manifest = matches.createMatchManifest({
+      fixtureRef: "019f0000-0000-7000-8000-0000000000f1" as MatchFixtureRef,
+      homeClubId: "019f0000-0000-7000-8000-0000000000a1" as MatchClubRef,
+      awayClubId: "019f0000-0000-7000-8000-0000000000a2" as MatchClubRef,
+      kickoffOn: "2026-02-01",
+      seed: world.seed,
+      engineBuild: "kernel@1",
+      timestepChances: 30,
+      homeStrength: 70,
+      awayStrength: 50,
+      worldDate: "2026-02-01",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "m:1",
+      worldSeed: world.seed,
+    });
+    if (!manifest.ok) throw manifest.error;
+    const matchId = manifest.value.id;
+    const start = matches.startMatch({
+      matchId,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "start:1",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!start.ok) throw start.error;
+    const command = matches.submitMatchCommand({
+      matchId,
+      actor: "coach-home",
+      commandType: "TACTIC_SHIFT",
+      side: "HOME",
+      delta: 6,
+      payloadHash: "attack",
+      expectedSequence: 1,
+      rulesetVersion: world.rulesetVersion,
+      commandId: "c1",
+      idempotencyKey: "cmd:1",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!command.ok) throw command.error;
+    const advanced = matches.advanceMatchTicks({
+      matchId,
+      ticks: 15,
+      rulesetVersion: world.rulesetVersion,
+    });
+    if (!advanced.ok) throw advanced.error;
+    const checkpoint = matches.checkpointMatch({
+      matchId,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "cp:15",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!checkpoint.ok) throw checkpoint.error;
+
+    await store.value.saveMatches(matches.snapshot(), null);
+    // round-trip: runtime, commandLog, checkpoints e events preservados sem stripping
+    expect(await store.value.findMatchesByWorldId(world.id)).toEqual(
+      matches.snapshot(),
+    );
+
+    // recovery: retry do mesmo checkpoint após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const useCase = new CheckpointMatch(restarted);
+    const retry = await useCase.execute(world.id, {
+      matchId,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "cp:15",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(retry).toMatchObject({ ok: true });
+    const reloaded = await restarted.findMatchesByWorldId(world.id);
+    expect(reloaded!.matches[0]!.checkpoints).toHaveLength(1);
+    expect(reloaded!.matches[0]!.commandLog).toHaveLength(1);
+    await expect(
+      store.value.saveMatches(matches.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "MATCHES_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -362,7 +453,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(9);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

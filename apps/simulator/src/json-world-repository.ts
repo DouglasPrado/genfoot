@@ -43,6 +43,8 @@ import {
   type WorldLedgerSnapshot,
   type CompetitionRepository,
   type WorldCompetitionsSnapshot,
+  type MatchRepository,
+  type WorldMatchesSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -747,6 +749,86 @@ const worldCompetitionsSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const worldMatchesSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  matches: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      fixtureRef: identifierSchema,
+      homeClubId: identifierSchema,
+      awayClubId: identifierSchema,
+      kickoffOn: z.string(),
+      status: z.enum(["CREATED", "IN_PROGRESS", "FINAL"]),
+      manifest: z.object({
+        seed: z.string().min(1),
+        engineBuild: z.string().min(1),
+        timestepChances: z.number().int().positive(),
+        homeStrength: z.number().int().min(0).max(100),
+        awayStrength: z.number().int().min(0).max(100),
+        inputHash: z.string().min(1),
+      }),
+      result: z
+        .object({
+          homeGoals: z.number().int().nonnegative(),
+          awayGoals: z.number().int().nonnegative(),
+          homeShots: z.number().int().nonnegative(),
+          awayShots: z.number().int().nonnegative(),
+          homePossession: z.number().int(),
+          resultHash: z.string().min(1),
+          statsHash: z.string().min(1),
+          finalizedOn: z.string(),
+        })
+        .nullable(),
+      runtime: z
+        .object({
+          currentTick: z.number().int().nonnegative(),
+          totalTicks: z.number().int().positive(),
+          homeGoals: z.number().int().nonnegative(),
+          awayGoals: z.number().int().nonnegative(),
+          homeShots: z.number().int().nonnegative(),
+          awayShots: z.number().int().nonnegative(),
+          rngCursor: z.number().int().nonnegative(),
+          nextSequence: z.number().int().positive(),
+        })
+        .optional(),
+      commandLog: z
+        .array(
+          z.object({
+            matchSequence: z.number().int().positive(),
+            tick: z.number().int().nonnegative(),
+            actor: z.string().min(1),
+            commandType: z.string().min(1),
+            side: z.enum(["HOME", "AWAY"]),
+            delta: z.number().int(),
+            payloadHash: z.string().min(1),
+            accepted: z.literal(true),
+            commandId: z.string().min(1),
+            idempotencyKey: z.string().min(1),
+          }),
+        )
+        .optional(),
+      checkpoints: z
+        .array(
+          z.object({
+            tick: z.number().int().nonnegative(),
+            stateHash: z.string().min(1),
+            rngCursor: z.number().int().nonnegative(),
+            commandSequence: z.number().int().nonnegative(),
+            idempotencyKey: z.string().min(1),
+          }),
+        )
+        .optional(),
+      rulesetVersion: z.string(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -801,6 +883,17 @@ const persistedSnapshotSchema = z.union([
     ledger: worldLedgerSchema.nullable(),
     competitions: worldCompetitionsSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(9),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+    matches: worldMatchesSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -811,6 +904,7 @@ interface LoadedEnvelope {
   readonly clubPortfolio: WorldClubPortfolioSnapshot | null;
   readonly ledger: WorldLedgerSnapshot | null;
   readonly competitions: WorldCompetitionsSnapshot | null;
+  readonly matches: WorldMatchesSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -821,7 +915,8 @@ export class JsonWorldRepository
     PlayerLifecycleRepository,
     ClubPortfolioRepository,
     LedgerRepository,
-    CompetitionRepository
+    CompetitionRepository,
+    MatchRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -864,6 +959,7 @@ export class JsonWorldRepository
       clubPortfolio: current?.clubPortfolio ?? null,
       ledger: current?.ledger ?? null,
       competitions: current?.competitions ?? null,
+      matches: current?.matches ?? null,
     });
   }
 
@@ -897,6 +993,7 @@ export class JsonWorldRepository
       clubPortfolio: current.clubPortfolio,
       ledger: current.ledger,
       competitions: current.competitions,
+      matches: current.matches,
     });
   }
 
@@ -1126,6 +1223,45 @@ export class JsonWorldRepository
     );
   }
 
+  public async findMatchesByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldMatchesSnapshot | null> {
+    return (await this.load(id))?.matches ?? null;
+  }
+
+  public async saveMatches(
+    matches: WorldMatchesSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(matches.gameWorldId, "matches", async () => {
+      const current = await this.load(matches.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.matches !== null) {
+        throw new DomainError(
+          "MATCHES_ALREADY_EXISTS",
+          "As partidas já existem.",
+        );
+      }
+      if (
+        expectedRevision !== null &&
+        current.matches?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "MATCHES_REVISION_CONFLICT",
+          "As partidas foram alteradas desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.matches?.revision ?? null,
+          },
+        );
+      }
+      await this.write(matches.gameWorldId, { ...current, matches });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -1155,7 +1291,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
           persisted.schemaVersion === 7 ||
-          persisted.schemaVersion === 8) &&
+          persisted.schemaVersion === 8 ||
+          persisted.schemaVersion === 9) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -1165,7 +1302,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
           persisted.schemaVersion === 7 ||
-          persisted.schemaVersion === 8) &&
+          persisted.schemaVersion === 8 ||
+          persisted.schemaVersion === 9) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
@@ -1174,25 +1312,34 @@ export class JsonWorldRepository
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
           persisted.schemaVersion === 7 ||
-          persisted.schemaVersion === 8) &&
+          persisted.schemaVersion === 8 ||
+          persisted.schemaVersion === 9) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
       const clubPortfolio =
         (persisted.schemaVersion === 6 ||
           persisted.schemaVersion === 7 ||
-          persisted.schemaVersion === 8) &&
+          persisted.schemaVersion === 8 ||
+          persisted.schemaVersion === 9) &&
         persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
       const ledger =
-        (persisted.schemaVersion === 7 || persisted.schemaVersion === 8) &&
+        (persisted.schemaVersion === 7 ||
+          persisted.schemaVersion === 8 ||
+          persisted.schemaVersion === 9) &&
         persisted.ledger !== null
           ? (persisted.ledger as unknown as WorldLedgerSnapshot)
           : null;
       const competitions =
-        persisted.schemaVersion === 8 && persisted.competitions !== null
+        (persisted.schemaVersion === 8 || persisted.schemaVersion === 9) &&
+        persisted.competitions !== null
           ? (persisted.competitions as unknown as WorldCompetitionsSnapshot)
+          : null;
+      const matches =
+        persisted.schemaVersion === 9 && persisted.matches !== null
+          ? (persisted.matches as unknown as WorldMatchesSnapshot)
           : null;
       return {
         world,
@@ -1202,6 +1349,7 @@ export class JsonWorldRepository
         clubPortfolio,
         ledger,
         competitions,
+        matches,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -1223,7 +1371,7 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 8,
+        schemaVersion: 9,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
@@ -1231,6 +1379,7 @@ export class JsonWorldRepository
         clubPortfolio: envelope.clubPortfolio,
         ledger: envelope.ledger,
         competitions: envelope.competitions,
+        matches: envelope.matches,
       },
       null,
       2,

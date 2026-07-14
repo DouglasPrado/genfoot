@@ -9,21 +9,34 @@ import {
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
-import { simulateMatch, stableHash } from "./match-kernel.js";
 import {
+  simulateMatch,
+  simulateUpTo,
+  stableHash,
+  type KernelCommand,
+} from "./match-kernel.js";
+import {
+  MatchCommandSide,
   MatchStatus,
+  type MatchCheckpointedEvent,
+  type MatchCheckpointSnapshot,
   type MatchClubRef,
+  type MatchCommandAcceptedEvent,
+  type MatchCommandLogEntry,
   type MatchDomainEvent,
   type MatchFinishedEvent,
   type MatchFixtureRef,
   type MatchResult,
   type MatchResultOfficialEvent,
+  type MatchRuntimeState,
   type MatchSnapshot,
   type MatchStartedEvent,
   type MatchSummary,
   type SimulationManifest,
   type WorldMatchesSnapshot,
 } from "./match-types.js";
+
+const COMMAND_MAX_DELTA = 8;
 
 export interface MatchReplayOutcome {
   readonly deterministic: boolean;
@@ -65,6 +78,31 @@ export class WorldMatches {
         match.version < 1
       ) {
         return fail(invalidMatches("Partida inválida."));
+      }
+      const runtime = match.runtime;
+      if (runtime !== undefined) {
+        if (
+          runtime.totalTicks !== match.manifest.timestepChances ||
+          runtime.currentTick < 0 ||
+          runtime.currentTick > runtime.totalTicks ||
+          runtime.nextSequence < 1 ||
+          !Number.isSafeInteger(runtime.rngCursor) ||
+          runtime.rngCursor < 0
+        ) {
+          return fail(invalidMatches("Runtime de partida inválido."));
+        }
+      }
+      const sequences = new Set<number>();
+      for (const entry of match.commandLog ?? []) {
+        if (
+          sequences.has(entry.matchSequence) ||
+          entry.tick < 0 ||
+          entry.tick >= match.manifest.timestepChances ||
+          Math.abs(entry.delta) > COMMAND_MAX_DELTA
+        ) {
+          return fail(invalidMatches("Command log de partida inválido."));
+        }
+        sequences.add(entry.matchSequence);
       }
       matchIds.add(match.id);
     }
@@ -205,9 +243,22 @@ export class WorldMatches {
     }
     const date = WorldDate.parse(input.worldDate);
     if (!date.ok) return date;
+    const runtime: MatchRuntimeState = {
+      currentTick: 0,
+      totalTicks: match.manifest.timestepChances,
+      homeGoals: 0,
+      awayGoals: 0,
+      homeShots: 0,
+      awayShots: 0,
+      rngCursor: 0,
+      nextSequence: 1,
+    };
     const started: MatchSnapshot = {
       ...match,
       status: MatchStatus.IN_PROGRESS,
+      runtime,
+      commandLog: [],
+      checkpoints: [],
       version: match.version + 1,
     };
     const matches = [...this.state.matches];
@@ -265,7 +316,11 @@ export class WorldMatches {
     }
     const date = WorldDate.parse(input.worldDate);
     if (!date.ok) return date;
-    const kernel = simulateMatch(match.id, match.manifest);
+    const kernel = simulateMatch(
+      match.id,
+      match.manifest,
+      toKernelCommands(match.commandLog),
+    );
     const result: MatchResult = {
       homeGoals: kernel.homeGoals,
       awayGoals: kernel.awayGoals,
@@ -324,6 +379,347 @@ export class WorldMatches {
     return succeed(finalized);
   }
 
+  public submitMatchCommand(
+    input: Readonly<{
+      matchId: string;
+      actor: string;
+      commandType: string;
+      side: string;
+      delta: number;
+      payloadHash: string;
+      expectedSequence: number;
+      rulesetVersion: RulesetVersion;
+      commandId: string;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<MatchCommandLogEntry, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const replay = this.findEvent("MatchCommandAccepted", input.idempotencyKey);
+    if (replay !== undefined) {
+      const match = this.state.matches.find(({ id }) => id === replay.matchId);
+      const logged = match?.commandLog?.find(
+        (entry) => entry.matchSequence === replay.matchSequence,
+      );
+      if (logged !== undefined) return succeed(logged);
+    }
+    const index = this.state.matches.findIndex(
+      ({ id }) => id === input.matchId,
+    );
+    if (index < 0) return fail(matchNotFound(input.matchId));
+    const match = this.state.matches[index]!;
+    const runtime = match.runtime;
+    if (match.status !== MatchStatus.IN_PROGRESS || runtime === undefined) {
+      return fail(matchNotStarted(match.id));
+    }
+    if (
+      input.side !== MatchCommandSide.HOME &&
+      input.side !== MatchCommandSide.AWAY
+    ) {
+      return fail(invalidCommand("O lado do command deve ser HOME ou AWAY."));
+    }
+    if (
+      !Number.isSafeInteger(input.delta) ||
+      Math.abs(input.delta) > COMMAND_MAX_DELTA ||
+      input.actor.trim() === "" ||
+      input.commandType.trim() === "" ||
+      input.payloadHash.trim() === "" ||
+      input.commandId.trim() === ""
+    ) {
+      return fail(
+        invalidCommand(
+          "actor/commandType/payloadHash/commandId e delta (±8) devem ser válidos.",
+        ),
+      );
+    }
+    if (runtime.currentTick >= runtime.totalTicks) {
+      return fail(
+        new DomainError(
+          "MATCH_COMMAND_OUT_OF_WINDOW",
+          "A partida já esgotou os ticks; nenhum command é aceito.",
+          { matchId: match.id, tick: runtime.currentTick },
+        ),
+      );
+    }
+    if (input.expectedSequence !== runtime.nextSequence) {
+      return fail(
+        input.expectedSequence < runtime.nextSequence
+          ? new DomainError(
+              "MATCH_COMMAND_STALE",
+              "Sequência já consumida (command atrasado/duplicado).",
+              { expected: runtime.nextSequence, received: input.expectedSequence },
+            )
+          : new DomainError(
+              "MATCH_COMMAND_SEQUENCE_GAP",
+              "Lacuna na sequência de commands.",
+              { expected: runtime.nextSequence, received: input.expectedSequence },
+            ),
+      );
+    }
+    const lastForActor = [...(match.commandLog ?? [])]
+      .reverse()
+      .find((entry) => entry.actor === input.actor);
+    if (lastForActor !== undefined && lastForActor.tick === runtime.currentTick) {
+      return fail(
+        new DomainError(
+          "MATCH_COMMAND_COOLDOWN",
+          "O actor já submeteu um command neste tick (cooldown).",
+          { matchId: match.id, actor: input.actor, tick: runtime.currentTick },
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const entry: MatchCommandLogEntry = {
+      matchSequence: runtime.nextSequence,
+      tick: runtime.currentTick,
+      actor: input.actor,
+      commandType: input.commandType,
+      side: input.side,
+      delta: input.delta,
+      payloadHash: input.payloadHash,
+      accepted: true,
+      commandId: input.commandId,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const updated: MatchSnapshot = {
+      ...match,
+      commandLog: [...(match.commandLog ?? []), entry],
+      runtime: { ...runtime, nextSequence: runtime.nextSequence + 1 },
+      version: match.version + 1,
+    };
+    const matches = [...this.state.matches];
+    matches[index] = updated;
+    const event: MatchCommandAcceptedEvent = {
+      id: deterministicUuidV7<"MatchEvent">({
+        worldSeed: input.worldSeed,
+        context: `match-command:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      type: "MatchCommandAccepted",
+      gameWorldId: this.state.gameWorldId,
+      matchId: match.id,
+      matchSequence: entry.matchSequence,
+      tick: entry.tick,
+      actor: entry.actor,
+      commandType: entry.commandType,
+      payloadHash: entry.payloadHash,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      matches,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(entry);
+  }
+
+  public advanceMatchTicks(
+    input: Readonly<{
+      matchId: string;
+      ticks: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<MatchSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const index = this.state.matches.findIndex(
+      ({ id }) => id === input.matchId,
+    );
+    if (index < 0) return fail(matchNotFound(input.matchId));
+    const match = this.state.matches[index]!;
+    const runtime = match.runtime;
+    if (match.status !== MatchStatus.IN_PROGRESS || runtime === undefined) {
+      return fail(matchNotStarted(match.id));
+    }
+    if (!Number.isSafeInteger(input.ticks) || input.ticks < 1) {
+      return fail(invalidCommand("O número de ticks deve ser inteiro ≥ 1."));
+    }
+    const nextTick = Math.min(
+      runtime.currentTick + input.ticks,
+      runtime.totalTicks,
+    );
+    if (nextTick === runtime.currentTick) return succeed(match);
+    const progress = simulateUpTo(
+      match.id,
+      match.manifest,
+      nextTick,
+      toKernelCommands(match.commandLog),
+    );
+    const advanced: MatchSnapshot = {
+      ...match,
+      runtime: {
+        ...runtime,
+        currentTick: nextTick,
+        homeGoals: progress.homeGoals,
+        awayGoals: progress.awayGoals,
+        homeShots: progress.homeShots,
+        awayShots: progress.awayShots,
+        rngCursor: progress.rngCursor,
+      },
+      version: match.version + 1,
+    };
+    const matches = [...this.state.matches];
+    matches[index] = advanced;
+    this.state = {
+      ...this.state,
+      matches,
+      revision: this.state.revision + 1,
+    };
+    return succeed(advanced);
+  }
+
+  public checkpointMatch(
+    input: Readonly<{
+      matchId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<MatchSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (this.findEvent("MatchCheckpointed", input.idempotencyKey) !== undefined) {
+      const existing = this.state.matches.find(
+        ({ id }) => id === input.matchId,
+      );
+      if (existing !== undefined) return succeed(existing);
+    }
+    const index = this.state.matches.findIndex(
+      ({ id }) => id === input.matchId,
+    );
+    if (index < 0) return fail(matchNotFound(input.matchId));
+    const match = this.state.matches[index]!;
+    const runtime = match.runtime;
+    if (match.status !== MatchStatus.IN_PROGRESS || runtime === undefined) {
+      return fail(matchNotStarted(match.id));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const checkpoint: MatchCheckpointSnapshot = {
+      tick: runtime.currentTick,
+      stateHash: runtimeStateHash(match.id, runtime),
+      rngCursor: runtime.rngCursor,
+      commandSequence: runtime.nextSequence - 1,
+      idempotencyKey: input.idempotencyKey,
+    };
+    const updated: MatchSnapshot = {
+      ...match,
+      checkpoints: [...(match.checkpoints ?? []), checkpoint],
+      version: match.version + 1,
+    };
+    const matches = [...this.state.matches];
+    matches[index] = updated;
+    const event: MatchCheckpointedEvent = {
+      id: deterministicUuidV7<"MatchEvent">({
+        worldSeed: input.worldSeed,
+        context: `match-checkpoint:${input.idempotencyKey}`,
+        timestampMilliseconds: timestampOf(date.value.toString()),
+      }),
+      type: "MatchCheckpointed",
+      gameWorldId: this.state.gameWorldId,
+      matchId: match.id,
+      tick: checkpoint.tick,
+      stateHash: checkpoint.stateHash,
+      commandSequence: checkpoint.commandSequence,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      matches,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(updated);
+  }
+
+  public resumeMatch(
+    input: Readonly<{
+      matchId: string;
+      checkpointTick: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<MatchSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const index = this.state.matches.findIndex(
+      ({ id }) => id === input.matchId,
+    );
+    if (index < 0) return fail(matchNotFound(input.matchId));
+    const match = this.state.matches[index]!;
+    const runtime = match.runtime;
+    if (match.status !== MatchStatus.IN_PROGRESS || runtime === undefined) {
+      return fail(matchNotStarted(match.id));
+    }
+    const checkpoint = (match.checkpoints ?? []).find(
+      ({ tick }) => tick === input.checkpointTick,
+    );
+    if (checkpoint === undefined) {
+      return fail(
+        new DomainError(
+          "MATCH_CHECKPOINT_NOT_FOUND",
+          "Nenhum checkpoint no tick informado.",
+          { matchId: match.id, checkpointTick: input.checkpointTick },
+        ),
+      );
+    }
+    const progress = simulateUpTo(
+      match.id,
+      match.manifest,
+      checkpoint.tick,
+      toKernelCommands(match.commandLog),
+    );
+    const restored: MatchRuntimeState = {
+      ...runtime,
+      currentTick: checkpoint.tick,
+      homeGoals: progress.homeGoals,
+      awayGoals: progress.awayGoals,
+      homeShots: progress.homeShots,
+      awayShots: progress.awayShots,
+      rngCursor: progress.rngCursor,
+    };
+    if (runtimeStateHash(match.id, restored) !== checkpoint.stateHash) {
+      return fail(
+        new DomainError(
+          "MATCH_CHECKPOINT_INCOMPATIBLE",
+          "O estado recomputado diverge do checkpoint (incompatível).",
+          { matchId: match.id, checkpointTick: input.checkpointTick },
+        ),
+      );
+    }
+    if (
+      runtime.currentTick === restored.currentTick &&
+      runtime.rngCursor === restored.rngCursor
+    ) {
+      return succeed(match);
+    }
+    const resumed: MatchSnapshot = {
+      ...match,
+      runtime: restored,
+      version: match.version + 1,
+    };
+    const matches = [...this.state.matches];
+    matches[index] = resumed;
+    this.state = {
+      ...this.state,
+      matches,
+      revision: this.state.revision + 1,
+    };
+    return succeed(resumed);
+  }
+
   public replayMatch(matchId: string): Result<MatchReplayOutcome, DomainError> {
     const match = this.state.matches.find(({ id }) => id === matchId);
     if (match === undefined) return fail(matchNotFound(matchId));
@@ -336,7 +732,11 @@ export class WorldMatches {
         ),
       );
     }
-    const kernel = simulateMatch(match.id, match.manifest);
+    const kernel = simulateMatch(
+      match.id,
+      match.manifest,
+      toKernelCommands(match.commandLog),
+    );
     return succeed({
       deterministic:
         kernel.resultHash === match.result.resultHash &&
@@ -357,6 +757,14 @@ export class WorldMatches {
         ({ status }) => status === MatchStatus.FINAL,
       ).length,
       eventCount: this.state.events.length,
+      commandCount: this.state.matches.reduce(
+        (total, match) => total + (match.commandLog?.length ?? 0),
+        0,
+      ),
+      checkpointCount: this.state.matches.reduce(
+        (total, match) => total + (match.checkpoints?.length ?? 0),
+        0,
+      ),
     };
   }
 
@@ -390,6 +798,45 @@ function matchNotFound(matchId: string): DomainError {
   return new DomainError("MATCH_NOT_FOUND", "Partida não encontrada.", {
     matchId,
   });
+}
+
+function matchNotStarted(matchId: string): DomainError {
+  return new DomainError(
+    "MATCH_NOT_STARTED",
+    "A partida precisa estar em andamento para esta operação.",
+    { matchId },
+  );
+}
+
+function invalidCommand(message: string): DomainError {
+  return new DomainError("INVALID_MATCH_COMMAND", message);
+}
+
+function runtimeStateHash(
+  matchId: string,
+  runtime: MatchRuntimeState,
+): string {
+  return stableHash(
+    [
+      matchId,
+      runtime.currentTick,
+      `${runtime.homeGoals}-${runtime.awayGoals}`,
+      `${runtime.homeShots}-${runtime.awayShots}`,
+      runtime.rngCursor,
+    ].join("|"),
+  );
+}
+
+function toKernelCommands(
+  commandLog: readonly MatchCommandLogEntry[] | undefined,
+): readonly KernelCommand[] {
+  return (commandLog ?? []).map((entry) => ({
+    tick: entry.tick,
+    matchSequence: entry.matchSequence,
+    side: entry.side,
+    delta: entry.delta,
+    payloadHash: entry.payloadHash,
+  }));
 }
 
 function validStrength(value: number): boolean {

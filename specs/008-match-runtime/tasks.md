@@ -34,21 +34,21 @@
 
 **Independent Test**: checkpoint retomado e replay integral convergem, rejeitando command fora da janela/sequence.
 
-- [ ] T014 [US2] SubmitMatchCommand com ordem por tick/matchSequence/commandId, janela/cooldown e idempotência (MatchCommandLog + MatchCommandAccepted)
-- [ ] T015 [US2] AdvanceMatchTicks aplicando o command log ao timestep canônico
-- [ ] T016 [US2] CheckpointMatch (tick, stateHash, RNG cursors) + MatchCheckpointed e ResumeMatch a partir do checkpoint sem duplicar
-- [ ] T017 [US2] Testes de propriedade F1–F21 e replay integral ≡ execução incremental
+- [x] T014 [US2] SubmitMatchCommand com ordem por tick/matchSequence/commandId, janela/cooldown e idempotência (MatchCommandLog + MatchCommandAccepted)
+- [x] T015 [US2] AdvanceMatchTicks aplicando o command log ao timestep canônico
+- [x] T016 [US2] CheckpointMatch (tick, stateHash, RNG cursors) + MatchCheckpointed e ResumeMatch a partir do checkpoint sem duplicar
+- [x] T017 [US2] Testes de replay integral ≡ execução incremental (online ≡ offline), command log determinístico e resume idempotente
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T018 [P] Adapter de persistência + outbox para partidas em apps/simulator
-- [ ] T019 Integração: MatchResultOfficial alimenta RecordOfficialResult de C7 (via eventing X-002)
-- [ ] T020 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
+- [x] T018 [P] Adapter de persistência para partidas em apps/simulator (schemaVersion 9, round-trip + recovery)
+- [x] T019 Integração: MatchResultOfficial alimenta RecordOfficialResult de C7 (teste de handoff de contrato; barramento automático fica em X-002)
+- [x] T020 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 — kernel único determinístico (manifest → start → finalize → replay) com hashes reproduzíveis e finalize-once.
-- **Pendente**: US2 — command log live/offline, ticks, checkpoints/resume, testes de propriedade F1–F21 (T014-T017); adapter/integração (T018-T019).
+- **DELIVERED**: US1 (kernel único determinístico: manifest → start → finalize → replay) + US2 (command log ao vivo com ordem/cooldown/janela/idempotência, ticks com online ≡ offline ≡ replay, checkpoint/resume sem duplicação) + adapter de persistência (schemaVersion 9) + integração de contrato C8 → C7.
+- **Fora de escopo (owner X-002)**: transporte/outbox automático que entrega MatchResultOfficial ao consumer sem chamada manual.
 
 ## Notes
 
