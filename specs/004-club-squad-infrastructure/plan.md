@@ -1,6 +1,6 @@
 # Implementation Plan: Clube, elenco e infraestrutura
 
-**Feature**: [spec.md](spec.md) · **ID**: BC-003 · **Status**: PARTIAL · **Date**: 2026-07-13
+**Feature**: [spec.md](spec.md) · **ID**: BC-003 · **Status**: DELIVERED · **Date**: 2026-07-13
 
 **Directory**: `specs/004-club-squad-infrastructure` · **Branch**: pacote de design do roadmap mestre
 
@@ -17,7 +17,7 @@ Entregar Club, Squad, departamentos, estádio, peças de infraestrutura, comerci
 - **Testing**: Vitest para unidade, propriedade, contrato, integração e replay.
 - **Performance**: processamento determinístico em lote por mundo, sem I/O dentro do kernel.
 - **Scale**: isolamento por `worldId`, workers concorrentes e retomada por checkpoint.
-- **Current vs target**: A gênese determinística cria 16 clubes e elencos válidos; gestão, estrutura, estádio, comercial e governança não estão implementados. Entregar aggregates e comandos de gestão com projetos longos, manutenção e consultas a owners externos.
+- **Current vs target**: O escopo autoritativo C3 está entregue: clubes/elencos determinísticos, gestão versionada e idempotente, manutenção e projetos SAGA-04 recuperáveis. Efeitos financeiros, licenciamento competitivo e transporte durável permanecem atrás das portas de C9, C7 e X-002.
 
 ## Constitution Check
 
@@ -57,18 +57,18 @@ Domínio não importa Prisma, transporte ou filesystem. Aplicação depende de p
 
 **Freeze point**: nomes/versionamento de commands e eventos antes dos adapters consumidores.
 
-**Evidence**: Já reproduzível: gênese e invariantes básicos de 16 clubes/elencos em `world-genesis.test.ts`. Pendente: todos os aggregates e fluxos de gestão além da gênese.
+**Evidence**: [evidência de implementação](validation/implementation-evidence.md) e [relatório do quickstart](validation/quickstart-report.md) registram 87 testes, gates completos, replay/idempotência, concorrência, recuperação da SAGA-04 e compatibilidade do snapshot v6.
 
 Rollback desativa novos handlers por feature flag, preserva eventos/fatos e reprocessa projeções; migração destrutiva e reinterpretação histórica são proibidas.
 
 ## Post-design Constitution Check
 
-| Gate                                  | Result                      |
-| ------------------------------------- | --------------------------- |
-| Domínio puro e owner único            | PASS no desenho             |
-| Determinismo, ruleset e isolamento    | PASS no desenho             |
-| Idempotência, retry e compatibilidade | PASS no desenho             |
-| Evidência de implementação            | PENDENTE para o escopo alvo |
+| Gate                                  | Result                     |
+| ------------------------------------- | -------------------------- |
+| Domínio puro e owner único            | PASS no desenho e execução |
+| Determinismo, ruleset e isolamento    | PASS no desenho e execução |
+| Idempotência, retry e compatibilidade | PASS no desenho e execução |
+| Evidência de implementação            | PASS para o escopo C3      |
 
 ## Complexity Tracking
 

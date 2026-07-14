@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { newEntityId } from "@grinta/shared";
 
 import { runCli, type CliIo } from "../src/cli.js";
 
@@ -265,8 +266,10 @@ describe("simulator CLI", () => {
     expect(startedSeason.data.world.currentDate).toBe("2026-01-04");
     expect(startedSeason.data.processedTasks).toEqual([
       { type: "players:process-day", status: "COMPLETED" },
+      { type: "clubs:process-day", status: "COMPLETED" },
       { type: "season:check-start-end", status: "COMPLETED" },
       { type: "players:process-day", status: "COMPLETED" },
+      { type: "clubs:process-day", status: "COMPLETED" },
     ]);
 
     const schedulerOutput = capture();
@@ -286,6 +289,7 @@ describe("simulator CLI", () => {
     });
     expect(scheduler.data.tasks.map(({ status }) => status)).toEqual([
       "COMPLETED",
+      "PENDING",
       "PENDING",
       "PENDING",
     ]);
@@ -389,6 +393,192 @@ describe("simulator CLI", () => {
       errorOutputSchema.parse(JSON.parse(output.stderr.join("")) as unknown)
         .error.code,
     ).toBe("INVALID_WORLD_DATE");
+  });
+
+  it("persiste, retoma e compensa obras SAGA-04 por CLI", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "grinta-project-cli-"));
+    directories.push(directory);
+    const createdOutput = capture();
+    await runCli(
+      ["world:create", "--seed", "project-cli", "--start-date", "2026-01-01"],
+      { dataDirectory: directory, io: createdOutput.io },
+    );
+    const worldId = createdOutputSchema.parse(
+      JSON.parse(createdOutput.stdout.join("")) as unknown,
+    ).data.world.id;
+    await runCli(["world:genesis", "--world", worldId], {
+      dataDirectory: directory,
+      io: capture().io,
+    });
+    const portfolioOutput = capture();
+    await runCli(["club:inspect", "--world", worldId], {
+      dataDirectory: directory,
+      io: portfolioOutput.io,
+    });
+    const portfolio = JSON.parse(portfolioOutput.stdout.join("")) as {
+      data: {
+        clubs: Array<{
+          id: string;
+          version: number;
+          stadium: { id: string; capacity: number };
+        }>;
+      };
+    };
+    const club = portfolio.data.clubs[0]!;
+    const projectId = newEntityId<"InfrastructureProject">();
+    const propose = capture();
+    expect(
+      await runCli(
+        [
+          "infrastructure:project:propose",
+          "--world",
+          worldId,
+          "--club",
+          club.id,
+          "--project",
+          projectId,
+          "--command-id",
+          "project-command-001",
+          "--idempotency-key",
+          "project:create:001",
+          "--expected-version",
+          String(club.version),
+          "--actor",
+          "board:1",
+          "--proposed-at",
+          "2026-01-01",
+          "--target-kind",
+          "STADIUM_CAPACITY",
+          "--target-reference",
+          club.stadium.id,
+          "--target-value",
+          "15000",
+          "--funding-ref",
+          "C9:funding:001",
+          "--milestones",
+          JSON.stringify([
+            {
+              id: "M1",
+              name: "Entrega",
+              dueOn: "2026-01-02",
+              amountMinor: 100000,
+            },
+          ]),
+        ],
+        { dataDirectory: directory, io: propose.io },
+      ),
+    ).toBe(0);
+    const resume = capture();
+    expect(
+      await runCli(
+        [
+          "infrastructure:project:resume",
+          "--world",
+          worldId,
+          "--project",
+          projectId,
+          "--world-date",
+          "2026-01-02",
+          "--approve-all",
+        ],
+        { dataDirectory: directory, io: resume.io },
+      ),
+    ).toBe(0);
+    expect(
+      (JSON.parse(resume.stdout.join("")) as { data: { status: string } }).data
+        .status,
+    ).toBe("COMPLETED");
+
+    const restartInspect = capture();
+    await runCli(
+      [
+        "infrastructure:project:inspect",
+        "--world",
+        worldId,
+        "--project",
+        projectId,
+      ],
+      { dataDirectory: directory, io: restartInspect.io },
+    );
+    expect(
+      (
+        JSON.parse(restartInspect.stdout.join("")) as {
+          data: { currentStepIndex: number };
+        }
+      ).data.currentStepIndex,
+    ).toBe(5);
+    const clubAfterOutput = capture();
+    await runCli(["club:inspect", "--world", worldId, "--club", club.id], {
+      dataDirectory: directory,
+      io: clubAfterOutput.io,
+    });
+    const clubAfter = (
+      JSON.parse(clubAfterOutput.stdout.join("")) as {
+        data: { club: { version: number; stadium: { capacity: number } } };
+      }
+    ).data.club;
+    expect(clubAfter.stadium.capacity).toBe(15_000);
+
+    const cancelledProjectId = newEntityId<"InfrastructureProject">();
+    await runCli(
+      [
+        "infrastructure:project:propose",
+        "--world",
+        worldId,
+        "--club",
+        club.id,
+        "--project",
+        cancelledProjectId,
+        "--command-id",
+        "project-command-002",
+        "--idempotency-key",
+        "project:create:002",
+        "--expected-version",
+        String(clubAfter.version),
+        "--actor",
+        "board:1",
+        "--proposed-at",
+        "2026-01-03",
+        "--target-kind",
+        "DEPARTMENT_LEVEL",
+        "--target-reference",
+        "TRAINING",
+        "--target-value",
+        "2",
+        "--funding-ref",
+        "C9:funding:002",
+        "--milestones",
+        JSON.stringify([
+          {
+            id: "M1",
+            name: "Entrega",
+            dueOn: "2026-02-01",
+            amountMinor: 50000,
+          },
+        ]),
+      ],
+      { dataDirectory: directory, io: capture().io },
+    );
+    const aborted = capture();
+    expect(
+      await runCli(
+        [
+          "infrastructure:project:abort",
+          "--world",
+          worldId,
+          "--project",
+          cancelledProjectId,
+          "--reason",
+          "cancelled by board",
+          "--approve-all",
+        ],
+        { dataDirectory: directory, io: aborted.io },
+      ),
+    ).toBe(0);
+    expect(
+      (JSON.parse(aborted.stdout.join("")) as { data: { status: string } }).data
+        .status,
+    ).toBe("FAILED");
   });
 
   it("inicia automaticamente, inspeciona e retoma SAGA-02", async () => {

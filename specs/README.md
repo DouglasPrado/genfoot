@@ -10,7 +10,7 @@ Status is evidence-based: `DELIVERED` covers only reproduced scope, `PARTIAL` se
 | ------- | ----------------------------------------------------------------------------------- | --------- | --------- |
 | FND-001 | [Domain Kernel and deterministic simulator](002-domain-kernel-simulator/spec.md)    | DELIVERED | M0        |
 | BC-002  | [World, seasons and scheduler](003-world-seasons-scheduler/spec.md)                 | DELIVERED | M1        |
-| BC-003  | [Club, squad and infrastructure](004-club-squad-infrastructure/spec.md)             | PARTIAL   | M1        |
+| BC-003  | [Club, squad and infrastructure](004-club-squad-infrastructure/spec.md)             | DELIVERED | M1        |
 | BC-004  | [Player development, health and youth](005-player-development-health-youth/spec.md) | PARTIAL   | M1        |
 | BC-005  | [Staff](006-staff/spec.md)                                                          | PLANNED   | M1        |
 | BC-007  | [Competitions and calendar](007-competitions-calendar/spec.md)                      | PARTIAL   | M1        |

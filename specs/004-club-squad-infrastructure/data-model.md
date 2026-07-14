@@ -40,3 +40,5 @@ Daily processing is idempotent by `(gameWorldId, worldDate)`. Each 30 logical da
 ## History and migration
 
 Simulator envelope v6 adds nullable `clubPortfolio`; v1–v5 remain readable. Existing worlds bootstrap from their immutable genesis when the feature is first invoked. Events, receipts, identity periods, board decisions, milestones and compensation facts are append-only.
+
+The implemented project record also stores `commandId`, `idempotencyKey`, `actorId` and `proposedAt`. SAGA retries use step keys, while each milestone uses `saga:{projectId}:step:3:milestone:{milestoneId}`. The JSON reader validates all five ordered steps and all persisted recovery fields.

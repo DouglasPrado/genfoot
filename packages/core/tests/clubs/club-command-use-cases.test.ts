@@ -94,21 +94,23 @@ describe("club command use cases", () => {
 class MemoryClubRepository implements ClubPortfolioRepository {
   public snapshots: WorldClubPortfolioSnapshot[] = [];
 
-  public async findClubPortfolioByWorldId(id: string) {
-    return this.snapshots.find(({ gameWorldId }) => gameWorldId === id) ?? null;
+  public findClubPortfolioByWorldId(id: string) {
+    return Promise.resolve(
+      this.snapshots.find(({ gameWorldId }) => gameWorldId === id) ?? null,
+    );
   }
 
-  public async findClubCommandReceipt(id: string, key: string) {
-    return (
+  public findClubCommandReceipt(id: string, key: string) {
+    return Promise.resolve(
       this.snapshots
         .find(({ gameWorldId }) => gameWorldId === id)
         ?.commandReceipts.find(
           ({ idempotencyKey }) => idempotencyKey === key,
-        ) ?? null
+        ) ?? null,
     );
   }
 
-  public async saveClubPortfolio(
+  public saveClubPortfolio(
     snapshot: WorldClubPortfolioSnapshot,
     expectedRevision: number | null,
   ) {
@@ -119,6 +121,7 @@ class MemoryClubRepository implements ClubPortfolioRepository {
     else if (this.snapshots[index]?.revision !== expectedRevision)
       throw new Error("revision conflict");
     else this.snapshots[index] = snapshot;
+    return Promise.resolve();
   }
 }
 

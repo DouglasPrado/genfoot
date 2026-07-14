@@ -3,7 +3,7 @@
 **Feature ID**: BC-003  
 **Directory**: `specs/004-club-squad-infrastructure`  
 **Created**: 2026-07-13  
-**Status**: PARTIAL  
+**Status**: DELIVERED
 **Milestone**: M1  
 **Owner**: C3 · Clube/Estrutura  
 **Input**: catálogo mestre, mapa de fontes e documentos canônicos.
@@ -56,9 +56,9 @@ Como mantenedor, quero evoluir o domínio preservando histórico, compatibilidad
 
 **Dependencies**: FND-001, BC-002. A dependência libera trabalho apenas quando seu contrato e evidência requerida estiverem disponíveis.
 
-**Current state**: A gênese determinística cria 16 clubes e elencos válidos; gestão, estrutura, estádio, comercial e governança não estão implementados.
+**Current state**: C3 entrega 16 clubes e elencos determinísticos, gestão versionada e idempotente, departamentos, estádio, comercial, governança, manutenção e projetos SAGA-04 recuperáveis em snapshot v6.
 
-**Target state**: Entregar aggregates e comandos de gestão com projetos longos, manutenção e consultas a owners externos.
+**Target state**: Entregue para o escopo C3. Saldo/reserva, licenciamento competitivo e eventing durável continuam nos owners C9, C7 e X-002 e são consumidos somente por portas versionadas.
 
 ## Requirements
 

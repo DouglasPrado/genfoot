@@ -10,6 +10,7 @@ import {
   ExecuteClubCommand,
   GenerateWorldGenesis,
   InspectClubPortfolio,
+  InspectInfrastructureProject,
   InspectWorld,
   InspectWorldScheduler,
   ListTemporalWindows,
@@ -18,13 +19,20 @@ import {
   RegisterTemporalWindow,
   ResumeSeasonRollover,
   RetryScheduledTask,
+  ResumeInfrastructureProject,
   ScheduleWorldTask,
   SEASON_ROLLOVER_STEPS,
   StartSeasonRollover,
+  StartInfrastructureProject,
+  AbortInfrastructureProject,
   InspectSeasonRollover,
   TemporalWindowType,
   createPlayerDayTaskHandler,
+  createClubMaintenanceTaskHandler,
   type ClubCommand,
+  type ClubCommandBase,
+  type InfrastructureFinancingPort,
+  type InfrastructureLicensingPort,
 } from "@grinta/core";
 import {
   DomainError,
@@ -206,7 +214,10 @@ export async function runCli(
         await new AdvanceScheduledWorldDays(
           repository,
           repository,
-          { "players:process-day": createPlayerDayTaskHandler(repository) },
+          {
+            "players:process-day": createPlayerDayTaskHandler(repository),
+            "clubs:process-day": createClubMaintenanceTaskHandler(repository),
+          },
           newEntityId<"WorldClockExecutor">(),
         ).execute(id.value, days.data),
       );
@@ -255,7 +266,10 @@ export async function runCli(
         await new AdvanceWorldDayCommand(
           repository,
           repository,
-          { "players:process-day": createPlayerDayTaskHandler(repository) },
+          {
+            "players:process-day": createPlayerDayTaskHandler(repository),
+            "clubs:process-day": createClubMaintenanceTaskHandler(repository),
+          },
           `cli:${input.data.commandId}`,
         ).execute(id.value, {
           ...input.data,
@@ -414,6 +428,256 @@ export async function runCli(
     );
   });
 
+  program
+    .command("infrastructure:project:propose")
+    .description("Propõe uma obra C3 e abre SAGA-04")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--club <uuid>")
+    .requiredOption("--project <uuid>")
+    .requiredOption("--command-id <id>")
+    .requiredOption("--idempotency-key <key>")
+    .requiredOption("--expected-version <number>")
+    .requiredOption("--actor <id>")
+    .requiredOption("--proposed-at <YYYY-MM-DD>")
+    .requiredOption("--target-kind <kind>")
+    .requiredOption("--target-reference <ref>")
+    .requiredOption("--target-value <number>")
+    .requiredOption("--funding-ref <ref>")
+    .requiredOption("--milestones <json>")
+    .option("--ruleset-version <version>", "Versão SemVer", "1.0.0")
+    .action(async (raw: Record<string, unknown>) => {
+      const world = parseWorldOption(raw);
+      if (!world.ok) {
+        exitCode = writeError(io, world.error);
+        return;
+      }
+      const input = z
+        .object({
+          club: z.string().uuid(),
+          project: z.string().uuid(),
+          commandId: z.string().trim().min(1),
+          idempotencyKey: z.string().trim().min(1),
+          expectedVersion: z.coerce.number().int().positive(),
+          actor: z.string().trim().min(1),
+          proposedAt: z.string(),
+          targetKind: z.enum(["STADIUM_CAPACITY", "DEPARTMENT_LEVEL"]),
+          targetReference: z.string().trim().min(1),
+          targetValue: z.coerce.number().int().positive(),
+          fundingRef: z.string().trim().min(1),
+          milestones: z.string().transform((value, context) => {
+            try {
+              return z
+                .array(
+                  z.object({
+                    id: z.string().min(1),
+                    name: z.string().min(1),
+                    dueOn: z.string(),
+                    amountMinor: z.number().int().positive(),
+                  }),
+                )
+                .min(1)
+                .parse(JSON.parse(value) as unknown);
+            } catch {
+              context.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "milestones deve ser um array JSON válido.",
+              });
+              return z.NEVER;
+            }
+          }),
+          rulesetVersion: z.string(),
+        })
+        .safeParse(raw);
+      if (!input.success) {
+        exitCode = writeError(io, invalidArguments(input.error.message));
+        return;
+      }
+      const proposedAt = WorldDate.parse(input.data.proposedAt);
+      const ruleset = parseRulesetVersion(input.data.rulesetVersion);
+      if (!proposedAt.ok) {
+        exitCode = writeError(io, proposedAt.error);
+        return;
+      }
+      if (!ruleset.ok) {
+        exitCode = writeError(io, ruleset.error);
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new StartInfrastructureProject(repository).execute({
+          id: input.data.project as never,
+          gameWorldId: world.value,
+          clubId: input.data.club as never,
+          rulesetVersion: ruleset.value,
+          commandId: input.data.commandId,
+          idempotencyKey: input.data.idempotencyKey,
+          actorId: input.data.actor,
+          proposedAt: proposedAt.value.toString(),
+          expectedClubVersion: input.data.expectedVersion,
+          target: {
+            kind: input.data.targetKind,
+            reference: input.data.targetReference,
+            targetValue: input.data.targetValue,
+          },
+          fundingRequestRef: input.data.fundingRef,
+          milestones: input.data.milestones,
+          maxAttemptsPerStep: 3,
+        }),
+      );
+    });
+
+  program
+    .command("infrastructure:project:inspect")
+    .description("Exibe o checkpoint da SAGA-04")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--project <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const world = parseWorldOption(raw);
+      if (!world.ok || typeof raw.project !== "string") {
+        exitCode = writeError(
+          io,
+          world.ok ? invalidArguments("project é obrigatório.") : world.error,
+        );
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new InspectInfrastructureProject(repository).execute(
+          world.value,
+          raw.project,
+        ),
+      );
+    });
+
+  program
+    .command("infrastructure:project:resume")
+    .description("Retoma SAGA-04; --approve-all usa ports sintéticos")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--project <uuid>")
+    .requiredOption("--world-date <YYYY-MM-DD>")
+    .option("--approve-all")
+    .action(async (raw: Record<string, unknown>) => {
+      const parsed = parseInfrastructureAction(raw);
+      if (!parsed.ok) {
+        exitCode = writeError(io, parsed.error);
+        return;
+      }
+      if (raw.approveAll !== true) {
+        exitCode = writeError(
+          io,
+          new DomainError(
+            "PROJECT_EXTERNAL_EVIDENCE_REQUIRED",
+            "O simulador exige --approve-all para ports sintéticos.",
+          ),
+        );
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new ResumeInfrastructureProject(
+          repository,
+          syntheticFinancingPort(),
+          syntheticLicensingPort(),
+          "simulator-infrastructure-worker",
+        ).execute(
+          parsed.value.world,
+          parsed.value.project,
+          parsed.value.worldDate,
+        ),
+      );
+    });
+
+  program
+    .command("infrastructure:project:abort")
+    .description("Compensa a parte reversível de SAGA-04")
+    .requiredOption("--world <uuid>")
+    .requiredOption("--project <uuid>")
+    .requiredOption("--reason <text>")
+    .option("--approve-all")
+    .action(async (raw: Record<string, unknown>) => {
+      const world = parseWorldOption(raw);
+      const input = z
+        .object({
+          project: z.string().uuid(),
+          reason: z.string().trim().min(1),
+        })
+        .safeParse(raw);
+      if (!world.ok || !input.success) {
+        exitCode = writeError(
+          io,
+          world.ok
+            ? invalidArguments(input.error?.message ?? "payload inválido")
+            : world.error,
+        );
+        return;
+      }
+      if (raw.approveAll !== true) {
+        exitCode = writeError(
+          io,
+          new DomainError(
+            "PROJECT_EXTERNAL_EVIDENCE_REQUIRED",
+            "O simulador exige --approve-all para compensar C9 sinteticamente.",
+          ),
+        );
+        return;
+      }
+      exitCode = writeResult(
+        io,
+        await new AbortInfrastructureProject(
+          repository,
+          syntheticFinancingPort(),
+          "simulator-infrastructure-worker",
+        ).execute(world.value, input.data.project, input.data.reason),
+      );
+    });
+
+  program
+    .command("club:maintenance:summary")
+    .description("Resume condição e pendências de manutenção C3")
+    .requiredOption("--world <uuid>")
+    .action(async (raw: Record<string, unknown>) => {
+      const world = parseWorldOption(raw);
+      if (!world.ok) {
+        exitCode = writeError(io, world.error);
+        return;
+      }
+      const inspected = await new InspectClubPortfolio(repository).world(
+        world.value,
+      );
+      if (!inspected.ok) {
+        exitCode = writeError(io, inspected.error);
+        return;
+      }
+      const conditions = inspected.value.clubs.flatMap((club) => [
+        club.stadium.condition,
+        ...club.departments.map(({ condition }) => condition),
+      ]);
+      io.stdout(
+        `${JSON.stringify(
+          {
+            ok: true,
+            data: {
+              minimumCondition: Math.min(...conditions),
+              maintenanceDueCount: inspected.value.clubs.reduce(
+                (count, club) =>
+                  count +
+                  Number(club.stadium.maintenanceDueOn !== null) +
+                  club.departments.filter(
+                    ({ maintenanceDueOn }) => maintenanceDueOn !== null,
+                  ).length,
+                0,
+              ),
+              processedDayCount:
+                inspected.value.processedMaintenanceDayKeys.length,
+            },
+          },
+          null,
+          2,
+        )}\n`,
+      );
+      exitCode = 0;
+    });
+
   addClubMutationOptions(
     program
       .command("club:squad:assign")
@@ -530,7 +794,7 @@ export async function runCli(
         type: "SignCommercialDeal",
         ...base,
         asset: payload.asset,
-        exclusive: payload.exclusive,
+        exclusive: payload.exclusive ?? false,
         startsOn: payload.startsOn,
         endsOn: payload.endsOn,
         externalAgreementRef: payload.agreementRef,
@@ -623,7 +887,10 @@ export async function runCli(
         await new ResumeWorldScheduler(
           repository,
           repository,
-          { "players:process-day": createPlayerDayTaskHandler(repository) },
+          {
+            "players:process-day": createPlayerDayTaskHandler(repository),
+            "clubs:process-day": createClubMaintenanceTaskHandler(repository),
+          },
           newEntityId<"WorldClockExecutor">(),
         ).execute(id.value),
       );
@@ -926,15 +1193,61 @@ function addClubMutationOptions(command: Command): Command {
     .option("--ruleset-version <version>", "Versão SemVer", "1.0.0");
 }
 
-async function runClubMutation<TSchema extends z.ZodTypeAny>(
+function parseInfrastructureAction(raw: Record<string, unknown>) {
+  const world = parseWorldOption(raw);
+  if (!world.ok) return world;
+  const input = z
+    .object({ project: z.string().uuid(), worldDate: z.string() })
+    .safeParse(raw);
+  if (!input.success) {
+    return { ok: false, error: invalidArguments(input.error.message) } as const;
+  }
+  const worldDate = WorldDate.parse(input.data.worldDate);
+  return worldDate.ok
+    ? ({
+        ok: true,
+        value: {
+          world: world.value,
+          project: input.data.project,
+          worldDate: worldDate.value.toString(),
+        },
+      } as const)
+    : worldDate;
+}
+
+function syntheticFinancingPort(): InfrastructureFinancingPort {
+  return {
+    reserve: (context) =>
+      Promise.resolve({
+        reservationRef: `simulator:${context.idempotencyKey}:reservation`,
+      }),
+    disburseMilestone: (context) =>
+      Promise.resolve({
+        disbursementRef: `simulator:${context.idempotencyKey}:disbursement`,
+      }),
+    releaseRemainder: (context) =>
+      Promise.resolve({
+        releaseFactRef: `simulator:${context.idempotencyKey}:release`,
+      }),
+  };
+}
+
+function syntheticLicensingPort(): InfrastructureLicensingPort {
+  return {
+    inspect: (context) =>
+      Promise.resolve({
+        approved: true,
+        inspectionRef: `simulator:${context.idempotencyKey}:license`,
+      }),
+  };
+}
+
+async function runClubMutation<TPayload>(
   raw: Record<string, unknown>,
   io: CliIo,
   repository: JsonWorldRepository,
-  payloadSchema: TSchema,
-  build: (
-    base: Omit<ClubCommand, "type"> & Record<string, never>,
-    payload: z.infer<TSchema>,
-  ) => ClubCommand,
+  payloadSchema: z.ZodType<TPayload>,
+  build: (base: ClubCommandBase, payload: TPayload) => ClubCommand,
 ): Promise<number> {
   const world = parseWorldOption(raw);
   if (!world.ok) return writeError(io, world.error);
@@ -977,7 +1290,7 @@ async function runClubMutation<TSchema extends z.ZodTypeAny>(
   return writeResult(
     io,
     await new ExecuteClubCommand(repository).execute(
-      build(commandBase as never, payload.data),
+      build(commandBase, payload.data),
     ),
   );
 }

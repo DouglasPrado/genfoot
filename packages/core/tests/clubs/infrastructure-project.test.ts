@@ -80,6 +80,10 @@ function createdProject(): InfrastructureProject {
     gameWorldId: schedulingWorldId(),
     clubId: newEntityId<"Club">(),
     rulesetVersion: schedulingRuleset(),
+    commandId: "project-command-1",
+    idempotencyKey: "project:create:1",
+    actorId: "board:1",
+    proposedAt: "2026-01-01",
     target: {
       kind: "STADIUM_CAPACITY",
       reference: "stadium:1",

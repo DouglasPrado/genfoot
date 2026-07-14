@@ -70,15 +70,15 @@
 
 ### Implementation for User Story 2
 
-- [ ] T024 [P] [US2] Define the five canonical SAGA-04 steps, statuses, milestones, lease/fencing and external port contracts in packages/core/src/clubs/infrastructure-project-types.ts
-- [ ] T025 [US2] Implement the forward-only InfrastructureProject aggregate with checkpointed milestones and reverse compensation in packages/core/src/clubs/infrastructure-project.ts
-- [ ] T026 [US2] Implement propose, inspect, resume, abort and compensate orchestration with persistence after every checkpoint in packages/core/src/clubs/infrastructure-project-use-cases.ts
-- [ ] T027 [US2] Integrate project snapshots and terminal asset/department effects into packages/core/src/clubs/world-club-portfolio.ts
-- [ ] T028 [US2] Implement deterministic maintenance/deterioration processing and a scheduler task handler in packages/core/src/clubs/club-maintenance.ts
-- [ ] T029 [US2] Register the C3 daily task during activation and execute it from simulator day handlers in packages/core/src/world/world-use-cases.ts and apps/simulator/src/cli.ts
-- [ ] T030 [US2] Extend JSON envelope v6 validation for projects, milestones and compensation state in apps/simulator/src/json-world-repository.ts
-- [ ] T031 [US2] Add project propose/inspect/resume/abort and maintenance summary commands with explicit synthetic financing/licensing harnesses in apps/simulator/src/cli.ts
-- [ ] T032 [US2] Add restart and CLI smoke coverage for successful, resumed and compensated projects in apps/simulator/tests/json-world-repository.test.ts and apps/simulator/tests/cli.test.ts
+- [x] T024 [P] [US2] Define the five canonical SAGA-04 steps, statuses, milestones, lease/fencing and external port contracts in packages/core/src/clubs/infrastructure-project-types.ts
+- [x] T025 [US2] Implement the forward-only InfrastructureProject aggregate with checkpointed milestones and reverse compensation in packages/core/src/clubs/infrastructure-project.ts
+- [x] T026 [US2] Implement propose, inspect, resume, abort and compensate orchestration with persistence after every checkpoint in packages/core/src/clubs/infrastructure-project-use-cases.ts
+- [x] T027 [US2] Integrate project snapshots and terminal asset/department effects into packages/core/src/clubs/world-club-portfolio.ts
+- [x] T028 [US2] Implement deterministic maintenance/deterioration processing and a scheduler task handler in packages/core/src/clubs/club-maintenance.ts
+- [x] T029 [US2] Register the C3 daily task during activation and execute it from simulator day handlers in packages/core/src/world/world-use-cases.ts and apps/simulator/src/cli.ts
+- [x] T030 [US2] Extend JSON envelope v6 validation for projects, milestones and compensation state in apps/simulator/src/json-world-repository.ts
+- [x] T031 [US2] Add project propose/inspect/resume/abort and maintenance summary commands with explicit synthetic financing/licensing harnesses in apps/simulator/src/cli.ts
+- [x] T032 [US2] Add restart and CLI smoke coverage for successful, resumed and compensated projects in apps/simulator/tests/json-world-repository.test.ts and apps/simulator/tests/cli.test.ts
 
 **Checkpoint**: User Story 2 completes or compensates SAGA-04 without cross-context writes.
 
@@ -88,10 +88,10 @@
 
 **Purpose**: Reconcile the executable contract, prove delivery and update portfolio governance honestly.
 
-- [ ] T033 [P] Update executable P1/P2 commands, failure injection and expected output in specs/004-club-squad-infrastructure/quickstart.md
-- [ ] T034 [P] Reconcile implemented storage version, limits and recovery decisions in specs/004-club-squad-infrastructure/data-model.md and specs/004-club-squad-infrastructure/research.md
-- [ ] T035 Run format, lint, typecheck, focused/full tests and build and record results in specs/004-club-squad-infrastructure/validation/implementation-evidence.md
-- [ ] T036 Execute the complete quickstart, reconcile PARTIAL/DELIVERED in spec/catalog/index/evidence registry, and record the boundary decision in specs/004-club-squad-infrastructure/validation/quickstart-report.md
+- [x] T033 [P] Update executable P1/P2 commands, failure injection and expected output in specs/004-club-squad-infrastructure/quickstart.md
+- [x] T034 [P] Reconcile implemented storage version, limits and recovery decisions in specs/004-club-squad-infrastructure/data-model.md and specs/004-club-squad-infrastructure/research.md
+- [x] T035 Run format, lint, typecheck, focused/full tests and build and record results in specs/004-club-squad-infrastructure/validation/implementation-evidence.md
+- [x] T036 Execute the complete quickstart, reconcile PARTIAL/DELIVERED in spec/catalog/index/evidence registry, and record the boundary decision in specs/004-club-squad-infrastructure/validation/quickstart-report.md
 
 ---
 

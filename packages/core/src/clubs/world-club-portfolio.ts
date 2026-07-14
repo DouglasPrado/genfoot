@@ -8,6 +8,12 @@ import {
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import { Club } from "./club.js";
+import { InfrastructureProject } from "./infrastructure-project.js";
+import {
+  InfrastructureProjectStatus,
+  type CreateInfrastructureProjectInput,
+  type InfrastructureProjectSnapshot,
+} from "./infrastructure-project-types.js";
 import { Squad } from "./squad.js";
 import type {
   ClubCommand,
@@ -44,6 +50,17 @@ export class WorldClubPortfolio {
         !Squad.fromSnapshot(squad).ok
       ) {
         return fail(invalidPortfolio("Elenco inválido ou fora do mundo."));
+      }
+    }
+    for (const project of snapshot.projects) {
+      if (
+        project.gameWorldId !== snapshot.gameWorldId ||
+        !clubIds.has(project.clubId) ||
+        !InfrastructureProject.fromSnapshot(project).ok
+      ) {
+        return fail(
+          invalidPortfolio("Projeto inválido ou fora do mundo/clube."),
+        );
       }
     }
     return succeed(new WorldClubPortfolio(snapshot));
@@ -124,7 +141,7 @@ export class WorldClubPortfolio {
           : loaded.value.remove(command.playerId);
       if (!mutation.ok) return mutation;
       squads[squadIndex] = loaded.value.snapshot();
-      aggregateVersion = squads[squadIndex]!.version;
+      aggregateVersion = squads[squadIndex].version;
       eventType = "SquadChanged";
       result = { squadId: command.squadId, playerId: command.playerId };
     } else {
@@ -138,7 +155,7 @@ export class WorldClubPortfolio {
       const mutation = mutateClub(loaded.value, command, identifiers);
       if (!mutation.ok) return mutation;
       clubs[clubIndex] = loaded.value.snapshot();
-      aggregateVersion = clubs[clubIndex]!.version;
+      aggregateVersion = clubs[clubIndex].version;
       eventType = eventFor(command.type);
       result = { clubId: command.clubId, type: command.type };
     }
@@ -195,6 +212,164 @@ export class WorldClubPortfolio {
       ).length,
       revision: this.state.revision,
     };
+  }
+
+  public startInfrastructureProject(
+    input: CreateInfrastructureProjectInput,
+    expectedClubVersion: number,
+  ): Result<InfrastructureProjectSnapshot, DomainError> {
+    const previous = this.state.projects.find(
+      ({ idempotencyKey }) => idempotencyKey === input.idempotencyKey,
+    );
+    if (previous !== undefined) {
+      return previous.id === input.id &&
+        previous.commandId === input.commandId &&
+        JSON.stringify(previous.target) === JSON.stringify(input.target) &&
+        previous.fundingRequestRef === input.fundingRequestRef
+        ? succeed(previous)
+        : fail(
+            new DomainError(
+              "IDEMPOTENCY_KEY_CONFLICT",
+              "A chave da obra já foi usada com outro payload.",
+            ),
+          );
+    }
+    if (
+      input.gameWorldId !== this.state.gameWorldId ||
+      input.rulesetVersion !== this.state.rulesetVersion
+    ) {
+      return fail(
+        new DomainError(
+          "CLUB_WORLD_MISMATCH",
+          "Projeto fora do mundo/ruleset.",
+        ),
+      );
+    }
+    const clubIndex = this.state.clubs.findIndex(
+      ({ id }) => id === input.clubId,
+    );
+    const club = this.state.clubs[clubIndex];
+    if (club === undefined) {
+      return fail(new DomainError("CLUB_NOT_FOUND", "Clube não encontrado."));
+    }
+    if (club.version !== expectedClubVersion) {
+      return fail(versionConflict(expectedClubVersion, club.version));
+    }
+    if (
+      this.state.projects.some(
+        (project) =>
+          project.clubId === input.clubId &&
+          project.target.reference === input.target.reference &&
+          project.status !== InfrastructureProjectStatus.COMPLETED &&
+          project.status !== InfrastructureProjectStatus.FAILED,
+      )
+    ) {
+      return fail(
+        new DomainError("INFRASTRUCTURE_CONFLICT", "Já existe obra no ativo."),
+      );
+    }
+    const created = InfrastructureProject.create(input);
+    if (!created.ok) return created;
+    const clubs = [...this.state.clubs];
+    clubs[clubIndex] = { ...club, version: club.version + 1 };
+    this.state = {
+      ...this.state,
+      clubs,
+      projects: [...this.state.projects, created.value.snapshot()],
+      revision: this.state.revision + 1,
+    };
+    return succeed(created.value.snapshot());
+  }
+
+  public replaceInfrastructureProject(
+    project: InfrastructureProjectSnapshot,
+  ): Result<void, DomainError> {
+    const index = this.state.projects.findIndex(({ id }) => id === project.id);
+    if (index < 0 || project.gameWorldId !== this.state.gameWorldId) {
+      return fail(
+        new DomainError("PROJECT_NOT_FOUND", "Projeto não encontrado."),
+      );
+    }
+    const projects = [...this.state.projects];
+    projects[index] = project;
+    this.state = {
+      ...this.state,
+      projects,
+      revision: this.state.revision + 1,
+    };
+    return succeed(undefined);
+  }
+
+  public operateInfrastructureProject(
+    project: InfrastructureProjectSnapshot,
+  ): Result<void, DomainError> {
+    if (project.status !== InfrastructureProjectStatus.COMPLETED) {
+      return fail(
+        new DomainError("PROJECT_INVALID_TRANSITION", "Projeto não concluído."),
+      );
+    }
+    const clubIndex = this.state.clubs.findIndex(
+      ({ id }) => id === project.clubId,
+    );
+    const club = this.state.clubs[clubIndex];
+    const projectIndex = this.state.projects.findIndex(
+      ({ id }) => id === project.id,
+    );
+    if (club === undefined || projectIndex < 0) {
+      return fail(
+        new DomainError("PROJECT_NOT_FOUND", "Projeto/clube não encontrado."),
+      );
+    }
+    let updated = club;
+    if (
+      project.target.kind === "STADIUM_CAPACITY" &&
+      project.target.reference === club.stadium.id
+    ) {
+      updated = {
+        ...club,
+        stadium: {
+          ...club.stadium,
+          capacity: project.target.targetValue,
+          version: club.stadium.version + 1,
+        },
+        version: club.version + 1,
+      };
+    } else if (project.target.kind === "DEPARTMENT_LEVEL") {
+      const departmentIndex = club.departments.findIndex(
+        ({ kind }) => kind === project.target.reference,
+      );
+      if (departmentIndex < 0) {
+        return fail(
+          new DomainError(
+            "PROJECT_TARGET_NOT_FOUND",
+            "Departamento não encontrado.",
+          ),
+        );
+      }
+      const departments = [...club.departments];
+      departments[departmentIndex] = {
+        ...departments[departmentIndex]!,
+        level: project.target.targetValue,
+        targetLevel: project.target.targetValue,
+        version: departments[departmentIndex]!.version + 1,
+      };
+      updated = { ...club, departments, version: club.version + 1 };
+    } else {
+      return fail(
+        new DomainError("PROJECT_TARGET_NOT_FOUND", "Ativo não encontrado."),
+      );
+    }
+    const clubs = [...this.state.clubs];
+    clubs[clubIndex] = updated;
+    const projects = [...this.state.projects];
+    projects[projectIndex] = project;
+    this.state = {
+      ...this.state,
+      clubs,
+      projects,
+      revision: this.state.revision + 1,
+    };
+    return succeed(undefined);
   }
 
   public snapshot(): WorldClubPortfolioSnapshot {

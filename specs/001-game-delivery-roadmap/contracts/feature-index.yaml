@@ -24,11 +24,11 @@ features:
 
   - id: BC-003
     slug: club-squad-infrastructure
-    status: PARTIAL
+    status: DELIVERED
     milestone: M1
     wave: 2
     prerequisites: [FND-001, BC-002]
-    contractFreeze: PENDING
+    contractFreeze: FROZEN
     childDirectory: specs/004-club-squad-infrastructure
 
   - id: BC-004

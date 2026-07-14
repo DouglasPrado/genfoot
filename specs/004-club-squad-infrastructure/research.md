@@ -36,6 +36,12 @@
 **Rationale**: produz invariantes testáveis e replay sem relógio global.  
 **Alternatives considered**: limites implícitos e deterioração aleatória; rejeitados por ambiguidade e replay.
 
+## Decision 7 — Simulator evidence boundary
+
+**Decision**: expose synthetic C9 financing and licensing only behind explicit `--approve-all`; persist their immutable references as if returned by real ports.
+**Rationale**: makes restart, recovery and compensation executable while keeping money and competition ownership outside C3.
+**Alternatives considered**: silently approving external steps or embedding a balance in Club; rejected because they would overstate delivery and violate ownership.
+
 ## Resolution
 
 Stack, ownership, integração, persistência, compatibilidade e validação estão decididos para geração de tarefas.

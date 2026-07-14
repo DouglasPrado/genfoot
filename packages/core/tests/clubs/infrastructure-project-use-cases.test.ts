@@ -33,6 +33,10 @@ describe("infrastructure project use cases", () => {
       clubId: club.id,
       expectedClubVersion: 1,
       rulesetVersion: world.rulesetVersion,
+      commandId: "project-command-e2e",
+      idempotencyKey: "project:create:e2e",
+      actorId: "board:1",
+      proposedAt: "2026-01-01",
       target: {
         kind: "STADIUM_CAPACITY",
         reference: club.stadium.id,
@@ -55,9 +59,9 @@ describe("infrastructure project use cases", () => {
         fact(calls, context.idempotencyKey, "releaseFactRef"),
     };
     const licensing: InfrastructureLicensingPort = {
-      inspect: async (context) => {
+      inspect: (context) => {
         calls.push(context.idempotencyKey);
-        return { approved: true, inspectionRef: "license:1" };
+        return Promise.resolve({ approved: true, inspectionRef: "license:1" });
       },
     };
     const resumed = await new ResumeInfrastructureProject(
@@ -75,25 +79,25 @@ describe("infrastructure project use cases", () => {
   });
 });
 
-async function fact(
+function fact(
   calls: string[],
   key: string,
   field: string,
 ): Promise<Record<string, string>> {
   calls.push(key);
-  return { [field]: `${field}:1` };
+  return Promise.resolve({ [field]: `${field}:1` });
 }
 
 class MemoryRepository implements ClubPortfolioRepository {
   public snapshot: WorldClubPortfolioSnapshot | null = null;
   public saves = 0;
-  public async findClubPortfolioByWorldId() {
-    return structuredClone(this.snapshot);
+  public findClubPortfolioByWorldId() {
+    return Promise.resolve(structuredClone(this.snapshot));
   }
-  public async findClubCommandReceipt() {
-    return null;
+  public findClubCommandReceipt() {
+    return Promise.resolve(null);
   }
-  public async saveClubPortfolio(
+  public saveClubPortfolio(
     snapshot: WorldClubPortfolioSnapshot,
     expectedRevision: number | null,
   ) {
@@ -104,5 +108,6 @@ class MemoryRepository implements ClubPortfolioRepository {
       throw new Error("revision conflict");
     this.snapshot = structuredClone(snapshot);
     this.saves += 1;
+    return Promise.resolve();
   }
 }

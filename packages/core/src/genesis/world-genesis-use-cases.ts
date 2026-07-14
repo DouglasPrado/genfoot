@@ -12,6 +12,7 @@ import {
   type WorldMutationResult,
 } from "../world/world-use-cases.js";
 import type { ClubPortfolioRepository } from "../clubs/club-repository.js";
+import { buildClubDailyTasks } from "../clubs/club-maintenance.js";
 import { InitializeClubPortfolio } from "../clubs/club-use-cases.js";
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { PlayerLifecycleRepository } from "../players/player-lifecycle-repository.js";
@@ -240,6 +241,18 @@ export class ActivateProvisionedWorld {
         }),
       );
       if (!playerTasks.ok) return playerTasks;
+      const clubTasks = await new ScheduleWorldTasks(
+        this.schedulingRepository,
+      ).execute(
+        gameWorldId,
+        buildClubDailyTasks({
+          gameWorldId,
+          worldSeed: world.seed,
+          fromExclusive: world.startDate,
+          throughInclusive: endsOn,
+        }),
+      );
+      if (!clubTasks.ok) return clubTasks;
     }
 
     return new ActivateWorld(this.worldRepository).execute(

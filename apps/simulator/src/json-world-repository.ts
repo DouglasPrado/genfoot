@@ -12,6 +12,10 @@ import { join } from "node:path";
 
 import {
   DominantFoot,
+  INFRASTRUCTURE_PROJECT_STEPS,
+  InfrastructureMilestoneStatus,
+  InfrastructureProjectStatus,
+  InfrastructureProjectStepStatus,
   SEASON_ROLLOVER_STEPS,
   PlayerPosition,
   PlayerAvailability,
@@ -397,6 +401,57 @@ const playerLifecycleSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const infrastructureProjectSchema = z.object({
+  id: identifierSchema,
+  gameWorldId: identifierSchema,
+  clubId: identifierSchema,
+  rulesetVersion: z.string(),
+  commandId: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+  actorId: z.string().min(1),
+  proposedAt: z.string(),
+  status: z.nativeEnum(InfrastructureProjectStatus),
+  target: z.object({
+    kind: z.enum(["STADIUM_CAPACITY", "DEPARTMENT_LEVEL"]),
+    reference: z.string().min(1),
+    targetValue: z.number().int().positive(),
+  }),
+  fundingRequestRef: z.string().min(1),
+  financingEvidence: z.record(z.unknown()).nullable(),
+  milestones: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      dueOn: z.string(),
+      amountMinor: z.number().int().positive(),
+      status: z.nativeEnum(InfrastructureMilestoneStatus),
+      disbursementFactRef: z.string().nullable(),
+      completedAt: z.string().nullable(),
+    }),
+  ),
+  inspection: z
+    .object({ approved: z.boolean(), inspectionRef: z.string().nullable() })
+    .nullable(),
+  currentStepIndex: z.number().int().min(0).max(5),
+  steps: z.array(
+    z.object({
+      stepId: z.enum(INFRASTRUCTURE_PROJECT_STEPS),
+      status: z.nativeEnum(InfrastructureProjectStepStatus),
+      attempts: z.number().int().nonnegative(),
+      fencingToken: z.number().int().positive().nullable(),
+      lastError: z.string().nullable(),
+      evidence: z.record(z.unknown()).nullable(),
+      completedAt: z.string().nullable(),
+    }),
+  ),
+  maxAttemptsPerStep: z.number().int().positive(),
+  leaseOwnerId: z.string().nullable(),
+  leaseExpiresAtMs: z.number().int().nonnegative().nullable(),
+  fencingToken: z.number().int().nonnegative(),
+  compensationEvidence: z.record(z.unknown()).nullable(),
+  version: z.number().int().positive(),
+});
+
 const clubPortfolioSchema = z.object({
   schemaVersion: z.literal(1),
   gameWorldId: identifierSchema,
@@ -436,7 +491,7 @@ const clubPortfolioSchema = z.object({
       })
       .passthrough(),
   ),
-  projects: z.array(z.record(z.unknown())),
+  projects: z.array(infrastructureProjectSchema),
   commandReceipts: z.array(z.record(z.unknown())),
   events: z.array(z.record(z.unknown())),
   processedMaintenanceDayKeys: z.array(z.string()),
