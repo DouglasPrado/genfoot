@@ -1,7 +1,7 @@
 # Feature Specification: Jogador, desenvolvimento, saúde e base
 
 **Feature ID**: BC-004 · **Directory**: `specs/005-player-development-health-youth` · **Created**: 2026-07-13  
-**Status**: PARTIAL · **Milestone**: M1 · **Owner**: C4 · Jogador/Desenvolvimento · **Input**: catálogo e fontes canônicas.
+**Status**: DELIVERED · **Milestone**: M1 · **Owner**: C4 · Jogador/Desenvolvimento · **Input**: catálogo e fontes canônicas.
 
 **Portfolio**: [catálogo](../001-game-delivery-roadmap/contracts/feature-catalog.md) · [mapa de fontes](../001-game-delivery-roadmap/contracts/source-map.md)  
 **Branch**: pacote de design do roadmap mestre

@@ -2,14 +2,14 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **11 specs** atingiram a barra `DELIVERED` de verdade na reconciliação evidenciada ("reproduced scope" + adapter + gate verde): FND-001, C1, C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; 12 contextos persistem no adapter JSON (schemaVersion 16). Ainda **PARTIAL** (evidência parcial): C2 (world/seasons), C3 (club/squad), C4 (player-dev) — o README de specs os marca DELIVERED mas a reconciliação em `001-.../validation/portfolio-completeness.md` mantém PARTIAL até fechar a evidência. `PLANNED`: VAL-001 (calibração), X-001 (automação), X-003/OPS (clientes/plataforma) e os 16 golden paths E2E.
+> **Conclusão (atualizada):** **12 specs** atingiram a barra `DELIVERED` na reconciliação evidenciada ("reproduced scope" + adapter + gate verde): FND-001, C1, C4 (player-dev), C5 (staff), C6, C7, C8, C9, C10, C11, C12 e X-002. As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; 12 contextos persistem no adapter JSON (schemaVersion 16). Reconciliação atual: **12 DELIVERED / 7 PARTIAL / 15 PLANNED** (corrigi a linha que estava dessincronizada da própria tabela). Ainda **PARTIAL**: C2 (world/seasons), C3 (club/squad) — marcados DELIVERED no índice do README mas mantidos PARTIAL na reconciliação até fechar evidência — e 5 golden paths (GP-002/004/005/006/011) que já rodam parcial. `PLANNED`: VAL-001, X-001, X-003/OPS e os demais golden paths E2E.
 
 ## Cobertura por spec
 
 | Spec | Commands impl/total | Events impl/total | Faltando (destaque) |
 |------|:---:|:---:|---|
 | 004 club/squad | 7/10 | 6/14 | infra-project propose/resume/abort; metade dos eventos |
-| 005 player/dev | 3/8 | 4/6 | GeneratePlayer, ApplyDailyDevelopment, SetTrainingDirection, GenerateYouthCohort, PromoteYouth |
+| 005 player/dev ✅ **DELIVERED** | 8/8 | 6/6 | — (geração/treino/desenvolvimento/youth + médico/aposentadoria + adapter; commit `c26b933`) |
 | 006 staff ✅ **DELIVERED** | 5/5 | 4/4 | — (contratos/alocação + capacidade as-of + query cursor + adapter; commit `1f19763`) |
 | 007 competitions ✅ **DELIVERED** | 6/6 | 5/5 | — (US2 completa: resultado/standings/homologação + adapter; commit `076e1e7`) |
 | 008 match ✅ **DELIVERED** | 8/8 | 5/5 | — (US2 ao vivo: command log/ticks/checkpoint/resume + adapter; commit `f14fa55`) |
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → **golden paths E2E (GP-001…016) + VAL-001/X-001/apps**.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → ~~`C11 notificações`~~ ✅ → ~~`C5 staff`~~ ✅ → ~~`C4 player-dev`~~ ✅ → **golden paths E2E (GP-001…016) + VAL-001/X-001/apps**.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).

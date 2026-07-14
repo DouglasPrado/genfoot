@@ -16,7 +16,7 @@
 | Duplicate packet IDs       | PASS — 0 duplicates                                                  |
 | Unresolved markers         | PASS — 0 occurrences                                                 |
 | Open checklist items       | PASS — 0 unchecked items                                             |
-| Status reconciliation      | PASS — 11 DELIVERED, 2 PARTIAL, 21 PLANNED                          |
+| Status reconciliation      | PASS — 12 DELIVERED, 7 PARTIAL, 15 PLANNED                          |
 
 Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, one Markdown contract under `contracts/`, and `checklists/requirements.md`. Identity, status and milestone were compared with `feature-index.yaml`.
 
@@ -27,7 +27,7 @@ Each packet was checked for `spec.md`, `plan.md`, `research.md`, `data-model.md`
 | FND-001 | `specs/002-domain-kernel-simulator`         | DELIVERED | 7/7       | PASS      | 0       |
 | BC-002  | `specs/003-world-seasons-scheduler`         | PARTIAL   | 7/7       | PASS      | 0       |
 | BC-003  | `specs/004-club-squad-infrastructure`       | PARTIAL   | 7/7       | PASS      | 0       |
-| BC-004  | `specs/005-player-development-health-youth` | PARTIAL   | 7/7       | PASS      | 0       |
+| BC-004  | `specs/005-player-development-health-youth` | DELIVERED | 7/7       | PASS      | 0       |
 | BC-005  | `specs/006-staff`                           | DELIVERED | 7/7       | PASS      | 0       |
 | BC-007  | `specs/007-competitions-calendar`           | DELIVERED | 7/7       | PASS      | 0       |
 | BC-008  | `specs/008-match-runtime`                   | DELIVERED | 7/7       | PASS      | 0       |
