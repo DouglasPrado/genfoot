@@ -5,7 +5,16 @@ export type IdentityClubRef = EntityId<"Club">;
 export type ClubReservationId = EntityId<"ClubReservation">;
 export type ClubControlId = EntityId<"ClubControl">;
 export type SessionFamilyId = EntityId<"SessionFamily">;
+export type SessionId = EntityId<"Session">;
 export type IdentityEventId = EntityId<"IdentityEvent">;
+
+export const AccountStatus = {
+  ACTIVE: "ACTIVE",
+  SUSPENDED: "SUSPENDED",
+} as const;
+
+export type AccountStatus =
+  (typeof AccountStatus)[keyof typeof AccountStatus];
 
 export const ClubReservationStatus = {
   HELD: "HELD",
@@ -40,6 +49,31 @@ export const SessionFamilyStatus = {
 
 export type SessionFamilyStatus =
   (typeof SessionFamilyStatus)[keyof typeof SessionFamilyStatus];
+
+export interface AccountSnapshot {
+  readonly id: IdentityAccountRef;
+  readonly gameWorldId: GameWorldId;
+  readonly status: AccountStatus;
+  readonly locale: string;
+  readonly createdOn: string;
+  readonly idempotencyKey: string;
+  readonly version: number;
+}
+
+export interface CredentialSnapshot {
+  readonly accountId: IdentityAccountRef;
+  readonly kind: string;
+  readonly secretHash: string;
+  readonly verifiedOn: string | null;
+}
+
+export interface SessionSnapshot {
+  readonly id: SessionId;
+  readonly familyId: SessionFamilyId;
+  readonly accountId: IdentityAccountRef;
+  readonly expiresOn: string;
+  readonly revokedOn: string | null;
+}
 
 export interface ClubReservationSnapshot {
   readonly id: ClubReservationId;
@@ -142,7 +176,29 @@ export interface SessionFamilyRevokedEvent {
   readonly idempotencyKey: string;
 }
 
+export interface AccountRegisteredEvent {
+  readonly id: IdentityEventId;
+  readonly type: "AccountRegistered";
+  readonly gameWorldId: GameWorldId;
+  readonly accountId: IdentityAccountRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
+export interface WorldParticipationActivatedEvent {
+  readonly id: IdentityEventId;
+  readonly type: "WorldParticipationActivated";
+  readonly gameWorldId: GameWorldId;
+  readonly accountId: IdentityAccountRef;
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type IdentityDomainEvent =
+  | AccountRegisteredEvent
+  | WorldParticipationActivatedEvent
   | ClubReservedEvent
   | ClubControlActivatedEvent
   | ClubControlEndedEvent
@@ -153,6 +209,9 @@ export interface WorldIdentitySnapshot {
   readonly gameWorldId: GameWorldId;
   readonly rulesetVersion: RulesetVersion;
   readonly cooldownDays: number;
+  readonly accounts?: readonly AccountSnapshot[];
+  readonly credentials?: readonly CredentialSnapshot[];
+  readonly sessions?: readonly SessionSnapshot[];
   readonly reservations: readonly ClubReservationSnapshot[];
   readonly controls: readonly ClubControlSnapshot[];
   readonly participations: readonly WorldParticipationSnapshot[];
@@ -163,8 +222,10 @@ export interface WorldIdentitySnapshot {
 }
 
 export interface IdentitySummary {
+  readonly accountCount: number;
   readonly activeReservationCount: number;
   readonly activeControlCount: number;
   readonly activeParticipationCount: number;
   readonly activeSessionFamilyCount: number;
+  readonly activeSessionCount: number;
 }

@@ -230,6 +230,130 @@ describe("Identity and club control", () => {
     ).toMatchObject({ ok: false, error: { code: "SESSION_REVOKED" } });
   });
 
+  it("registra conta e ingressa no mundo com autorização", () => {
+    const { gameWorld, value } = identity();
+    const account = value.registerAccount({
+      locale: "pt-BR",
+      credentialKind: "PASSWORD",
+      secretHash: "hash-1",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "acc:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-02",
+    });
+    expect(account).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+    if (!account.ok) throw account.error;
+    expect(
+      value.snapshot().events.filter((e) => e.type === "AccountRegistered"),
+    ).toHaveLength(1);
+    expect(value.snapshot().credentials).toHaveLength(1);
+
+    // conta não registrada não ingressa
+    expect(
+      value.joinWorld({
+        accountId: ACCOUNT_B,
+        gameWorldId: gameWorld.id,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "join:bad",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-03",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "AUTHENTICATION_REQUIRED" } });
+
+    // mundo divergente é proibido
+    expect(
+      value.joinWorld({
+        accountId: account.value.id,
+        gameWorldId: newGameWorldId(),
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "join:forbidden",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-03",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "WORLD_FORBIDDEN" } });
+
+    const joined = value.joinWorld({
+      accountId: account.value.id,
+      gameWorldId: gameWorld.id,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "join:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(joined).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+    expect(
+      value.snapshot().events.filter((e) => e.type === "WorldParticipationActivated"),
+    ).toHaveLength(1);
+
+    // registro idempotente
+    const revision = value.snapshot().revision;
+    const repeated = value.registerAccount({
+      locale: "pt-BR",
+      credentialKind: "PASSWORD",
+      secretHash: "hash-1",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "acc:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-02",
+    });
+    expect(repeated).toMatchObject({ ok: true, value: { id: account.value.id } });
+    expect(value.snapshot().revision).toBe(revision);
+  });
+
+  it("revoga a família de sessão explicitamente e invalida sessões", () => {
+    const { gameWorld, value } = identity();
+    const start = value.startSession({
+      accountId: ACCOUNT_A,
+      tokenHash: "t1",
+      expiresOn: "2026-02-01",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "sess:r",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-05",
+    });
+    if (!start.ok) throw start.error;
+
+    const revoked = value.revokeSessionFamily({
+      familyId: start.value.id,
+      reason: "USER_LOGOUT",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "revoke:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-06",
+    });
+    expect(revoked).toMatchObject({ ok: true, value: { status: "REVOKED" } });
+    expect(value.snapshot().sessions![0]!.revokedOn).not.toBeNull();
+    expect(
+      value.snapshot().events.filter((e) => e.type === "SessionFamilyRevoked"),
+    ).toHaveLength(1);
+
+    // refresh após revogação falha
+    expect(
+      value.refreshSession({
+        familyId: start.value.id,
+        presentedTokenHash: "t1",
+        newTokenHash: "t2",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "ref:revoked",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-07",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SESSION_REVOKED" } });
+
+    // revogação repetida = efeito único
+    const revision = value.snapshot().revision;
+    const again = value.revokeSessionFamily({
+      familyId: start.value.id,
+      reason: "USER_LOGOUT",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "revoke:again",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-08",
+    });
+    expect(again).toMatchObject({ ok: true, value: { status: "REVOKED" } });
+    expect(value.snapshot().revision).toBe(revision);
+  });
+
   it("confirma onboarding idempotente via caso de uso", async () => {
     const { gameWorld, value } = identity();
     const reservation = reserve(value, gameWorld, ACCOUNT_A, CLUB, "res:uc");

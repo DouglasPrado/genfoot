@@ -11,10 +11,12 @@ import {
   RecordOfficialResult,
   WorldCompetitions,
   WorldEventing,
+  WorldIdentity,
   WorldLedger,
   WorldMarket,
   WorldMatches,
   WorldScheduler,
+  JoinWorld,
   SeasonRollover,
   WorldGenesisGenerator,
   WorldPlayerLifecycle,
@@ -40,7 +42,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(11) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(12) });
 
 afterEach(async () => {
   await Promise.all(
@@ -87,7 +89,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(11);
+    expect(file.schemaVersion).toBe(12);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -604,6 +606,69 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "MARKET_REVISION_CONFLICT" });
   });
 
+  it("persiste a identidade C1 com conta e sessão (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldIdentity.initialize(world);
+    if (!created.ok) throw created.error;
+    const identity = created.value;
+    const account = identity.registerAccount({
+      locale: "pt-BR",
+      credentialKind: "PASSWORD",
+      secretHash: "hash-1",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "acc:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!account.ok) throw account.error;
+    const joined = identity.joinWorld({
+      accountId: account.value.id,
+      gameWorldId: world.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "join:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!joined.ok) throw joined.error;
+    const session = identity.startSession({
+      accountId: account.value.id,
+      tokenHash: "token-1",
+      expiresOn: "2026-02-01",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "sess:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!session.ok) throw session.error;
+
+    await store.value.saveIdentity(identity.snapshot(), null);
+    // round-trip: accounts, credentials, sessions e events preservados sem stripping
+    expect(await store.value.findIdentityByWorldId(world.id)).toEqual(
+      identity.snapshot(),
+    );
+
+    // recovery: retry de joinWorld após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const join = new JoinWorld(restarted);
+    const retry = await join.execute(world.id, {
+      accountId: account.value.id,
+      gameWorldId: world.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "join:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(retry).toMatchObject({ ok: true });
+    const reloaded = await restarted.findIdentityByWorldId(world.id);
+    expect(reloaded!.accounts).toHaveLength(1);
+    expect(reloaded!.sessions).toHaveLength(1);
+    await expect(
+      store.value.saveIdentity(identity.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "IDENTITY_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -639,7 +704,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(11);
+    expect(migrated.schemaVersion).toBe(12);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

@@ -10,6 +10,7 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { IdentityRepository } from "./identity-repository.js";
 import type {
+  AccountSnapshot,
   ClubControlSnapshot,
   ClubReservationSnapshot,
   IdentityAccountRef,
@@ -17,6 +18,7 @@ import type {
   IdentitySummary,
   SessionFamilySnapshot,
   WorldIdentitySnapshot,
+  WorldParticipationSnapshot,
 } from "./identity-types.js";
 import { WorldIdentity } from "./world-identity.js";
 
@@ -72,6 +74,67 @@ export class InitializeIdentity {
     if (!created.ok) return created;
     await this.repository.saveIdentity(created.value.snapshot(), null);
     return succeed(created.value.snapshot());
+  }
+}
+
+export class RegisterAccount {
+  public constructor(private readonly repository: IdentityRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      locale: string;
+      credentialKind?: string;
+      secretHash?: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<AccountSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (identity) =>
+      identity.registerAccount(input),
+    );
+  }
+}
+
+export class JoinWorld {
+  public constructor(private readonly repository: IdentityRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      accountId: IdentityAccountRef;
+      gameWorldId: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<WorldParticipationSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (identity) =>
+      identity.joinWorld(input),
+    );
+  }
+}
+
+export class RevokeSessionFamily {
+  public constructor(private readonly repository: IdentityRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      familyId: string;
+      reason: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SessionFamilySnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (identity) =>
+      identity.revokeSessionFamily(input),
+    );
   }
 }
 

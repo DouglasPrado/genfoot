@@ -49,6 +49,8 @@ import {
   type WorldEventingSnapshot,
   type MarketRepository,
   type WorldMarketSnapshot,
+  type IdentityRepository,
+  type WorldIdentitySnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -1077,6 +1079,97 @@ const worldMarketSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const worldIdentitySchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  cooldownDays: z.number().int().nonnegative(),
+  accounts: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        status: z.enum(["ACTIVE", "SUSPENDED"]),
+        locale: z.string().min(1),
+        createdOn: z.string(),
+        idempotencyKey: z.string().min(1),
+        version: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  credentials: z
+    .array(
+      z.object({
+        accountId: identifierSchema,
+        kind: z.string().min(1),
+        secretHash: z.string().min(1),
+        verifiedOn: z.string().nullable(),
+      }),
+    )
+    .optional(),
+  sessions: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        familyId: identifierSchema,
+        accountId: identifierSchema,
+        expiresOn: z.string(),
+        revokedOn: z.string().nullable(),
+      }),
+    )
+    .optional(),
+  reservations: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      clubId: identifierSchema,
+      accountId: identifierSchema,
+      status: z.enum(["HELD", "CONFIRMED", "EXPIRED", "RELEASED"]),
+      heldOn: z.string(),
+      expiresOn: z.string(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  controls: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      clubId: identifierSchema,
+      accountId: identifierSchema,
+      status: z.enum(["ACTIVE", "ENDED"]),
+      activeFrom: z.string(),
+      endedOn: z.string().nullable(),
+      endedReason: z.string().nullable(),
+      version: z.number().int().positive(),
+    }),
+  ),
+  participations: z.array(
+    z.object({
+      accountId: identifierSchema,
+      gameWorldId: identifierSchema,
+      status: z.enum(["ACTIVE", "ENDED"]),
+      activatedOn: z.string(),
+    }),
+  ),
+  cooldowns: z.array(
+    z.object({
+      accountId: identifierSchema,
+      gameWorldId: identifierSchema,
+      untilOn: z.string(),
+    }),
+  ),
+  sessionFamilies: z.array(
+    z.object({
+      id: identifierSchema,
+      accountId: identifierSchema,
+      currentTokenHash: z.string().min(1),
+      status: z.enum(["ACTIVE", "REVOKED"]),
+    }),
+  ),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -1167,6 +1260,20 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(12),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+    matches: worldMatchesSchema.nullable(),
+    eventing: worldEventingSchema.nullable(),
+    market: worldMarketSchema.nullable(),
+    identity: worldIdentitySchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -1180,6 +1287,7 @@ interface LoadedEnvelope {
   readonly matches: WorldMatchesSnapshot | null;
   readonly eventing: WorldEventingSnapshot | null;
   readonly market: WorldMarketSnapshot | null;
+  readonly identity: WorldIdentitySnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -1193,7 +1301,8 @@ export class JsonWorldRepository
     CompetitionRepository,
     MatchRepository,
     EventingRepository,
-    MarketRepository
+    MarketRepository,
+    IdentityRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -1239,6 +1348,7 @@ export class JsonWorldRepository
       matches: current?.matches ?? null,
       eventing: current?.eventing ?? null,
       market: current?.market ?? null,
+      identity: current?.identity ?? null,
     });
   }
 
@@ -1275,6 +1385,7 @@ export class JsonWorldRepository
       matches: current.matches,
       eventing: current.eventing,
       market: current.market,
+      identity: current.identity,
     });
   }
 
@@ -1618,6 +1729,45 @@ export class JsonWorldRepository
     });
   }
 
+  public async findIdentityByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldIdentitySnapshot | null> {
+    return (await this.load(id))?.identity ?? null;
+  }
+
+  public async saveIdentity(
+    identity: WorldIdentitySnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(identity.gameWorldId, "identity", async () => {
+      const current = await this.load(identity.gameWorldId);
+      if (current === null) {
+        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+      }
+      if (expectedRevision === null && current.identity !== null) {
+        throw new DomainError(
+          "IDENTITY_ALREADY_EXISTS",
+          "A identidade já existe.",
+        );
+      }
+      if (
+        expectedRevision !== null &&
+        current.identity?.revision !== expectedRevision
+      ) {
+        throw new DomainError(
+          "IDENTITY_REVISION_CONFLICT",
+          "A identidade foi alterada desde a última leitura.",
+          {
+            expectedRevision,
+            actualRevision: current.identity?.revision ?? null,
+          },
+        );
+      }
+      await this.write(identity.gameWorldId, { ...current, identity });
+    });
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -1650,7 +1800,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -1663,7 +1814,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
@@ -1675,7 +1827,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
@@ -1685,7 +1838,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
@@ -1694,7 +1848,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.ledger !== null
           ? (persisted.ledger as unknown as WorldLedgerSnapshot)
           : null;
@@ -1702,25 +1857,34 @@ export class JsonWorldRepository
         (persisted.schemaVersion === 8 ||
           persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.competitions !== null
           ? (persisted.competitions as unknown as WorldCompetitionsSnapshot)
           : null;
       const matches =
         (persisted.schemaVersion === 9 ||
           persisted.schemaVersion === 10 ||
-          persisted.schemaVersion === 11) &&
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.matches !== null
           ? (persisted.matches as unknown as WorldMatchesSnapshot)
           : null;
       const eventing =
-        (persisted.schemaVersion === 10 || persisted.schemaVersion === 11) &&
+        (persisted.schemaVersion === 10 ||
+          persisted.schemaVersion === 11 ||
+          persisted.schemaVersion === 12) &&
         persisted.eventing !== null
           ? (persisted.eventing as unknown as WorldEventingSnapshot)
           : null;
       const market =
-        persisted.schemaVersion === 11 && persisted.market !== null
+        (persisted.schemaVersion === 11 || persisted.schemaVersion === 12) &&
+        persisted.market !== null
           ? (persisted.market as unknown as WorldMarketSnapshot)
+          : null;
+      const identity =
+        persisted.schemaVersion === 12 && persisted.identity !== null
+          ? (persisted.identity as unknown as WorldIdentitySnapshot)
           : null;
       return {
         world,
@@ -1733,6 +1897,7 @@ export class JsonWorldRepository
         matches,
         eventing,
         market,
+        identity,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -1754,7 +1919,7 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 11,
+        schemaVersion: 12,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
@@ -1765,6 +1930,7 @@ export class JsonWorldRepository
         matches: envelope.matches,
         eventing: envelope.eventing,
         market: envelope.market,
+        identity: envelope.identity,
       },
       null,
       2,
