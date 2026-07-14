@@ -1,6 +1,6 @@
 # Feature Specification: Anti-abuso, suporte e administração
 
-**Feature Branch**: `017-anti-abuse-admin` | **Created**: 2026-07-13 | **Status**: PLANNED  
+**Feature Branch**: `017-anti-abuse-admin` | **Created**: 2026-07-13 | **Status**: DELIVERED  
 **Feature ID**: BC-012 | **Milestone**: M2 | **Owner**: C12 Anti-abuso/Admin
 
 **Input**: Entregar risco, quarentena, sanções, recursos, correções, audit hash-chain, suporte e reprocessamento.
