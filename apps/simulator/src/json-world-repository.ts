@@ -59,6 +59,8 @@ import {
   type WorldInboxSnapshot,
   type StaffRepository,
   type WorldStaffSnapshot,
+  type AutomationRepository,
+  type WorldAutomationSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -1580,6 +1582,55 @@ const worldStaffSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const worldAutomationSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  rules: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      controllerId: identifierSchema,
+      scope: z.string().min(1),
+      trigger: z.string(),
+      action: z.string(),
+      risk: z.number().int(),
+      priority: z.number().int(),
+      status: z.enum(["DRAFT", "ACTIVE", "SUSPENDED", "REVOKED", "EXPIRED"]),
+      validFrom: z.string(),
+      validUntil: z.string(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  proposals: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      ruleId: identifierSchema,
+      asOf: z.string(),
+      seedStream: z.string(),
+      chosenCommand: z.string(),
+      chosenScore: z.number(),
+      factors: z.array(z.string()),
+      alternatives: z.array(
+        z.object({ commandDraft: z.string(), score: z.number() }),
+      ),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  executions: z.array(
+    z.object({
+      ruleId: identifierSchema,
+      decisionId: identifierSchema,
+      commandDraft: z.string(),
+      status: z.enum(["SUBMITTED", "REJECTED"]),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -1750,6 +1801,25 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     inbox: worldInboxSchema.nullable(),
     staff: worldStaffSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(17),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+    matches: worldMatchesSchema.nullable(),
+    eventing: worldEventingSchema.nullable(),
+    market: worldMarketSchema.nullable(),
+    identity: worldIdentitySchema.nullable(),
+    admin: worldAdminSchema.nullable(),
+    narrative: worldNarrativeSchema.nullable(),
+    inbox: worldInboxSchema.nullable(),
+    staff: worldStaffSchema.nullable(),
+    automation: worldAutomationSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -1768,6 +1838,7 @@ interface LoadedEnvelope {
   readonly narrative: WorldNarrativeSnapshot | null;
   readonly inbox: WorldInboxSnapshot | null;
   readonly staff: WorldStaffSnapshot | null;
+  readonly automation: WorldAutomationSnapshot | null;
 }
 
 export class JsonWorldRepository

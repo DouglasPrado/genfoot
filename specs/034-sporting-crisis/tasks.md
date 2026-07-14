@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Abertura automática de crise por severidade agregada (protestos/apoio/imprensa)
-- [ ] T003 [US1] Pressão da diretoria (C1) e risco de fim de controle; objetivos revistos (C3)
-- [ ] T004 Consumo dos MatchResultOfficial (C8) via X-002 para alimentar a narrativa
+- [x] T002 [US1] Abertura automática de crise por severidade agregada (protestos/apoio/imprensa)
+- [x] T003 [US1] Pressão da diretoria (C1) e risco de fim de controle; objetivos revistos (C3)
+- [x] T004 Consumo dos MatchResultOfficial (C8) via X-002 para alimentar a narrativa
 
 ## Notes
 

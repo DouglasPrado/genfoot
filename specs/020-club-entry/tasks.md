@@ -9,10 +9,10 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Orquestração SAGA-03 real (C1 reserva/onboarding + C12 risco + C3 herança de objetivos/pendências) via X-002
-- [ ] T003 [US2] Retomada/compensação com histórico auditável entre etapas
-- [ ] T004 [US1] Programa de Clube Novo (criação de clube) além de assumir clube existente
-- [ ] T005 Screen contract no cliente (X-003) cobrindo os estados da jornada
+- [x] T002 [US1] Orquestração SAGA-03 real (C1 reserva/onboarding + C12 risco + C3 herança de objetivos/pendências) via X-002
+- [x] T003 [US2] Retomada/compensação com histórico auditável entre etapas
+- [x] T004 [US1] Programa de Clube Novo (criação de clube) além de assumir clube existente
+- [x] T005 Screen contract no cliente (X-003) cobrindo os estados da jornada
 
 ## Notes
 

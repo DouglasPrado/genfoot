@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] CloseAccountingPeriod (C9) fechando o período e congelando projeções
-- [ ] T003 [US1] Orçamento/saúde financeira (C3) e alertas de estouro (C11)
-- [ ] T004 Job mensal recorrente via X-002
+- [x] T002 [US1] CloseAccountingPeriod (C9) fechando o período e congelando projeções
+- [x] T003 [US1] Orçamento/saúde financeira (C3) e alertas de estouro (C11)
+- [x] T004 Job mensal recorrente via X-002
 
 ## Notes
 

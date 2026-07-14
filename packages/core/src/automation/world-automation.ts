@@ -15,6 +15,8 @@ import {
   RuleStatus,
   type AutomationControllerRef,
   type AutomationDomainEvent,
+  type AutomationRuleId,
+  type DecisionId,
   type AutomationExecutionSnapshot,
   type AutomationRuleActivatedEvent,
   type AutomationRuleSnapshot,
@@ -24,6 +26,18 @@ import {
   type DecisionProposedEvent,
   type WorldAutomationSnapshot,
 } from "./automation-types.js";
+
+const DEFAULT_RISK_THRESHOLD = 50;
+
+export interface DecisionExplanation {
+  readonly decisionId: DecisionId;
+  readonly ruleId: AutomationRuleId;
+  readonly chosenCommand: string;
+  readonly chosenScore: number;
+  readonly factors: readonly string[];
+  readonly alternatives: readonly DecisionOption[];
+  readonly asOf: string;
+}
 
 export class WorldAutomation {
   private constructor(private state: WorldAutomationSnapshot) {}
@@ -199,6 +213,7 @@ export class WorldAutomation {
       seedStream: string;
       options: readonly DecisionOption[];
       factors: readonly string[];
+      humanPrecedenceActive?: boolean;
       rulesetVersion: RulesetVersion;
       idempotencyKey: string;
       worldSeed: string;
@@ -222,6 +237,29 @@ export class WorldAutomation {
         new DomainError("RULE_NOT_ACTIVE", "A regra não está ativa.", {
           ruleId: rule.id,
         }),
+      );
+    }
+    // Precedência humana: uma decisão humana recente conflitante bloqueia a automação.
+    if (input.humanPrecedenceActive === true) {
+      return fail(
+        new DomainError(
+          "HUMAN_PRECEDENCE",
+          "Há uma decisão humana recente conflitante; a automação recua.",
+          { ruleId: rule.id },
+        ),
+      );
+    }
+    // Filtro de conhecimento: só fatos autorizados entram na decisão.
+    if (
+      input.factors.some((factor) => factor.startsWith("HIDDEN:")) ||
+      input.options.some((option) => option.commandDraft.startsWith("HIDDEN:"))
+    ) {
+      return fail(
+        new DomainError(
+          "KNOWLEDGE_FORBIDDEN",
+          "A decisão referencia conhecimento oculto não autorizado.",
+          { ruleId: rule.id },
+        ),
       );
     }
     if (input.options.length === 0) {
@@ -282,6 +320,8 @@ export class WorldAutomation {
     input: Readonly<{
       decisionId: string;
       accept: boolean;
+      auto?: boolean;
+      riskThreshold?: number;
       reason?: string;
       rulesetVersion: RulesetVersion;
       idempotencyKey: string;
@@ -305,6 +345,21 @@ export class WorldAutomation {
           decisionId: input.decisionId,
         }),
       );
+    }
+    // Escopo de risco: a submissão automática só cobre ações de baixo risco;
+    // alto risco permanece proposta pendente aguardando decisão humana.
+    if (input.accept === true && input.auto === true) {
+      const rule = this.state.rules.find(({ id }) => id === proposal.ruleId);
+      const threshold = input.riskThreshold ?? DEFAULT_RISK_THRESHOLD;
+      if (rule !== undefined && rule.risk > threshold) {
+        return fail(
+          new DomainError(
+            "HIGH_RISK_REQUIRES_APPROVAL",
+            "Ação de alto risco exige aprovação humana; a proposta fica pendente.",
+            { decisionId: proposal.id, risk: rule.risk, threshold },
+          ),
+        );
+      }
     }
     const date = WorldDate.parse(input.worldDate);
     if (!date.ok) return date;
@@ -396,6 +451,28 @@ export class WorldAutomation {
 
   public findRule(ruleId: string): AutomationRuleSnapshot | null {
     return this.state.rules.find(({ id }) => id === ruleId) ?? null;
+  }
+
+  /**
+   * GetDecisionExplanation (read-only): expõe o porquê da decisão — comando escolhido,
+   * fatores e alternativas — sem revelar conhecimento oculto (fatores HIDDEN: são filtrados).
+   */
+  public explainDecision(decisionId: string): DecisionExplanation | null {
+    const proposal = this.state.proposals.find(({ id }) => id === decisionId);
+    if (proposal === undefined) return null;
+    return {
+      decisionId: proposal.id,
+      ruleId: proposal.ruleId,
+      chosenCommand: proposal.chosenCommand,
+      chosenScore: proposal.chosenScore,
+      factors: proposal.factors.filter(
+        (factor) => !factor.startsWith("HIDDEN:"),
+      ),
+      alternatives: proposal.alternatives.filter(
+        (option) => !option.commandDraft.startsWith("HIDDEN:"),
+      ),
+      asOf: proposal.asOf,
+    };
   }
 
   public summary(): AutomationSummary {

@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] RecordOfficialResult (C7) atualizando standings a partir do MatchResultOfficial (C8) via X-002
-- [ ] T003 [US1] Efeitos: satisfação da torcida (C10), prêmios/bilheteria (C9), disponibilidade de jogadores (C4)
-- [ ] T004 [US2] Live match commands/ticks/checkpoints (C8 US2)
+- [x] T002 [US1] RecordOfficialResult (C7) atualizando standings a partir do MatchResultOfficial (C8) via X-002
+- [x] T003 [US1] Efeitos: satisfação da torcida (C10), prêmios/bilheteria (C9), disponibilidade de jogadores (C4)
+- [x] T004 [US2] Live match commands/ticks/checkpoints (C8 US2)
 
 ## Notes
 

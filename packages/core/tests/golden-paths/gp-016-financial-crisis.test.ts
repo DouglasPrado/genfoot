@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   GameWorld,
+  WorldAdmin,
+  WorldEventing,
   WorldLedger,
   WorldNarrative,
   type GameWorldSnapshot,
@@ -137,5 +139,91 @@ describe("GP-016 Financial crisis (convergence)", () => {
       }),
     ).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
     expect(ledger.summary().residualMinor).toBe(0);
+  });
+
+  it("insolvência abre caso/sanção fair-play (C12) e consome LedgerPeriodClosed (X-002)", () => {
+    const gameWorld = world();
+    const ruleset = gameWorld.rulesetVersion;
+
+    // C9: fecha o período contábil (o fato financeiro que dispara o consumo).
+    const ledgerR = WorldLedger.initialize(gameWorld);
+    if (!ledgerR.ok) throw ledgerR.error;
+    const ledger = ledgerR.value;
+    const period = ledger.closeAccountingPeriod({
+      label: "2026-Q1",
+      opensOn: "2026-01-01",
+      closesOn: "2026-03-31",
+      rulesetVersion: ruleset,
+      idempotencyKey: "period:q1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-01",
+    });
+    expect(period).toMatchObject({ ok: true, value: { status: "CLOSED" } });
+
+    // C12: a insolvência abre um caso e uma sanção de fair-play (quatro-olhos).
+    const adminR = WorldAdmin.initialize(gameWorld);
+    if (!adminR.ok) throw adminR.error;
+    const admin = adminR.value;
+    const abuseCase = admin.openCase({
+      subjects: ["club:1"],
+      severity: 85,
+      evidenceRefs: ["ledger:q1-insolvent"],
+      openedBy: "ffp-officer",
+      rulesetVersion: ruleset,
+      idempotencyKey: "case:ffp",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-02",
+    });
+    expect(abuseCase).toMatchObject({ ok: true, value: { status: "OPEN" } });
+    const proposed = admin.proposeSanction({
+      subject: "club:1",
+      sanctionType: "FAIR_PLAY_LIMIT",
+      severity: 85,
+      basis: "insolvency",
+      evidenceRefs: ["ledger:q1-insolvent"],
+      proposedBy: "ffp-officer",
+      rulesetVersion: ruleset,
+      idempotencyKey: "sanction:ffp",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-02",
+    });
+    if (!proposed.ok) throw proposed.error;
+    const activated = admin.approveSanction({
+      sanctionId: proposed.value.id,
+      approvedBy: "committee",
+      rulesetVersion: ruleset,
+      idempotencyKey: "sanction:ffp:approve",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-03",
+    });
+    expect(activated).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
+
+    // X-002: o fato LedgerPeriodClosed é transportado e a projeção reconstruída.
+    const eventingR = WorldEventing.initialize(gameWorld);
+    if (!eventingR.ok) throw eventingR.error;
+    const eventing = eventingR.value;
+    const published = eventing.publishOutboxBatch({
+      stream: "finance",
+      messages: [
+        { eventType: "LedgerPeriodClosed", payloadHash: "q1", occurredOn: "2026-04-01" },
+      ],
+      rulesetVersion: ruleset,
+      idempotencyKey: "finance:closed",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-01",
+    });
+    if (!published.ok) throw published.error;
+    const projection = eventing.rebuildProjection({
+      projectionId: "ffp-monitor",
+      stream: "finance",
+      rulesetVersion: ruleset,
+      idempotencyKey: "proj:ffp",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-04-01",
+    });
+    expect(projection).toMatchObject({ ok: true, value: { cursor: 1 } });
+
+    // auditoria íntegra após todo o fluxo.
+    expect(admin.verifyAuditChain()).toBe(true);
   });
 });

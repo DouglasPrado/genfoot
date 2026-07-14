@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] SAGA de venda cross-context (C6 vínculo + C9 liquidação + C7 desinscrição) via X-002
-- [ ] T003 [US1] Cláusulas (sell-on, luvas) e impostos/taxas no ledger
-- [ ] T004 Compensação após falha pós-transferência
+- [x] T002 [US1] SAGA de venda cross-context (C6 vínculo + C9 liquidação + C7 desinscrição) via X-002
+- [x] T003 [US1] Cláusulas (sell-on, luvas) e impostos/taxas no ledger
+- [x] T004 Compensação após falha pós-transferência
 
 ## Notes
 

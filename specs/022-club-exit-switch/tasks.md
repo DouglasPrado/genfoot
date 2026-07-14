@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Transferência de pendências/objetivos ao novo controlador (C3/C11) e cooldown/limite de trocas
-- [ ] T003 [US2] Compensação de saída interrompida com auditoria
-- [ ] T004 Integração via X-002 (SAGA de handover)
+- [x] T002 [US1] Transferência de pendências/objetivos ao novo controlador (C3/C11) e cooldown/limite de trocas
+- [x] T003 [US2] Compensação de saída interrompida com auditoria
+- [x] T004 Integração via X-002 (SAGA de handover)
 
 ## Notes
 

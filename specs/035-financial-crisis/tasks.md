@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Detecção automática de insolvência (orçamento/dívida) e sanção/fair-play (C12)
-- [ ] T003 [US1] Plano de recuperação com efeitos reais no ledger (corte de folha, venda de ativos)
-- [ ] T004 Consumo dos fatos financeiros (LedgerPeriodClosed) via X-002
+- [x] T002 [US1] Detecção automática de insolvência (orçamento/dívida) e sanção/fair-play (C12)
+- [x] T003 [US1] Plano de recuperação com efeitos reais no ledger (corte de folha, venda de ativos)
+- [x] T004 Consumo dos fatos financeiros (LedgerPeriodClosed) via X-002
 
 ## Notes
 

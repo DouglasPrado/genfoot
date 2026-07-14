@@ -12,9 +12,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Orquestrar SAGA-04 (C3) com as liquidações por milestone (C9) via X-002
-- [ ] T003 [US1] Impacto da obra (capacidade do estádio → receita) no ledger e na torcida
-- [ ] T004 Compensação financeira ao abortar a obra
+- [x] T002 [US1] Orquestrar SAGA-04 (C3) com as liquidações por milestone (C9) via X-002
+- [x] T003 [US1] Impacto da obra (capacidade do estádio → receita) no ledger e na torcida
+- [x] T004 Compensação financeira ao abortar a obra
 
 ## Notes
 

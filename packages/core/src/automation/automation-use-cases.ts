@@ -18,7 +18,10 @@ import type {
   DecisionProposalSnapshot,
   WorldAutomationSnapshot,
 } from "./automation-types.js";
-import { WorldAutomation } from "./world-automation.js";
+import {
+  WorldAutomation,
+  type DecisionExplanation,
+} from "./world-automation.js";
 
 async function loadAutomation(
   repository: AutomationRepository,
@@ -155,6 +158,7 @@ export class EvaluateDecision {
       seedStream: string;
       options: readonly DecisionOption[];
       factors: readonly string[];
+      humanPrecedenceActive?: boolean;
       rulesetVersion: RulesetVersion;
       idempotencyKey: string;
       worldSeed: string;
@@ -175,6 +179,8 @@ export class ExecuteDecisionProposal {
     input: Readonly<{
       decisionId: string;
       accept: boolean;
+      auto?: boolean;
+      riskThreshold?: number;
       reason?: string;
       rulesetVersion: RulesetVersion;
       idempotencyKey: string;
@@ -185,6 +191,26 @@ export class ExecuteDecisionProposal {
     return mutate(this.repository, gameWorldId, (automation) =>
       automation.executeDecisionProposal(input),
     );
+  }
+}
+
+export class GetDecisionExplanation {
+  public constructor(private readonly repository: AutomationRepository) {}
+
+  public async execute(
+    gameWorldId: GameWorldId,
+    decisionId: string,
+  ): Promise<Result<DecisionExplanation, DomainError>> {
+    const loaded = await loadAutomation(this.repository, gameWorldId);
+    if (!loaded.ok) return loaded;
+    const explanation = loaded.value.explainDecision(decisionId);
+    return explanation === null
+      ? fail(
+          new DomainError("DECISION_NOT_FOUND", "Decisão não encontrada.", {
+            decisionId,
+          }),
+        )
+      : succeed(explanation);
   }
 }
 

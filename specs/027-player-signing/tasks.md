@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] SAGA-01 real (StartTransfer/AdvanceTransferStep/CompensateTransfer) com fencing via X-002
-- [ ] T003 [US1] Compensação após falha pós-reserva (liberar reserva, estados consistentes)
-- [ ] T004 [US1] Disponibilidade do jogador (C4) e inscrição na competição (C7) após a assinatura
+- [x] T002 [US1] SAGA-01 real (StartTransfer/AdvanceTransferStep/CompensateTransfer) com fencing via X-002
+- [x] T003 [US1] Compensação após falha pós-reserva (liberar reserva, estados consistentes)
+- [x] T004 [US1] Disponibilidade do jogador (C4) e inscrição na competição (C7) após a assinatura
 
 ## Notes
 

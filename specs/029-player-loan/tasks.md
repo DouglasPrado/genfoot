@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] LoanAgreement dedicado (período, custos, opção de compra) com propriedade suspensa da origem (não reencerrar/reativar contrato)
-- [ ] T003 [US1] ExerciseLoanOption (compra) e custos de empréstimo no ledger (C9)
-- [ ] T004 Retorno automático por data lógica (job agendado) via X-002
+- [x] T002 [US1] LoanAgreement dedicado (período, custos, opção de compra) com propriedade suspensa da origem (não reencerrar/reativar contrato)
+- [x] T003 [US1] ExerciseLoanOption (compra) e custos de empréstimo no ledger (C9)
+- [x] T004 Retorno automático por data lógica (job agendado) via X-002
 
 ## Notes
 

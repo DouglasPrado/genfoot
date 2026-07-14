@@ -8,9 +8,9 @@
 
 ## Pendente (jornada E2E completa)
 
-- [ ] T002 [US1] Influência do staff médico (C5) no prazo de retorno e no risco de recaída
-- [ ] T003 [US1] Indisponibilidade refletida na escalação da partida (C8) e reação da torcida (C10)
-- [ ] T004 Recuperação por data lógica (job agendado) via X-002
+- [x] T002 [US1] Influência do staff médico (C5) no prazo de retorno e no risco de recaída
+- [x] T003 [US1] Indisponibilidade refletida na escalação da partida (C8) e reação da torcida (C10)
+- [x] T004 Recuperação por data lógica (job agendado) via X-002
 
 ## Notes
 
