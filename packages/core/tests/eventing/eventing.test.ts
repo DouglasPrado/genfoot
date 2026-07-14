@@ -205,6 +205,229 @@ describe("Eventing outbox/inbox/DLQ", () => {
     ).toMatchObject({ ok: true, value: { status: "CONSUMED" } });
   });
 
+  it("executa saga durável: start → claim(lease/fencing) → advance → complete", () => {
+    const { gameWorld, value } = publishedEventing();
+    const saga = value.startSaga({
+      sagaType: "SAGA-01",
+      correlationKey: "transfer:1",
+      steps: ["reserve", "settle"],
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "saga:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!saga.ok) throw saga.error;
+    expect(
+      value.snapshot().events.filter((e) => e.type === "SagaStarted"),
+    ).toHaveLength(1);
+
+    const claim = value.claimSaga({
+      sagaId: saga.value.id,
+      owner: "worker-a",
+      nowMs: 1_000,
+      leaseMs: 30_000,
+      rulesetVersion: gameWorld.rulesetVersion,
+    });
+    if (!claim.ok) throw claim.error;
+    expect(claim.value.fencingToken).toBe(1);
+
+    // lease detido por outro worker enquanto válido
+    expect(
+      value.claimSaga({
+        sagaId: saga.value.id,
+        owner: "worker-b",
+        nowMs: 2_000,
+        leaseMs: 30_000,
+        rulesetVersion: gameWorld.rulesetVersion,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SAGA_LEASE_HELD" } });
+
+    // fencing obsoleto rejeitado
+    expect(
+      value.advanceSagaStep({
+        sagaId: saga.value.id,
+        fencingToken: 99,
+        checkpointHash: "cp",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "bad",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-03",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "FENCING_TOKEN_STALE" } });
+
+    const step0 = value.advanceSagaStep({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-0",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "step:0",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(step0).toMatchObject({ ok: true, value: { status: "RUNNING", currentStep: 1 } });
+
+    // retomada do mesmo step = efeito único
+    const revision = value.snapshot().revision;
+    const replay = value.advanceSagaStep({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-0",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "step:0",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(replay).toMatchObject({ ok: true, value: { currentStep: 1 } });
+    expect(value.snapshot().revision).toBe(revision);
+
+    const step1 = value.advanceSagaStep({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-1",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "step:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-04",
+    });
+    expect(step1).toMatchObject({ ok: true, value: { status: "COMPLETED" } });
+    expect(
+      value.snapshot().events.filter((e) => e.type === "SagaCompleted"),
+    ).toHaveLength(1);
+  });
+
+  it("compensa a saga e rejeita transição terminal", () => {
+    const { gameWorld, value } = publishedEventing();
+    const saga = value.startSaga({
+      sagaType: "SAGA-01",
+      correlationKey: "transfer:2",
+      steps: ["reserve", "settle"],
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "saga:2",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!saga.ok) throw saga.error;
+    const claim = value.claimSaga({
+      sagaId: saga.value.id,
+      owner: "worker-a",
+      nowMs: 1_000,
+      leaseMs: 30_000,
+      rulesetVersion: gameWorld.rulesetVersion,
+    });
+    if (!claim.ok) throw claim.error;
+    const step0 = value.advanceSagaStep({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-0",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "step:0",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!step0.ok) throw step0.error;
+
+    const compensated = value.compensateSaga({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      reason: "settle-failed",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "comp:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-04",
+    });
+    expect(compensated).toMatchObject({ ok: true, value: { status: "COMPENSATED" } });
+    expect(compensated.ok && compensated.value.steps[0]!.status).toBe("COMPENSATED");
+
+    expect(
+      value.advanceSagaStep({
+        sagaId: saga.value.id,
+        fencingToken: claim.value.fencingToken,
+        checkpointHash: "cp",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "step:after",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-05",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SAGA_TERMINAL" } });
+  });
+
+  it("reconstrói projeção por cursor contíguo e detecta gap", () => {
+    const { gameWorld, value } = publishedEventing();
+    const rebuilt = value.rebuildProjection({
+      projectionId: "clubs-view",
+      stream: "clubs",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "proj:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(rebuilt).toMatchObject({ ok: true, value: { cursor: 2 } });
+    expect(
+      value.snapshot().events.filter((e) => e.type === "ProjectionAdvanced"),
+    ).toHaveLength(1);
+
+    // idempotente: reconstruir para o mesmo cursor/hash não muda a revisão
+    const revision = value.snapshot().revision;
+    const again = value.rebuildProjection({
+      projectionId: "clubs-view",
+      stream: "clubs",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "proj:1:again",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(again).toMatchObject({ ok: true, value: { cursor: 2 } });
+    expect(value.snapshot().revision).toBe(revision);
+
+    // gap: alvo além do contíguo publicado
+    expect(
+      value.rebuildProjection({
+        projectionId: "clubs-view",
+        stream: "clubs",
+        throughSequence: 5,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "proj:gap",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-01-03",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SEQUENCE_GAP" } });
+  });
+
+  it("retoma realtime por sequence/resume token e rejeita além do publicado", () => {
+    const { gameWorld, value } = publishedEventing();
+    const resume = value.resumeRealtimeStream({
+      audience: "web",
+      stream: "clubs",
+      fromSequence: 1,
+      expiresOn: "2026-01-10",
+      rulesetVersion: gameWorld.rulesetVersion,
+    });
+    expect(resume).toMatchObject({ ok: true, value: { lastSequence: 1 } });
+    expect(resume.ok && resume.value.resumeToken).toMatch(/^[0-9a-f]{16}$/);
+
+    // idempotente: mesma retomada não muda a revisão
+    const revision = value.snapshot().revision;
+    const same = value.resumeRealtimeStream({
+      audience: "web",
+      stream: "clubs",
+      fromSequence: 1,
+      expiresOn: "2026-01-10",
+      rulesetVersion: gameWorld.rulesetVersion,
+    });
+    expect(same).toEqual(resume);
+    expect(value.snapshot().revision).toBe(revision);
+
+    expect(
+      value.resumeRealtimeStream({
+        audience: "web",
+        stream: "clubs",
+        fromSequence: 9,
+        expiresOn: "2026-01-10",
+        rulesetVersion: gameWorld.rulesetVersion,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "SEQUENCE_GAP" } });
+  });
+
   it("consome de forma idempotente via caso de uso", async () => {
     const { gameWorld, value, messages } = publishedEventing();
     const repository = new MemoryEventingRepository();

@@ -3,11 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
+  AdvanceSagaStep,
   CheckpointMatch,
   OpenLedgerAccount,
   PostTransaction,
   RecordOfficialResult,
   WorldCompetitions,
+  WorldEventing,
   WorldLedger,
   WorldMatches,
   WorldScheduler,
@@ -33,7 +35,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(9) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(10) });
 
 afterEach(async () => {
   await Promise.all(
@@ -80,7 +82,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(9);
+    expect(file.schemaVersion).toBe(10);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -418,6 +420,91 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "MATCHES_REVISION_CONFLICT" });
   });
 
+  it("persiste eventing X-002 com saga durável e projeção (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldEventing.initialize(world, 2);
+    if (!created.ok) throw created.error;
+    const eventing = created.value;
+    const published = eventing.publishOutboxBatch({
+      stream: "transfers",
+      messages: [
+        { eventType: "TransferOpened", payloadHash: "h1", occurredOn: "2026-01-02" },
+        { eventType: "TransferAgreed", payloadHash: "h2", occurredOn: "2026-01-02" },
+      ],
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "batch:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!published.ok) throw published.error;
+    const saga = eventing.startSaga({
+      sagaType: "SAGA-01",
+      correlationKey: "transfer:1",
+      steps: ["reserve", "settle"],
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "saga:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-02",
+    });
+    if (!saga.ok) throw saga.error;
+    const claim = eventing.claimSaga({
+      sagaId: saga.value.id,
+      owner: "worker-a",
+      nowMs: 1_000,
+      leaseMs: 30_000,
+      rulesetVersion: world.rulesetVersion,
+    });
+    if (!claim.ok) throw claim.error;
+    const advanced = eventing.advanceSagaStep({
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-1",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "step:0",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!advanced.ok) throw advanced.error;
+    const projection = eventing.rebuildProjection({
+      projectionId: "transfers-view",
+      stream: "transfers",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "proj:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    if (!projection.ok) throw projection.error;
+
+    await store.value.saveEventing(eventing.snapshot(), null);
+    // round-trip: sagas, projections, registry e events preservados sem stripping
+    expect(await store.value.findEventingByWorldId(world.id)).toEqual(
+      eventing.snapshot(),
+    );
+
+    // recovery: retry do mesmo step após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const step = new AdvanceSagaStep(restarted);
+    const retry = await step.execute(world.id, {
+      sagaId: saga.value.id,
+      fencingToken: claim.value.fencingToken,
+      checkpointHash: "cp-1",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "step:0",
+      worldSeed: world.seed,
+      worldDate: "2026-01-03",
+    });
+    expect(retry).toMatchObject({ ok: true });
+    const reloaded = await restarted.findEventingByWorldId(world.id);
+    expect(
+      reloaded!.sagas!.find((s) => s.id === saga.value.id)!.steps[0]!.status,
+    ).toBe("DONE");
+    await expect(
+      store.value.saveEventing(eventing.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "EVENTING_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -453,7 +540,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

@@ -11,8 +11,12 @@ import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { EventingRepository } from "./eventing-repository.js";
 import type {
   EventingSummary,
+  EventRegistryEntrySnapshot,
   InboxRecordSnapshot,
   OutboxMessageSnapshot,
+  ProjectionCheckpointSnapshot,
+  RealtimeCursorSnapshot,
+  SagaInstanceSnapshot,
   WorldEventingSnapshot,
 } from "./eventing-types.js";
 import { WorldEventing } from "./world-eventing.js";
@@ -133,6 +137,149 @@ export class RetryDeadLetter {
   ): Promise<Result<InboxRecordSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (eventing) =>
       eventing.retryDeadLetter(input),
+    );
+  }
+}
+
+export class RegisterEventType {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      eventType: string;
+      version: number;
+      owner: string;
+      schemaHash: string;
+      compatibility?: "ADDITIVE" | "BREAKING";
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<EventRegistryEntrySnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.registerEventType(input),
+    );
+  }
+}
+
+export class StartSaga {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      sagaType: string;
+      correlationKey: string;
+      steps: readonly string[];
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SagaInstanceSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.startSaga(input),
+    );
+  }
+}
+
+export class ClaimSaga {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      sagaId: string;
+      owner: string;
+      nowMs: number;
+      leaseMs: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<SagaInstanceSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.claimSaga(input),
+    );
+  }
+}
+
+export class AdvanceSagaStep {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      sagaId: string;
+      fencingToken: number;
+      checkpointHash: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SagaInstanceSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.advanceSagaStep(input),
+    );
+  }
+}
+
+export class CompensateSaga {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      sagaId: string;
+      fencingToken: number;
+      reason: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<SagaInstanceSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.compensateSaga(input),
+    );
+  }
+}
+
+export class RebuildProjection {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      projectionId: string;
+      stream: string;
+      throughSequence?: number;
+      schemaVersion?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<ProjectionCheckpointSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.rebuildProjection(input),
+    );
+  }
+}
+
+export class ResumeRealtimeStream {
+  public constructor(private readonly repository: EventingRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      audience: string;
+      stream: string;
+      fromSequence: number;
+      expiresOn: string;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Promise<Result<RealtimeCursorSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (eventing) =>
+      eventing.resumeRealtimeStream(input),
     );
   }
 }

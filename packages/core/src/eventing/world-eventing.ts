@@ -8,14 +8,27 @@ import {
 } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import { stableHash } from "../matches/match-kernel.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
   InboxStatus,
+  SagaStatus,
+  SagaStepStatus,
+  type EventingDomainEvent,
   type EventingSummary,
+  type EventRegistryEntrySnapshot,
   type InboxRecordSnapshot,
   type MessageDeadLetteredEvent,
   type OutboxMessageSnapshot,
   type OutboxPublishedEvent,
+  type ProjectionAdvancedEvent,
+  type ProjectionCheckpointSnapshot,
+  type RealtimeCursorSnapshot,
+  type SagaCheckpointedEvent,
+  type SagaCompletedEvent,
+  type SagaInstanceSnapshot,
+  type SagaStartedEvent,
+  type SagaStepSnapshot,
   type WorldEventingSnapshot,
 } from "./eventing-types.js";
 
@@ -69,6 +82,33 @@ export class WorldEventing {
       if (event.gameWorldId !== snapshot.gameWorldId) {
         return fail(invalidEventing("Evento de eventing inválido."));
       }
+    }
+    const sagaIds = new Set<string>();
+    for (const saga of snapshot.sagas ?? []) {
+      if (
+        saga.gameWorldId !== snapshot.gameWorldId ||
+        sagaIds.has(saga.id) ||
+        saga.steps.length === 0 ||
+        saga.currentStep < 0 ||
+        saga.currentStep > saga.steps.length ||
+        saga.fencingToken < 0 ||
+        !Number.isSafeInteger(saga.version) ||
+        saga.version < 1
+      ) {
+        return fail(invalidEventing("Instância de saga inválida."));
+      }
+      sagaIds.add(saga.id);
+    }
+    const projectionIds = new Set<string>();
+    for (const projection of snapshot.projections ?? []) {
+      if (
+        projection.gameWorldId !== snapshot.gameWorldId ||
+        projectionIds.has(projection.projectionId) ||
+        projection.cursor < 0
+      ) {
+        return fail(invalidEventing("Checkpoint de projeção inválido."));
+      }
+      projectionIds.add(projection.projectionId);
     }
     return succeed(new WorldEventing(snapshot));
   }
@@ -286,7 +326,542 @@ export class WorldEventing {
     return succeed(reset);
   }
 
+  public registerEventType(
+    input: Readonly<{
+      eventType: string;
+      version: number;
+      owner: string;
+      schemaHash: string;
+      compatibility?: "ADDITIVE" | "BREAKING";
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<EventRegistryEntrySnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (
+      input.eventType.trim() === "" ||
+      input.owner.trim() === "" ||
+      input.schemaHash.trim() === "" ||
+      !Number.isSafeInteger(input.version) ||
+      input.version < 1
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_EVENT_REGISTRY",
+          "eventType/owner/schemaHash/version devem ser válidos.",
+        ),
+      );
+    }
+    const registry = this.state.registry ?? [];
+    const existing = registry.find(
+      (entry) =>
+        entry.eventType === input.eventType && entry.version === input.version,
+    );
+    if (existing !== undefined) {
+      if (existing.schemaHash !== input.schemaHash) {
+        return fail(
+          new DomainError(
+            "EVENT_SCHEMA_CONFLICT",
+            "O tipo/versão já foi registrado com outro schemaHash (fato imutável).",
+            { eventType: input.eventType, version: input.version },
+          ),
+        );
+      }
+      return succeed(existing);
+    }
+    const entry: EventRegistryEntrySnapshot = {
+      eventType: input.eventType,
+      version: input.version,
+      owner: input.owner,
+      schemaHash: input.schemaHash,
+      compatibility: input.compatibility ?? "ADDITIVE",
+    };
+    this.state = {
+      ...this.state,
+      registry: [...registry, entry],
+      revision: this.state.revision + 1,
+    };
+    return succeed(entry);
+  }
+
+  public startSaga(
+    input: Readonly<{
+      sagaType: string;
+      correlationKey: string;
+      steps: readonly string[];
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<SagaInstanceSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const existing = (this.state.sagas ?? []).find(
+      (saga) => saga.idempotencyKey === input.idempotencyKey,
+    );
+    if (existing !== undefined) return succeed(existing);
+    if (
+      input.sagaType.trim() === "" ||
+      input.correlationKey.trim() === "" ||
+      input.steps.length === 0 ||
+      input.steps.some((name) => name.trim() === "")
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_SAGA",
+          "sagaType, correlationKey e ao menos um passo nomeado são obrigatórios.",
+        ),
+      );
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const sagaId = deterministicUuidV7<"SagaInstance">({
+      worldSeed: input.worldSeed,
+      context: `saga:${input.idempotencyKey}`,
+      timestampMilliseconds: timestampOf(date.value.toString()),
+    });
+    const steps: SagaStepSnapshot[] = input.steps.map((name, index) => ({
+      index,
+      name,
+      status: SagaStepStatus.PENDING,
+      attempts: 0,
+      checkpointHash: null,
+      completedOn: null,
+    }));
+    const saga: SagaInstanceSnapshot = {
+      id: sagaId,
+      gameWorldId: this.state.gameWorldId,
+      sagaType: input.sagaType,
+      correlationKey: input.correlationKey,
+      status: SagaStatus.RUNNING,
+      currentStep: 0,
+      steps,
+      leaseOwnerId: null,
+      leaseExpiresAtMs: null,
+      fencingToken: 0,
+      idempotencyKey: input.idempotencyKey,
+      version: 1,
+    };
+    const event: SagaStartedEvent = {
+      id: this.eventId(input.worldSeed, `saga-started:${input.idempotencyKey}`, date.value.toString()),
+      type: "SagaStarted",
+      gameWorldId: this.state.gameWorldId,
+      sagaId,
+      sagaType: input.sagaType,
+      correlationKey: input.correlationKey,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      sagas: [...(this.state.sagas ?? []), saga],
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(saga);
+  }
+
+  public claimSaga(
+    input: Readonly<{
+      sagaId: string;
+      owner: string;
+      nowMs: number;
+      leaseMs: number;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<SagaInstanceSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    const found = this.locateSaga(input.sagaId);
+    if (!found.ok) return found;
+    const { saga, index } = found.value;
+    if (saga.status !== SagaStatus.RUNNING) {
+      return fail(sagaTerminal(saga.id));
+    }
+    if (
+      input.owner.trim() === "" ||
+      !Number.isSafeInteger(input.nowMs) ||
+      input.nowMs < 0 ||
+      !Number.isSafeInteger(input.leaseMs) ||
+      input.leaseMs < 1
+    ) {
+      return fail(new DomainError("INVALID_SAGA_LEASE", "owner/nowMs/leaseMs inválidos."));
+    }
+    const heldByOther =
+      saga.leaseOwnerId !== null &&
+      saga.leaseOwnerId !== input.owner &&
+      saga.leaseExpiresAtMs !== null &&
+      saga.leaseExpiresAtMs > input.nowMs;
+    if (heldByOther) {
+      return fail(
+        new DomainError(
+          "SAGA_LEASE_HELD",
+          "A saga está arrendada por outro worker e o lease não expirou.",
+          { sagaId: saga.id, leaseOwnerId: saga.leaseOwnerId },
+        ),
+      );
+    }
+    const claimed: SagaInstanceSnapshot = {
+      ...saga,
+      leaseOwnerId: input.owner,
+      leaseExpiresAtMs: input.nowMs + input.leaseMs,
+      fencingToken: saga.fencingToken + 1,
+      version: saga.version + 1,
+    };
+    this.replaceSaga(index, claimed);
+    return succeed(claimed);
+  }
+
+  public advanceSagaStep(
+    input: Readonly<{
+      sagaId: string;
+      fencingToken: number;
+      checkpointHash: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<SagaInstanceSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (
+      this.findEvent("SagaCheckpointed", input.idempotencyKey) !== undefined ||
+      this.findEvent("SagaCompleted", input.idempotencyKey) !== undefined
+    ) {
+      const replayed = (this.state.sagas ?? []).find(
+        ({ id }) => id === input.sagaId,
+      );
+      if (replayed !== undefined) return succeed(replayed);
+    }
+    const found = this.locateSaga(input.sagaId);
+    if (!found.ok) return found;
+    const { saga, index } = found.value;
+    if (saga.status !== SagaStatus.RUNNING) {
+      return fail(sagaTerminal(saga.id));
+    }
+    const fencing = this.checkFencing(saga, input.fencingToken);
+    if (!fencing.ok) return fencing;
+    if (input.checkpointHash.trim() === "") {
+      return fail(new DomainError("INVALID_SAGA", "checkpointHash é obrigatório."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const stepIndex = saga.currentStep;
+    const steps = saga.steps.map((step) =>
+      step.index === stepIndex
+        ? {
+            ...step,
+            status: SagaStepStatus.DONE,
+            attempts: step.attempts + 1,
+            checkpointHash: input.checkpointHash,
+            completedOn: date.value.toString(),
+          }
+        : step,
+    );
+    const nextStep = stepIndex + 1;
+    const completed = nextStep >= steps.length;
+    const advanced: SagaInstanceSnapshot = {
+      ...saga,
+      steps,
+      currentStep: completed ? steps.length : nextStep,
+      status: completed ? SagaStatus.COMPLETED : SagaStatus.RUNNING,
+      version: saga.version + 1,
+    };
+    this.replaceSaga(index, advanced);
+    const event: SagaCheckpointedEvent | SagaCompletedEvent = completed
+      ? {
+          id: this.eventId(input.worldSeed, `saga-completed:${input.idempotencyKey}`, date.value.toString()),
+          type: "SagaCompleted",
+          gameWorldId: this.state.gameWorldId,
+          sagaId: saga.id,
+          outcome: "COMPLETED",
+          worldDate: date.value.toString(),
+          rulesetVersion: input.rulesetVersion,
+          idempotencyKey: input.idempotencyKey,
+        }
+      : {
+          id: this.eventId(input.worldSeed, `saga-checkpointed:${input.idempotencyKey}`, date.value.toString()),
+          type: "SagaCheckpointed",
+          gameWorldId: this.state.gameWorldId,
+          sagaId: saga.id,
+          stepIndex,
+          checkpointHash: input.checkpointHash,
+          fencingToken: saga.fencingToken,
+          worldDate: date.value.toString(),
+          rulesetVersion: input.rulesetVersion,
+          idempotencyKey: input.idempotencyKey,
+        };
+    this.state = {
+      ...this.state,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(advanced);
+  }
+
+  public compensateSaga(
+    input: Readonly<{
+      sagaId: string;
+      fencingToken: number;
+      reason: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<SagaInstanceSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (this.findEvent("SagaCompleted", input.idempotencyKey) !== undefined) {
+      const replayed = (this.state.sagas ?? []).find(
+        ({ id }) => id === input.sagaId,
+      );
+      if (replayed !== undefined) return succeed(replayed);
+    }
+    const found = this.locateSaga(input.sagaId);
+    if (!found.ok) return found;
+    const { saga, index } = found.value;
+    if (
+      saga.status === SagaStatus.COMPLETED ||
+      saga.status === SagaStatus.COMPENSATED
+    ) {
+      return fail(sagaTerminal(saga.id));
+    }
+    const fencing = this.checkFencing(saga, input.fencingToken);
+    if (!fencing.ok) return fencing;
+    if (input.reason.trim() === "") {
+      return fail(new DomainError("INVALID_SAGA", "reason é obrigatório."));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const steps = saga.steps.map((step) =>
+      step.status === SagaStepStatus.DONE
+        ? { ...step, status: SagaStepStatus.COMPENSATED }
+        : step,
+    );
+    const compensated: SagaInstanceSnapshot = {
+      ...saga,
+      steps,
+      status: SagaStatus.COMPENSATED,
+      version: saga.version + 1,
+    };
+    this.replaceSaga(index, compensated);
+    const event: SagaCompletedEvent = {
+      id: this.eventId(input.worldSeed, `saga-compensated:${input.idempotencyKey}`, date.value.toString()),
+      type: "SagaCompleted",
+      gameWorldId: this.state.gameWorldId,
+      sagaId: saga.id,
+      outcome: "COMPENSATED",
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(compensated);
+  }
+
+  public rebuildProjection(
+    input: Readonly<{
+      projectionId: string;
+      stream: string;
+      throughSequence?: number;
+      schemaVersion?: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<ProjectionCheckpointSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (input.projectionId.trim() === "" || input.stream.trim() === "") {
+      return fail(
+        new DomainError("INVALID_PROJECTION", "projectionId e stream são obrigatórios."),
+      );
+    }
+    const ordered = this.state.outbox
+      .filter((message) => message.stream === input.stream)
+      .sort((a, b) => a.sequence - b.sequence);
+    // cursor contíguo a partir de 1 (detecção de gap)
+    let cursor = 0;
+    const replayed: string[] = [];
+    for (const message of ordered) {
+      if (message.sequence !== cursor + 1) break;
+      cursor += 1;
+      replayed.push(message.payloadHash);
+    }
+    if (
+      input.throughSequence !== undefined &&
+      input.throughSequence > cursor
+    ) {
+      return fail(
+        new DomainError(
+          "SEQUENCE_GAP",
+          "Há uma lacuna de sequência antes do alvo solicitado.",
+          { stream: input.stream, contiguousThrough: cursor, requested: input.throughSequence },
+        ),
+      );
+    }
+    const targetCursor =
+      input.throughSequence === undefined ? cursor : input.throughSequence;
+    const stateHash = stableHash(
+      `${input.projectionId}|${input.stream}|${replayed.slice(0, targetCursor).join(",")}`,
+    );
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const projections = this.state.projections ?? [];
+    const index = projections.findIndex(
+      (checkpoint) => checkpoint.projectionId === input.projectionId,
+    );
+    const existing = index >= 0 ? projections[index]! : null;
+    const checkpoint: ProjectionCheckpointSnapshot = {
+      projectionId: input.projectionId,
+      gameWorldId: this.state.gameWorldId,
+      stream: input.stream,
+      cursor: targetCursor,
+      schemaVersion: input.schemaVersion ?? 1,
+      stateHash,
+      updatedOn: date.value.toString(),
+    };
+    if (
+      existing !== null &&
+      existing.cursor === checkpoint.cursor &&
+      existing.stateHash === checkpoint.stateHash &&
+      existing.stream === checkpoint.stream
+    ) {
+      return succeed(existing);
+    }
+    const nextProjections =
+      index >= 0
+        ? projections.map((current, position) =>
+            position === index ? checkpoint : current,
+          )
+        : [...projections, checkpoint];
+    const event: ProjectionAdvancedEvent = {
+      id: this.eventId(input.worldSeed, `projection-advanced:${input.idempotencyKey}`, date.value.toString()),
+      type: "ProjectionAdvanced",
+      gameWorldId: this.state.gameWorldId,
+      projectionId: input.projectionId,
+      stream: input.stream,
+      cursor: targetCursor,
+      stateHash,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      projections: nextProjections,
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(checkpoint);
+  }
+
+  public resumeRealtimeStream(
+    input: Readonly<{
+      audience: string;
+      stream: string;
+      fromSequence: number;
+      expiresOn: string;
+      rulesetVersion: RulesetVersion;
+    }>,
+  ): Result<RealtimeCursorSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (
+      input.audience.trim() === "" ||
+      input.stream.trim() === "" ||
+      !Number.isSafeInteger(input.fromSequence) ||
+      input.fromSequence < 0
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_REALTIME_CURSOR",
+          "audience/stream/fromSequence devem ser válidos.",
+        ),
+      );
+    }
+    const maxSequence = this.state.outbox
+      .filter((message) => message.stream === input.stream)
+      .reduce((max, message) => Math.max(max, message.sequence), 0);
+    if (input.fromSequence > maxSequence) {
+      return fail(
+        new DomainError(
+          "SEQUENCE_GAP",
+          "Não é possível retomar além da última sequência publicada.",
+          { stream: input.stream, maxSequence, requested: input.fromSequence },
+        ),
+      );
+    }
+    const expires = WorldDate.parse(input.expiresOn);
+    if (!expires.ok) return expires;
+    const resumeToken = stableHash(
+      `${input.audience}|${input.stream}|${input.fromSequence}`,
+    );
+    const cursor: RealtimeCursorSnapshot = {
+      audience: input.audience,
+      stream: input.stream,
+      lastSequence: input.fromSequence,
+      resumeToken,
+      expiresOn: expires.value.toString(),
+    };
+    const cursors = this.state.cursors ?? [];
+    const index = cursors.findIndex(
+      (current) =>
+        current.audience === input.audience && current.stream === input.stream,
+    );
+    const existing = index >= 0 ? cursors[index]! : null;
+    if (
+      existing !== null &&
+      existing.lastSequence === cursor.lastSequence &&
+      existing.resumeToken === cursor.resumeToken &&
+      existing.expiresOn === cursor.expiresOn
+    ) {
+      return succeed(existing);
+    }
+    const nextCursors =
+      index >= 0
+        ? cursors.map((current, position) =>
+            position === index ? cursor : current,
+          )
+        : [...cursors, cursor];
+    this.state = {
+      ...this.state,
+      cursors: nextCursors,
+      revision: this.state.revision + 1,
+    };
+    return succeed(cursor);
+  }
+
+  public findSaga(sagaId: string): SagaInstanceSnapshot | null {
+    return (this.state.sagas ?? []).find(({ id }) => id === sagaId) ?? null;
+  }
+
+  public projectionFor(projectionId: string): ProjectionCheckpointSnapshot | null {
+    return (
+      (this.state.projections ?? []).find(
+        (checkpoint) => checkpoint.projectionId === projectionId,
+      ) ?? null
+    );
+  }
+
   public summary(): EventingSummary {
+    const sagas = this.state.sagas ?? [];
     return {
       outboxCount: this.state.outbox.length,
       consumedCount: this.state.inbox.filter(
@@ -296,11 +871,75 @@ export class WorldEventing {
         ({ status }) => status === InboxStatus.DEAD_LETTERED,
       ).length,
       eventCount: this.state.events.length,
+      sagaCount: sagas.length,
+      completedSagaCount: sagas.filter(
+        ({ status }) => status === SagaStatus.COMPLETED,
+      ).length,
+      projectionCount: (this.state.projections ?? []).length,
+      cursorCount: (this.state.cursors ?? []).length,
     };
   }
 
   public snapshot(): WorldEventingSnapshot {
     return this.state;
+  }
+
+  private eventId(
+    worldSeed: string,
+    context: string,
+    worldDate: string,
+  ): SagaStartedEvent["id"] {
+    return deterministicUuidV7<"EventingEvent">({
+      worldSeed,
+      context,
+      timestampMilliseconds: timestampOf(worldDate),
+    });
+  }
+
+  private findEvent<T extends EventingDomainEvent["type"]>(
+    type: T,
+    idempotencyKey: string,
+  ): Extract<EventingDomainEvent, { type: T }> | undefined {
+    return this.state.events.find(
+      (event): event is Extract<EventingDomainEvent, { type: T }> =>
+        event.type === type && event.idempotencyKey === idempotencyKey,
+    );
+  }
+
+  private locateSaga(
+    sagaId: string,
+  ): Result<{ saga: SagaInstanceSnapshot; index: number }, DomainError> {
+    const index = (this.state.sagas ?? []).findIndex(
+      ({ id }) => id === sagaId,
+    );
+    if (index < 0) {
+      return fail(
+        new DomainError("SAGA_NOT_FOUND", "Saga não encontrada.", { sagaId }),
+      );
+    }
+    return succeed({ saga: this.state.sagas![index]!, index });
+  }
+
+  private replaceSaga(index: number, saga: SagaInstanceSnapshot): void {
+    const sagas = [...(this.state.sagas ?? [])];
+    sagas[index] = saga;
+    this.state = { ...this.state, sagas };
+  }
+
+  private checkFencing(
+    saga: SagaInstanceSnapshot,
+    fencingToken: number,
+  ): Result<true, DomainError> {
+    if (fencingToken !== saga.fencingToken || saga.leaseOwnerId === null) {
+      return fail(
+        new DomainError(
+          "FENCING_TOKEN_STALE",
+          "Fencing token obsoleto ou saga não arrendada; readquira o lease.",
+          { sagaId: saga.id, expected: saga.fencingToken, received: fencingToken },
+        ),
+      );
+    }
+    return succeed(true);
   }
 
   private deadLetterEvent(
@@ -339,6 +978,14 @@ function rulesetMismatch(): DomainError {
   return new DomainError(
     "RULESET_VERSION_MISMATCH",
     "O command usa um ruleset diferente do eventing.",
+  );
+}
+
+function sagaTerminal(sagaId: string): DomainError {
+  return new DomainError(
+    "SAGA_TERMINAL",
+    "A saga já está em estado terminal e não aceita esta transição.",
+    { sagaId },
   );
 }
 

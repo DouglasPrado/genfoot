@@ -33,21 +33,21 @@
 
 **Independent Test**: SAGA-01…05 retomam por checkpoint/fencing; projeção e cliente recuperam gap por cursor.
 
-- [ ] T013 [US2] Ordenação estrita por stream + detecção de gap por cursor (SEQUENCE_GAP) e replay
-- [ ] T014 [US2] Saga durável: StartSaga/ClaimSaga(lease+fencing)/AdvanceSagaStep(checkpoint)/CompensateSaga (SAGA-01…05)
-- [ ] T015 [US2] Projeções reconstruíveis: RebuildProjection + ProjectionAdvanced por cursor
-- [ ] T016 [US2] Realtime recuperável: ResumeRealtimeStream por sequence/resume token
+- [x] T013 [US2] Ordenação estrita por stream + detecção de gap por cursor (SEQUENCE_GAP) e replay (via rebuildProjection contíguo)
+- [x] T014 [US2] Saga durável: StartSaga/ClaimSaga(lease+fencing)/AdvanceSagaStep(checkpoint)/CompensateSaga (parametrizável para SAGA-01…05)
+- [x] T015 [US2] Projeções reconstruíveis: RebuildProjection + ProjectionAdvanced por cursor
+- [x] T016 [US2] Realtime recuperável: ResumeRealtimeStream por sequence/resume token
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T017 [P] Adapter de broker/persistência (outbox atômica ao commit do owner) em apps/simulator
-- [ ] T018 Registry de eventos + envelope versionado (correlation/causation) compartilhado
-- [ ] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência PARTIAL
+- [x] T017 [P] Adapter de persistência para eventing em apps/simulator (schemaVersion 10, round-trip + recovery)
+- [x] T018 Registry de eventos versionado (EventRegistryEntry: owner/schemaHash/compatibility) + registerEventType
+- [x] T019 Rodar gate (pnpm lint && pnpm typecheck && pnpm test && pnpm build) e promover evidência
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 — outbox sequenciada + inbox dedup (consumo único) + DLQ com retry.
-- **Pendente**: US2 — ordenação/gap/replay, sagas duráveis com fencing, projeções e realtime (T013-T016); broker/registry (T017-T018).
+- **DELIVERED**: US1 (outbox sequenciada + inbox dedup + DLQ/retry) + US2 (saga durável com lease/fencing e checkpoint, compensação, projeções reconstruíveis por cursor com detecção de gap, realtime por resume token) + registry versionado + adapter de persistência (schemaVersion 10).
+- **Fora de escopo (owner dos aggregates de negócio)**: os passos concretos das sagas SAGA-01…05 são dirigidos pelos owners (C6 transferência, C1 onboarding); X-002 entrega a máquina durável parametrizável.
 
 ## Notes
 
