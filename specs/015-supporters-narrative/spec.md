@@ -1,6 +1,6 @@
 # Feature Specification: Torcida, imprensa e narrativa
 
-**Feature Branch**: `015-supporters-narrative` | **Created**: 2026-07-13 | **Status**: PLANNED  
+**Feature Branch**: `015-supporters-narrative` | **Created**: 2026-07-13 | **Status**: DELIVERED  
 **Feature ID**: BC-010 | **Milestone**: M2 | **Owner**: C10 Torcida/Narrativa
 
 **Input**: Entregar fanbase, satisfação, rivalidades, reputação, imprensa, promessas, conversas e crises sem autoridade competitiva.

@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-14 · **Método:** superfície de contrato (commands/events do `contracts/README.md`) e entidades do `data-model.md` **exigidas** vs. **implementadas** em `packages/core`. Heurístico (camelCase p/ command, string literal p/ evento) — ordem de grandeza, não exato.
 
-> **Conclusão (atualizada):** **8 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C1 (identidade), C6 (mercado), C7, C8, C9, C12 (anti-abuso) e X-002 (eventing). As sagas SAGA-01 (transferência) e SAGA-03 (onboarding) rodam de ponta a ponta sobre a máquina de X-002; C12 corrige/reprocessa sem cross-write com audit hash-chain. O restante segue como **PARTIAL** (slice P1/P2) ou `PLANNED`. Próximo alvo: C10/C11 (narrativa/notificações) ou C5 (staff).
+> **Conclusão (atualizada):** **9 specs** já atingiram a barra `DELIVERED` de verdade ("reproduced scope" + adapter + gate verde): FND-001, C1 (identidade), C6 (mercado), C7, C8, C9, C10 (narrativa), C12 (anti-abuso) e X-002 (eventing). As sagas SAGA-01/SAGA-03 rodam de ponta a ponta; C12 corrige/reprocessa sem cross-write com audit hash-chain; C10 reage a fatos oficiais com promessas/mídia/crise. O restante segue como **PARTIAL** (slice P1/P2) ou `PLANNED`. Próximo alvo: C11 (notificações) ou C5 (staff).
 
 ## Cobertura por spec
 
@@ -18,7 +18,7 @@
 | 011 market ✅ **DELIVERED** | 14/14 | 12/12 | — (SAGA-01 transferência + empréstimos + listing/cancel + adapter; commit `ed5f0cd`) |
 | 012 automation | 6/6 | 5/5 | superfície ok; faltam precedência humana, knowledge filter, adapter |
 | 014 identity ✅ **DELIVERED** | 10/10 | 7/7 | — (conta/sessão/credencial + SAGA-03 onboarding + adapter; commit `3f57ebf`) |
-| 015 narrative | 2/5 | 4/8 | ChooseConversationOption, AcknowledgeCrisis, CancelPromise; mídia/rivalidades |
+| 015 narrative ✅ **DELIVERED** | 5/5 | 8/8 | — (conversa/mídia/promessa/crise/rivalidade + adapter; commit `764c330`) |
 | 016 notifications | 2/5 | 5/8 | RequestReport, RebuildProjection, RetryDelivery; DeliveryAttempt |
 | 017 anti-abuse ✅ **DELIVERED** | 12/12 | 9/9 | — (caso/quarentena/correção/reprocessamento/suporte + adapter; commit `1afed28`) |
 | 019 platform | 0/6 | — | DeployRelease/Rollback/KillSwitch/Restore/DR como commands (só fiz kernel de lógica) |
@@ -37,6 +37,6 @@
 
 ## Ordem sugerida de conclusão (respeita dependências)
 
-~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → **C10/C11 narrativa/notificações** → C5 staff → apps/plataforma.
+~~`C9 ledger`~~ ✅ → ~~`C7 standings/homologação`~~ ✅ → ~~`C8 partida ao vivo`~~ ✅ → ~~`X-002 saga runner`~~ ✅ → ~~`C6 transferência/empréstimo`~~ ✅ → ~~`C1 conta/sessão`~~ ✅ → ~~`C12 anti-abuso/admin`~~ ✅ → ~~`C10 narrativa`~~ ✅ → **C11 notificações** → C5 staff → apps/plataforma.
 
 Cada uma seguindo o processo do `CLAUDE.md` (§3) via `/speckit.tasks → /speckit.analyze → /speckit.implement → /speckit.converge`, até a Definição de Pronto (§4).
