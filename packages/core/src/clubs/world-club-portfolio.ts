@@ -272,13 +272,25 @@ export class WorldClubPortfolio {
     if (!created.ok) return created;
     const clubs = [...this.state.clubs];
     clubs[clubIndex] = { ...club, version: club.version + 1 };
+    const projectSnapshot = created.value.snapshot();
+    const proposed = this.infraEvent(
+      "InfrastructureProjectProposed",
+      projectSnapshot,
+      {
+        clubId: input.clubId,
+        target: projectSnapshot.target,
+        fundingRequestRef: projectSnapshot.fundingRequestRef,
+      },
+      projectSnapshot.proposedAt,
+    );
     this.state = {
       ...this.state,
       clubs,
-      projects: [...this.state.projects, created.value.snapshot()],
+      projects: [...this.state.projects, projectSnapshot],
+      events: [...this.state.events, proposed],
       revision: this.state.revision + 1,
     };
-    return succeed(created.value.snapshot());
+    return succeed(projectSnapshot);
   }
 
   public replaceInfrastructureProject(
@@ -290,14 +302,117 @@ export class WorldClubPortfolio {
         new DomainError("PROJECT_NOT_FOUND", "Projeto não encontrado."),
       );
     }
+    const previous = this.state.projects[index]!;
     const projects = [...this.state.projects];
     projects[index] = project;
     this.state = {
       ...this.state,
       projects,
+      events: [...this.state.events, ...this.infraDiffEvents(previous, project)],
       revision: this.state.revision + 1,
     };
     return succeed(undefined);
+  }
+
+  private infraEvent(
+    type: string,
+    project: InfrastructureProjectSnapshot,
+    payload: Readonly<Record<string, unknown>>,
+    occurredAt: string,
+    contextKey = "",
+  ): ClubDomainEvent {
+    return {
+      id: deterministicUuidV7<"ClubDomainEvent">({
+        worldSeed: this.state.gameWorldId,
+        context: `infra-event:${project.id}:${type}:${contextKey}`,
+        timestampMilliseconds: Date.parse(`${occurredAt}T00:00:00.000Z`),
+      }),
+      type,
+      eventVersion: 1,
+      gameWorldId: this.state.gameWorldId,
+      aggregateId: project.id,
+      aggregateVersion: project.version,
+      occurredAt,
+      rulesetVersion: this.state.rulesetVersion,
+      correlationId: project.commandId,
+      causationId: project.commandId,
+      payload,
+    };
+  }
+
+  private infraDiffEvents(
+    previous: InfrastructureProjectSnapshot,
+    next: InfrastructureProjectSnapshot,
+  ): ClubDomainEvent[] {
+    const events: ClubDomainEvent[] = [];
+    const stepEventFor: Record<string, string> = {
+      APPROVE: "StadiumWorksApproved",
+      FINANCE: "FinancialReservationAcknowledged",
+      LICENSE: "FacilityLicensed",
+    };
+    for (const step of next.steps) {
+      const before = previous.steps.find((s) => s.stepId === step.stepId);
+      const justCompleted =
+        step.status === "COMPLETED" && before?.status !== "COMPLETED";
+      const mapped = stepEventFor[step.stepId];
+      if (justCompleted && mapped !== undefined) {
+        events.push(
+          this.infraEvent(
+            mapped,
+            next,
+            {
+              stepId: step.stepId,
+              fundingRequestRef: next.fundingRequestRef,
+              evidence: step.evidence,
+            },
+            step.completedAt ?? next.proposedAt,
+            step.stepId,
+          ),
+        );
+      }
+    }
+    for (const milestone of next.milestones) {
+      const before = previous.milestones.find((m) => m.id === milestone.id);
+      if (
+        milestone.status === "COMPLETED" &&
+        before?.status !== "COMPLETED"
+      ) {
+        events.push(
+          this.infraEvent(
+            "ConstructionMilestoneReached",
+            next,
+            {
+              milestoneId: milestone.id,
+              amountMinor: milestone.amountMinor,
+              disbursementFactRef: milestone.disbursementFactRef,
+            },
+            milestone.completedAt ?? next.proposedAt,
+            milestone.id,
+          ),
+        );
+      }
+    }
+    if (next.status === "COMPLETED" && previous.status !== "COMPLETED") {
+      events.push(
+        this.infraEvent(
+          "StadiumWorksCompleted",
+          next,
+          { clubId: next.clubId, target: next.target },
+          next.steps.at(-1)?.completedAt ?? next.proposedAt,
+        ),
+      );
+    }
+    if (next.status === "FAILED" && previous.status !== "FAILED") {
+      events.push(
+        this.infraEvent(
+          "ProjectCancelled",
+          next,
+          { clubId: next.clubId, compensationEvidence: next.compensationEvidence },
+          next.proposedAt,
+        ),
+      );
+    }
+    return events;
   }
 
   public operateInfrastructureProject(
@@ -362,11 +477,13 @@ export class WorldClubPortfolio {
     const clubs = [...this.state.clubs];
     clubs[clubIndex] = updated;
     const projects = [...this.state.projects];
+    const previous = projects[projectIndex]!;
     projects[projectIndex] = project;
     this.state = {
       ...this.state,
       clubs,
       projects,
+      events: [...this.state.events, ...this.infraDiffEvents(previous, project)],
       revision: this.state.revision + 1,
     };
     return succeed(undefined);

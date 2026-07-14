@@ -76,6 +76,19 @@ describe("infrastructure project use cases", () => {
     expect(new Set(calls).size).toBe(calls.length);
     expect(repository.snapshot?.clubs[0]?.stadium.capacity).toBe(15_000);
     expect(repository.saves).toBeGreaterThanOrEqual(6);
+
+    // SAGA-04 emite os fatos de infraestrutura do contrato C3
+    const types = new Set(repository.snapshot!.events.map((e) => e.type));
+    for (const expected of [
+      "InfrastructureProjectProposed",
+      "StadiumWorksApproved",
+      "FinancialReservationAcknowledged",
+      "ConstructionMilestoneReached",
+      "FacilityLicensed",
+      "StadiumWorksCompleted",
+    ]) {
+      expect(types.has(expected)).toBe(true);
+    }
   });
 });
 

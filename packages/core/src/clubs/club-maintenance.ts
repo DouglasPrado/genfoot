@@ -9,7 +9,10 @@ import {
 import type { ScheduledTaskHandler } from "../scheduling/scheduling-types.js";
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import type { ClubPortfolioRepository } from "./club-repository.js";
-import type { WorldClubPortfolioSnapshot } from "./club-types.js";
+import type {
+  ClubDomainEvent,
+  WorldClubPortfolioSnapshot,
+} from "./club-types.js";
 
 export function processClubMaintenanceDay(
   snapshot: WorldClubPortfolioSnapshot,
@@ -58,12 +61,64 @@ export function processClubMaintenanceDay(
         version: club.version + 1,
       }))
     : snapshot.clubs;
+  // MaintenanceDue: um fato por facilidade que cruzou o limiar nesta manutenção
+  const dueEvents: ClubDomainEvent[] = [];
+  if (deteriorates) {
+    for (const club of clubs) {
+      const wasDue = new Set(
+        (snapshot.clubs.find((c) => c.id === club.id)?.departments ?? [])
+          .filter((d) => d.maintenanceDueOn === worldDate)
+          .map((d) => d.kind),
+      );
+      for (const department of club.departments) {
+        if (department.maintenanceDueOn === worldDate && !wasDue.has(department.kind)) {
+          dueEvents.push(
+            maintenanceEvent(snapshot, club.id, `department:${department.kind}`, worldDate),
+          );
+        }
+      }
+      const stadiumWasDue =
+        snapshot.clubs.find((c) => c.id === club.id)?.stadium.maintenanceDueOn ===
+        worldDate;
+      if (club.stadium.maintenanceDueOn === worldDate && !stadiumWasDue) {
+        dueEvents.push(
+          maintenanceEvent(snapshot, club.id, `stadium:${club.stadium.id}`, worldDate),
+        );
+      }
+    }
+  }
   return succeed({
     ...snapshot,
     clubs,
+    events: [...snapshot.events, ...dueEvents],
     processedMaintenanceDayKeys: [...snapshot.processedMaintenanceDayKeys, key],
     revision: snapshot.revision + 1,
   });
+}
+
+function maintenanceEvent(
+  snapshot: WorldClubPortfolioSnapshot,
+  clubId: string,
+  facility: string,
+  worldDate: string,
+): ClubDomainEvent {
+  return {
+    id: deterministicUuidV7<"ClubDomainEvent">({
+      worldSeed: snapshot.gameWorldId,
+      context: `maintenance-due:${clubId}:${facility}:${worldDate}`,
+      timestampMilliseconds: Date.parse(`${worldDate}T00:00:00.000Z`),
+    }),
+    type: "MaintenanceDue",
+    eventVersion: 1,
+    gameWorldId: snapshot.gameWorldId,
+    aggregateId: clubId,
+    aggregateVersion: 1,
+    occurredAt: worldDate,
+    rulesetVersion: snapshot.rulesetVersion,
+    correlationId: `maintenance:${worldDate}`,
+    causationId: `maintenance:${worldDate}`,
+    payload: { facility },
+  };
 }
 
 export function createClubMaintenanceTaskHandler(
