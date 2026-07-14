@@ -286,4 +286,171 @@ describe("Competitions and calendar", () => {
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.editions).toHaveLength(1);
   });
+
+  it("registra resultado oficial, atualiza standings, é idempotente e uma vez por match", () => {
+    const { gameWorld, value, editionId } = editionWithParticipants();
+    const generated = value.generateFixtures({
+      editionId,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "fixtures:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-20",
+    });
+    if (!generated.ok) throw generated.error;
+    const fixture = generated.value[0]!;
+
+    const recorded = value.recordOfficialResult({
+      fixtureId: fixture.id,
+      matchRef: "match:0",
+      homeGoals: 2,
+      awayGoals: 0,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "res:0",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(recorded).toMatchObject({
+      ok: true,
+      value: { status: "FINAL", homeGoals: 2, awayGoals: 0 },
+    });
+    const home = value
+      .standingsFor(editionId)
+      .find((s) => s.clubId === fixture.homeClubId)!;
+    expect(home.points).toBe(3);
+    expect(home.won).toBe(1);
+    expect(home.goalsFor).toBe(2);
+
+    // idempotente: mesmo matchRef não gera novo efeito
+    const revision = value.snapshot().revision;
+    const repeat = value.recordOfficialResult({
+      fixtureId: fixture.id,
+      matchRef: "match:0",
+      homeGoals: 2,
+      awayGoals: 0,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "res:0b",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(repeat).toMatchObject({ ok: true, value: { status: "FINAL" } });
+    expect(value.snapshot().revision).toBe(revision);
+
+    // matchRef diferente numa fixture já FINAL = conflito (fato não reescrito)
+    expect(
+      value.recordOfficialResult({
+        fixtureId: fixture.id,
+        matchRef: "match:other",
+        homeGoals: 1,
+        awayGoals: 1,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "res:conf",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-02-02",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "RESULT_ALREADY_RECORDED" } });
+  });
+
+  it("aplica disciplina no desempate do standing, idempotente por chave", () => {
+    const { gameWorld, value, editionId } = editionWithParticipants();
+    const generated = value.generateFixtures({
+      editionId,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "fixtures:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-20",
+    });
+    if (!generated.ok) throw generated.error;
+
+    const disc = value.applyDiscipline({
+      editionId,
+      clubId: CLUBS[0]!,
+      disciplinaryPoints: 5,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "disc:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(disc).toMatchObject({ ok: true, value: { disciplinaryPoints: 5 } });
+    // com tudo empatado em 0, o punido cai no desempate disciplinar
+    expect(value.standingsFor(editionId).at(-1)!.clubId).toBe(CLUBS[0]);
+
+    const revision = value.snapshot().revision;
+    const again = value.applyDiscipline({
+      editionId,
+      clubId: CLUBS[0]!,
+      disciplinaryPoints: 5,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "disc:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-02-01",
+    });
+    expect(again).toEqual(disc);
+    expect(value.snapshot().revision).toBe(revision);
+  });
+
+  it("homologa só com todas as fixtures finalizadas, determinística e idempotente", () => {
+    const { gameWorld, value, editionId } = editionWithParticipants();
+    const generated = value.generateFixtures({
+      editionId,
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "fixtures:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-01-20",
+    });
+    if (!generated.ok) throw generated.error;
+    const fixtures = generated.value;
+
+    // homologar antes de finalizar tudo é prematuro
+    expect(
+      value.homologateCompetition({
+        editionId,
+        decidedBy: "board",
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: "hom:early",
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-06-01",
+      }),
+    ).toMatchObject({ ok: false, error: { code: "HOMOLOGATION_PREMATURE" } });
+
+    fixtures.forEach((fixture, index) => {
+      const recorded = value.recordOfficialResult({
+        fixtureId: fixture.id,
+        matchRef: `match:${index}`,
+        homeGoals: 2,
+        awayGoals: 1,
+        rulesetVersion: gameWorld.rulesetVersion,
+        idempotencyKey: `res:${index}`,
+        worldSeed: gameWorld.seed,
+        worldDate: "2026-05-01",
+      });
+      if (!recorded.ok) throw recorded.error;
+    });
+
+    const homologated = value.homologateCompetition({
+      editionId,
+      decidedBy: "board",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "hom:1",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-06-01",
+    });
+    expect(homologated).toMatchObject({ ok: true });
+    if (!homologated.ok) throw homologated.error;
+    expect(value.findEdition(editionId)!.status).toBe("HOMOLOGATED");
+    expect(homologated.value.finalRanking).toHaveLength(4);
+    expect(homologated.value.inputHash).toMatch(/^[0-9a-f]{16}$/);
+
+    // idempotente: uma edição já homologada devolve a mesma homologação
+    const revision = value.snapshot().revision;
+    const again = value.homologateCompetition({
+      editionId,
+      decidedBy: "board",
+      rulesetVersion: gameWorld.rulesetVersion,
+      idempotencyKey: "hom:again",
+      worldSeed: gameWorld.seed,
+      worldDate: "2026-06-02",
+    });
+    expect(again.ok && again.value.inputHash).toBe(homologated.value.inputHash);
+    expect(value.snapshot().revision).toBe(revision);
+  });
 });

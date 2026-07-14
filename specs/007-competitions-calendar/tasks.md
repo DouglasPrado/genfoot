@@ -35,21 +35,20 @@
 
 **Independent Test**: resultados únicos atualizam standings e somente edição completa pode ser homologada.
 
-- [ ] T013 [US2] RecordOfficialResult (uma vez por matchId/version) recalculando standings determinísticos + StandingChanged
-- [ ] T014 [US2] StandingEntry (pontos, saldo, disciplina, rank provisório) e query as-of
-- [ ] T015 [US2] ApplyDiscipline ajustando standings + evento
-- [ ] T016 [US2] HomologateCompetition (bloqueia homologação prematura; título/acesso/rebaixamento provisórios até homologar) + CompetitionHomologated
+- [x] T013 [US2] RecordOfficialResult (uma vez por matchId/version) recalculando standings determinísticos + StandingChanged
+- [x] T014 [US2] StandingEntry (pontos, saldo, disciplina, rank provisório) e query as-of
+- [x] T015 [US2] ApplyDiscipline ajustando standings + evento
+- [x] T016 [US2] HomologateCompetition (bloqueia homologação prematura; título/acesso/rebaixamento provisórios até homologar) + CompetitionHomologated
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T017 [P] Adapter de persistência + outbox para competições em apps/simulator
-- [ ] T018 Recovery/replay após falha pós-commit
-- [ ] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência PARTIAL
+- [x] T017 [P] Adapter de persistência + outbox para competições em apps/simulator
+- [x] T018 Recovery/replay após falha pós-commit
+- [x] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência PARTIAL
 
 ## Implementation Strategy
 
-- **Incremento atual**: US1 completo (edição + inscrição + fixtures turno-returno determinísticas).
-- **Pendente**: US2 (resultados/standings/disciplina/homologação, T013-T016), adapter/recovery (T017-T018).
+- **Concluído (DELIVERED)**: US1 (edição + inscrição + fixtures turno-returno) e US2 completa (RecordOfficialResult/standings determinísticos, ApplyDiscipline, HomologateCompetition com bloqueio de homologação prematura). Superfície inteira do contrato (6 commands, 5 events) + entidades StandingEntry/Homologation, adapter de persistência JSON (schemaVersion 8) com round-trip e recovery. Gate lint+typecheck+test+build verde.
 
 ## Notes
 

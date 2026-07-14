@@ -41,6 +41,8 @@ import {
   type WorldPlayerLifecycleSnapshot,
   type LedgerRepository,
   type WorldLedgerSnapshot,
+  type CompetitionRepository,
+  type WorldCompetitionsSnapshot,
   type WorldSchedulerSnapshot,
   type WorldCommandReceipt,
   type WorldClubPortfolioSnapshot,
@@ -667,6 +669,84 @@ const worldLedgerSchema = z.object({
   revision: z.number().int().positive(),
 });
 
+const worldCompetitionsSchema = z.object({
+  gameWorldId: identifierSchema,
+  rulesetVersion: z.string(),
+  editions: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      seasonRef: identifierSchema,
+      name: z.string().min(1),
+      formatVersion: z.string().min(1),
+      status: z.enum(["REGISTRATION", "SCHEDULED", "HOMOLOGATED"]),
+      maxParticipants: z.number().int().positive(),
+      startOn: z.string(),
+      roundIntervalDays: z.number().int().positive(),
+      idempotencyKey: z.string().min(1),
+      version: z.number().int().positive(),
+    }),
+  ),
+  participants: z.array(
+    z.object({
+      editionId: identifierSchema,
+      clubId: identifierSchema,
+      seedNumber: z.number().int().positive(),
+      registeredOn: z.string(),
+      idempotencyKey: z.string().min(1),
+    }),
+  ),
+  fixtures: z.array(
+    z.object({
+      id: identifierSchema,
+      gameWorldId: identifierSchema,
+      editionId: identifierSchema,
+      phase: z.string().min(1),
+      round: z.number().int().positive(),
+      homeClubId: identifierSchema,
+      awayClubId: identifierSchema,
+      kickoffOn: z.string(),
+      status: z.enum(["SCHEDULED", "FINAL"]),
+      homeGoals: z.number().int().nullable(),
+      awayGoals: z.number().int().nullable(),
+      resultRef: z.string().min(1).optional(),
+    }),
+  ),
+  standings: z
+    .array(
+      z.object({
+        editionId: identifierSchema,
+        clubId: identifierSchema,
+        played: z.number().int(),
+        won: z.number().int(),
+        drawn: z.number().int(),
+        lost: z.number().int(),
+        goalsFor: z.number().int(),
+        goalsAgainst: z.number().int(),
+        points: z.number().int(),
+        disciplinaryPoints: z.number().int(),
+        provisionalRank: z.number().int().positive(),
+      }),
+    )
+    .optional(),
+  homologations: z
+    .array(
+      z.object({
+        id: identifierSchema,
+        gameWorldId: identifierSchema,
+        editionId: identifierSchema,
+        inputHash: z.string().min(1),
+        decidedBy: z.string().min(1),
+        decidedOn: z.string(),
+        finalRanking: z.array(identifierSchema),
+        idempotencyKey: z.string().min(1),
+      }),
+    )
+    .optional(),
+  events: z.array(z.record(z.unknown())),
+  revision: z.number().int().positive(),
+});
+
 const persistedSnapshotSchema = z.union([
   z.object({ schemaVersion: z.literal(1), world: worldSchema }),
   z.object({
@@ -711,6 +791,16 @@ const persistedSnapshotSchema = z.union([
     clubPortfolio: clubPortfolioSchema.nullable(),
     ledger: worldLedgerSchema.nullable(),
   }),
+  z.object({
+    schemaVersion: z.literal(8),
+    world: worldSchema,
+    genesis: genesisSchema.nullable(),
+    scheduler: schedulerSchema.nullable(),
+    playerLifecycle: playerLifecycleSchema.nullable(),
+    clubPortfolio: clubPortfolioSchema.nullable(),
+    ledger: worldLedgerSchema.nullable(),
+    competitions: worldCompetitionsSchema.nullable(),
+  }),
 ]);
 
 interface LoadedEnvelope {
@@ -720,6 +810,7 @@ interface LoadedEnvelope {
   readonly playerLifecycle: WorldPlayerLifecycleSnapshot | null;
   readonly clubPortfolio: WorldClubPortfolioSnapshot | null;
   readonly ledger: WorldLedgerSnapshot | null;
+  readonly competitions: WorldCompetitionsSnapshot | null;
 }
 
 export class JsonWorldRepository
@@ -729,7 +820,8 @@ export class JsonWorldRepository
     SchedulingRepository,
     PlayerLifecycleRepository,
     ClubPortfolioRepository,
-    LedgerRepository
+    LedgerRepository,
+    CompetitionRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
@@ -771,6 +863,7 @@ export class JsonWorldRepository
       playerLifecycle: current?.playerLifecycle ?? null,
       clubPortfolio: current?.clubPortfolio ?? null,
       ledger: current?.ledger ?? null,
+      competitions: current?.competitions ?? null,
     });
   }
 
@@ -803,6 +896,7 @@ export class JsonWorldRepository
       playerLifecycle: current.playerLifecycle,
       clubPortfolio: current.clubPortfolio,
       ledger: current.ledger,
+      competitions: current.competitions,
     });
   }
 
@@ -989,6 +1083,49 @@ export class JsonWorldRepository
     });
   }
 
+  public async findCompetitionsByWorldId(
+    id: GameWorldId,
+  ): Promise<WorldCompetitionsSnapshot | null> {
+    return (await this.load(id))?.competitions ?? null;
+  }
+
+  public async saveCompetitions(
+    competitions: WorldCompetitionsSnapshot,
+    expectedRevision: number | null,
+  ): Promise<void> {
+    await mkdir(this.baseDirectory, { recursive: true });
+    await this.withNamedLock(
+      competitions.gameWorldId,
+      "competitions",
+      async () => {
+        const current = await this.load(competitions.gameWorldId);
+        if (current === null) {
+          throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
+        }
+        if (expectedRevision === null && current.competitions !== null) {
+          throw new DomainError(
+            "COMPETITIONS_ALREADY_EXISTS",
+            "As competições já existem.",
+          );
+        }
+        if (
+          expectedRevision !== null &&
+          current.competitions?.revision !== expectedRevision
+        ) {
+          throw new DomainError(
+            "COMPETITIONS_REVISION_CONFLICT",
+            "As competições foram alteradas desde a última leitura.",
+            {
+              expectedRevision,
+              actualRevision: current.competitions?.revision ?? null,
+            },
+          );
+        }
+        await this.write(competitions.gameWorldId, { ...current, competitions });
+      },
+    );
+  }
+
   private async load(id: GameWorldId): Promise<LoadedEnvelope | null> {
     const filePath = this.pathFor(id);
     let contents: string;
@@ -1017,7 +1154,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
-          persisted.schemaVersion === 7) &&
+          persisted.schemaVersion === 7 ||
+          persisted.schemaVersion === 8) &&
         persisted.genesis !== null
           ? (persisted.genesis as unknown as WorldGenesisSnapshot)
           : null;
@@ -1026,7 +1164,8 @@ export class JsonWorldRepository
           persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
-          persisted.schemaVersion === 7) &&
+          persisted.schemaVersion === 7 ||
+          persisted.schemaVersion === 8) &&
         persisted.scheduler !== null
           ? (persisted.scheduler as unknown as WorldSchedulerSnapshot)
           : null;
@@ -1034,18 +1173,26 @@ export class JsonWorldRepository
         (persisted.schemaVersion === 4 ||
           persisted.schemaVersion === 5 ||
           persisted.schemaVersion === 6 ||
-          persisted.schemaVersion === 7) &&
+          persisted.schemaVersion === 7 ||
+          persisted.schemaVersion === 8) &&
         persisted.playerLifecycle !== null
           ? (persisted.playerLifecycle as unknown as WorldPlayerLifecycleSnapshot)
           : null;
       const clubPortfolio =
-        (persisted.schemaVersion === 6 || persisted.schemaVersion === 7) &&
+        (persisted.schemaVersion === 6 ||
+          persisted.schemaVersion === 7 ||
+          persisted.schemaVersion === 8) &&
         persisted.clubPortfolio !== null
           ? (persisted.clubPortfolio as unknown as WorldClubPortfolioSnapshot)
           : null;
       const ledger =
-        persisted.schemaVersion === 7 && persisted.ledger !== null
+        (persisted.schemaVersion === 7 || persisted.schemaVersion === 8) &&
+        persisted.ledger !== null
           ? (persisted.ledger as unknown as WorldLedgerSnapshot)
+          : null;
+      const competitions =
+        persisted.schemaVersion === 8 && persisted.competitions !== null
+          ? (persisted.competitions as unknown as WorldCompetitionsSnapshot)
           : null;
       return {
         world,
@@ -1054,6 +1201,7 @@ export class JsonWorldRepository
         playerLifecycle,
         clubPortfolio,
         ledger,
+        competitions,
       };
     } catch (error: unknown) {
       throw new DomainError(
@@ -1075,13 +1223,14 @@ export class JsonWorldRepository
     const temporary = `${destination}.${randomUUID()}.tmp`;
     const contents = `${JSON.stringify(
       {
-        schemaVersion: 7,
+        schemaVersion: 8,
         world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
         playerLifecycle: envelope.playerLifecycle,
         clubPortfolio: envelope.clubPortfolio,
         ledger: envelope.ledger,
+        competitions: envelope.competitions,
       },
       null,
       2,

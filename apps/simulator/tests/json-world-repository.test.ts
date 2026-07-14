@@ -5,6 +5,8 @@ import { join } from "node:path";
 import {
   OpenLedgerAccount,
   PostTransaction,
+  RecordOfficialResult,
+  WorldCompetitions,
   WorldLedger,
   WorldScheduler,
   SeasonRollover,
@@ -12,6 +14,8 @@ import {
   WorldPlayerLifecycle,
   WorldStatus,
   buildClubPortfolioFromGenesis,
+  type CompetitionClubRef,
+  type CompetitionSeasonRef,
   type GameWorldSnapshot,
 } from "@grinta/core";
 import {
@@ -25,7 +29,7 @@ import { z } from "zod";
 import { JsonWorldRepository } from "../src/json-world-repository.js";
 
 const directories: string[] = [];
-const envelopeSchema = z.object({ schemaVersion: z.literal(7) });
+const envelopeSchema = z.object({ schemaVersion: z.literal(8) });
 
 afterEach(async () => {
   await Promise.all(
@@ -72,7 +76,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(file.schemaVersion).toBe(7);
+    expect(file.schemaVersion).toBe(8);
   });
 
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
@@ -237,6 +241,92 @@ describe("JsonWorldRepository", () => {
     ).toBe(0);
   });
 
+  it("persiste as competições C7 com standings e resultado (round-trip + recovery)", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+    const created = WorldCompetitions.initialize(world);
+    if (!created.ok) throw created.error;
+    const competitions = created.value;
+    const season = "019f0000-0000-7000-8000-0000000000aa" as CompetitionSeasonRef;
+    const clubs = [
+      "019f0000-0000-7000-8000-0000000000c1",
+      "019f0000-0000-7000-8000-0000000000c2",
+    ].map((id) => id as CompetitionClubRef);
+    const edition = competitions.createCompetitionEdition({
+      seasonRef: season,
+      name: "Liga",
+      formatVersion: "league@1",
+      maxParticipants: 2,
+      startOn: "2026-02-01",
+      roundIntervalDays: 7,
+      worldDate: "2026-01-15",
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "edition:1",
+      worldSeed: world.seed,
+    });
+    if (!edition.ok) throw edition.error;
+    clubs.forEach((clubId, index) => {
+      const registered = competitions.registerParticipant({
+        editionId: edition.value.id,
+        clubId,
+        rulesetVersion: world.rulesetVersion,
+        idempotencyKey: `reg:${index}`,
+        worldSeed: world.seed,
+        worldDate: "2026-01-16",
+      });
+      if (!registered.ok) throw registered.error;
+    });
+    const fixtures = competitions.generateFixtures({
+      editionId: edition.value.id,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "fixtures:1",
+      worldSeed: world.seed,
+      worldDate: "2026-01-20",
+    });
+    if (!fixtures.ok) throw fixtures.error;
+    const first = competitions.recordOfficialResult({
+      fixtureId: fixtures.value[0]!.id,
+      matchRef: "match:0",
+      homeGoals: 3,
+      awayGoals: 1,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "res:0",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    });
+    if (!first.ok) throw first.error;
+
+    await store.value.saveCompetitions(competitions.snapshot(), null);
+    // round-trip: standings + fixture com resultRef preservados sem stripping
+    expect(await store.value.findCompetitionsByWorldId(world.id)).toEqual(
+      competitions.snapshot(),
+    );
+
+    // recovery: retry do mesmo resultado após restart = efeito único
+    const restarted = new JsonWorldRepository(store.directory);
+    const record = new RecordOfficialResult(restarted);
+    const retryInput = {
+      fixtureId: fixtures.value[0]!.id,
+      matchRef: "match:0",
+      homeGoals: 3,
+      awayGoals: 1,
+      rulesetVersion: world.rulesetVersion,
+      idempotencyKey: "res:0:retry",
+      worldSeed: world.seed,
+      worldDate: "2026-02-01",
+    };
+    const retry = await record.execute(world.id, retryInput);
+    expect(retry).toMatchObject({ ok: true, value: { status: "FINAL" } });
+    const reloaded = await restarted.findCompetitionsByWorldId(world.id);
+    expect(
+      reloaded!.fixtures.filter((f) => f.status === "FINAL"),
+    ).toHaveLength(1);
+    await expect(
+      store.value.saveCompetitions(competitions.snapshot(), 99),
+    ).rejects.toMatchObject({ code: "COMPETITIONS_REVISION_CONFLICT" });
+  });
+
   it("persiste o portfólio C3 com restart e revisão otimista", async () => {
     const store = await repository();
     const world = snapshot();
@@ -272,7 +362,7 @@ describe("JsonWorldRepository", () => {
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {

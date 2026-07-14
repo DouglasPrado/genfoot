@@ -13,9 +13,11 @@ import type {
   CompetitionClubRef,
   CompetitionEditionSnapshot,
   CompetitionFixtureSnapshot,
+  CompetitionHomologationSnapshot,
   CompetitionParticipantSnapshot,
   CompetitionSeasonRef,
   CompetitionSummary,
+  StandingEntrySnapshot,
   WorldCompetitionsSnapshot,
 } from "./competition-types.js";
 import { WorldCompetitions } from "./world-competitions.js";
@@ -130,6 +132,69 @@ export class GenerateFixtures {
   ): Promise<Result<readonly CompetitionFixtureSnapshot[], DomainError>> {
     return mutate(this.repository, gameWorldId, (competitions) =>
       competitions.generateFixtures(input),
+    );
+  }
+}
+
+export class RecordOfficialResult {
+  public constructor(private readonly repository: CompetitionRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      fixtureId: string;
+      matchRef: string;
+      homeGoals: number;
+      awayGoals: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<CompetitionFixtureSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (competitions) =>
+      competitions.recordOfficialResult(input),
+    );
+  }
+}
+
+export class ApplyDiscipline {
+  public constructor(private readonly repository: CompetitionRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      editionId: string;
+      clubId: CompetitionClubRef;
+      disciplinaryPoints: number;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<StandingEntrySnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (competitions) =>
+      competitions.applyDiscipline(input),
+    );
+  }
+}
+
+export class HomologateCompetition {
+  public constructor(private readonly repository: CompetitionRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      editionId: string;
+      decidedBy: string;
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<CompetitionHomologationSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (competitions) =>
+      competitions.homologateCompetition(input),
     );
   }
 }
