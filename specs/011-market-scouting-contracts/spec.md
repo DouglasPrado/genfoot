@@ -2,7 +2,7 @@
 
 **Feature Branch**: `011-market-scouting-contracts`  
 **Created**: 2026-07-13  
-**Status**: PLANNED  
+**Status**: DELIVERED  
 **Feature ID**: BC-006  
 **Milestone**: M1 — Temporada headless  
 **Owner**: C6 Mercado/Contratos  
