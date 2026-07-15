@@ -1,3 +1,4 @@
+import { commandTelemetry, type CommandTelemetryEvent } from "./telemetry.js";
 import {
   GrintaApiError,
   type Catalog,
@@ -27,6 +28,8 @@ export interface ClientOptions {
   readonly token?: string;
   /** Implementação de fetch (default: globalThis.fetch). */
   readonly fetch?: FetchLike;
+  /** Sink de telemetria segura (FR-013): recebe só IDs, nunca payload/PII. */
+  readonly onTelemetry?: (event: CommandTelemetryEvent) => void;
 }
 
 let correlationCounter = 0;
@@ -39,10 +42,12 @@ export class GrintaClient {
   private readonly baseUrl: string;
   private readonly token: string | undefined;
   private readonly fetchImpl: FetchLike;
+  private readonly onTelemetry: ((e: CommandTelemetryEvent) => void) | undefined;
 
   constructor(options: ClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.token = options.token;
+    this.onTelemetry = options.onTelemetry;
     // Envolve o fetch global num wrapper: no browser, `window.fetch` precisa ser
     // chamado com `this === window` (senão "Illegal invocation"); guardá-lo
     // destacado e chamá-lo como `this.fetchImpl(...)` quebraria. O wrapper
@@ -64,6 +69,7 @@ export class GrintaClient {
       baseUrl: this.baseUrl,
       token,
       fetch: this.fetchImpl,
+      ...(this.onTelemetry ? { onTelemetry: this.onTelemetry } : {}),
     });
   }
 
@@ -135,8 +141,22 @@ export class GrintaClient {
       correlationId: `sdk-${correlationCounter}`,
       ...envelope,
     };
-    return (await this.request<CommandResponse>("POST", "/api/v1/commands", full))
-      .body;
+    const response = (
+      await this.request<CommandResponse>("POST", "/api/v1/commands", full)
+    ).body;
+    // Telemetria segura (FR-013): só IDs, nunca payload.
+    this.onTelemetry?.(
+      commandTelemetry({
+        commandType: full.commandType,
+        status: response.status,
+        correlationId: response.correlationId,
+        commandId: response.commandId,
+        ...("error" in response && response.error
+          ? { errorCode: response.error.code }
+          : {}),
+      }),
+    );
+    return response;
   }
 
   async query<T = unknown>(

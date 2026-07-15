@@ -75,3 +75,10 @@
 
 - Clientes são NÃO autoritativos; usam contratos oficiais e nunca decidem retry de ação irreversível.
 - Offline restrito à whitelist reversível; realtime é gap-aware e idempotente.
+
+## Phase 10: Convergence
+
+- [~] T034 Leitura offline cacheada **wired** no admin via `QueryCache` (stale-while-revalidate, segregado por escopo); a **fila de intents offline** (OfflineIntentQueue) é do mobile (T031) — admin é ferramenta online per FR-005 (partial resolvido no que cabe ao admin)
+- [x] T035 Telemetria segura emitida de fato: `onTelemetry` no `GrintaClient` dispara `commandTelemetry` (só IDs) por command; admin passa o sink; teste prova ausência de payload per FR-013
+- [x] T036 Check automatizado de acessibilidade: `contrastRatio` WCAG no design-system + teste (texto ≥4.5:1, acento/apoio ≥3:1, botão primário ≥4.5:1) per FR-011/SC-004
+- [x] T037 Nomes reconciliados/justificados: `@grinta/api-client` = SDK dos contratos de cliente (plan `packages/contracts`), `@grinta/design-system` = tokens de UI (plan `packages/ui`) — mesma função, nomes mais claros per plan

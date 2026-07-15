@@ -75,6 +75,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       createClient({
         baseUrl: BASE_URL,
         ...(session ? { token: session.token } : {}),
+        // Telemetria segura (FR-013): só IDs, nunca payload/PII.
+        onTelemetry: (event) => {
+          if (typeof console !== "undefined") {
+            console.info("[telemetry]", JSON.stringify(event));
+          }
+        },
       }),
     [session],
   );

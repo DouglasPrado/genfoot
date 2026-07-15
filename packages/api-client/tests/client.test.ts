@@ -85,6 +85,32 @@ describe("GrintaClient", () => {
     ).rejects.toBeInstanceOf(GrintaApiError);
   });
 
+  it("emite telemetria segura por command (FR-013) — sem payload", async () => {
+    const { fetchImpl } = mockFetch(() => ({
+      status: 201,
+      body: { commandId: "c1", status: "ACCEPTED", correlationId: "sdk-x", resource: null },
+    }));
+    const events: unknown[] = [];
+    const client = createClient({
+      baseUrl: "http://x",
+      token: "t",
+      fetch: fetchImpl,
+      onTelemetry: (e) => events.push(e),
+    });
+    await client.command({
+      commandType: "admin:place-quarantine",
+      idempotencyKey: "k",
+      payload: { subject: "user-secret" },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).not.toHaveProperty("payload");
+    expect(events[0]).toMatchObject({
+      type: "command",
+      commandType: "admin:place-quarantine",
+      status: "ACCEPTED",
+    });
+  });
+
   it("withToken deriva client autenticado", () => {
     const { fetchImpl } = mockFetch(() => ({ status: 200, body: {} }));
     const anon = createClient({ baseUrl: "http://x", fetch: fetchImpl });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   color,
   commandRisk,
+  contrastRatio,
   requiresConfirmation,
   riskColor,
   riskLevel,
@@ -51,5 +52,16 @@ describe("design-system tokens", () => {
     expect(requiresConfirmation("competition:homologate")).toBe(true);
     expect(requiresConfirmation("admin:record-risk")).toBe(true);
     expect(requiresConfirmation("world:advance-days")).toBe(false);
+  });
+
+  it("contraste WCAG dos tokens críticos passa os limiares (FR-011/SC-004)", () => {
+    // texto normal ≥ 4.5:1; texto de apoio e acento (UI) ≥ 3:1
+    expect(contrastRatio(color.text, color.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(color.textMuted, color.background)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(color.primary, color.background)).toBeGreaterThanOrEqual(3);
+    // botão primário: texto escuro sobre verde-neon
+    expect(
+      contrastRatio(color.primaryContrast, color.primary),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });
