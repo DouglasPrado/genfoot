@@ -7,10 +7,15 @@ import { AppShell, PageHeader } from "@/components/app-shell";
 import { CommandConsole } from "@/components/command-console";
 import { ContextInspector } from "@/components/context-inspector";
 import { ContextPulse, type ContextName } from "@/components/context-pulse";
+import { CompetitionsPanel } from "@/components/panels/competitions-panel";
+import { EconomyPanel } from "@/components/panels/economy-panel";
+import { HealthPanel } from "@/components/panels/health-panel";
+import { ModerationPanel } from "@/components/panels/moderation-panel";
 import { QuickActions } from "@/components/quick-actions";
 import { RealtimeFeed } from "@/components/realtime-feed";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from "@/lib/session";
 
 interface WorldSnapshot {
@@ -34,10 +39,9 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function WorldDetailPage() {
   const params = useParams<{ worldId: string }>();
   const worldId = params.worldId;
-  const { api } = useSession();
+  const { api, session } = useSession();
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
   const [commandTypes, setCommandTypes] = useState<readonly string[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ContextName>("club");
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -48,9 +52,7 @@ export default function WorldDetailPage() {
       .then((envelope) => {
         if (alive) setSnapshot(envelope.data);
       })
-      .catch(() => {
-        if (alive) setError("Mundo não encontrado ou API offline.");
-      });
+      .catch(() => undefined);
     api
       .catalog()
       .then((catalog) => {
@@ -66,6 +68,8 @@ export default function WorldDetailPage() {
     setRefreshKey((k) => k + 1);
   }
 
+  const isAdmin = session?.role === "admin";
+
   return (
     <AppShell>
       <PageHeader
@@ -79,15 +83,9 @@ export default function WorldDetailPage() {
           ) : null
         }
       />
-      <div className="space-y-6 p-6">
-        {error ? (
-          <p className="mono rounded-sm border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-
+      <div className="p-6">
         {snapshot ? (
-          <Card>
+          <Card className="mb-6">
             <CardContent className="flex flex-wrap items-center justify-between gap-6">
               <div className="flex gap-8">
                 <Stat label="Data lógica" value={snapshot.currentDate} />
@@ -99,53 +97,96 @@ export default function WorldDetailPage() {
           </Card>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Feed de tempo real</CardTitle>
-            <span className="mono text-[11px] text-muted-foreground">
-              Socket.IO · gateway com handshake
-            </span>
-          </CardHeader>
-          <CardContent>
-            <RealtimeFeed worldId={worldId} />
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="painel">
+          <TabsList>
+            <TabsTrigger value="painel">Painel</TabsTrigger>
+            <TabsTrigger value="economia">Economia</TabsTrigger>
+            <TabsTrigger value="competicoes">Competições</TabsTrigger>
+            {isAdmin ? <TabsTrigger value="moderacao">Moderação</TabsTrigger> : null}
+            <TabsTrigger value="console">Console</TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pulso dos contextos</CardTitle>
-            <span className="mono text-[11px] text-muted-foreground">
-              clique para inspecionar · live = inicializado
-            </span>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ContextPulse
-              worldId={worldId}
-              selected={selected}
-              onSelect={setSelected}
-              refreshKey={refreshKey}
-            />
-            <div className="rounded-sm border border-border bg-background p-4">
-              <ContextInspector
-                worldId={worldId}
-                context={selected}
-                refreshKey={refreshKey}
-              />
+          <TabsContent value="painel">
+            <div className="space-y-6">
+              <HealthPanel worldId={worldId} refreshKey={refreshKey} />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Feed de tempo real</CardTitle>
+                  <span className="mono text-[11px] text-muted-foreground">
+                    Socket.IO · handshake
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <RealtimeFeed worldId={worldId} />
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Console de commands</CardTitle>
-            <span className="mono text-[11px] text-muted-foreground">
-              {commandTypes.length} tipos · RBAC admin:* exige papel admin
-            </span>
-          </CardHeader>
-          <CardContent>
-            <CommandConsole worldId={worldId} commandTypes={commandTypes} />
-          </CardContent>
-        </Card>
+          <TabsContent value="economia">
+            <EconomyPanel
+              worldId={worldId}
+              refreshKey={refreshKey}
+              onDone={refresh}
+            />
+          </TabsContent>
+
+          <TabsContent value="competicoes">
+            <CompetitionsPanel
+              worldId={worldId}
+              refreshKey={refreshKey}
+              onDone={refresh}
+            />
+          </TabsContent>
+
+          {isAdmin ? (
+            <TabsContent value="moderacao">
+              <ModerationPanel worldId={worldId} />
+            </TabsContent>
+          ) : null}
+
+          <TabsContent value="console">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pulso dos contextos</CardTitle>
+                  <span className="mono text-[11px] text-muted-foreground">
+                    clique para inspecionar
+                  </span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <ContextPulse
+                    worldId={worldId}
+                    selected={selected}
+                    onSelect={setSelected}
+                    refreshKey={refreshKey}
+                  />
+                  <div className="rounded-sm border border-border bg-background p-4">
+                    <ContextInspector
+                      worldId={worldId}
+                      context={selected}
+                      refreshKey={refreshKey}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Console de commands</CardTitle>
+                  <span className="mono text-[11px] text-muted-foreground">
+                    {commandTypes.length} tipos · reauth em admin:*
+                  </span>
+                </CardHeader>
+                <CardContent>
+                  <CommandConsole
+                    worldId={worldId}
+                    commandTypes={commandTypes}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppShell>
   );
