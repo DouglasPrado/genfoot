@@ -2,7 +2,6 @@ import { ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { color, space } from "@/theme";
 import { HOME_SEED } from "./home-data";
-import { LiveWorld } from "./live-world";
 import { PlayerHeader } from "./player-header";
 import { ChampionshipStrip } from "./championship-strip";
 import { NextMatch } from "./next-match";
@@ -16,7 +15,6 @@ export function Home() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <LiveWorld />
         <PlayerHeader club={vm.club} wallet={vm.wallet} />
         <ChampionshipStrip standing={vm.standing} />
         <NextMatch nextMatch={vm.nextMatch} />
