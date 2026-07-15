@@ -69,15 +69,11 @@ export class Club {
       }
     }
     const effectiveOn = input.effectiveOn.toString();
-    if (effectiveOn <= this.state.identity.effectiveFrom) {
+    if (effectiveOn < this.state.identity.effectiveFrom) {
       return fail(
-        invalidClub("A nova identidade deve iniciar depois da atual."),
+        invalidClub("A nova identidade não pode iniciar antes da atual."),
       );
     }
-    const closed = {
-      ...this.state.identity,
-      effectiveThrough: input.effectiveOn.addDays(-1).toString(),
-    };
     const identity = {
       id: input.identityId,
       name: input.name.trim(),
@@ -91,14 +87,21 @@ export class Club {
           ? { visualIdentity: this.state.identity.visualIdentity }
           : {}),
     } as const;
+    // Mesmo dia lógico do período aberto: a última escrita do dia vence —
+    // substitui o período aberto em vez de fechá-lo, para não inverter o
+    // histórico (períodos fechados nunca são reescritos). Dias seguintes
+    // fecham o período anterior na véspera e abrem um novo.
+    const sameDay = effectiveOn === this.state.identity.effectiveFrom;
+    const closed = {
+      ...this.state.identity,
+      effectiveThrough: input.effectiveOn.addDays(-1).toString(),
+    };
     this.state = {
       ...this.state,
       identity,
-      identityHistory: [
-        ...this.state.identityHistory.slice(0, -1),
-        closed,
-        identity,
-      ],
+      identityHistory: sameDay
+        ? [...this.state.identityHistory.slice(0, -1), identity]
+        : [...this.state.identityHistory.slice(0, -1), closed, identity],
       version: this.state.version + 1,
     };
     return succeed(undefined);

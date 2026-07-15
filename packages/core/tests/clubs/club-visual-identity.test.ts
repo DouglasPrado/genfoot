@@ -144,6 +144,63 @@ describe("club visual identity (personalização)", () => {
     if (!badColor.ok) expect(badColor.error.code).toBe("INVALID_VISUAL_IDENTITY");
   });
 
+  it("permite rebranding no mesmo dia lógico do período atual (mundo recém-criado)", async () => {
+    const { repository, portfolio } = await setup();
+    const genesisDay = portfolio.clubs[0]!.identity.effectiveFrom;
+    const result = await new ExecuteClubCommand(repository).execute(
+      rebrandCommand(portfolio, { occurredAt: genesisDay }),
+    );
+
+    expect(result.ok).toBe(true);
+    const club = repository.snapshots[0]!.clubs[0]!;
+    expect(club.identity.name).toBe("Grinta Atlético");
+    expect(club.identity.effectiveFrom).toBe(genesisDay);
+    // Mesmo dia: substitui o período aberto — continua havendo exatamente um aberto.
+    expect(
+      club.identityHistory.filter((p) => p.effectiveThrough === null),
+    ).toHaveLength(1);
+    expect(
+      club.identityHistory.every(
+        (p) => p.effectiveThrough === null || p.effectiveThrough >= p.effectiveFrom,
+      ),
+    ).toBe(true);
+  });
+
+  it("dois rebrandings no mesmo dia: o último vence e o histórico não inverte", async () => {
+    const { repository, portfolio } = await setup();
+    const genesisDay = portfolio.clubs[0]!.identity.effectiveFrom;
+    const executor = new ExecuteClubCommand(repository);
+    const first = await executor.execute(
+      rebrandCommand(portfolio, { occurredAt: genesisDay }),
+    );
+    expect(first.ok).toBe(true);
+    const second = await executor.execute(
+      rebrandCommand(portfolio, {
+        occurredAt: genesisDay,
+        commandId: "cmd-rebrand-2",
+        idempotencyKey: "club:rebrand:2",
+        expectedVersion: 2,
+        name: "Grinta Fúria",
+        shortCode: "GRF",
+      }),
+    );
+
+    expect(second.ok).toBe(true);
+    const club = repository.snapshots[0]!.clubs[0]!;
+    expect(club.identity.name).toBe("Grinta Fúria");
+    expect(
+      club.identityHistory.filter((p) => p.effectiveThrough === null),
+    ).toHaveLength(1);
+  });
+
+  it("rejeita rebranding com data anterior ao período atual", async () => {
+    const { repository, portfolio } = await setup();
+    const result = await new ExecuteClubCommand(repository).execute(
+      rebrandCommand(portfolio, { occurredAt: "2020-01-01" }),
+    );
+    expect(result.ok).toBe(false);
+  });
+
   it("is idempotent: repeating the same rebrand yields one effect", async () => {
     const { repository, portfolio } = await setup();
     const command = rebrandCommand(portfolio, {});
