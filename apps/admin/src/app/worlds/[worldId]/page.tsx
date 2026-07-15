@@ -10,6 +10,7 @@ import { ContextPulse, type ContextName } from "@/components/context-pulse";
 import { CompetitionsPanel } from "@/components/panels/competitions-panel";
 import { EconomyPanel } from "@/components/panels/economy-panel";
 import { HealthPanel } from "@/components/panels/health-panel";
+import { MarketPanel } from "@/components/panels/market-panel";
 import { ModerationPanel } from "@/components/panels/moderation-panel";
 import { QuickActions } from "@/components/quick-actions";
 import { RealtimeFeed } from "@/components/realtime-feed";
@@ -101,6 +102,7 @@ export default function WorldDetailPage() {
           <TabsList>
             <TabsTrigger value="painel">Painel</TabsTrigger>
             <TabsTrigger value="economia">Economia</TabsTrigger>
+            <TabsTrigger value="mercado">Mercado</TabsTrigger>
             <TabsTrigger value="competicoes">Competições</TabsTrigger>
             {isAdmin ? <TabsTrigger value="moderacao">Moderação</TabsTrigger> : null}
             <TabsTrigger value="console">Console</TabsTrigger>
@@ -125,6 +127,14 @@ export default function WorldDetailPage() {
 
           <TabsContent value="economia">
             <EconomyPanel
+              worldId={worldId}
+              refreshKey={refreshKey}
+              onDone={refresh}
+            />
+          </TabsContent>
+
+          <TabsContent value="mercado">
+            <MarketPanel
               worldId={worldId}
               refreshKey={refreshKey}
               onDone={refresh}
