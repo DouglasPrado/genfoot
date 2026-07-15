@@ -14,3 +14,12 @@ export const API_BASE_URL: string =
  * de login real; aqui, para iterar visual, abre-se uma sessão de dev.
  */
 export const DEV_SUBJECT = "mobile-dev-player";
+
+/**
+ * Mundo padrão consultado pelo app. Configurável via EXPO_PUBLIC_WORLD_ID.
+ * O default aponta para o mundo demo semeado localmente (create → genesis →
+ * activate; ver apps/api/scripts/seed-demo-world.mjs). Quando o mundo não
+ * existe/está indisponível, as telas caem no estado apropriado (sem dado vivo).
+ */
+export const DEFAULT_WORLD_ID: string =
+  process.env.EXPO_PUBLIC_WORLD_ID ?? "019f65eb-9ba4-707d-aa7c-426ceb5ea41b";
