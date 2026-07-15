@@ -8,9 +8,11 @@ import {
 } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import { SeededRandom } from "../foundation/seeded-random.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type {
-  MatchOutcome} from "./narrative-types.js";
+  MatchOutcome,
+  SupporterBaseChangedEvent} from "./narrative-types.js";
 import {
   CrisisStatus,
   FanbaseSegment,
@@ -41,6 +43,25 @@ const INITIAL_SEGMENTS: readonly SegmentSatisfaction[] = [
   { segment: FanbaseSegment.CASUAL, satisfaction: 50, reactivity: 40 },
 ];
 const DEFAULT_REPUTATION = 50;
+/** Piso do headcount da torcida — um rebranding nunca zera a torcida. */
+const MIN_FANBASE_SIZE = 500;
+
+/**
+ * Semente determinística do tamanho da torcida a partir do porte do clube
+ * (banda de reputação + capacidade do estádio). Pura — usada tanto para o
+ * default da projeção quanto como base do primeiro fato de rebranding.
+ */
+export function seedFanbaseSize(
+  reputationBand: number,
+  stadiumCapacity: number,
+): number {
+  const rep = Number.isFinite(reputationBand) ? Math.max(0, reputationBand) : 0;
+  const capacity =
+    Number.isFinite(stadiumCapacity) && stadiumCapacity > 0
+      ? Math.floor(stadiumCapacity)
+      : 10_000;
+  return Math.floor(capacity * (8 + rep * 4));
+}
 
 export class WorldNarrative {
   private constructor(private state: WorldNarrativeSnapshot) {}
@@ -134,6 +155,84 @@ export class WorldNarrative {
       clubId: input.clubId,
       factId: input.factId,
       overall,
+      factors,
+      worldDate: date.value.toString(),
+      rulesetVersion: input.rulesetVersion,
+      idempotencyKey: input.idempotencyKey,
+    };
+    this.state = {
+      ...this.state,
+      fanbases: this.upsertFanbase(fanbase),
+      appliedFactIds: [...this.state.appliedFactIds, input.factId],
+      events: [...this.state.events, event],
+      revision: this.state.revision + 1,
+    };
+    return succeed(fanbase);
+  }
+
+  /**
+   * Consome o fato oficial `ClubRebranded` (de C3): reduz o tamanho da torcida
+   * do clube de 10 a 15% de forma determinística e emite `SupporterBaseChanged`.
+   * Idempotente por `factId`. `baseSize` (semente derivada do porte do clube por
+   * quem tem acesso a C3) é usado apenas se o clube ainda não tem tamanho gravado.
+   */
+  public applyRebrandFact(
+    input: Readonly<{
+      factId: string;
+      clubId: NarrativeClubRef;
+      baseSize: number;
+      changedFields?: readonly string[];
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Result<ClubFanbaseSnapshot, DomainError> {
+    if (input.rulesetVersion !== this.state.rulesetVersion) {
+      return fail(rulesetMismatch());
+    }
+    if (this.state.appliedFactIds.includes(input.factId)) {
+      return succeed(this.fanbaseFor(input.clubId));
+    }
+    const date = WorldDate.parse(input.worldDate);
+    if (!date.ok) return date;
+    const current = this.fanbaseFor(input.clubId);
+    const currentSize =
+      current.fanbaseSize ?? Math.max(0, Math.floor(input.baseSize));
+    // Queda determinística em [100, 150] permille = 10,0%–15,0%.
+    const dropPermille = new SeededRandom({
+      worldSeed: input.worldSeed,
+      context: `rebrand-drop:${input.factId}`,
+    }).nextInt(100, 151);
+    const newSize = Math.max(
+      MIN_FANBASE_SIZE,
+      Math.floor((currentSize * (1000 - dropPermille)) / 1000),
+    );
+    const fanbase: ClubFanbaseSnapshot = {
+      ...current,
+      clubId: input.clubId,
+      fanbaseSize: newSize,
+    };
+    const factors = [
+      "reason:REBRAND",
+      `dropPermille:${dropPermille}`,
+      `previousSize:${currentSize}`,
+      ...(input.changedFields ?? []).map((field) => `changed:${field}`),
+    ];
+    const event: SupporterBaseChangedEvent = {
+      id: this.eventId(
+        input.worldSeed,
+        `supporter-base:${input.idempotencyKey}`,
+        date.value.toString(),
+      ),
+      type: "SupporterBaseChanged",
+      gameWorldId: this.state.gameWorldId,
+      clubId: input.clubId,
+      factId: input.factId,
+      previousSize: currentSize,
+      newSize,
+      dropPermille,
+      reason: "REBRAND",
       factors,
       worldDate: date.value.toString(),
       rulesetVersion: input.rulesetVersion,

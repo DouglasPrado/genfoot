@@ -1371,6 +1371,7 @@ const worldNarrativeSchema = z.object({
         }),
       ),
       overall: z.number().int().min(0).max(100),
+      fanbaseSize: z.number().int().nonnegative().optional(),
     }),
   ),
   reputation: z.array(

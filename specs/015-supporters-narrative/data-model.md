@@ -3,7 +3,7 @@
 | Entity           | Fields                                     | Rules                 |
 | ---------------- | ------------------------------------------ | --------------------- |
 | SupporterSegment | clubId, kind, size, weights, patience      | perfis versionados    |
-| FanbaseSnapshot  | asOf, segmentScores, overall, factors      | 0–100, derivado       |
+| FanbaseSnapshot  | asOf, segmentScores, overall, factors, fanbaseSize | 0–100 (scores); `fanbaseSize` é headcount inteiro ≥ piso |
 | Expectation      | subject, capturedAt, expectedBand          | anterior ao fato      |
 | Rivalry          | clubs, intensity, history                  | simétrica e histórica |
 | Reputation       | subject, dimensions, score, asOf           | mudança explicável    |
@@ -16,3 +16,5 @@
 Promise: PROPOSED -> ACTIVE -> FULFILLED | BROKEN | CANCELLED
 Crisis: WATCH -> OPEN -> RECOVERY -> RESOLVED
 ```
+
+`fanbaseSize` (headcount): semeado por `seedFanbaseSize(reputationBand, stadiumCapacity)`; um `ClubRebranded` reduz `fanbaseSize` em 10–15% (permilagem determinística por `worldSeed`+`factId`), respeitando um piso mínimo; idempotente por `factId`. Emite `SupporterBaseChanged`.

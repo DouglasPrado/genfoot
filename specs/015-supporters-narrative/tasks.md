@@ -55,6 +55,17 @@
 - **DELIVERED**: US1 (satisfação determinística/idempotente por factId), US2 (promessas avaliadas uma vez + cancelamento com prazo + conversa/mídia com opções aprovadas) e US3 (ciclo de crise open→recovery→resolved). Rivalidades simétricas. Adapter schemaVersion 14.
 - **Nota**: C10 não tem autoridade competitiva; consome apenas fatos oficiais versionados de C7/C8/C9 (transporte por X-002).
 
+## US-rebrand — Reação da torcida ao rebranding (delta aditivo)
+
+Consome o fato `ClubRebranded` (C3) e reduz o headcount da torcida 10–15%.
+
+- [x] T021 Tipos: `fanbaseSize?` em `ClubFanbaseSnapshot` e evento `SupporterBaseChanged` em `packages/core/src/narrative/narrative-types.ts`.
+- [x] T022 Aggregate: `WorldNarrative.applyRebrandFact` (queda determinística 10–15% via `SeededRandom`, piso mínimo, idempotência por `factId`) + função pura `seedFanbaseSize` em `world-narrative.ts`.
+- [x] T023 Use case: `ApplyNarrativeRebrandFact` e `InspectNarrative.world()` em `narrative-use-cases.ts`.
+- [x] T024 Persistência: `fanbaseSize` opcional no schema Zod de `fanbases` (`json-world-repository.ts`).
+- [x] T025 Orquestração API (C3→C10): `apps/api/src/commands/rebrand-reaction.ts` disparado no handler `club:command` após `UpdateClubVisualIdentity`; projeção `narrative` compõe `fanbaseSize` por clube (`apps/api/src/queries/narrative-projection.ts`).
+- [x] T026 Testes: `packages/core/tests/narrative/club-rebrand.test.ts` (queda, determinismo, idempotência, piso, semente) + e2e `apps/api/test/club-customization.e2e.test.ts` (queda visível na projeção narrative).
+
 ## Notes
 
 - C10 não tem autoridade competitiva; consome apenas fatos oficiais versionados.

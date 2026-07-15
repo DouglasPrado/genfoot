@@ -9,13 +9,14 @@ import {
   InspectLedger,
   InspectMarket,
   InspectMatches,
-  InspectNarrative,
   InspectPlayerLifecycle,
   InspectStaff,
   InspectWorldScheduler,
 } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import type { DomainError, GameWorldId, Result } from "@grinta/shared";
+
+import { composeNarrativeProjection } from "./narrative-projection.js";
 
 /**
  * Registry de queries do X-003. Cada tipo mapeia para um caso de uso de inspeção
@@ -43,7 +44,7 @@ const handlers: Record<string, QueryHandler> = {
   staff: (repository, worldId) =>
     new InspectStaff(repository).summary(worldId),
   narrative: (repository, worldId) =>
-    new InspectNarrative(repository).summary(worldId),
+    composeNarrativeProjection(repository, worldId),
   inbox: (repository, worldId) =>
     new InspectInbox(repository).summary(worldId),
   admin: (repository, worldId) =>

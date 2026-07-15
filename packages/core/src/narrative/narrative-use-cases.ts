@@ -94,6 +94,28 @@ export class ApplyNarrativeFact {
   }
 }
 
+export class ApplyNarrativeRebrandFact {
+  public constructor(private readonly repository: NarrativeRepository) {}
+
+  public execute(
+    gameWorldId: GameWorldId,
+    input: Readonly<{
+      factId: string;
+      clubId: NarrativeClubRef;
+      baseSize: number;
+      changedFields?: readonly string[];
+      rulesetVersion: RulesetVersion;
+      idempotencyKey: string;
+      worldSeed: string;
+      worldDate: string;
+    }>,
+  ): Promise<Result<ClubFanbaseSnapshot, DomainError>> {
+    return mutate(this.repository, gameWorldId, (narrative) =>
+      narrative.applyRebrandFact(input),
+    );
+  }
+}
+
 export class MakePublicPromise {
   public constructor(private readonly repository: NarrativeRepository) {}
 
@@ -249,5 +271,12 @@ export class InspectNarrative {
   ): Promise<Result<NarrativeSummary, DomainError>> {
     const loaded = await loadNarrative(this.repository, gameWorldId);
     return loaded.ok ? succeed(loaded.value.summary()) : loaded;
+  }
+
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldNarrativeSnapshot, DomainError>> {
+    const loaded = await loadNarrative(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
   }
 }

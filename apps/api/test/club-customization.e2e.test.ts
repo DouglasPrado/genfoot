@@ -9,12 +9,16 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { seedFanbaseSize } from "@grinta/core";
+
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
 
 interface ClubSnapshot {
   readonly id: string;
   readonly version: number;
+  readonly reputationBand: number;
+  readonly stadium: { readonly capacity: number };
   readonly identity: {
     readonly name: string;
     readonly shortCode: string;
@@ -205,5 +209,25 @@ describe("API club customization (e2e)", () => {
         },
       });
     expect(response.body.status).toBe("REJECTED");
+  });
+
+  it("torcida do clube rebrandeado caiu 10–15% na projeção narrative", async () => {
+    // O clube [0] foi rebrandeado no primeiro teste (idempotencyKey cust-rebrand-1),
+    // disparando a reação da torcida (C10) via orquestração do handler.
+    const target = (await readClubs())[0]!;
+    const seed = seedFanbaseSize(target.reputationBand, target.stadium.capacity);
+
+    const narrative = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/narrative`,
+    );
+    expect(narrative.status).toBe(200);
+    const entry = (
+      narrative.body.data.clubs as { clubId: string; fanbaseSize: number }[]
+    ).find((candidate) => candidate.clubId === target.id);
+    expect(entry).toBeDefined();
+    // Queda determinística de 10–15% sobre a semente do clube.
+    expect(entry!.fanbaseSize).toBeLessThan(seed);
+    expect(entry!.fanbaseSize).toBeGreaterThanOrEqual(Math.floor(seed * 0.85) - 1);
+    expect(entry!.fanbaseSize).toBeLessThanOrEqual(Math.floor(seed * 0.9) + 1);
   });
 });

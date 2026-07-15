@@ -159,6 +159,7 @@ import {
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
+import { applyRebrandReaction } from "./rebrand-reaction.js";
 
 export interface CommandOutcome {
   readonly resource: string | null;
@@ -509,6 +510,15 @@ const handlers: Record<string, CommandHandler> = {
     } as ClubCommand;
     const result = await new ExecuteClubCommand(repository).execute(command);
     if (!result.ok) return result;
+    // Rebranding (C3) → reação da torcida (C10): queda de 10–15% no headcount.
+    if (parsed.data.command.type === "UpdateClubVisualIdentity") {
+      await applyRebrandReaction(
+        repository,
+        worldId.value,
+        parsed.data.clubId,
+        envelope.idempotencyKey,
+      );
+    }
     return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 

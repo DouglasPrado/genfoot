@@ -60,6 +60,12 @@ export interface ClubFanbaseSnapshot {
   readonly clubId: NarrativeClubRef;
   readonly segments: readonly SegmentSatisfaction[];
   readonly overall: number;
+  /**
+   * Tamanho da torcida (headcount). Ausente enquanto o clube nunca teve um fato
+   * que o defina; a projeção usa a semente por clube (reputação + estádio) como
+   * default nesse caso. Um rebranding reduz esse valor de 10 a 15%.
+   */
+  readonly fanbaseSize?: number;
 }
 
 export interface ClubReputationSnapshot {
@@ -188,8 +194,26 @@ export interface MediaStoryPublishedEvent {
   readonly idempotencyKey: string;
 }
 
+export interface SupporterBaseChangedEvent {
+  readonly id: NarrativeEventId;
+  readonly type: "SupporterBaseChanged";
+  readonly gameWorldId: GameWorldId;
+  readonly clubId: NarrativeClubRef;
+  readonly factId: string;
+  readonly previousSize: number;
+  readonly newSize: number;
+  /** Queda aplicada em permilagem (100–150 = 10,0%–15,0%). */
+  readonly dropPermille: number;
+  readonly reason: "REBRAND";
+  readonly factors: readonly string[];
+  readonly worldDate: string;
+  readonly rulesetVersion: RulesetVersion;
+  readonly idempotencyKey: string;
+}
+
 export type NarrativeDomainEvent =
   | SupporterSatisfactionChangedEvent
+  | SupporterBaseChangedEvent
   | PromiseMadeEvent
   | PromiseSettledEvent
   | ReputationChangedEvent
