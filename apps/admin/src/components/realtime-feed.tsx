@@ -15,6 +15,7 @@ interface FeedEvent {
   readonly eventType: string;
   readonly occurredAt: string;
   readonly correlationId: string;
+  readonly payload?: { commandType?: string };
 }
 
 type Status = "connecting" | "live" | "offline";
@@ -98,6 +99,11 @@ export function RealtimeFeed({ worldId }: { worldId: string }) {
                 <span className="font-medium text-sm text-foreground">
                   {event.eventType}
                 </span>
+                {event.payload?.commandType ? (
+                  <span className="mono text-[11px] text-muted-foreground">
+                    {event.payload.commandType}
+                  </span>
+                ) : null}
                 <span className="mono ml-auto text-[11px] text-muted-foreground">
                   {event.occurredAt.slice(11, 19)}
                 </span>

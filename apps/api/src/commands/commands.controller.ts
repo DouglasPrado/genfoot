@@ -204,14 +204,23 @@ export class CommandsController {
       resource: result.value.resource ?? undefined,
     });
 
-    // Acelera a entrega dos eventos de domínio via realtime (não autoritativo).
-    const mutation = result.value.mutation;
-    if (mutation && envelope.worldId !== undefined) {
-      this.realtime.publish(
-        envelope.worldId,
-        envelope.correlationId,
-        mutation.events as unknown as Record<string, unknown>[],
-      );
+    // Realtime (não autoritativo): publica os eventos de domínio quando houver,
+    // e sempre um CommandAccepted — assim o feed reflete toda a atividade do mundo.
+    if (envelope.worldId !== undefined) {
+      const mutation = result.value.mutation;
+      const domainEvents =
+        mutation !== undefined
+          ? (mutation.events as unknown as Record<string, unknown>[])
+          : [];
+      this.realtime.publish(envelope.worldId, envelope.correlationId, [
+        {
+          type: "CommandAccepted",
+          commandType: envelope.commandType,
+          resource: result.value.resource ?? null,
+          commandId,
+        },
+        ...domainEvents,
+      ]);
     }
 
     return {
