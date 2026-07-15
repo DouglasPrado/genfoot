@@ -32,26 +32,11 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }}
-      />
-      <Tabs.Screen
-        name="partidas"
-        options={{ title: "PARTIDAS", tabBarIcon: tabIcon("football") }}
-      />
-      <Tabs.Screen
-        name="eventos"
-        options={{ title: "EVENTOS", tabBarIcon: tabIcon("trophy") }}
-      />
-      <Tabs.Screen
-        name="noticias"
-        options={{ title: "NOTÍCIAS", tabBarIcon: tabIcon("newspaper") }}
-      />
-      <Tabs.Screen
-        name="mensagens"
-        options={{ title: "MENSAGENS", tabBarIcon: tabIcon("mail") }}
-      />
+      <Tabs.Screen name="index" options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }} />
+      <Tabs.Screen name="elenco" options={{ title: "ELENCO", tabBarIcon: tabIcon("people") }} />
+      <Tabs.Screen name="partidas" options={{ title: "PARTIDAS", tabBarIcon: tabIcon("football") }} />
+      <Tabs.Screen name="mercado" options={{ title: "MERCADO", tabBarIcon: tabIcon("cart") }} />
+      <Tabs.Screen name="clube" options={{ title: "CLUBE", tabBarIcon: tabIcon("shield") }} />
     </Tabs>
   );
 }
