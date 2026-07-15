@@ -43,6 +43,29 @@
 - [x] T018 [P] Cache de query com scope/version imutável (`QueryCache` em `@grinta/api-client`: segregado por scopeKey, monotônico por projectionVersion, `clearScope` na troca) + testes
 - [ ] T019 Rodar quickstart (pnpm typecheck && pnpm test) e promover evidência
 
+## Phase 7: Transporte oficial (API + SDK) — habilita clientes reais (FR-002)
+
+- [x] T020 API NestJS `apps/api` `/api/v1`: command endpoint (envelope idempotente), query envelope, erro-padrão, catálogo — 136 commands + 14 queries (X-003 contracts)
+- [x] T021 Auth/sessão + RBAC (guard global, `/auth/session`, admin:* → 403) e realtime Socket.IO com handshake + gap recovery (FR-012/FR-004)
+- [x] T022 `@grinta/api-client` (SDK tipado: session/command/query/catalog/validation + `GrintaApiError`) e `@grinta/design-system` (tokens do protótipo + risco) — testados
+- [x] T023 Endpoint `POST /validation/run` (VAL-001) para o Laboratório
+
+## Phase 8: Admin operacional — fluxos AF-01..10 (US3)
+
+- [x] T024 [US3] AF-00/01/02 Painel: acesso/RBAC/seleção de mundo + saúde (demografia/estrutura) + feed realtime + ações rápidas
+- [x] T025 [US3] AF-03/04/05/06/07 Moderação: C12 com formulários reais (`CommandForm`+`command-specs`) — risco, caso, quarentena, sanção (quatro-olhos), correção, reprocessamento, recurso, suporte; confirmação de risco + reauth
+- [x] T026 [US3] AF-08 Competições/fim de temporada: view + registrar resultado + homologar; economia (ledger) e mercado com view + init
+- [x] T027 [US3] AF-09 Laboratório: rodar calibração + relatório (bandas/gate)
+- [ ] T028 [US3] AF-10 Versionamento de regras (ruleset) — depende de comando de ruleset no domínio (ausente hoje)
+
+## Phase 9: Cobertura de telas + mobile (FR-007/010/011) — pendente
+
+- [x] T029 Registro versionado das 138 telas (114 mobile + 24 admin) em `packages/core/src/clients/screen-registry.ts`: arquétipo canônico (L-M01..09 / L-A01..05) + risco + estados; testes provam 138/114/24, sem duplicata, todos com arquétipo (SC-003/FR-010)
+- [x] T030 12 estados obrigatórios por tela (initial-loading/empty/partial-stale/offline/processing/success/domain-error/technical-error/forbidden/conflict/expired/maintenance) herdados e testados (FR-007)
+- [ ] T031 [US1] App Expo `apps/mobile`: telas GP-001…GP-016 consumindo SDK + kernel + design system (T011/T012) — **não certificável headless; requer `expo start`**
+- [ ] T032 [US2] Transporte realtime do mobile via X-002 (sequence/resume token) — T015 (depende do app Expo)
+- [x] T033 Telemetria sem PII correlacionada por IDs seguros (`redactForTelemetry`/`commandTelemetry` em `@grinta/api-client`) + testes (FR-013)
+
 ## Implementation Strategy
 
 - **Incremento atual**: kernel de contrato de cliente (whitelist offline, tracking sem simular sucesso, realtime dedup/gap, intent TTL) — pura lógica testável, compartilhável entre mobile e admin.
