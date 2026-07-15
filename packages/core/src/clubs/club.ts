@@ -11,7 +11,9 @@ import type {
   ClubSnapshot,
   CommercialAgreementSnapshot,
   TicketPricePolicySnapshot,
+  VisualIdentitySnapshot,
 } from "./club-types.js";
+import { validateVisualIdentity } from "./visual-identity-catalog.js";
 
 export class Club {
   private constructor(private state: ClubSnapshot) {}
@@ -54,10 +56,17 @@ export class Club {
       effectiveOn: WorldDate;
       rulesetVersion: ClubSnapshot["identity"]["rulesetVersion"];
       identityId: ClubSnapshot["identity"]["id"];
+      visualIdentity?: VisualIdentitySnapshot;
     }>,
   ): Result<void, DomainError> {
     if (input.name.trim() === "" || !/^[A-Z0-9]{2,5}$/u.test(input.shortCode)) {
       return fail(invalidClub("Nome ou código do clube inválido."));
+    }
+    if (input.visualIdentity !== undefined) {
+      const invalid = validateVisualIdentity(input.visualIdentity);
+      if (invalid !== null) {
+        return fail(new DomainError("INVALID_VISUAL_IDENTITY", invalid));
+      }
     }
     const effectiveOn = input.effectiveOn.toString();
     if (effectiveOn <= this.state.identity.effectiveFrom) {
@@ -76,6 +85,11 @@ export class Club {
       effectiveFrom: effectiveOn,
       effectiveThrough: null,
       rulesetVersion: input.rulesetVersion,
+      ...(input.visualIdentity !== undefined
+        ? { visualIdentity: input.visualIdentity }
+        : this.state.identity.visualIdentity !== undefined
+          ? { visualIdentity: this.state.identity.visualIdentity }
+          : {}),
     } as const;
     this.state = {
       ...this.state,

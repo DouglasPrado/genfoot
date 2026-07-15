@@ -592,6 +592,16 @@ const clubPortfolioSchema = z.object({
           effectiveFrom: z.string(),
           effectiveThrough: z.string().nullable(),
           rulesetVersion: z.string(),
+          visualIdentity: z
+            .object({
+              primaryColor: z.string(),
+              secondaryColor: z.string(),
+              tertiaryColor: z.string().nullable(),
+              homeKitTemplateId: z.string(),
+              awayKitTemplateId: z.string(),
+              crestTemplateId: z.string(),
+            })
+            .optional(),
         }),
         identityHistory: z.array(z.record(z.unknown())),
         departments: z.array(z.record(z.unknown())),

@@ -39,6 +39,20 @@ Como mantenedor, quero evoluir o domínio preservando histórico, compatibilidad
 1. **Given** falha após persistência parcial, **When** o processamento é retomado, **Then** continua do checkpoint sem duplicar efeitos.
 2. **Given** versão/ruleset incompatível, **When** uma mutação é solicitada, **Then** falha de modo tipado sem alterar estado.
 
+### User Story 3 — Personalizar a identidade do clube (Priority: P2)
+
+Como dono do clube, quero personalizar nome, cores (primária/secundária/terciária) e os modelos de camisa e escudo, para expressar a identidade visual do clube — sabendo que uma mudança brusca comunica-se à torcida.
+
+**Why this priority**: entrega a superfície de identidade visual (cosmética) sobre o modelo temporal de identidade já existente, sem tocar em estado competitivo.
+
+**Independent Test**: um rebranding válido abre um novo período de identidade com a identidade visual escolhida e emite `ClubRebranded`; um nome já usado por outro clube do mundo é rejeitado.
+
+**Acceptance Scenarios**
+
+1. **Given** um clube ativo, **When** o dono confirma `UpdateClubVisualIdentity` com nome inédito e paleta/modelos válidos, **Then** a identidade visual é persistida, um novo período de identidade abre e `ClubRebranded` é emitido com os campos alterados.
+2. **Given** dois clubes no mesmo mundo, **When** um tenta assumir o nome (normalizado, case-insensitive) do outro, **Then** o comando é rejeitado com `CLUB_NAME_ALREADY_TAKEN` sem alterar estado.
+3. **Given** uma paleta com cor malformada, modelo desconhecido ou cor terciária ausente para um modelo de 3 cores, **When** o comando é submetido, **Then** falha com `INVALID_VISUAL_IDENTITY` sem alterar estado.
+
 ### Edge Cases
 
 - comando duplicado, concorrente ou fora de ordem;
@@ -48,7 +62,7 @@ Como mantenedor, quero evoluir o domínio preservando histórico, compatibilidad
 
 ## Scope & Boundaries
 
-**Included**: Club, Squad, departamentos, estádio, peças de infraestrutura, comercial, diretoria, manutenção e projetos.
+**Included**: Club, Squad, departamentos, estádio, peças de infraestrutura, comercial, diretoria, manutenção, projetos e identidade visual cosmética (nome, cores, camisas e escudo) com unicidade de nome no mundo.
 
 **Excluded**: contratos de jogador/staff (C6/C5), saldo/reserva (C9), sanções administrativas (C12).
 
@@ -70,6 +84,8 @@ Como mantenedor, quero evoluir o domínio preservando histórico, compatibilidad
 - **FR-004** Níveis de estrutura devem respeitar capacidade, tempo, manutenção, deterioração e dependências.
 - **FR-005** Obras devem seguir SAGA-04 e não confirmar etapa financeira sem fato de C9.
 - **FR-006** Governança deve registrar decisão, autor, justificativa e vigência.
+- **FR-007** A identidade do clube deve suportar identidade visual cosmética (cores primária/secundária/terciária em hex, modelo de camisa 1, camisa 2 e escudo por id de catálogo), versionada junto do período de identidade. Cores e modelos devem ser validados; a cor terciária é obrigatória se — e só se — algum modelo escolhido usa 3 cores.
+- **FR-008** O nome do clube deve ser único no mundo (normalizado, case-insensitive). Alterações de identidade que colidem são rejeitadas de modo tipado sem alterar estado. Um rebranding emite o fato oficial `ClubRebranded` (consumido por C10 para reação da torcida).
 
 ### Domain Rules and Invariants
 
@@ -99,6 +115,7 @@ Aliases seguem C1…C12 e concerns do `source-map.md`. Não há conflito aberto;
 - **SC-002**: replay com mesma entrada, seed e ruleset produz os mesmos hashes aplicáveis.
 - **SC-003**: 100% das escritas carregam `worldId`, versão esperada e chave idempotente.
 - **SC-004**: evidências atuais e pendentes permanecem separadas; ausência de prova resulta em pendência.
+- **SC-005**: rebranding válido persiste identidade visual e emite `ClubRebranded`; nome duplicado e paleta inválida são rejeitados sem efeito colateral; a identidade visual sobrevive ao round-trip de persistência.
 
 ## Assumptions
 

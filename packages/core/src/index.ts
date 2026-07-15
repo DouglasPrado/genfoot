@@ -1,6 +1,7 @@
 export * from "./foundation/deterministic-uuid.js";
 export * from "./foundation/seeded-random.js";
 export * from "./clubs/club-bootstrap.js";
+export * from "./clubs/visual-identity-catalog.js";
 export * from "./clubs/club-maintenance.js";
 export * from "./clubs/club-repository.js";
 export * from "./clubs/club-types.js";

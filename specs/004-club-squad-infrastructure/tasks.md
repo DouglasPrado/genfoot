@@ -95,6 +95,17 @@
 
 ---
 
+## US3 — Personalização visual do clube (contract 1.1.0)
+
+Delta aditivo entregue sobre o modelo temporal de identidade. Escopo: identidade visual cosmética (cores + modelos de camisa/escudo) e unicidade de nome no mundo. O fato `ClubRebranded` é consumido por C10 (spec 015).
+
+- [x] T037 [P] Catálogo de modelos (ruleset): `packages/core/src/clubs/visual-identity-catalog.ts` — `KIT_TEMPLATES`/`CREST_TEMPLATES` (grupos de 2/3 cores), `validateVisualIdentity`. Exportado em `packages/core/src/index.ts`.
+- [x] T038 Tipos e comando: `VisualIdentitySnapshot`, campo opcional em `ClubIdentityPeriodSnapshot`, comando `UpdateClubVisualIdentity` em `packages/core/src/clubs/club-types.ts`.
+- [x] T039 Aggregate/entidade: `Club.updateIdentity` valida e versiona a identidade visual (`club.ts`); `world-club-portfolio.ts` aplica unicidade de nome (`CLUB_NAME_ALREADY_TAKEN`), mapeia `ClubRebranded` e monta o payload do fato (previous/new + `changedFields`).
+- [x] T040 Persistência: schema Zod do bloco `identity` estendido com `visualIdentity` opcional em `packages/persistence/src/json-world-repository.ts` (preserva no round-trip).
+- [x] T041 [P] Testes de domínio/use-case: `packages/core/tests/clubs/club-visual-identity.test.ts` (rebrand, unicidade case-insensitive, paleta inválida, idempotência, `validateVisualIdentity`).
+- [x] T042 Teste e2e de API: `apps/api/test/club-customization.e2e.test.ts` (comando via HTTP, unicidade, paleta inválida, round-trip da identidade visual na projeção `club`). Handler `club:command` é genérico — sem mudança de controller.
+
 ## Dependencies and execution order
 
 - Phase 1 precedes all implementation because it freezes the public contract.

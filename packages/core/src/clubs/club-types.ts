@@ -35,6 +35,21 @@ export const StadiumLicenseStatus = {
 export type StadiumLicenseStatus =
   (typeof StadiumLicenseStatus)[keyof typeof StadiumLicenseStatus];
 
+/**
+ * Identidade visual do clube (cosmética). As cores são hex `#RRGGBB` e os
+ * `templateId`s referenciam o catálogo (`visual-identity-catalog.ts`). É
+ * versionada junto do período de identidade — cada rebranding abre um novo
+ * período com sua própria identidade visual, preservando o histórico.
+ */
+export interface VisualIdentitySnapshot {
+  readonly primaryColor: string;
+  readonly secondaryColor: string;
+  readonly tertiaryColor: string | null;
+  readonly homeKitTemplateId: string;
+  readonly awayKitTemplateId: string;
+  readonly crestTemplateId: string;
+}
+
 export interface ClubIdentityPeriodSnapshot {
   readonly id: ClubIdentityPeriodId;
   readonly name: string;
@@ -42,6 +57,7 @@ export interface ClubIdentityPeriodSnapshot {
   readonly effectiveFrom: string;
   readonly effectiveThrough: string | null;
   readonly rulesetVersion: RulesetVersion;
+  readonly visualIdentity?: VisualIdentitySnapshot;
 }
 
 export interface ClubDepartmentSnapshot {
@@ -190,6 +206,13 @@ export type ClubCommand =
         type: "UpdateClubIdentity";
         name: string;
         shortCode: string;
+      }>)
+  | (ClubCommandBase &
+      Readonly<{
+        type: "UpdateClubVisualIdentity";
+        name: string;
+        shortCode: string;
+        visualIdentity: VisualIdentitySnapshot;
       }>)
   | (ClubCommandBase &
       Readonly<{

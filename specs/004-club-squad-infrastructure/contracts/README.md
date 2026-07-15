@@ -1,6 +1,6 @@
 # Contracts: Clube, elenco e infraestrutura
 
-**Version**: 1.0.0 · **Owner**: C3 · Clube/Estrutura · **Compatibility**: additive within major 1.
+**Version**: 1.1.0 · **Owner**: C3 · Clube/Estrutura · **Compatibility**: additive within major 1.
 
 ## Common command envelope
 
@@ -10,7 +10,8 @@ Every mutation carries `commandId`, `idempotencyKey`, `gameWorldId`, `clubId`, `
 
 | Command                        | Required payload                                                                          | Result / invariant                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `UpdateClubIdentity`           | `name`, `shortCode`                                                                       | Closes the previous identity period and opens one active period.                                         |
+| `UpdateClubIdentity`           | `name`, `shortCode`                                                                       | Closes the previous identity period and opens one active period. `name` must be unique in the world.     |
+| `UpdateClubVisualIdentity`     | `name`, `shortCode`, `visualIdentity` (`primaryColor`, `secondaryColor`, `tertiaryColor`, `homeKitTemplateId`, `awayKitTemplateId`, `crestTemplateId`) | Rebranding: opens a new identity period carrying the visual identity and emits `ClubRebranded`. `name` unique in the world; colors are `#RRGGBB`; template ids come from the visual-identity catalog; tertiary color required only if a chosen model uses 3 colors. |
 | `AssignSquadSlot`              | `squadId`, `playerId`, `slot`                                                             | One player per slot and one primary membership in the squad. Player remains an external C4/C6 reference. |
 | `RemoveSquadMember`            | `squadId`, `playerId`                                                                     | Removes only C3 membership; never changes player or contract.                                            |
 | `SetDepartmentPlan`            | `kind`, `targetLevel`, `capacity`                                                         | Level 1–10, one active plan per department and capacity within the level band.                           |
@@ -32,7 +33,9 @@ Every mutation carries `commandId`, `idempotencyKey`, `gameWorldId`, `clubId`, `
 
 Events carry `eventId`, `eventType`, `eventVersion=1`, `gameWorldId`, `aggregateId`, `aggregateVersion`, `occurredAt`, `rulesetVersion`, `correlationId`, `causationId` and payload.
 
-`ClubUpdated`, `SquadChanged`, `DepartmentPlanChanged`, `TicketPricePolicyChanged`, `CommercialDealSigned`, `BoardDecisionRecorded`, `InfrastructureProjectProposed`, `StadiumWorksApproved`, `FinancialReservationAcknowledged`, `ConstructionMilestoneReached`, `FacilityLicensed`, `StadiumWorksCompleted`, `ProjectCancelled`, `MaintenanceDue`.
+`ClubUpdated`, `ClubRebranded`, `SquadChanged`, `DepartmentPlanChanged`, `TicketPricePolicyChanged`, `CommercialDealSigned`, `BoardDecisionRecorded`, `InfrastructureProjectProposed`, `StadiumWorksApproved`, `FinancialReservationAcknowledged`, `ConstructionMilestoneReached`, `FacilityLicensed`, `StadiumWorksCompleted`, `ProjectCancelled`, `MaintenanceDue`.
+
+`ClubRebranded` payload carries `clubId`, `previousName`, `newName`, `previousShortCode`, `newShortCode`, `visualIdentity` and `changedFields`. It is the official fact C10 (Torcida/Narrativa) consumes to apply the fanbase reaction to a brand change.
 
 ## SAGA-04 ports
 
@@ -48,7 +51,7 @@ The simulator `--approve-all` harness implements these ports synthetically. It v
 
 ## Errors
 
-Stable codes include `CLUB_PORTFOLIO_NOT_FOUND`, `CLUB_NOT_FOUND`, `SQUAD_NOT_FOUND`, `CLUB_VERSION_CONFLICT`, `RULESET_VERSION_MISMATCH`, `IDEMPOTENCY_KEY_CONFLICT`, `SQUAD_CAPACITY_EXCEEDED`, `PLAYER_ALREADY_ASSIGNED`, `SQUAD_SLOT_OCCUPIED`, `COMMERCIAL_EXCLUSIVITY_CONFLICT`, `INFRASTRUCTURE_CONFLICT`, `PROJECT_NOT_FOUND`, `PROJECT_INVALID_TRANSITION`, `PROJECT_WAITING`, `PROJECT_RETRY_EXHAUSTED`, `PROJECT_MANUAL_REVIEW`, `PROJECT_LEASE_HELD`, `STALE_FENCING_TOKEN`, `FINANCING_PENDING` and `LICENSE_PENDING`.
+Stable codes include `CLUB_PORTFOLIO_NOT_FOUND`, `CLUB_NOT_FOUND`, `SQUAD_NOT_FOUND`, `CLUB_VERSION_CONFLICT`, `CLUB_NAME_ALREADY_TAKEN`, `INVALID_VISUAL_IDENTITY`, `RULESET_VERSION_MISMATCH`, `IDEMPOTENCY_KEY_CONFLICT`, `SQUAD_CAPACITY_EXCEEDED`, `PLAYER_ALREADY_ASSIGNED`, `SQUAD_SLOT_OCCUPIED`, `COMMERCIAL_EXCLUSIVITY_CONFLICT`, `INFRASTRUCTURE_CONFLICT`, `PROJECT_NOT_FOUND`, `PROJECT_INVALID_TRANSITION`, `PROJECT_WAITING`, `PROJECT_RETRY_EXHAUSTED`, `PROJECT_MANUAL_REVIEW`, `PROJECT_LEASE_HELD`, `STALE_FENCING_TOKEN`, `FINANCING_PENDING` and `LICENSE_PENDING`.
 
 Errors expose non-sensitive details and `retryable` semantics. A timeout is unknown outcome: callers query by idempotency key before retry.
 

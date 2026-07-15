@@ -20,6 +20,7 @@ import type {
   ClubCommandReceipt,
   ClubDomainEvent,
   ClubPortfolioSummary,
+  ClubSnapshot,
   WorldClubPortfolioSnapshot,
 } from "./club-types.js";
 
@@ -149,6 +150,25 @@ export class WorldClubPortfolio {
       if (current.version !== command.expectedVersion) {
         return fail(versionConflict(command.expectedVersion, current.version));
       }
+      if (
+        command.type === "UpdateClubIdentity" ||
+        command.type === "UpdateClubVisualIdentity"
+      ) {
+        const taken = this.state.clubs.some(
+          (other) =>
+            other.id !== command.clubId &&
+            normalizeClubName(other.identity.name) ===
+              normalizeClubName(command.name),
+        );
+        if (taken) {
+          return fail(
+            new DomainError(
+              "CLUB_NAME_ALREADY_TAKEN",
+              "Já existe um clube com esse nome neste mundo.",
+            ),
+          );
+        }
+      }
       const loaded = Club.fromSnapshot(current);
       if (!loaded.ok) return loaded;
       const identifiers = this.commandIdentifiers(command);
@@ -157,7 +177,19 @@ export class WorldClubPortfolio {
       clubs[clubIndex] = loaded.value.snapshot();
       aggregateVersion = clubs[clubIndex].version;
       eventType = eventFor(command.type);
-      result = { clubId: command.clubId, type: command.type };
+      result =
+        command.type === "UpdateClubVisualIdentity"
+          ? {
+              clubId: command.clubId,
+              type: command.type,
+              previousName: current.identity.name,
+              newName: command.name.trim(),
+              previousShortCode: current.identity.shortCode,
+              newShortCode: command.shortCode,
+              visualIdentity: command.visualIdentity,
+              changedFields: rebrandChangedFields(current, command),
+            }
+          : { clubId: command.clubId, type: command.type };
     }
 
     const portfolioRevision = this.state.revision + 1;
@@ -533,6 +565,19 @@ function mutateClub(
           })
         : date;
     }
+    case "UpdateClubVisualIdentity": {
+      const date = WorldDate.parse(command.occurredAt);
+      return date.ok
+        ? club.updateIdentity({
+            name: command.name,
+            shortCode: command.shortCode,
+            effectiveOn: date.value,
+            rulesetVersion: command.rulesetVersion,
+            identityId: ids.identity,
+            visualIdentity: command.visualIdentity,
+          })
+        : date;
+    }
     case "SetDepartmentPlan":
       return club.setDepartmentPlan(command);
     case "SetTicketPrices":
@@ -569,6 +614,7 @@ function mutateClub(
 function eventFor(type: ClubCommand["type"]): string {
   return {
     UpdateClubIdentity: "ClubUpdated",
+    UpdateClubVisualIdentity: "ClubRebranded",
     AssignSquadSlot: "SquadChanged",
     RemoveSquadMember: "SquadChanged",
     SetDepartmentPlan: "DepartmentPlanChanged",
@@ -576,6 +622,42 @@ function eventFor(type: ClubCommand["type"]): string {
     SignCommercialDeal: "CommercialDealSigned",
     RecordBoardDecision: "BoardDecisionRecorded",
   }[type];
+}
+
+/** Normaliza o nome do clube para checagem de unicidade no mundo. */
+function normalizeClubName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/gu, " ");
+}
+
+/** Lista quais campos da identidade mudaram no rebranding (auditoria / C10). */
+function rebrandChangedFields(
+  current: ClubSnapshot,
+  command: Extract<ClubCommand, { type: "UpdateClubVisualIdentity" }>,
+): readonly string[] {
+  const changed: string[] = [];
+  if (current.identity.name !== command.name.trim()) changed.push("name");
+  if (current.identity.shortCode !== command.shortCode) {
+    changed.push("shortCode");
+  }
+  const previous = current.identity.visualIdentity;
+  const next = command.visualIdentity;
+  if (previous?.primaryColor !== next.primaryColor) changed.push("primaryColor");
+  if (previous?.secondaryColor !== next.secondaryColor) {
+    changed.push("secondaryColor");
+  }
+  if ((previous?.tertiaryColor ?? null) !== next.tertiaryColor) {
+    changed.push("tertiaryColor");
+  }
+  if (previous?.homeKitTemplateId !== next.homeKitTemplateId) {
+    changed.push("homeKitTemplateId");
+  }
+  if (previous?.awayKitTemplateId !== next.awayKitTemplateId) {
+    changed.push("awayKitTemplateId");
+  }
+  if (previous?.crestTemplateId !== next.crestTemplateId) {
+    changed.push("crestTemplateId");
+  }
+  return changed;
 }
 
 function versionConflict(expectedVersion: number, actualVersion: number) {

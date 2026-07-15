@@ -11,6 +11,8 @@ World-scoped persistence boundary with `schemaVersion=1`, `gameWorldId`, `rulese
 `id`, current identity, immutable identity periods, `regionId`, reputation band, status, departments, stadium, ticket policies, commercial agreements, board decisions and `version`.
 
 - Exactly one identity period is open.
+- The active club name is unique within the world (normalized, case-insensitive).
+- An identity period optionally carries a **VisualIdentity** (cosmetic): `primaryColor`, `secondaryColor`, `tertiaryColor` (hex `#RRGGBB`, tertiary nullable), and `homeKitTemplateId`, `awayKitTemplateId`, `crestTemplateId` referencing the visual-identity catalog. Tertiary color is required only if a chosen model uses 3 colors. Rebranding opens a new period carrying the new VisualIdentity, preserving history, and emits `ClubRebranded`.
 - Department level is 1–10; condition is 0–100; target level cannot skip dependencies.
 - Stadium capacity is a positive safe integer; condition is 0–100; `OPERATING` requires approved licensing.
 - Ticket prices are positive integer minor units.
