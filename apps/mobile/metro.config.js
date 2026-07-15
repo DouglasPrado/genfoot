@@ -22,4 +22,22 @@ config.resolver.nodeModulesPaths = [
 // react-native-helmet-async, dep do expo-router). Desligá-lo quebra o pnpm.
 config.resolver.unstable_enableSymlinks = true;
 
+// 4. React tem que ser UMA cópia só no bundle. Como o nodeModulesPaths inclui a
+// raiz do workspace (onde vivem react@19 + react-dom@19 do admin/guide), sem
+// isto algum `react` resolve lá em vez do React 18 do app — duas cópias = dois
+// `$$typeof`, e o RN quebra com "Objects are not valid as a React child".
+// Fixamos react/react-dom (e subpaths, ex. react/jsx-runtime) na cópia local.
+// NÃO incluir `react-native`: só existe no app (não duplica) e no web o Expo
+// precisa aliasá-lo para react-native-web por plataforma — pinar quebraria.
+const SINGLETONS = ["react", "react-dom"];
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  for (const pkg of SINGLETONS) {
+    if (moduleName === pkg || moduleName.startsWith(`${pkg}/`)) {
+      const pinned = path.join(projectRoot, "node_modules", moduleName);
+      return context.resolveRequest(context, pinned, platform);
+    }
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;
