@@ -23,13 +23,19 @@ const BOT_R = 98;
 const TOP_Y = 4;
 const BOT_Y = 136;
 
-/** Projeta coords normalizadas do slot no trapézio em perspectiva. */
+// Sem compressão: jogadores espalhados por todo o campo (distantes).
+const COMPRESS_Y = 1;
+const COMPRESS_X = 1;
+
+/** Projeta coords normalizadas do slot no trapézio em perspectiva (comprimido). */
 function project(nx: number, ny: number): { xv: number; yv: number; depth: number } {
-  const yv = lerp(TOP_Y, BOT_Y, ny);
-  const leftX = lerp(TOP_L, BOT_L, ny);
-  const rightX = lerp(TOP_R, BOT_R, ny);
-  const xv = leftX + nx * (rightX - leftX);
-  return { xv, yv, depth: ny };
+  const nyc = 0.5 + (ny - 0.5) * COMPRESS_Y;
+  const nxc = 0.5 + (nx - 0.5) * COMPRESS_X;
+  const yv = lerp(TOP_Y, BOT_Y, nyc);
+  const leftX = lerp(TOP_L, BOT_L, nyc);
+  const rightX = lerp(TOP_R, BOT_R, nyc);
+  const xv = leftX + nxc * (rightX - leftX);
+  return { xv, yv, depth: nyc };
 }
 
 function stripe(y0: number, y1: number, fill: string) {
@@ -48,8 +54,8 @@ function Field() {
     <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 140" preserveAspectRatio="none">
       <Defs>
         <LinearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#2b6a41" />
-          <Stop offset="1" stopColor="#3a8354" />
+          <Stop offset="0" stopColor="#3fa85f" />
+          <Stop offset="1" stopColor="#55c878" />
         </LinearGradient>
       </Defs>
       <Polygon points={`${TOP_L},${TOP_Y} ${TOP_R},${TOP_Y} ${BOT_R},${BOT_Y} ${BOT_L},${BOT_Y}`} fill="url(#grass)" />
@@ -93,7 +99,7 @@ function Token({
 }) {
   const tint = GROUP_TINT[slot.group];
   const { xv, yv, depth } = project(slot.x, slot.y);
-  const scale = lerp(0.82, 1.14, depth);
+  const scale = lerp(0.9, 1.16, depth);
   const fit = player?.fitness ?? 0;
   return (
     <Pressable
@@ -102,19 +108,19 @@ function Token({
       style={[styles.token, { left: `${xv}%`, top: `${(yv / 140) * 100}%`, transform: [{ scale }] }]}
     >
       <View style={[styles.photo, { borderColor: selected ? color.primary : tint }, selected ? styles.photoSelected : null]}>
-        <Icon name="person" size={20} color={color.textMuted} />
+        <Icon name="person" size={22} color={color.textMuted} />
         <View style={styles.numberBadge}>
           <Text style={styles.numberText}>{player?.number ?? "?"}</Text>
+        </View>
+        <View style={[styles.roleBadge, { borderColor: tint }]}>
+          <Text style={[styles.roleText, { color: tint }]}>{slot.role}</Text>
         </View>
         <View style={[styles.ovrBadge, { borderColor: tint }]}>
           <Text style={styles.ovrText}>{player?.ovr ?? "—"}</Text>
         </View>
       </View>
       <View style={styles.fitTrack}>
-        <View style={{ width: `${fit}%`, height: 3, backgroundColor: fitnessTint(fit), borderRadius: 2 }} />
-      </View>
-      <View style={[styles.roleChip, { borderColor: tint }]}>
-        <Text style={[styles.roleText, { color: tint }]}>{slot.role}</Text>
+        <View style={{ width: `${fit}%`, height: 4, backgroundColor: fitnessTint(fit), borderRadius: 2 }} />
       </View>
       <Text style={styles.name} numberOfLines={1}>
         {player ? player.name.split(" ").slice(-1)[0] : "—"}
@@ -156,12 +162,12 @@ export function Pitch({
   );
 }
 
-const TOKEN = 52;
-const PHOTO = 40;
+const TOKEN = 56;
+const PHOTO = 44;
 const styles = StyleSheet.create({
   pitch: {
     width: "100%",
-    aspectRatio: 100 / 140,
+    aspectRatio: 100 / 134,
     borderRadius: radius.lg,
     overflow: "hidden",
   },
@@ -186,47 +192,49 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -4,
     left: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 2,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 9.5,
+    paddingHorizontal: 3,
     backgroundColor: color.backgroundElevated,
     borderWidth: 1,
     borderColor: color.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  numberText: { color: color.text, fontSize: 9, fontWeight: fontWeight.black as "800" },
+  numberText: { color: color.text, fontSize: 11, fontWeight: fontWeight.black as "800" },
   ovrBadge: {
     position: "absolute",
-    bottom: -6,
-    minWidth: 22,
-    height: 15,
-    borderRadius: 7.5,
-    paddingHorizontal: 3,
+    bottom: -7,
+    minWidth: 26,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     backgroundColor: color.background,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  ovrText: { color: color.text, fontSize: 9, fontWeight: fontWeight.black as "800", fontStyle: "italic" },
-  fitTrack: { width: PHOTO - 6, height: 3, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 2, marginTop: 7, overflow: "hidden" },
-  roleChip: {
-    marginTop: 4,
-    borderRadius: 4,
+  ovrText: { color: color.text, fontSize: 11, fontWeight: fontWeight.black as "800", fontStyle: "italic" },
+  fitTrack: { width: PHOTO - 8, height: 4, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 2, marginTop: 5, overflow: "hidden" },
+  roleBadge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    borderRadius: 5,
     borderWidth: 1,
-    paddingHorizontal: 5,
+    paddingHorizontal: 3,
     paddingVertical: 1,
-    backgroundColor: "rgba(10,11,13,0.85)",
+    backgroundColor: "rgba(10,11,13,0.92)",
   },
   roleText: {
     fontSize: 8,
     fontWeight: fontWeight.black as "800",
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
   },
   name: {
     color: "#ffffff",
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: fontWeight.bold as "700",
     marginTop: 2,
     maxWidth: TOKEN + 14,
