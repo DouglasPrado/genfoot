@@ -1,11 +1,11 @@
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card, SectionHeader } from "@/components/card";
 import { ProgressBar } from "@/components/progress-bar";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { MatchViewModel, Momentum } from "./match-data";
 
-const MOMENTUM: Record<Momentum, { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; tint: string }> = {
+const MOMENTUM: Record<Momentum, { label: string; icon: IconName; tint: string }> = {
   rising: { label: "SUBINDO", icon: "arrow-up", tint: color.success },
   falling: { label: "CAINDO", icon: "arrow-down", tint: color.danger },
   steady: { label: "ESTÁVEL", icon: "remove", tint: color.textMuted },
@@ -45,7 +45,7 @@ export function GameStateBand({ state }: { state: MatchViewModel["state"] }) {
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>MOMENTUM</Text>
           <View style={styles.momentumRow}>
-            <Ionicons name={m.icon} size={16} color={m.tint} />
+            <Icon name={m.icon} size={16} color={m.tint} />
             <Text style={[styles.metricValue, { color: m.tint }]}>{m.label}</Text>
           </View>
         </View>
@@ -61,7 +61,7 @@ export function GameStateBand({ state }: { state: MatchViewModel["state"] }) {
         </Text>
         {state.warning ? (
           <View style={styles.warnRow}>
-            <Ionicons name="warning" size={13} color={color.warning} />
+            <Icon name="warning" size={13} color={color.warning} />
             <Text style={styles.warnText}>{state.warning}</Text>
           </View>
         ) : null}

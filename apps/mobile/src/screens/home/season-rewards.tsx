@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card } from "@/components/card";
 import { color, space, radius, fontSize, fontWeight, formatAmount } from "@/theme";
 import type { HomeViewModel } from "./home-data";
@@ -53,11 +53,11 @@ export function SeasonRewards({
         <Text style={styles.pointsLabel}>PRÓXIMA EM</Text>
         <Text style={styles.timer}>{rewardBox.nextInLabel}</Text>
         <View style={styles.chestWrap}>
-          <Ionicons name="cube" size={44} color={color.primary} />
+          <Icon name="cube" size={44} color={color.primary} />
         </View>
         <Pressable style={styles.openBtn} onPress={onOpenBox} accessibilityRole="button">
           <Text style={styles.openText}>ABRIR AGORA</Text>
-          <Ionicons name="diamond" size={12} color={color.gem} />
+          <Icon name="diamond" size={12} color={color.gem} />
           <Text style={styles.openCost}>{rewardBox.openCost.amount}</Text>
         </Pressable>
       </Card>

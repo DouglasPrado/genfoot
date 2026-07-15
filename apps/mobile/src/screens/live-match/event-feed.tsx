@@ -1,10 +1,10 @@
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card, SectionHeader } from "@/components/card";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { MatchViewModel, EventKind } from "./match-data";
 
-const KIND: Record<EventKind, { icon: React.ComponentProps<typeof Ionicons>["name"]; tint: string }> = {
+const KIND: Record<EventKind, { icon: IconName; tint: string }> = {
   goal: { icon: "football", tint: color.primary },
   sub: { icon: "swap-horizontal", tint: color.info },
   possession: { icon: "arrow-down", tint: color.danger },
@@ -22,7 +22,7 @@ export function EventFeed({ events }: { events: MatchViewModel["events"] }) {
           return (
             <View key={e.id} style={[styles.row, e.highlight ? styles.rowHighlight : null]}>
               <View style={[styles.iconWrap, { borderColor: k.tint }]}>
-                <Ionicons name={k.icon} size={16} color={k.tint} />
+                <Icon name={k.icon} size={16} color={k.tint} />
               </View>
               <Text style={styles.minute}>{e.minute}'</Text>
               <View style={styles.body}>

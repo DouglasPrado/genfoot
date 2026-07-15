@@ -1,5 +1,5 @@
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "@/lib/session";
 import { color, space, fontSize, fontWeight } from "@/theme";
@@ -17,7 +17,7 @@ function ConnectionBar() {
   if (status === "online") {
     return (
       <View style={[styles.conn, { borderColor: color.primaryDim }]}>
-        <Ionicons name="ellipse" size={8} color={color.success} />
+        <Icon name="ellipse" size={8} color={color.success} />
         <Text style={styles.connText}>
           API online{contractVersion ? ` · contrato ${contractVersion}` : ""}
         </Text>
@@ -27,7 +27,7 @@ function ConnectionBar() {
   const connecting = status === "connecting";
   return (
     <Pressable style={[styles.conn, { borderColor: color.borderStrong }]} onPress={retry}>
-      <Ionicons name="ellipse" size={8} color={connecting ? color.warning : color.danger} />
+      <Icon name="ellipse" size={8} color={connecting ? color.warning : color.danger} />
       <Text style={styles.connText}>
         {connecting ? "Conectando à API…" : "API offline — toque para tentar de novo"}
       </Text>

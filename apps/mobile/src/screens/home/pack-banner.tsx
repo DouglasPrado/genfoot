@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 
 const CARDS = [
@@ -22,7 +22,7 @@ export function PackBanner() {
           <View key={c.name} style={styles.card}>
             <Text style={styles.rating}>{c.rating}</Text>
             <Text style={styles.pos}>{c.pos}</Text>
-            <Ionicons name="person" size={20} color={color.textMuted} />
+            <Icon name="person" size={20} color={color.textMuted} />
             <Text style={styles.cardName} numberOfLines={1}>
               {c.name}
             </Text>

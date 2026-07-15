@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ScrollView, View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import { MATCH_SEED } from "./match-data";
@@ -22,7 +22,7 @@ function ModeToggle({ detailed, onToggle }: { detailed: boolean; onToggle: () =>
           <Text style={detailed ? styles.modeOn : undefined}>Detalhado</Text>
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={color.primaryContrast} />
+      <Icon name="chevron-forward" size={18} color={color.primaryContrast} />
     </Pressable>
   );
 }

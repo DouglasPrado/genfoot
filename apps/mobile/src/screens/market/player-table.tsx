@@ -1,5 +1,5 @@
 import { View, Text, Pressable, ScrollView, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { MarketPlayer, Confidence, ExitRisk } from "./market-data";
 
@@ -35,10 +35,10 @@ function Row({ p }: { p: MarketPlayer }) {
     <View style={styles.row}>
       <View style={[styles.cell, { width: COL.player, flexDirection: "row", alignItems: "center", gap: space.sm }]}>
         <Pressable hitSlop={4} accessibilityRole="button">
-          <Ionicons name="star-outline" size={16} color={color.textMuted} />
+          <Icon name="star-outline" size={16} color={color.textMuted} />
         </Pressable>
         <View style={styles.avatar}>
-          <Ionicons name="person" size={16} color={color.textMuted} />
+          <Icon name="person" size={16} color={color.textMuted} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.name} numberOfLines={1}>{p.name}</Text>

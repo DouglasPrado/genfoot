@@ -1,11 +1,5 @@
-import { Placeholder } from "@/screens/placeholder";
+import { Club } from "@/screens/club";
 
 export default function ClubeRoute() {
-  return (
-    <Placeholder
-      title="CLUBE"
-      icon="shield"
-      hint="Infraestrutura, finanças e identidade do clube."
-    />
-  );
+  return <Club />;
 }

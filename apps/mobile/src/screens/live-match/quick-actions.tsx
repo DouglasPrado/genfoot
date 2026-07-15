@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card, SectionHeader } from "@/components/card";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import { QUICK_ACTIONS } from "./match-data";
@@ -19,7 +19,7 @@ export function QuickActions({ onAction }: { onAction?: (id: string) => void }) 
               onPress={() => onAction?.(a.id)}
               accessibilityRole="button"
             >
-              <Ionicons name={a.icon} size={22} color={active ? color.primary : color.text} />
+              <Icon name={a.icon} size={22} color={active ? color.primary : color.text} />
               <Text style={[styles.label, active ? styles.labelActive : null]} numberOfLines={1}>
                 {a.label}
               </Text>

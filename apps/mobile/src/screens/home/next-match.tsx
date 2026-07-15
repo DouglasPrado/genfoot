@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card, SectionHeader } from "@/components/card";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { HomeViewModel } from "./home-data";
@@ -39,7 +39,7 @@ export function NextMatch({
         title="PRÓXIMA PARTIDA"
         trailing={
           <View style={styles.kickoff}>
-            <Ionicons name="time-outline" size={13} color={color.textMuted} />
+            <Icon name="time-outline" size={13} color={color.textMuted} />
             <Text style={styles.kickoffText}>{nextMatch.kickoffLabel}</Text>
           </View>
         }
@@ -51,7 +51,7 @@ export function NextMatch({
       </View>
       <Pressable style={styles.cta} onPress={onLineup} accessibilityRole="button">
         <Text style={styles.ctaText}>ESCALAR TIME</Text>
-        <Ionicons name="chevron-forward" size={16} color={color.primaryContrast} />
+        <Icon name="chevron-forward" size={16} color={color.primaryContrast} />
       </Pressable>
     </Card>
   );

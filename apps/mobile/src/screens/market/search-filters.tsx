@@ -1,9 +1,9 @@
 import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { MarketViewModel } from "./market-data";
 
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+type IoniconName = IconName;
 
 const FILTERS = [
   { label: "POSIÇÃO", value: "TODAS" },
@@ -16,7 +16,7 @@ const FILTERS = [
 function SegTab({ label, icon, active, onPress }: { label: string; icon: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable style={[styles.tab, active ? styles.tabActive : null]} onPress={onPress} accessibilityRole="button">
-      <Ionicons name={icon as IoniconName} size={14} color={active ? color.primary : color.textMuted} />
+      <Icon name={icon as IoniconName} size={14} color={active ? color.primary : color.textMuted} />
       <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>{label}</Text>
     </Pressable>
   );
@@ -42,7 +42,7 @@ export function SearchFilters({
     <View style={styles.root}>
       <View style={styles.searchRow}>
         <View style={styles.search}>
-          <Ionicons name="search" size={16} color={color.textMuted} />
+          <Icon name="search" size={16} color={color.textMuted} />
           <TextInput
             placeholder="Buscar por jogador, posição ou clube…"
             placeholderTextColor={color.textFaint}
@@ -50,7 +50,7 @@ export function SearchFilters({
           />
         </View>
         <Pressable style={styles.filterBtn} accessibilityRole="button">
-          <Ionicons name="options" size={18} color={color.text} />
+          <Icon name="options" size={18} color={color.text} />
         </Pressable>
       </View>
 
@@ -67,7 +67,7 @@ export function SearchFilters({
               <Text style={styles.filterLabel}>{f.label}</Text>
               <Text style={styles.filterValue}>{f.value}</Text>
             </View>
-            <Ionicons name="chevron-down" size={14} color={color.textMuted} />
+            <Icon name="chevron-down" size={14} color={color.textMuted} />
           </View>
         ))}
       </ScrollView>

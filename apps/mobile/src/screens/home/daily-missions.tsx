@@ -1,11 +1,11 @@
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { Card, SectionHeader } from "@/components/card";
 import { ProgressBar } from "@/components/progress-bar";
 import { color, space, radius, fontSize, fontWeight, formatAmount } from "@/theme";
 import type { HomeViewModel } from "./home-data";
 
-const MISSION_ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
+const MISSION_ICON: Record<string, IconName> = {
   walk: "walk",
   star: "star",
   eye: "eye",
@@ -30,7 +30,7 @@ export function DailyMissions({ missions }: Pick<HomeViewModel, "missions">) {
         {missions.items.map((m) => (
           <View key={m.id} style={styles.row}>
             <View style={styles.iconWrap}>
-              <Ionicons name={MISSION_ICON[m.icon] ?? "ellipse"} size={18} color={color.primary} />
+              <Icon name={MISSION_ICON[m.icon] ?? "ellipse"} size={18} color={color.primary} />
             </View>
             <View style={styles.body}>
               <Text style={styles.label} numberOfLines={1}>
@@ -46,12 +46,12 @@ export function DailyMissions({ missions }: Pick<HomeViewModel, "missions">) {
               </View>
             </View>
             <View style={styles.reward}>
-              <Ionicons name={REWARD_ICON[m.reward.currency]} size={12} color={REWARD_TINT[m.reward.currency]} />
+              <Icon name={REWARD_ICON[m.reward.currency]} size={12} color={REWARD_TINT[m.reward.currency]} />
               <Text style={styles.rewardAmount}>{formatAmount(m.reward.amount)}</Text>
               {m.done ? (
-                <Ionicons name="checkmark-circle" size={18} color={color.success} />
+                <Icon name="checkmark-circle" size={18} color={color.success} />
               ) : (
-                <Ionicons name="chevron-forward" size={16} color={color.textMuted} />
+                <Icon name="chevron-forward" size={16} color={color.textMuted} />
               )}
             </View>
           </View>

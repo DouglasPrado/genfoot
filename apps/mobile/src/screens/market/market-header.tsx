@@ -1,11 +1,11 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { CurrencyChip } from "@/components/currency-chip";
 import { HOME_SEED } from "@/screens/home/home-data";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { Temperature } from "./market-data";
 
-const TEMP: Record<Temperature, { label: string; tint: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
+const TEMP: Record<Temperature, { label: string; tint: string; icon: IconName }> = {
   cold: { label: "FRIO", tint: color.info, icon: "snow" },
   warm: { label: "MORNO", tint: color.warning, icon: "thermometer" },
   hot: { label: "QUENTE", tint: color.danger, icon: "flame" },
@@ -34,7 +34,7 @@ export function MarketHeader({
           ))}
         </View>
         <Pressable hitSlop={8} accessibilityRole="button">
-          <Ionicons name="notifications-outline" size={20} color={color.text} />
+          <Icon name="notifications-outline" size={20} color={color.text} />
         </Pressable>
       </View>
 
@@ -47,13 +47,13 @@ export function MarketHeader({
           <View style={styles.tempMain}>
             <Text style={styles.tempLabel}>TEMPERATURA DO MERCADO</Text>
             <View style={styles.tempRow}>
-              <Ionicons name={t.icon} size={18} color={t.tint} />
+              <Icon name={t.icon} size={18} color={t.tint} />
               <Text style={[styles.tempValue, { color: t.tint }]}>{t.label}</Text>
             </View>
           </View>
           <Text style={styles.tempNote}>{note}</Text>
           <Pressable style={styles.reportBtn} onPress={onReport} accessibilityRole="button">
-            <Ionicons name="trending-up" size={13} color={color.primary} />
+            <Icon name="trending-up" size={13} color={color.primary} />
             <Text style={styles.reportText}>VER RELATÓRIO</Text>
           </Pressable>
         </View>

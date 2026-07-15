@@ -1,8 +1,8 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 
-type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+type IoniconName = IconName;
 
 const ACTIONS: { id: string; icon: IoniconName; title: string; sub: string }[] = [
   { id: "relatorio", icon: "document-text", title: "RELATÓRIO DE MERCADO", sub: "Necessidades, oportunidades e contratos vencendo" },
@@ -17,7 +17,7 @@ export function MarketActions({ onAction }: { onAction?: (id: string) => void })
     <View style={styles.grid}>
       {ACTIONS.map((a) => (
         <Pressable key={a.id} style={styles.card} onPress={() => onAction?.(a.id)} accessibilityRole="button">
-          <Ionicons name={a.icon} size={20} color={color.primary} />
+          <Icon name={a.icon} size={20} color={color.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>{a.title}</Text>
             <Text style={styles.sub} numberOfLines={2}>{a.sub}</Text>

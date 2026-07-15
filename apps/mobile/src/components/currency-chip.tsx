@@ -1,10 +1,10 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight, formatAmount } from "@/theme";
 
 export type Currency = "coin" | "gem" | "energy";
 
-const META: Record<Currency, { icon: React.ComponentProps<typeof Ionicons>["name"]; tint: string }> = {
+const META: Record<Currency, { icon: IconName; tint: string }> = {
   coin: { icon: "logo-usd", tint: color.coin },
   gem: { icon: "diamond", tint: color.gem },
   energy: { icon: "flash", tint: color.energy },
@@ -26,12 +26,12 @@ export function CurrencyChip({
   const label = max !== undefined ? `${formatAmount(amount)} / ${formatAmount(max)}` : formatAmount(amount);
   return (
     <View style={styles.chip}>
-      <Ionicons name={meta.icon} size={14} color={meta.tint} />
+      <Icon name={meta.icon} size={14} color={meta.tint} />
       <Text style={styles.amount} numberOfLines={1}>
         {label}
       </Text>
       <Pressable style={styles.plus} onPress={onAdd} hitSlop={6} accessibilityRole="button">
-        <Ionicons name="add" size={16} color={color.primaryContrast} />
+        <Icon name="add" size={16} color={color.primaryContrast} />
       </Pressable>
     </View>
   );

@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@/components/icon";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import type { MatchViewModel } from "./match-data";
 
@@ -23,7 +23,7 @@ export function EmergencyCard({
       </View>
       <View style={styles.alert}>
         <View style={styles.alertIcon}>
-          <Ionicons name="shirt" size={20} color={color.danger} />
+          <Icon name="shirt" size={20} color={color.danger} />
         </View>
         <View style={styles.alertBody}>
           <Text style={styles.alertTitle}>{emergency.title}</Text>
@@ -39,7 +39,7 @@ export function EmergencyCard({
               </Text>
               <Text style={styles.optionTag}>({o.tag})</Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={color.textMuted} />
+            <Icon name="chevron-forward" size={16} color={color.textMuted} />
           </Pressable>
         ))}
       </View>
