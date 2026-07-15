@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Grinta",
+    "slug": "grinta",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "grinta",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true },
+    "android": {
+      "adaptiveIcon": { "backgroundColor": "#0a0b0d" }
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}

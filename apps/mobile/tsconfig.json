@@ -1,0 +1,22 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // Só o alias @/* aqui: o Metro do Expo aplica estes `paths` em runtime
+    // (é como o @/* resolve no bundler). O dedup de React (18 vs 19) NÃO pode
+    // morar aqui — senão o Metro redireciona `react` → `@types/react` e quebra
+    // o bundle. Ele vive em tsconfig.typecheck.json, usado só pelo gate.
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "typeRoots": ["./node_modules/@types"]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  // Config exclusiva do gate (`pnpm typecheck`). Estende a base e adiciona o
+  // dedup de React: força TODO `react` (inclusive dentro das deps RN, ex.
+  // react-native-safe-area-context / @expo/vector-icons) a resolver na cópia
+  // 18 local do app — senão o @types/react 19 do root (admin/guide usam
+  // React 19) vaza e cria duas cópias incompatíveis de ReactNode.
+  //
+  // Fica separado do tsconfig.json porque o Metro do Expo aplica os `paths`
+  // do tsconfig.json em runtime; um alias de `react` ali quebraria o bundle.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"]
+    }
+  }
+}
