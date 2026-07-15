@@ -1,11 +1,5 @@
-import { Placeholder } from "@/screens/placeholder";
+import { LiveMatch } from "@/screens/live-match";
 
 export default function PartidasRoute() {
-  return (
-    <Placeholder
-      title="PARTIDAS"
-      icon="football"
-      hint="Simulador de partida ao vivo — próxima fatia."
-    />
-  );
+  return <LiveMatch />;
 }
