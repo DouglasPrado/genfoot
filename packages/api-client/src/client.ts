@@ -7,6 +7,7 @@ import {
   type Role,
   type SessionResponse,
   type StandardError,
+  type ValidationReport,
 } from "./types.js";
 
 type FetchLike = (
@@ -113,6 +114,17 @@ export class GrintaClient {
 
   async catalog(): Promise<Catalog> {
     return (await this.request<Catalog>("GET", "/api/v1/commands/catalog")).body;
+  }
+
+  /** Roda a calibração (VAL-001) e devolve o relatório com bandas e gate. */
+  async validation(manifest?: unknown): Promise<ValidationReport> {
+    return (
+      await this.request<ValidationReport>(
+        "POST",
+        "/api/v1/validation/run",
+        manifest ?? {},
+      )
+    ).body;
   }
 
   async command(envelope: CommandEnvelope): Promise<CommandResponse> {

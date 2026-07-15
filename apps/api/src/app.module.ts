@@ -10,10 +10,16 @@ import { API_INFO, type ApiInfo } from "./core/tokens.js";
 import { HealthController } from "./health/health.controller.js";
 import { QueriesController } from "./queries/queries.controller.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { ValidationController } from "./validation/validation.controller.js";
 
 @Module({
   imports: [CoreModule, RealtimeModule, AuthModule],
-  controllers: [HealthController, CommandsController, QueriesController],
+  controllers: [
+    HealthController,
+    CommandsController,
+    QueriesController,
+    ValidationController,
+  ],
   providers: [
     {
       provide: API_INFO,

@@ -50,6 +50,27 @@ export interface Catalog {
   readonly commandCount: number;
 }
 
+export interface BandEvaluation {
+  readonly bandId: string;
+  readonly metric: string;
+  readonly observed: number;
+  readonly lo: number;
+  readonly hi: number;
+  readonly result: "PASS" | "FAIL";
+  readonly oracleVersion: string;
+}
+
+export interface ValidationReport {
+  readonly rulesetVersion: string;
+  readonly runsExecuted: number;
+  readonly matchesExecuted: number;
+  readonly bandEvaluations: readonly BandEvaluation[];
+  readonly invariantViolationCount: number;
+  readonly gateResult: "PASS" | "FAIL";
+  readonly reportHash: string;
+  readonly metrics: readonly { metricId: string; value: number }[];
+}
+
 export interface StandardError {
   readonly code: string;
   readonly messageKey: string;
