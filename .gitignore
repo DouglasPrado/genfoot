@@ -21,3 +21,6 @@ Thumbs.db
 *.swp
 .vscode/
 .idea/
+
+# Dados locais do adapter JSON (descontinuado — ver R-172)
+.grinta/

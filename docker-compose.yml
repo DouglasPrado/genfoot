@@ -1,0 +1,27 @@
+# Postgres de desenvolvimento (gate M2: materializar PostgreSQL/Prisma).
+#
+# Sobe só o banco: a API roda no host (`pnpm --filter @grinta/api dev`). Porta
+# 5433 de propósito — 5432 costuma estar ocupada por um Postgres local.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: grinta-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: grinta
+      POSTGRES_PASSWORD: grinta
+      POSTGRES_DB: grinta
+    ports:
+      - "5433:5432"
+    volumes:
+      - grinta-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` só diz que o processo respondeu; o -d garante que o banco
+      # da aplicação existe antes de alguém tentar migrar.
+      test: ["CMD-SHELL", "pg_isready -U grinta -d grinta"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  grinta-pgdata:
