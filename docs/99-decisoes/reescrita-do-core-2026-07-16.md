@@ -150,6 +150,15 @@ Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.
 - **`MaintenancePlan`: plano ou vencimento?** Root canônico que não existe em nenhum lado; hoje é `maintenanceDueOn` disperso + `processedMaintenanceDayKeys[]`, um array de dedupe que cresce sem limite dentro do agregado do mundo.
 - **Roots canônicos sem materialização em lado nenhum:** `WorldEntryProcess`, `NotificationThread`, `PressResponse`, `AutomationRuleVersion`, `Budget`, `Payment`/`TransferPaymentSchedule`, `CompetitionRuleSet`, `CreditFacility`, `ScoutingMission`, `TransferStrategy`, `Watchlist`, `PlayerCareerPlan`, `YouthClass`.
 - **X-001 não tem `level`, `risk` nem `priority` simultaneamente.** `AutomationLevel` é o conceito central da automação e não existe no domínio; as duas invariantes canônicas ("alto risco não delegável", "sem conflito de precedência") dependem de `risk` e `priority`, que não existem no schema. A automação não é expressável em nenhuma das duas fontes.
+- **`UserAccount.createdOn` é data de mundo gravada em coluna de instante de plataforma.** A reescrita expôs uma distinção que vale para os ~70 roots e não estava dita:
+
+  | | Quem manda | Coluna | Default |
+  |---|---|---|---|
+  | **Data do mundo** — rege regra de jogo, tem de ser determinística (`WorldParticipant.joinedOn`) | o domínio | `DATE` | **nenhum** — um default de relógio inventaria a data e mataria o replay |
+  | **Instante de plataforma** — auditoria/ops, nunca rege regra (`UserAccount.createdAt`, `lastLoginAt`) | a infra | `DateTime` | `now()` é **correto**: é um relógio que o domínio deliberadamente não pode ter |
+
+  `UserAccount` é global (R-172): não tem mundo, logo não tem data de mundo. O `createdOn` do snapshot existe só para semear o id determinístico, e `prisma-user-account-repository.ts` o grava em `createdAt` — perdendo quando a conta nasceu de fato. Decidir: o `createdOn` sai do snapshot (é só semente) ou ganha coluna própria?
+
 - **Gate DB-01..DB-16 segue devido** (herdado de R-173): constraints PostgreSQL não expressáveis no Prisma e conversão das FKs world-scoped restantes em compostas — incluindo o bug de `StaffContract.club` (`schema.prisma:1264`), FK simples onde a Decisão 19.8 exige composta.
 
 ## Efeito

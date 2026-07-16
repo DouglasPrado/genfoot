@@ -50,7 +50,24 @@ export const SessionFamilyStatus = {
 export type SessionFamilyStatus =
   (typeof SessionFamilyStatus)[keyof typeof SessionFamilyStatus];
 
-export interface ClubReservationSnapshot {
+/*
+ * ─── Tipos `Legacy*`: condenados, não copie ──────────────────────────────────
+ *
+ * São as coleções de dentro do mega-agregado `WorldIdentity`, que a R-175
+ * aposenta. Cada um já tem substituto como agregado próprio:
+ *
+ *   LegacyWorldParticipationSnapshot → world-participant.ts   (tem `id`)
+ *   LegacyClubControlSnapshot        → club-control.ts        (aponta para a participação)
+ *   LegacyClubReservationSnapshot    → (a fazer)
+ *   LegacyCooldownSnapshot           → (a fazer)
+ *
+ * O prefixo existe só para os dois modelos conviverem enquanto os quatro roots
+ * saem um a um: sem ele, `export *` no index colide. Somem junto com o
+ * `WorldIdentity`; se você está lendo isto e eles ainda existem, a migração de
+ * C1 não terminou.
+ */
+
+export interface LegacyClubReservationSnapshot {
   readonly id: ClubReservationId;
   readonly gameWorldId: GameWorldId;
   readonly clubId: IdentityClubRef;
@@ -62,7 +79,7 @@ export interface ClubReservationSnapshot {
   readonly version: number;
 }
 
-export interface ClubControlSnapshot {
+export interface LegacyClubControlSnapshot {
   readonly id: ClubControlId;
   readonly gameWorldId: GameWorldId;
   readonly clubId: IdentityClubRef;
@@ -74,14 +91,14 @@ export interface ClubControlSnapshot {
   readonly version: number;
 }
 
-export interface WorldParticipationSnapshot {
+export interface LegacyWorldParticipationSnapshot {
   readonly accountId: IdentityAccountRef;
   readonly gameWorldId: GameWorldId;
   readonly status: ParticipationStatus;
   readonly activatedOn: string;
 }
 
-export interface CooldownSnapshot {
+export interface LegacyCooldownSnapshot {
   readonly accountId: IdentityAccountRef;
   readonly gameWorldId: GameWorldId;
   readonly untilOn: string;
@@ -185,10 +202,10 @@ export interface WorldIdentitySnapshot {
   readonly gameWorldId: GameWorldId;
   readonly rulesetVersion: RulesetVersion;
   readonly cooldownDays: number;
-  readonly reservations: readonly ClubReservationSnapshot[];
-  readonly controls: readonly ClubControlSnapshot[];
-  readonly participations: readonly WorldParticipationSnapshot[];
-  readonly cooldowns: readonly CooldownSnapshot[];
+  readonly reservations: readonly LegacyClubReservationSnapshot[];
+  readonly controls: readonly LegacyClubControlSnapshot[];
+  readonly participations: readonly LegacyWorldParticipationSnapshot[];
+  readonly cooldowns: readonly LegacyCooldownSnapshot[];
   readonly events: readonly IdentityDomainEvent[];
   readonly revision: number;
 }

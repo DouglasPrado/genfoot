@@ -15,8 +15,8 @@ import {
   ClubReservationStatus,
   type ClubControlActivatedEvent,
   type ClubControlEndedEvent,
-  type ClubControlSnapshot,
-  type ClubReservationSnapshot,
+  type LegacyClubControlSnapshot,
+  type LegacyClubReservationSnapshot,
   type ClubReservedEvent,
   type CooldownStartedEvent,
   type IdentityAccountRef,
@@ -25,7 +25,7 @@ import {
   type IdentitySummary,
   type WorldIdentitySnapshot,
   type WorldParticipationActivatedEvent,
-  type WorldParticipationSnapshot,
+  type LegacyWorldParticipationSnapshot,
 } from "./identity-types.js";
 
 const DEFAULT_COOLDOWN_DAYS = 30;
@@ -106,7 +106,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<WorldParticipationSnapshot, DomainError> {
+  ): Result<LegacyWorldParticipationSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -141,7 +141,7 @@ export class WorldIdentity {
         current.status === ParticipationStatus.ACTIVE,
     );
     if (existingActive !== undefined) return succeed(existingActive);
-    const participation: WorldParticipationSnapshot = {
+    const participation: LegacyWorldParticipationSnapshot = {
       accountId: input.accountId,
       gameWorldId: this.state.gameWorldId,
       status: ParticipationStatus.ACTIVE,
@@ -185,7 +185,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<ClubReservationSnapshot, DomainError> {
+  ): Result<LegacyClubReservationSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -216,7 +216,7 @@ export class WorldIdentity {
       context: `club-reservation:${input.idempotencyKey}`,
       timestampMilliseconds: timestampOf(date.value.toString()),
     });
-    const reservation: ClubReservationSnapshot = {
+    const reservation: LegacyClubReservationSnapshot = {
       id: reservationId,
       gameWorldId: this.state.gameWorldId,
       clubId: input.clubId,
@@ -259,7 +259,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<ClubControlSnapshot, DomainError> {
+  ): Result<LegacyClubControlSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -308,7 +308,7 @@ export class WorldIdentity {
       status: ClubReservationStatus.CONFIRMED,
       version: reservation.version + 1,
     };
-    const control: ClubControlSnapshot = {
+    const control: LegacyClubControlSnapshot = {
       id: controlId,
       gameWorldId: this.state.gameWorldId,
       clubId: reservation.clubId,
@@ -319,7 +319,7 @@ export class WorldIdentity {
       endedReason: null,
       version: 1,
     };
-    const participation: WorldParticipationSnapshot = {
+    const participation: LegacyWorldParticipationSnapshot = {
       accountId: reservation.accountId,
       gameWorldId: this.state.gameWorldId,
       status: ParticipationStatus.ACTIVE,
@@ -365,7 +365,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<ClubReservationSnapshot, DomainError> {
+  ): Result<LegacyClubReservationSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -386,7 +386,7 @@ export class WorldIdentity {
         ),
       );
     }
-    const released: ClubReservationSnapshot = {
+    const released: LegacyClubReservationSnapshot = {
       ...reservation,
       status: ClubReservationStatus.RELEASED,
       version: reservation.version + 1,
@@ -411,7 +411,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<ClubControlSnapshot, DomainError> {
+  ): Result<LegacyClubControlSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -437,7 +437,7 @@ export class WorldIdentity {
     const endedOn = WorldDate.parse(input.endedOn);
     if (!endedOn.ok) return endedOn;
     const untilOn = endedOn.value.addDays(this.state.cooldownDays).toString();
-    const ended: ClubControlSnapshot = {
+    const ended: LegacyClubControlSnapshot = {
       ...control,
       status: ControlStatus.ENDED,
       endedOn: endedOn.value.toString(),
@@ -510,7 +510,7 @@ export class WorldIdentity {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Result<ClubReservationSnapshot, DomainError> {
+  ): Result<LegacyClubReservationSnapshot, DomainError> {
     if (input.rulesetVersion !== this.state.rulesetVersion) {
       return fail(rulesetMismatch());
     }
@@ -542,7 +542,7 @@ export class WorldIdentity {
     });
   }
 
-  public activeControlForClub(clubId: string): ClubControlSnapshot | null {
+  public activeControlForClub(clubId: string): LegacyClubControlSnapshot | null {
     return (
       this.state.controls.find(
         (control) =>

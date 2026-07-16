@@ -98,9 +98,11 @@ enum WorldStatus {
   ARCHIVED
 }
 
-enum ClubControlType {
-  USER
-  AI
+/// R-175: era `Boolean isActive` + `endsAtWorldTick` — dois campos contando o
+/// mesmo fato, livres para se contradizer.
+enum ClubControlStatus {
+  ACTIVE
+  ENDED
 }
 
 enum ClubStatus {
@@ -859,7 +861,10 @@ model Club {
   city                String?
   country             String
   foundedYear         Int?
-  controlType         ClubControlType @default(AI)
+  // R-180: `controlType` saiu daqui também. Era projeção duplicada do
+  // `ClubControl` — e duas fontes para "quem comanda" divergem em silêncio.
+  // Clube sem controle ativo é tocado pela IA; a pergunta se responde no
+  // ClubControl, não num flag do clube.
   status              ClubStatus      @default(ACTIVE)
   reputation          Int             @default(1)
   level               Int             @default(1)
@@ -900,22 +905,40 @@ model Club {
 
 /// Controle atual ou histórico do clube por um participante do mundo.
 /// Invariante (índice único parcial em migration SQL): 1 controle ACTIVE por clube.
+/// Quem comanda o clube, e desde quando.
+///
+/// R-177: `startsAtWorldTick`/`endsAtWorldTick` viraram DATA. Eram o único par
+/// de colunas `*WorldTick` do schema inteiro, e não existia conversor data↔tick
+/// em lado nenhum — o domínio sempre foi `YYYY-MM-DD`.
+///
+/// R-180: `controlType` saiu. Clube sem `ClubControl` ativo é tocado pela IA.
+/// O enum era incoerente com a própria tabela: `controlType = AI` exigiria um
+/// `WorldParticipant` fantasma, porque `worldParticipantId` é NOT NULL.
+///
+/// `endedReason` passa a existir: `ClubControlEndedEvent.reason` é obrigatório
+/// no domínio e não tinha coluna — o motivo evaporava na gravação.
 model ClubControl {
-  id                 String          @id @default(uuid(7)) @db.Uuid
-  gameWorldId        String          @db.Uuid
-  clubId             String          @db.Uuid
-  worldParticipantId String          @db.Uuid
-  controlType        ClubControlType
-  isActive           Boolean         @default(true)
-  startsAtWorldTick  BigInt
-  endsAtWorldTick    BigInt?
-  version            Int             @default(1)
+  id                 String            @id @db.Uuid
+  gameWorldId        String            @db.Uuid
+  clubId             String            @db.Uuid
+  worldParticipantId String            @db.Uuid
+  status             ClubControlStatus @default(ACTIVE)
+  startsOn           DateTime          @db.Date
+  endedOn            DateTime?         @db.Date
+  endedReason        String?
+  version            Int               @default(1)
 
-  club             Club             @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  worldParticipant WorldParticipant @relation(fields: [worldParticipantId], references: [id])
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  // FK composta world-scoped (Decisão 19.8). Era simples (`references: [id]`) —
+  // o mesmo defeito que `StaffContract.club` ainda tem.
+  worldParticipant WorldParticipant @relation(fields: [gameWorldId, worldParticipantId], references: [gameWorldId, id])
 
+  @@unique([gameWorldId, id])
   @@index([gameWorldId, clubId])
-  @@index([worldParticipantId])
+  @@index([gameWorldId, worldParticipantId])
+  // "1 controle ativo por clube" precisa de índice único PARCIAL
+  // (`WHERE status = 'ACTIVE'`), que o Prisma não expressa. Vai como SQL cru na
+  // migration — é um dos casos que o gate DB-01..DB-16 antecipa.
 }
 
 model ClubDepartment {

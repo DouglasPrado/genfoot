@@ -1,32 +1,27 @@
-import { UserAccount, WorldParticipant } from "@grinta/core";
+import { WorldParticipant } from "@grinta/core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaWorldParticipantRepository } from "../src/prisma-world-participant-repository.js";
+import {
+  IDENTITY_TABLES,
+  WORLD_ID,
+  WORLD_SEED,
+  accountSnapshot,
+  seedAccount,
+  seedWorld,
+} from "./fixtures.js";
 import { connect, hasDatabase, skipReason, truncate } from "./postgres.harness.js";
-
-const WORLD_ID = "019b76da-a800-7787-9462-49c009be1111";
 
 function participant(over: Record<string, unknown> = {}) {
   const result = WorldParticipant.join({
     gameWorldId: WORLD_ID,
-    accountId: account().id,
-    worldSeed: "grinta-demo",
+    accountId: accountSnapshot().id,
+    worldSeed: WORLD_SEED,
     occurredOn: "2026-01-02",
     ...over,
   });
   if (!result.ok) throw result.error;
   return result.value;
-}
-
-function account() {
-  const result = UserAccount.register({
-    email: "douglas@exemplo.com",
-    name: "Douglas",
-    occurredOn: "2026-01-02",
-    idempotencySeed: "grinta-demo",
-  });
-  if (!result.ok) throw result.error;
-  return result.value.snapshot();
 }
 
 describe.skipIf(!hasDatabase)(
@@ -41,28 +36,11 @@ describe.skipIf(!hasDatabase)(
     });
 
     beforeEach(async () => {
-      await truncate(client, ["GameWorld", "UserAccount", "WorldParticipant"]);
+      await truncate(client, IDENTITY_TABLES);
       // As FKs são reais: sem mundo e sem conta, a participação não existe. É
       // justamente isso que o JSON não impunha.
-      await client.gameWorld.create({
-        data: {
-          id: WORLD_ID,
-          name: "Mundo de teste",
-          currentDate: new Date("2026-01-02T00:00:00.000Z"),
-          maxClubs: 16,
-          initialClubCashMinor: 100_000_00n,
-          currencyId: "019b76da-a800-7787-9462-49c009becccc",
-        },
-      });
-      const snapshot = account();
-      await client.userAccount.create({
-        data: {
-          id: snapshot.id,
-          name: snapshot.name,
-          email: snapshot.email,
-          createdAt: new Date(`${snapshot.createdOn}T00:00:00.000Z`),
-        },
-      });
+      await seedWorld(client);
+      await seedAccount(client);
     });
 
     afterAll(async () => {

@@ -10,13 +10,13 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { IdentityRepository } from "./identity-repository.js";
 import type {
-  ClubControlSnapshot,
-  ClubReservationSnapshot,
+  LegacyClubControlSnapshot,
+  LegacyClubReservationSnapshot,
   IdentityAccountRef,
   IdentityClubRef,
   IdentitySummary,
   WorldIdentitySnapshot,
-  WorldParticipationSnapshot,
+  LegacyWorldParticipationSnapshot,
 } from "./identity-types.js";
 import { WorldIdentity } from "./world-identity.js";
 
@@ -88,7 +88,7 @@ export class JoinWorld {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<WorldParticipationSnapshot, DomainError>> {
+  ): Promise<Result<LegacyWorldParticipationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.joinWorld(input),
     );
@@ -109,7 +109,7 @@ export class ReserveClub {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<ClubReservationSnapshot, DomainError>> {
+  ): Promise<Result<LegacyClubReservationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.reserveClub(input),
     );
@@ -128,7 +128,7 @@ export class ConfirmOnboarding {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<ClubControlSnapshot, DomainError>> {
+  ): Promise<Result<LegacyClubControlSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.confirmOnboarding(input),
     );
@@ -147,7 +147,7 @@ export class ReleaseClubReservation {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<ClubReservationSnapshot, DomainError>> {
+  ): Promise<Result<LegacyClubReservationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.releaseReservation(input),
     );
@@ -168,7 +168,7 @@ export class EndClubControl {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<ClubControlSnapshot, DomainError>> {
+  ): Promise<Result<LegacyClubControlSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.endClubControl(input),
     );
@@ -189,7 +189,7 @@ export class RequestClubSwitch {
       worldSeed: string;
       worldDate: string;
     }>,
-  ): Promise<Result<ClubReservationSnapshot, DomainError>> {
+  ): Promise<Result<LegacyClubReservationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.requestClubSwitch(input),
     );
