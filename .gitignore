@@ -24,3 +24,6 @@ Thumbs.db
 
 # Dados locais do adapter JSON (descontinuado — ver R-172)
 .grinta/
+
+# Client gerado pelo Prisma (produzido por `prisma generate`)
+packages/persistence/src/generated/

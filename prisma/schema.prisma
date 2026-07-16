@@ -39,7 +39,12 @@
 // =============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  // Prisma 7 + pnpm: o gerador legado `prisma-client-js` escreve dentro de
+  // node_modules/@prisma/client e não resolve num workspace isolado (o client
+  // vive em packages/persistence, não na raiz). O gerador novo escreve num
+  // caminho explícito, que o adapter importa direto.
+  provider = "prisma-client"
+  output   = "../packages/persistence/src/generated/prisma"
 }
 
 datasource db {
