@@ -4,7 +4,7 @@ import type {
 } from "@grinta/core";
 import { ParticipationStatus } from "@grinta/core";
 
-import type { PrismaClient } from "./prisma-connection.js";
+import type { Prisma } from "./generated/prisma/client.js";
 
 /**
  * Adapter do vínculo conta ↔ mundo (R-175). Segundo agregado por entidade, e o
@@ -15,7 +15,7 @@ import type { PrismaClient } from "./prisma-connection.js";
  * local aqui quebraria o determinismo.
  */
 export class PrismaWorldParticipantRepository implements WorldParticipantRepository {
-  public constructor(private readonly client: PrismaClient) {}
+  public constructor(private readonly client: Prisma.TransactionClient) {}
 
   public async findParticipantById(
     gameWorldId: string,

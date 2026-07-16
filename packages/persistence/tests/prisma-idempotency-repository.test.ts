@@ -127,6 +127,30 @@ describe.skipIf(!hasDatabase)(
       expect(await repository.find(ACTOR, "nao-existe")).toBeNull();
     });
 
+    /**
+     * O teste que faltava, e que esconderia um defeito real.
+     *
+     * Solto, cada `tryClaim` é sua própria transação implícita, e capturar a
+     * violação de unicidade funciona. DENTRO de uma transação explícita — que é
+     * onde ele vai rodar, porque a Decisão 19.10 exige agregado + evento no
+     * mesmo commit — qualquer erro ABORTA a transação inteira no Postgres:
+     * `current transaction is aborted, commands ignored until end of
+     * transaction block`. Capturar não adianta; os comandos seguintes falham.
+     *
+     * Por isso o `tryClaim` usa ON CONFLICT DO NOTHING (contando linhas) em vez
+     * de inserir-e-capturar.
+     */
+    it("a colisão não derruba a transação em volta", async () => {
+      await client.$transaction(async (tx) => {
+        const dentro = new PrismaIdempotencyRepository(tx);
+        expect((await dentro.tryClaim(claim())).claimed).toBe(true);
+        expect((await dentro.tryClaim(claim())).claimed).toBe(false);
+        // Se a transação tivesse abortado, ISTO explodiria.
+        expect(await tx.idempotencyKey.count()).toBe(1);
+      });
+      expect(await repository.find(ACTOR, "cadastro-1")).not.toBeNull();
+    });
+
     // Duas requisições simultâneas com a mesma chave: exatamente uma reserva.
     it("tentativas concorrentes: só uma reserva", async () => {
       const outcomes = await Promise.all(

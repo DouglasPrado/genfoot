@@ -4,7 +4,7 @@ import type {
 } from "@grinta/core";
 import { ClubReservationStatus } from "@grinta/core";
 
-import type { PrismaClient } from "./prisma-connection.js";
+import type { Prisma } from "./generated/prisma/client.js";
 
 /**
  * Adapter da reserva de entrada (R-175).
@@ -16,7 +16,7 @@ import type { PrismaClient } from "./prisma-connection.js";
 export class PrismaClubEntryReservationRepository
   implements ClubEntryReservationRepository
 {
-  public constructor(private readonly client: PrismaClient) {}
+  public constructor(private readonly client: Prisma.TransactionClient) {}
 
   public async findReservationById(
     gameWorldId: string,

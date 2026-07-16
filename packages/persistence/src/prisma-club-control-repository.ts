@@ -1,7 +1,7 @@
 import type { ClubControlRepository, ClubControlSnapshot } from "@grinta/core";
 import { ControlStatus } from "@grinta/core";
 
-import type { PrismaClient } from "./prisma-connection.js";
+import type { Prisma } from "./generated/prisma/client.js";
 
 /**
  * Adapter do controle de clube (R-175).
@@ -13,7 +13,7 @@ import type { PrismaClient } from "./prisma-connection.js";
  * o mundo inteiro dentro, e dois ativos seriam indetectáveis.
  */
 export class PrismaClubControlRepository implements ClubControlRepository {
-  public constructor(private readonly client: PrismaClient) {}
+  public constructor(private readonly client: Prisma.TransactionClient) {}
 
   public async findControlById(
     gameWorldId: string,

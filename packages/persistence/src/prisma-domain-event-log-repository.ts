@@ -9,7 +9,6 @@ import {
 } from "@grinta/core";
 
 import type { Prisma } from "./generated/prisma/client.js";
-import type { PrismaClient } from "./prisma-connection.js";
 
 /**
  * `H` da R-133: "a `hashAlgorithm` do replay (ex.: `sha256`)".
@@ -44,7 +43,7 @@ type ChainedEvent = ChainableEvent & {
  * "banco INSERT-only na auditoria" que R-133 exige e que a implementação
  * anterior violava, reescrevendo a cadeia inteira a cada `saveAdmin`.
  *
- * O append faz três coisas numa transação só:
+ * O append faz três coisas, e as três TÊM de estar na mesma transação:
  *
  *  1. **incrementa `GameWorld.worldSequence`** e pega o valor — o `UPDATE`
  *     segura o lock da linha até o commit, e é ISSO que dá ordem total por
@@ -53,13 +52,20 @@ type ChainedEvent = ChainableEvent & {
  *  2. **lê o último hash do mundo** — seguro porque já seguramos o lock;
  *  3. **encadeia e insere**.
  *
+ * Quem abre a transação é o `UnitOfWork`, não este adapter: a Decisão 19.10
+ * exige que o evento seja gravado no MESMO commit do agregado que o produziu.
+ * Se cada um abrisse a sua, o agregado poderia gravar e o evento não — e a
+ * história ficaria com buraco. Por isso o construtor recebe um
+ * `Prisma.TransactionClient`: ele não tem `$transaction`, e o tipo impede o
+ * adapter de abrir uma por conta própria.
+ *
  * O preço é o ponto de serialização por mundo que R-175 aceita: comandos do
  * mesmo mundo que emitem evento serializam no commit. É barato perto do que
  * havia antes (reescrever o blob inteiro do contexto a cada comando), e é o que
  * sustenta replay, fencing (INV-31) e o stream de tempo real (doc 08).
  */
 export class PrismaDomainEventLogRepository implements DomainEventLogRepository {
-  public constructor(private readonly client: PrismaClient) {}
+  public constructor(private readonly client: Prisma.TransactionClient) {}
 
   public async append(
     events: readonly NewDomainEvent[],
@@ -74,42 +80,40 @@ export class PrismaDomainEventLogRepository implements DomainEventLogRepository 
       throw new MixedWorldBatch();
     }
 
-    return this.client.$transaction(async (tx) => {
-      const bumped = await tx.$queryRawUnsafe<{ worldSequence: bigint }[]>(
-        `UPDATE "GameWorld" SET "worldSequence" = "worldSequence" + $1
-           WHERE "id" = $2::uuid
-         RETURNING "worldSequence"`,
-        events.length,
-        gameWorldId,
-      );
-      if (bumped.length === 0) throw new WorldNotFound(gameWorldId);
+    const bumped = await this.client.$queryRawUnsafe<{ worldSequence: bigint }[]>(
+      `UPDATE "GameWorld" SET "worldSequence" = "worldSequence" + $1
+         WHERE "id" = $2::uuid
+       RETURNING "worldSequence"`,
+      events.length,
+      gameWorldId,
+    );
+    if (bumped.length === 0) throw new WorldNotFound(gameWorldId);
 
-      // Sequência do primeiro do lote: o UPDATE devolve a do último.
-      const first = bumped[0]!.worldSequence - BigInt(events.length) + 1n;
+    // Sequência do primeiro do lote: o UPDATE devolve a do último.
+    const first = bumped[0]!.worldSequence - BigInt(events.length) + 1n;
 
-      const last = await tx.domainEventLog.findFirst({
-        where: { gameWorldId },
-        orderBy: { sequence: "desc" },
-        select: { eventHash: true },
-      });
-
-      const chained: ChainedEvent[] = [];
-      let prev = last?.eventHash ?? CHAIN_GENESIS_HASH;
-
-      for (const [index, event] of events.entries()) {
-        const withSequence = { ...event, sequence: first + BigInt(index) };
-        const eventHash = computeEventHash({
-          event: withSequence,
-          prevEventHash: prev,
-          hash: sha256,
-        });
-        chained.push({ ...withSequence, prevEventHash: prev, eventHash });
-        prev = eventHash;
-      }
-
-      await tx.domainEventLog.createMany({ data: chained.map(toRow) });
-      return chained;
+    const last = await this.client.domainEventLog.findFirst({
+      where: { gameWorldId },
+      orderBy: { sequence: "desc" },
+      select: { eventHash: true },
     });
+
+    const chained: ChainedEvent[] = [];
+    let prev = last?.eventHash ?? CHAIN_GENESIS_HASH;
+
+    for (const [index, event] of events.entries()) {
+      const withSequence = { ...event, sequence: first + BigInt(index) };
+      const eventHash = computeEventHash({
+        event: withSequence,
+        prevEventHash: prev,
+        hash: sha256,
+      });
+      chained.push({ ...withSequence, prevEventHash: prev, eventHash });
+      prev = eventHash;
+    }
+
+    await this.client.domainEventLog.createMany({ data: chained.map(toRow) });
+    return chained;
   }
 
   public async readWorldChain(gameWorldId: string): Promise<readonly ChainableEvent[]> {

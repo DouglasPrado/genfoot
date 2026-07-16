@@ -4,7 +4,7 @@ import type {
 } from "@grinta/core";
 import { AccountStatus } from "@grinta/core";
 
-import type { PrismaClient } from "./prisma-connection.js";
+import type { Prisma } from "./generated/prisma/client.js";
 
 /**
  * Primeiro adapter Prisma (R-173). A conta é global (R-172), então esta porta
@@ -17,7 +17,7 @@ import type { PrismaClient } from "./prisma-connection.js";
  * semente do id determinístico, o que perdia quando a conta de fato nasceu.
  */
 export class PrismaUserAccountRepository implements UserAccountRepository {
-  public constructor(private readonly client: PrismaClient) {}
+  public constructor(private readonly client: Prisma.TransactionClient) {}
 
   public async findAccountById(id: string): Promise<UserAccountSnapshot | null> {
     return toSnapshot(await this.client.userAccount.findUnique({ where: { id } }));
