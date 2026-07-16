@@ -66,13 +66,34 @@ describe.skipIf(!hasDatabase)(
       expect(await repository.findAccountByExternalSubject("nao_existe")).toBeNull();
     });
 
-    // `createdOn` é data do MUNDO; `createdAt` é DateTime. A conversão tem de
-    // ser estável nos dois sentidos, senão o determinismo do domínio se perde.
-    it("a data do mundo atravessa sem deslizar de dia", async () => {
+    /**
+     * A conta é global (R-172): não tem mundo, logo não tem data de mundo. O
+     * `occurredOn` é SEMENTE do id determinístico, não estado — antes ele era
+     * gravado em `createdAt`, o que punha uma data de mundo numa coluna de
+     * instante de plataforma e perdia quando a conta nasceu de fato.
+     *
+     * Quem grava `createdAt` é o `@default(now())`: é um relógio, e o domínio
+     * deliberadamente não tem relógio.
+     */
+    it("o snapshot não carrega data — quem data a conta é o banco", async () => {
       const snapshot = register({ occurredOn: "2026-12-31" });
+      expect(snapshot).not.toHaveProperty("createdOn");
+
       await repository.saveAccount(snapshot, null);
-      expect((await repository.findAccountById(snapshot.id))?.createdOn).toBe(
-        "2026-12-31",
+      const row = await client.userAccount.findUnique({ where: { id: snapshot.id } });
+      // Instante real, não a data que semeou o id. (Comparar só o ano não
+      // serviria: a semente é 2026 e o relógio também está em 2026.)
+      expect(row?.createdAt.toISOString().slice(0, 10)).not.toBe("2026-12-31");
+      expect(row!.createdAt.getTime()).toBeGreaterThan(Date.now() - 60_000);
+    });
+
+    // A semente segue determinando o id, mesmo sem ser persistida.
+    it("a semente ainda determina o id", () => {
+      expect(register({ occurredOn: "2026-12-31" }).id).toBe(
+        register({ occurredOn: "2026-12-31" }).id,
+      );
+      expect(register({ occurredOn: "2026-12-31" }).id).not.toBe(
+        register({ occurredOn: "2026-01-02" }).id,
       );
     });
 

@@ -782,6 +782,16 @@ model GameWorld {
   initialClubCashMinor    BigInt // caixa inicial em unidade mínima
   currencyId              String      @db.Uuid // moeda-base do mundo (FK Currency)
   createdAt               DateTime    @default(now())
+  // R-182: o contador do mundo morava DENTRO da tabela de eventos
+  // (`DomainEventLog.sequence`/`OutboxEvent.sequence`) e não tinha dono. É
+  // daqui que sai o `worldSequence` de cada evento: o append incrementa esta
+  // linha, e o lock dela é o que garante ordem total sem gap nem duplicata
+  // (CA-REG-01).
+  //
+  // `seed` e `startDate` — o resto de R-182 — entram com a reescrita de C2, que
+  // é quem cria mundo. Hoje o seed viaja como parâmetro e o mundo NÃO é
+  // reproduzível a partir do banco.
+  worldSequence           BigInt      @default(0)
   version                 Int         @default(1)
 
   seasons           Season[]

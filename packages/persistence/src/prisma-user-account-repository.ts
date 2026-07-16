@@ -11,9 +11,10 @@ import type { PrismaClient } from "./prisma-connection.js";
  * não tem `gameWorldId` — e o `JsonWorldRepository`, indexado por mundo, não
  * conseguiria implementá-la nem se quisesse. Por isso ela é a primeira.
  *
- * `createdOn` do domínio é data do MUNDO (`YYYY-MM-DD`) e `createdAt` da tabela
- * é `DateTime`: a conversão é explícita nos dois sentidos, à meia-noite UTC.
- * Guardar o horário local aqui quebraria o determinismo que o domínio garante.
+ * `createdAt` NÃO é escrito daqui: é instante de plataforma, e quem o grava é o
+ * `@default(now())` do banco. O domínio não tem relógio — e a conta, sendo
+ * global, não tem data de mundo para pôr no lugar. Antes escrevíamos aqui a
+ * semente do id determinístico, o que perdia quando a conta de fato nasceu.
  */
 export class PrismaUserAccountRepository implements UserAccountRepository {
   public constructor(private readonly client: PrismaClient) {}
@@ -50,7 +51,6 @@ export class PrismaUserAccountRepository implements UserAccountRepository {
       name: snapshot.name,
       email: snapshot.email,
       externalSubject: snapshot.externalSubject,
-      createdAt: fromWorldDate(snapshot.createdOn),
       version: snapshot.version,
     };
 
@@ -85,7 +85,6 @@ interface UserAccountRow {
   readonly name: string;
   readonly email: string;
   readonly externalSubject: string | null;
-  readonly createdAt: Date;
   readonly version: number;
 }
 
@@ -97,19 +96,8 @@ function toSnapshot(row: UserAccountRow | null): UserAccountSnapshot | null {
     name: row.name,
     email: row.email,
     externalSubject: row.externalSubject,
-    createdOn: toWorldDate(row.createdAt),
     version: row.version,
   };
-}
-
-/** `YYYY-MM-DD` → meia-noite UTC. */
-function fromWorldDate(worldDate: string): Date {
-  return new Date(`${worldDate}T00:00:00.000Z`);
-}
-
-/** Volta só a data: o domínio não conhece hora. */
-function toWorldDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
 }
 
 function toDbStatus(status: AccountStatus): "ACTIVE" | "SUSPENDED" {

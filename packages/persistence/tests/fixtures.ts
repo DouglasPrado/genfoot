@@ -63,13 +63,10 @@ export async function seedAccount(
   email?: string,
 ): Promise<string> {
   const snapshot = accountSnapshot(email);
+  // Sem `createdAt`: é instante de plataforma, e quem o grava é o
+  // `@default(now())`. A conta é global (R-172) e não tem data de mundo.
   await client.userAccount.create({
-    data: {
-      id: snapshot.id,
-      name: snapshot.name,
-      email: snapshot.email,
-      createdAt: new Date(`${snapshot.createdOn}T00:00:00.000Z`),
-    },
+    data: { id: snapshot.id, name: snapshot.name, email: snapshot.email },
   });
   return snapshot.id;
 }

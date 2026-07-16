@@ -18,6 +18,21 @@ import { AccountStatus, type IdentityAccountRef } from "./identity-types.js";
  * `locale` NÃO mora aqui: pelo modelo canônico (`02-modelo-de-dados.md §6.3.1`)
  * é preferência de usuário (`UserLocalePreference`), não atributo de conta.
  * Guardá-lo na conta repetiria o erro que a R-172 acabou de corrigir.
+ *
+ * `createdOn` também não. A reescrita expôs uma distinção que vale para os ~70
+ * roots:
+ *
+ * - **data do mundo** rege regra de jogo, tem de ser determinística, e o
+ *   domínio a possui (ex.: `WorldParticipant.joinedOn`, coluna DATE sem
+ *   default);
+ * - **instante de plataforma** é auditoria/ops, nunca rege regra, e quem o
+ *   possui é a infra (`UserAccount.createdAt @default(now())`) — é um relógio
+ *   que o domínio deliberadamente não pode ter.
+ *
+ * A conta é global: não tem mundo, logo não tem data de mundo. O `occurredOn`
+ * do registro é SEMENTE do id determinístico, não estado — persistí-lo em
+ * `createdAt` gravava uma data de mundo numa coluna de instante e perdia quando
+ * a conta de fato nasceu.
  */
 export interface UserAccountSnapshot {
   readonly id: IdentityAccountRef;
@@ -26,7 +41,6 @@ export interface UserAccountSnapshot {
   /** Normalizado (minúsculas, sem espaços): é a chave única do modelo físico. */
   readonly email: string;
   readonly externalSubject: string | null;
-  readonly createdOn: string;
   readonly version: number;
 }
 
@@ -38,7 +52,10 @@ export interface RegisterUserAccountInput {
   readonly email: string;
   readonly name: string;
   readonly externalSubject?: string;
-  /** Data do mundo de origem; a conta é global, mas o id é determinístico. */
+  /**
+   * Semente do id determinístico, não data de criação: a conta é global e não
+   * tem mundo. Quando a conta nasceu de fato é `createdAt`, que o banco grava.
+   */
   readonly occurredOn: string;
   readonly idempotencySeed: string;
 }
@@ -78,7 +95,6 @@ export class UserAccount {
         name: input.name.trim(),
         email,
         externalSubject: subject === undefined || subject === "" ? null : subject,
-        createdOn: date.value.toString(),
         version: 1,
       }),
     );
