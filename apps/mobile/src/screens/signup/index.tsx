@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -91,17 +91,28 @@ export function Signup() {
 
   const confirmCode = useCallback(async () => {
     const verified = await signUp.verifications.verifyEmailCode({ code });
-    if (verified.error) {
-      setErrors(mapClerkError(verified.error));
-      return;
-    }
-    const done = await signUp.finalize();
-    if (done.error) {
-      setErrors(mapClerkError(done.error));
-      return;
-    }
-    router.replace("/");
-  }, [code, router, signUp]);
+    if (verified.error) setErrors(mapClerkError(verified.error));
+    // Sucesso não navega aqui: o status vira `complete` e o efeito abaixo
+    // finaliza. Assim o cadastro concluído por qualquer caminho (código,
+    // retomada) termina igual.
+  }, [code, signUp]);
+
+  // `finalize` converte o cadastro completo em sessão ativa. Roda uma vez só:
+  // sem a trava, cada re-render dispararia outra tentativa.
+  const finalizing = useRef(false);
+  useEffect(() => {
+    if (step !== "complete" || finalizing.current) return;
+    finalizing.current = true;
+    void (async () => {
+      const done = await signUp.finalize();
+      if (done.error) {
+        setErrors(mapClerkError(done.error));
+        finalizing.current = false;
+        return;
+      }
+      router.replace("/");
+    })();
+  }, [router, signUp, step]);
 
   const withGoogle = useCallback(async () => {
     try {
@@ -129,7 +140,27 @@ export function Signup() {
     >
       <Text style={styles.logo}>GRINTA</Text>
 
-      {step === "verify-email" ? (
+      {step === "complete" ? (
+        <>
+          <Text style={styles.heading}>CONTA CRIADA</Text>
+          <Text style={styles.help}>Entrando…</Text>
+          {/* Se `finalize` falhar, o erro aparece aqui — antes esta tela caía
+              no formulário e o erro sumia. */}
+          {formError === null ? null : (
+            <>
+              <Text style={styles.formError}>{formError}</Text>
+              <Primary
+                label="TENTAR DE NOVO"
+                onPress={() => {
+                  finalizing.current = false;
+                  setErrors([]);
+                }}
+                disabled={busy}
+              />
+            </>
+          )}
+        </>
+      ) : step === "verify-email" ? (
         <>
           <Text style={styles.heading}>CONFIRME SEU E-MAIL</Text>
           <Text style={styles.help}>Enviamos um código para {pendingEmail}.</Text>
