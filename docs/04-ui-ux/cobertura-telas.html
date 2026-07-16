@@ -388,7 +388,7 @@
         <span class="stat-l">Prontas</span>
       </div>
       <div class="stat is-partial">
-        <span class="stat-n">14</span>
+        <span class="stat-n">15</span>
         <span class="stat-l">Parciais</span>
       </div>
       <div class="stat is-read">
@@ -396,14 +396,14 @@
         <span class="stat-l">Fragmento de leitura</span>
       </div>
       <div class="stat is-missing">
-        <span class="stat-n">94</span>
+        <span class="stat-n">93</span>
         <span class="stat-l">Zero implementação</span>
       </div>
     </div>
 
-    <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 14 amarelas têm caminho real, mas não fecham.</p>
+    <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 15 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>b3a77da</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>52a6e8e</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -459,12 +459,12 @@
         <span class="arch-id">L-M01</span>
         <span class="arch-name">Wizard — autenticação, onboarding, entrada</span>
         <span class="risk medium">Risco médio</span>
-        <span class="arch-count"><b>4</b> parciais / 14</span>
+        <span class="arch-count"><b>5</b> parciais / 14</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-SPLASH</span><span class="chip-d">Checa contrato e roteia. Loading, erro com retry e bloqueio "atualize o app" verificados no simulador. Não fecha: falta link à store e WebSocket/deep link</span><span class="tag">falta store + deep link</span></div>
         <div class="chip missing"><span class="chip-id">M-LOGIN</span><span class="chip-d">Login — <b>travada no domínio</b>: não há e-mail na conta nem verificação de credencial</span></div>
-        <div class="chip missing"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro — <b>travada</b>: registerAccount não tem identificador de conta</span></div>
+        <div class="chip partial"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro via Clerk: e-mail, senha, aceite de termos e código por e-mail — verificados no simulador com conta real criada. Não fecha: falta Apple, e Google segue sem teste</span><span class="tag">falta Apple</span></div>
         <div class="chip missing"><span class="chip-id">M-RECOVER</span><span class="chip-d">Recuperação de senha — <b>travada</b>: sem e-mail e sem envio</span></div>
         <div class="chip missing"><span class="chip-id">M-WORLD-PICK</span><span class="chip-d">Seleção de mundo — o mundo é uma constante</span></div>
         <div class="chip partial"><span class="chip-id">M-CLUB-PICK</span><span class="chip-d">Escolher clube — lista real, sem filtro nem região</span><span class="tag">parcial</span></div>
@@ -687,8 +687,8 @@
         <p><b>Ainda trava.</b> As <span class="num">4</span> chamadas de rota do app continuam sendo <code>router.replace</code>: não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. O M-SPLASH abriu a primeira divisão real — <code>/</code> virou o splash e a home foi para <code>/inicio</code>, levando a árvore de 6 para <span class="num">7</span> rotas — mas empilhar tela sobre tela ainda é impossível. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Continua pré-requisito de quase todo o L-M03.</p>
       </div>
       <div class="blocker">
-        <h3>Não existe autenticação — M-LOGIN, M-SIGNUP, M-RECOVER e M-ACCOUNT estão travadas</h3>
-        <p>A palavra <code>email</code> não aparece em <code>packages/core/src</code> nem em <code>apps/api/src</code>: <code>AccountSnapshot</code> não tem identificador, então não há como achar uma conta. Nenhum command verifica credencial — <code>registerAccount</code> aceita <code>secretHash</code>, mas nada lê esse hash, e <code>startSession</code> recebe <code>accountId</code> + <code>tokenHash</code> e confia. <code>POST /auth/session</code> emite Bearer para qualquer <code>subject</code>; a doc do próprio endpoint diz que a verificação contra C1 "é evolução". Enquanto isso não existir, uma tela de login aceitaria qualquer senha — seria login falso, não tela parcial. É trava de domínio, não de UI.</p>
+        <h3>Autenticação existe no cliente, mas a API ainda não a exige</h3>
+        <p><b>Destravou em parte.</b> O Clerk (R-171) passou a ser o provedor: o cadastro cria conta real, com e-mail verificado por código — exercitado no simulador. Some a trava antiga de "não existe e-mail nem verificação de credencial". <b>O que ainda trava:</b> <code>POST /auth/session</code> continua emitindo Bearer para qualquer <code>subject</code>, sem prova, então autenticar no Clerk ainda não é autenticar no jogo. Enquanto a API não verificar o token, M-LOGIN não fecha e a tabela de usuários do admin lista só o <code>DEV_SUBJECT</code>. Apple segue indisponível: desabilitado na instância e exige conta Apple Developer + development build (não roda em Expo Go).</p>
       </div>
       <div class="blocker">
         <h3>Sem app publicado, telas que apontam para a loja não fecham</h3>
@@ -718,6 +718,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-16</span>
+        <span class="log-text"><b>M-SIGNUP entra amarela</b> (<code>52a6e8e</code>) — 14 → 15 parciais. Cadastro via Clerk exercitado por uma pessoa no iPhone 17 Pro: conta real criada, e-mail <code>verified (email_code)</code> confirmado via <code>clerk users list</code>, e o app entra na Home. <b>Não é verde</b>: o doc pede provedor Apple/Google — Apple está desabilitado e exige conta Apple Developer + dev build; Google está implementado mas ainda sem teste. Bug achado pelo teste real: ao concluir, o render caía no <code>else</code> e redesenhava o formulário — parecia que o cadastro tinha falhado quando tinha dado certo. Trava de autenticação revisada: caiu a parte do cliente, continua a da API.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-16</span>
         <span class="log-text"><b>Verde passa a exigir 100%; parcial vira amarelo.</b> As 11 telas antes contadas como "com tela" eram todas incompletas — foram recoloridas. <b>Nenhuma tela está pronta.</b> M-SPLASH entra amarela (<code>9ce106b</code>): checa contrato e roteia, com loading, erro/retry e bloqueio "atualize o app" verificados no iPhone 17 Pro contra a API real; não fecha porque faltam link à store e WebSocket/deep link. Dois bugs achados exercitando, não lendo: <code>router.replace</code> em loop deixava a tela preta, e o rodapé dizia "CONECTADO" enquanto o painel dizia "SEM CONEXÃO". Trava nova: sem app publicado não existe URL de loja. Trava de navegação continua — a árvore foi de 6 para 7 rotas, mas ainda não há <code>router.push</code>.</span>
