@@ -229,7 +229,7 @@ export function Onboarding() {
       );
       return;
     }
-    if (step.kind === "complete") router.replace("/");
+    if (step.kind === "complete") router.replace("/inicio");
   }, [
     execute,
     refresh,

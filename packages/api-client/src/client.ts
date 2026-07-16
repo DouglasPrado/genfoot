@@ -32,6 +32,13 @@ export interface ClientOptions {
   readonly onTelemetry?: (event: CommandTelemetryEvent) => void;
 }
 
+/**
+ * Versão do contrato que este SDK fala. Vai em todo command e é comparada com a
+ * `contractVersion` do `/health` no bootstrap do cliente: major diferente é
+ * `BREAKING` e exige atualizar o app (doc 08 §versionamento).
+ */
+export const CONTRACT_VERSION = "v1";
+
 let correlationCounter = 0;
 
 /**
@@ -136,7 +143,7 @@ export class GrintaClient {
   async command(envelope: CommandEnvelope): Promise<CommandResponse> {
     correlationCounter += 1;
     const full = {
-      contractVersion: "v1",
+      contractVersion: CONTRACT_VERSION,
       payload: {},
       correlationId: `sdk-${correlationCounter}`,
       ...envelope,

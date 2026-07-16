@@ -32,7 +32,7 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }} />
+      <Tabs.Screen name="inicio" options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }} />
       <Tabs.Screen name="elenco" options={{ title: "ELENCO", tabBarIcon: tabIcon("people") }} />
       <Tabs.Screen name="partidas" options={{ title: "PARTIDAS", tabBarIcon: tabIcon("trophy") }} />
       <Tabs.Screen name="mercado" options={{ title: "MERCADO", tabBarIcon: tabIcon("transfer") }} />
