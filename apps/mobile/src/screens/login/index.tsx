@@ -197,6 +197,11 @@ export function Login() {
 function Field({
   label,
   error,
+  // Explícito de propósito: passos diferentes renderizam um Field na mesma
+  // posição da árvore, então o React reusa a TextInput nativa. Sem valor
+  // declarado, o campo herdava o teclado do passo anterior — a senha só
+  // aceitava números depois da tela de código.
+  keyboardType = "default",
   ...input
 }: {
   label: string;
@@ -208,6 +213,7 @@ function Field({
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={color.textFaint}
+        keyboardType={keyboardType}
         style={[styles.input, error === null ? null : styles.inputError]}
         {...input}
       />

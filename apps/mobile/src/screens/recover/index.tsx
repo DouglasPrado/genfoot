@@ -147,6 +147,7 @@ export function Recover() {
           <Text style={styles.help}>Código confirmado. Escolha a nova senha.</Text>
 
           <Field
+            key="new-password"
             label="NOVA SENHA"
             value={password}
             onChangeText={setPassword}
@@ -175,6 +176,7 @@ export function Recover() {
           </Text>
 
           <Field
+            key="code"
             label="CÓDIGO"
             value={code}
             onChangeText={setCode}
@@ -202,6 +204,7 @@ export function Recover() {
           </Text>
 
           <Field
+            key="email"
             label="E-MAIL"
             value={email}
             onChangeText={(v) => {
@@ -240,6 +243,11 @@ export function Recover() {
 function Field({
   label,
   error,
+  // Explícito de propósito: passos diferentes renderizam um Field na mesma
+  // posição da árvore, então o React reusa a TextInput nativa. Sem valor
+  // declarado, o campo herdava o teclado do passo anterior — a senha só
+  // aceitava números depois da tela de código.
+  keyboardType = "default",
   ...input
 }: {
   label: string;
@@ -251,6 +259,7 @@ function Field({
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={color.textFaint}
+        keyboardType={keyboardType}
         style={[styles.input, error === null ? null : styles.inputError]}
         {...input}
       />
