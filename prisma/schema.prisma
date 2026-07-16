@@ -105,6 +105,13 @@ enum ClubControlStatus {
   ENDED
 }
 
+enum ClubEntryReservationStatus {
+  HELD
+  CONFIRMED
+  EXPIRED
+  RELEASED
+}
+
 enum ClubStatus {
   ACTIVE
   INACTIVE
@@ -685,6 +692,7 @@ model WorldParticipant {
   gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id])
   user         UserAccount   @relation(fields: [userId], references: [id])
   clubControls ClubControl[]
+  clubEntryReservations ClubEntryReservation[]
 
   @@unique([gameWorldId, userId]) // 1 participação por usuário/mundo
   @@unique([gameWorldId, id])
@@ -879,6 +887,7 @@ model Club {
 
   gameWorld         GameWorld              @relation(fields: [gameWorldId], references: [id])
   controls          ClubControl[]
+  entryReservations ClubEntryReservation[]
   departments       ClubDepartment[]
   aiProfile         ClubAIProfile?
   players           Player[]
@@ -917,6 +926,38 @@ model Club {
 ///
 /// `endedReason` passa a existir: `ClubControlEndedEvent.reason` é obrigatório
 /// no domínio e não tinha coluna — o motivo evaporava na gravação.
+/// Retenção temporária da vaga num clube, com TTL (R-25).
+///
+/// Root canônico que não tinha tabela: 9 campos sem destino, e a reserva vivia
+/// dentro do blob de identidade do mundo. Não era detalhe de gravação —
+/// expirar reserva varrendo um blob JSON não é o mesmo produto que expirar por
+/// índice em `expiresOn`, que é o que `@@index([status, expiresOn])` dá.
+///
+/// "1 reserva HELD por clube" é índice único PARCIAL, em SQL cru na migration.
+/// Já "não reservar clube com controle ativo" cruza agregados e não vira
+/// constraint: fica no caso de uso, com o índice parcial do `ClubControl` como
+/// árbitro final na hora de confirmar. A reserva é retenção mole com prazo; a
+/// vaga só é de fato tomada quando o controle nasce.
+model ClubEntryReservation {
+  id                 String                     @id @db.Uuid
+  gameWorldId        String                     @db.Uuid
+  clubId             String                     @db.Uuid
+  worldParticipantId String                     @db.Uuid
+  status             ClubEntryReservationStatus @default(HELD)
+  heldOn             DateTime                   @db.Date
+  expiresOn          DateTime                   @db.Date
+  version            Int                        @default(1)
+
+  club             Club             @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  worldParticipant WorldParticipant @relation(fields: [gameWorldId, worldParticipantId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId, worldParticipantId])
+  // O varredor de vencidas acha as suas por índice, não lendo o mundo inteiro.
+  @@index([status, expiresOn])
+}
+
 model ClubControl {
   id                 String            @id @db.Uuid
   gameWorldId        String            @db.Uuid
