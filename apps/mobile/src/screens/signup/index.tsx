@@ -284,7 +284,10 @@ export function Signup() {
             <Text style={styles.secondaryText}>CONTINUAR COM GOOGLE</Text>
           </Pressable>
 
-          <Pressable accessibilityRole="button" onPress={() => router.replace("/")}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace("/entrar")}
+          >
             <Text style={styles.link}>Já tenho conta</Text>
           </Pressable>
         </>

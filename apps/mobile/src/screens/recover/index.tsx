@@ -222,8 +222,11 @@ export function Recover() {
         </>
       )}
 
-      <Pressable accessibilityRole="button" onPress={() => router.replace("/")}>
-        <Text style={styles.link}>Voltar</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.replace("/entrar")}
+      >
+        <Text style={styles.link}>Voltar para entrar</Text>
       </Pressable>
     </ScrollView>
     </SafeAreaView>

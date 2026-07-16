@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { CONTRACT_VERSION } from "@grinta/api-client";
+import { useAuth } from "@clerk/expo";
 
 import { ProgressBar } from "@/components/progress-bar";
 import { useSession } from "@/lib/session";
@@ -23,6 +24,7 @@ const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
 export function SplashScreen() {
   const router = useRouter();
   const { session, status, contractVersion, retry } = useSession();
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const identityQuery = useWorldQuery<MobileIdentityProjection>(
     session === null ? null : "identity-detail",
   );
@@ -50,6 +52,9 @@ export function SplashScreen() {
     serverContractVersion: contractVersion,
     clientContractVersion: CONTRACT_VERSION,
     hasActiveControl,
+    // null enquanto o Clerk carrega: decidir agora mandaria ao login quem já
+    // tem conta, num piscar.
+    hasAccount: clerkLoaded ? isSignedIn : null,
     identityFailed:
       identityQuery.state === "error" || identityQuery.state === "offline",
   });

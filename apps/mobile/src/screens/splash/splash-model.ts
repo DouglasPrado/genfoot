@@ -13,7 +13,10 @@ export type SplashDecision =
       readonly server: string;
     }
   | { readonly kind: "network-error" }
-  | { readonly kind: "route"; readonly to: "/onboarding" | "/inicio" };
+  | {
+      readonly kind: "route";
+      readonly to: "/onboarding" | "/inicio" | "/entrar";
+    };
 
 export interface SplashInput {
   readonly status: ConnectionStatus;
@@ -22,6 +25,8 @@ export interface SplashInput {
   readonly clientContractVersion: string;
   /** null enquanto a projeção de identidade não resolveu. */
   readonly hasActiveControl: boolean | null;
+  /** Conta do provedor conectada neste aparelho; null enquanto carrega. */
+  readonly hasAccount: boolean | null;
   /** A projeção de identidade falhou (erro/offline), mesmo com sessão aberta. */
   readonly identityFailed?: boolean;
 }
@@ -67,6 +72,7 @@ export function deriveSplashDecision(input: SplashInput): SplashDecision {
     serverContractVersion,
     clientContractVersion,
     hasActiveControl,
+    hasAccount,
     identityFailed = false,
   } = input;
 
@@ -83,6 +89,11 @@ export function deriveSplashDecision(input: SplashInput): SplashDecision {
       server: serverContractVersion,
     };
   }
+
+  // MF-00: sem sessão → M-LOGIN. Vem antes da identidade do jogo: sem conta
+  // não se olha clube.
+  if (hasAccount === null) return { kind: "loading" };
+  if (!hasAccount) return { kind: "route", to: "/entrar" };
 
   if (identityFailed) return { kind: "network-error" };
   if (hasActiveControl === null) return { kind: "loading" };

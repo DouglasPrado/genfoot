@@ -43,6 +43,7 @@ describe("deriveSplashDecision", () => {
     serverContractVersion: "v1",
     clientContractVersion: "v1",
     hasActiveControl: true as boolean | null,
+    hasAccount: true as boolean | null,
   };
 
   it("carrega enquanto a sessão está conectando", () => {
@@ -106,6 +107,40 @@ describe("deriveSplashDecision", () => {
         hasActiveControl: null,
       }),
     ).toEqual({ kind: "network-error" });
+  });
+
+  // MF-00: "Sem sessão → M-LOGIN". Antes o splash decidia pela sessão de
+  // desenvolvimento e mostrava o clube para quem estava deslogado no Clerk.
+  it("sem conta conectada, roteia para o login", () => {
+    expect(
+      deriveSplashDecision({ ...base, hasAccount: false }),
+    ).toEqual({ kind: "route", to: "/entrar" });
+  });
+
+  it("aguarda a conta resolver antes de decidir", () => {
+    expect(deriveSplashDecision({ ...base, hasAccount: null })).toEqual({
+      kind: "loading",
+    });
+  });
+
+  it("contrato BREAKING vence o login — nem entrar adianta", () => {
+    expect(
+      deriveSplashDecision({
+        ...base,
+        hasAccount: false,
+        serverContractVersion: "v2",
+      }).kind,
+    ).toBe("upgrade-required");
+  });
+
+  it("login vence a identidade do jogo: sem conta não se olha clube", () => {
+    expect(
+      deriveSplashDecision({
+        ...base,
+        hasAccount: false,
+        hasActiveControl: true,
+      }),
+    ).toEqual({ kind: "route", to: "/entrar" });
   });
 
   it("mostra erro de rede quando a identidade falhou, mesmo com sessão online", () => {
