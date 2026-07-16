@@ -14,7 +14,7 @@ export interface FieldError {
   readonly messageKey: string;
 }
 
-export type RecoverStep = "request" | "reset" | "complete";
+export type RecoverStep = "request" | "code" | "new-password" | "complete";
 
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,14 +30,15 @@ export function validateRecoverEmail(email: string): readonly FieldError[] {
   return [];
 }
 
-export function validateNewPassword(
-  code: string,
-  password: string,
-): readonly FieldError[] {
-  const errors: FieldError[] = [];
+export function validateCode(code: string): readonly FieldError[] {
   if (code.trim() === "") {
-    errors.push({ field: "code", messageKey: "Código é obrigatório." });
+    return [{ field: "code", messageKey: "Código é obrigatório." }];
   }
+  return [];
+}
+
+export function validateNewPassword(password: string): readonly FieldError[] {
+  const errors: FieldError[] = [];
   if (password === "") {
     errors.push({ field: "password", messageKey: "Senha é obrigatória." });
   } else if (password.length < MIN_PASSWORD_LENGTH) {
@@ -82,9 +83,15 @@ export function isIdentifierNotFound(error: unknown): boolean {
 }
 
 /**
- * Passo da tela. `sent` é nosso, não do Clerk: com e-mail inexistente não há
- * sign-in nenhum, e mesmo assim precisamos seguir para o passo do código para
- * não denunciar a ausência da conta.
+ * Passo da tela. Verificar o código e definir a senha são passos SEPARADOS:
+ * `verifyCode` consome a verificação e o status vira `needs_new_password`.
+ * Juntos num passo só, o botão reverificava um código já consumido e o Clerk
+ * respondia "not sent" — não há verificação pendente —, acusando falha depois
+ * de ter dado certo.
+ *
+ * `sent` é nosso, não do Clerk: com e-mail inexistente não há sign-in nenhum, e
+ * mesmo assim seguimos ao passo do código para não denunciar a ausência da
+ * conta.
  *
  * Quem tem sessão ativa nem chega aqui: o guard de `(auth)/_layout` redireciona
  * — era o "Session already exists" que o Clerk devolvia ao tentar.
@@ -94,7 +101,8 @@ export function deriveRecoverStep(
   sent: boolean,
 ): RecoverStep {
   if (status === "complete") return "complete";
-  if (sent || status === "needs_new_password") return "reset";
+  if (status === "needs_new_password") return "new-password";
+  if (sent) return "code";
   return "request";
 }
 

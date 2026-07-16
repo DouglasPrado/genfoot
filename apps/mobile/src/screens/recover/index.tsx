@@ -16,6 +16,7 @@ import {
   deriveRecoverStep,
   isIdentifierNotFound,
   mapRecoverError,
+  validateCode,
   validateNewPassword,
   validateRecoverEmail,
   type FieldError,
@@ -43,6 +44,9 @@ export function Recover() {
   const [errors, setErrors] = useState<readonly FieldError[]>([]);
 
   const busy = fetchStatus === "fetching";
+  // O estado local se perde ao recarregar a tela; o sign-in do Clerk não.
+  const pendingEmail =
+    signIn?.identifier ?? (email.trim() === "" ? "esse e-mail" : email.trim());
   // `isLoaded` primeiro: enquanto o Clerk carrega, `isSignedIn` é indefinido e
   // tratá-lo como "fora" deixaria o formulário piscar antes do guard.
   const step = deriveRecoverStep(signIn?.status ?? null, sent);
@@ -75,24 +79,31 @@ export function Recover() {
     setSent(true);
   }, [email, signIn]);
 
-  const submitNewPassword = useCallback(async () => {
-    const local = validateNewPassword(code, password);
+  // Verificar consome o código: o status vira `needs_new_password` e a tela
+  // avança. Reverificar depois disso devolve "not sent".
+  const confirmCode = useCallback(async () => {
+    const local = validateCode(code);
     if (local.length > 0) {
       setErrors(local);
       return;
     }
     setErrors([]);
-
     const verified = await signIn.resetPasswordEmailCode.verifyCode({ code });
-    if (verified.error) {
-      setErrors(mapRecoverError(verified.error));
+    if (verified.error) setErrors(mapRecoverError(verified.error));
+  }, [code, signIn]);
+
+  const submitNewPassword = useCallback(async () => {
+    const local = validateNewPassword(password);
+    if (local.length > 0) {
+      setErrors(local);
       return;
     }
+    setErrors([]);
     const submitted = await signIn.resetPasswordEmailCode.submitPassword({
       password,
     });
     if (submitted.error) setErrors(mapRecoverError(submitted.error));
-  }, [code, password, signIn]);
+  }, [password, signIn]);
 
   // Mesmo padrão do M-SIGNUP: `finalize` roda uma vez ao completar, e o
   // sucesso navega daqui — não de dentro do submit.
@@ -130,22 +141,11 @@ export function Recover() {
             <Text style={styles.formError}>{formError}</Text>
           )}
         </>
-      ) : step === "reset" ? (
+      ) : step === "new-password" ? (
         <>
           <Text style={styles.heading}>DEFINA A NOVA SENHA</Text>
-          {/* Neutra de propósito: não diz se a conta existe. */}
-          <Text style={styles.help}>
-            Se houver uma conta para {email.trim()}, enviamos um código.
-          </Text>
+          <Text style={styles.help}>Código confirmado. Escolha a nova senha.</Text>
 
-          <Field
-            label="CÓDIGO"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            error={errorFor(errors, "code")}
-          />
           <Field
             label="NOVA SENHA"
             value={password}
@@ -160,8 +160,36 @@ export function Recover() {
           )}
 
           <Primary
-            label={busy ? "REDEFININDO…" : "REDEFINIR SENHA"}
+            label={busy ? "SALVANDO…" : "SALVAR SENHA"}
             onPress={() => void submitNewPassword()}
+            disabled={busy}
+          />
+        </>
+      ) : step === "code" ? (
+        <>
+          <Text style={styles.heading}>CONFIRME O CÓDIGO</Text>
+          {/* Neutra de propósito: não diz se a conta existe. O e-mail vem do
+              sign-in em curso, que sobrevive a recarregar a tela. */}
+          <Text style={styles.help}>
+            Se houver uma conta para {pendingEmail}, enviamos um código.
+          </Text>
+
+          <Field
+            label="CÓDIGO"
+            value={code}
+            onChangeText={setCode}
+            keyboardType="number-pad"
+            autoComplete="one-time-code"
+            error={errorFor(errors, "code")}
+          />
+
+          {formError === null ? null : (
+            <Text style={styles.formError}>{formError}</Text>
+          )}
+
+          <Primary
+            label={busy ? "CONFIRMANDO…" : "CONFIRMAR CÓDIGO"}
+            onPress={() => void confirmCode()}
             disabled={busy}
           />
         </>

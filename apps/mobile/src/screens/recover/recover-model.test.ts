@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveRecoverStep,
+  validateCode,
   isIdentifierNotFound,
   mapRecoverError,
   validateNewPassword,
@@ -26,25 +27,31 @@ describe("validateRecoverEmail", () => {
   });
 });
 
-describe("validateNewPassword", () => {
-  it("aceita código e senha novos", () => {
-    expect(validateNewPassword("123456", "uma-senha-nova-42")).toEqual([]);
+describe("validateCode", () => {
+  it("aceita código preenchido", () => {
+    expect(validateCode("123456")).toEqual([]);
   });
 
   it("exige o código", () => {
-    expect(validateNewPassword("", "uma-senha-nova-42")).toEqual([
+    expect(validateCode(" ")).toEqual([
       { field: "code", messageKey: "Código é obrigatório." },
     ]);
   });
+});
+
+describe("validateNewPassword", () => {
+  it("aceita senha nova", () => {
+    expect(validateNewPassword("uma-senha-nova-42")).toEqual([]);
+  });
 
   it("exige a senha nova", () => {
-    expect(validateNewPassword("123456", "")).toEqual([
+    expect(validateNewPassword("")).toEqual([
       { field: "password", messageKey: "Senha é obrigatória." },
     ]);
   });
 
   it("recusa senha curta antes de ir à rede", () => {
-    expect(validateNewPassword("123456", "abc")).toEqual([
+    expect(validateNewPassword("abc")).toEqual([
       { field: "password", messageKey: "Use ao menos 8 caracteres." },
     ]);
   });
@@ -73,8 +80,20 @@ describe("deriveRecoverStep", () => {
     expect(deriveRecoverStep(null, false)).toBe("request");
   });
 
-  it("pede a senha nova quando o código foi aceito", () => {
-    expect(deriveRecoverStep("needs_new_password", true)).toBe("reset");
+  it("pede o código depois do envio", () => {
+    expect(deriveRecoverStep("needs_first_factor", true)).toBe("code");
+  });
+
+  // Regressão: verificar e definir senha eram o MESMO passo, então o botão
+  // chamava verifyCode de novo sobre um código já verificado. O Clerk devolve
+  // "not sent" (não há verificação pendente) e a tela acusava falha depois de
+  // ter dado certo.
+  it("depois do código aceito, pede só a senha nova", () => {
+    expect(deriveRecoverStep("needs_new_password", true)).toBe("new-password");
+  });
+
+  it("senha nova pendente vence o envio: nunca volta a pedir código", () => {
+    expect(deriveRecoverStep("needs_new_password", false)).toBe("new-password");
   });
 
   it("conclui quando o sign-in completa", () => {
@@ -83,6 +102,12 @@ describe("deriveRecoverStep", () => {
 
   it("completo vence o envio pendente", () => {
     expect(deriveRecoverStep("complete", false)).toBe("complete");
+  });
+
+  // E-mail inexistente não cria sign-in; ainda assim vamos ao passo do código
+  // para não denunciar a ausência da conta.
+  it("sem sign-in mas com envio confirmado, segue ao código", () => {
+    expect(deriveRecoverStep(null, true)).toBe("code");
   });
 });
 
