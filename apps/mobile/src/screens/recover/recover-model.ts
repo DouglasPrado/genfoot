@@ -14,7 +14,7 @@ export interface FieldError {
   readonly messageKey: string;
 }
 
-export type RecoverStep = "request" | "reset" | "complete";
+export type RecoverStep = "request" | "reset" | "complete" | "signed-in";
 
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,12 +68,18 @@ export function isIdentifierNotFound(error: unknown): boolean {
  * Passo da tela. `sent` é nosso, não do Clerk: com e-mail inexistente não há
  * sign-in nenhum, e mesmo assim precisamos seguir para o passo do código para
  * não denunciar a ausência da conta.
+ *
+ * `signedIn` guarda a entrada: recuperar senha é fluxo de quem está fora, e o
+ * Clerk recusa `signIn.create()` com sessão ativa ("Session already exists").
+ * Vem depois de `complete` porque o próprio reset termina criando sessão.
  */
 export function deriveRecoverStep(
   status: string | null,
   sent: boolean,
+  signedIn = false,
 ): RecoverStep {
   if (status === "complete") return "complete";
+  if (signedIn) return "signed-in";
   if (sent || status === "needs_new_password") return "reset";
   return "request";
 }

@@ -7,9 +7,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as AuthSession from "expo-auth-session";
-import { useSSO, useSignUp } from "@clerk/expo";
+import { useAuth, useSSO, useSignUp } from "@clerk/expo";
 
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import {
@@ -43,6 +44,7 @@ export function Signup() {
   const router = useRouter();
   const { signUp, fetchStatus } = useSignUp();
   const { startSSOFlow } = useSSO();
+  const { isLoaded, isSignedIn, signOut } = useAuth();
 
   const [form, setForm] = useState<SignupForm>(EMPTY);
   const [code, setCode] = useState("");
@@ -133,6 +135,7 @@ export function Signup() {
   const formError = errorFor(visible, "form");
 
   return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.content}
@@ -140,7 +143,25 @@ export function Signup() {
     >
       <Text style={styles.logo}>GRINTA</Text>
 
-      {step === "complete" ? (
+      {isLoaded && isSignedIn && step !== "complete" ? (
+        <>
+          <Text style={styles.heading}>VOCÊ JÁ ESTÁ CONECTADO</Text>
+          <Text style={styles.help}>
+            Já existe uma conta ativa neste aparelho. Saia antes de criar outra.
+          </Text>
+          <Primary
+            label="SAIR"
+            onPress={() => void signOut()}
+            disabled={!isLoaded}
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace("/")}
+          >
+            <Text style={styles.link}>Voltar ao app</Text>
+          </Pressable>
+        </>
+      ) : step === "complete" ? (
         <>
           <Text style={styles.heading}>CONTA CRIADA</Text>
           <Text style={styles.help}>Entrando…</Text>
@@ -269,6 +290,7 @@ export function Signup() {
         </>
       )}
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -318,8 +340,9 @@ function Primary({
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: color.background },
   root: { flex: 1, backgroundColor: color.background },
-  content: { padding: space.lg, paddingTop: space.xl * 2, gap: space.md },
+  content: { padding: space.lg, gap: space.md, paddingBottom: space.xl4 },
   logo: { ...display, fontSize: 32, letterSpacing: 1.5, textAlign: "center" },
   heading: {
     ...display,

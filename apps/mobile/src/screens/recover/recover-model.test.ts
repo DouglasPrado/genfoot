@@ -73,6 +73,22 @@ describe("deriveRecoverStep", () => {
     expect(deriveRecoverStep(null, false)).toBe("request");
   });
 
+  // Regressão: com sessão do Clerk ativa, signIn.create() falha com
+  // "Session already exists" e o erro cru vazava para a tela. Recuperação é
+  // fluxo de quem está fora (o doc alcança M-RECOVER por M-LOGIN).
+  it("com sessão ativa a tela não tenta recuperar — pede sair antes", () => {
+    expect(deriveRecoverStep(null, false, true)).toBe("signed-in");
+  });
+
+  it("sessão ativa vence até o envio já feito", () => {
+    expect(deriveRecoverStep(null, true, true)).toBe("signed-in");
+  });
+
+  it("mas não atrapalha a conclusão do próprio reset", () => {
+    // Ao redefinir, o finalize cria sessão: `complete` tem de vencer.
+    expect(deriveRecoverStep("complete", true, true)).toBe("complete");
+  });
+
   it("vai ao código assim que o envio é confirmado, mesmo sem sign-in", () => {
     // E-mail inexistente não cria sign-in; ainda assim seguimos ao passo do
     // código, senão a tela revelaria que a conta não existe.

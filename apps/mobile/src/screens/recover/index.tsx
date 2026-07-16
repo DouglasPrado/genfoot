@@ -7,8 +7,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useSignIn } from "@clerk/expo";
+import { useAuth, useSignIn } from "@clerk/expo";
 
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import {
@@ -34,6 +35,7 @@ function errorFor(
 export function Recover() {
   const router = useRouter();
   const { signIn, fetchStatus } = useSignIn();
+  const { isLoaded, isSignedIn, signOut } = useAuth();
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -42,7 +44,13 @@ export function Recover() {
   const [errors, setErrors] = useState<readonly FieldError[]>([]);
 
   const busy = fetchStatus === "fetching";
-  const step = deriveRecoverStep(signIn?.status ?? null, sent);
+  // `isLoaded` primeiro: enquanto o Clerk carrega, `isSignedIn` é indefinido e
+  // tratá-lo como "fora" deixaria o formulário piscar antes do guard.
+  const step = deriveRecoverStep(
+    signIn?.status ?? null,
+    sent,
+    isLoaded && isSignedIn,
+  );
 
   const request = useCallback(async () => {
     const local = validateRecoverEmail(email);
@@ -111,6 +119,7 @@ export function Recover() {
   const formError = errorFor(errors, "form");
 
   return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.content}
@@ -118,7 +127,26 @@ export function Recover() {
     >
       <Text style={styles.logo}>GRINTA</Text>
 
-      {step === "complete" ? (
+      {step === "signed-in" ? (
+        <>
+          <Text style={styles.heading}>VOCÊ JÁ ESTÁ CONECTADO</Text>
+          <Text style={styles.help}>
+            Recuperar acesso é para quem não consegue entrar. Para trocar a
+            senha estando conectado, saia primeiro.
+          </Text>
+          <Primary
+            label="SAIR E RECUPERAR"
+            onPress={() => void signOut()}
+            disabled={!isLoaded}
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace("/")}
+          >
+            <Text style={styles.link}>Voltar ao app</Text>
+          </Pressable>
+        </>
+      ) : step === "complete" ? (
         <>
           <Text style={styles.heading}>SENHA REDEFINIDA</Text>
           <Text style={styles.help}>Entrando…</Text>
@@ -198,6 +226,7 @@ export function Recover() {
         <Text style={styles.link}>Voltar</Text>
       </Pressable>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -247,8 +276,9 @@ function Primary({
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: color.background },
   root: { flex: 1, backgroundColor: color.background },
-  content: { padding: space.lg, paddingTop: space.xl * 2, gap: space.md },
+  content: { padding: space.lg, gap: space.md, paddingBottom: space.xl4 },
   logo: { ...display, fontSize: 32, letterSpacing: 1.5, textAlign: "center" },
   heading: { ...display, fontSize: fontSize.lg, marginTop: space.lg },
   help: {

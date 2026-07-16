@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { CONTRACT_VERSION } from "@grinta/api-client";
@@ -61,7 +62,7 @@ export function SplashScreen() {
   }, [target, router]);
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       <View style={styles.center}>
         <Text style={styles.logo}>GRINTA</Text>
 
@@ -108,7 +109,7 @@ export function SplashScreen() {
         <Text style={styles.meta}>VERSÃO {CLIENT_VERSION}</Text>
         <Text style={styles.meta}>{connectionLabel(status, decision)}</Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -27,6 +27,7 @@ import {
   type VisualIdentity,
 } from "@/screens/club/customization/visual-identity";
 import { deriveScreenState } from "@/lib/screen-state";
+import { useAuth, useUser } from "@clerk/expo";
 import { useWorldQuery } from "@/lib/world";
 import { useWorldId } from "@/lib/world";
 import { useSession } from "@/lib/session";
@@ -67,6 +68,8 @@ interface LedgerSummaryProjection {
 
 /** Tela de Clube: identidade, finanças e infraestrutura. */
 export function Club() {
+  const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
   const worldId = useWorldId();
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
@@ -444,6 +447,52 @@ export function Club() {
           </Card>
         ) : null}
 
+        {/* Conta vive aqui provisoriamente; a casa canônica é o M-ACCOUNT
+            ("Conta e sessão", L-M09), que ainda não existe. O card mostra o
+            estado real em vez de sumir: hoje a sessão do jogo é independente
+            do Clerk, então dá para estar "no clube" e fora da conta. */}
+        {isLoaded ? (
+          <Card>
+            <SectionHeader
+              title="CONTA"
+              trailing={<Icon name="person" size={16} color={color.textMuted} />}
+            />
+            {isSignedIn ? (
+              <>
+                <Text style={styles.controlNote}>
+                  {user?.primaryEmailAddress?.emailAddress ?? "Conta conectada"}
+                  {"\n"}Sair encerra a sessão neste aparelho. Seu clube e seu
+                  progresso continuam intactos.
+                </Text>
+                <Pressable
+                  style={styles.signOutButton}
+                  onPress={() => void signOut()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sair da conta"
+                >
+                  <Text style={styles.signOutText}>SAIR DA CONTA</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.controlNote}>
+                  Nenhuma conta conectada neste aparelho. O jogo ainda usa a
+                  sessão de desenvolvimento — por isso o clube aparece mesmo
+                  sem conta.
+                </Text>
+                <Pressable
+                  style={styles.signOutButton}
+                  onPress={() => router.push("/cadastro")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar conta"
+                >
+                  <Text style={styles.signOutText}>CRIAR CONTA</Text>
+                </Pressable>
+              </>
+            )}
+          </Card>
+        ) : null}
+
         <Card>
           <SectionHeader
             title="INFRAESTRUTURA"
@@ -725,5 +774,20 @@ const styles = StyleSheet.create({
     color: color.danger,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black as "800",
+  },
+  signOutButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    marginTop: space.sm,
+  },
+  signOutText: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
   },
 });
