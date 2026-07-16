@@ -10,7 +10,7 @@ import {
   Req,
 } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { IdentityUnitOfWork } from "@grinta/core";
+import type { IdentityUnitOfWork, WorldRepository } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import type { Request } from "express";
 
@@ -20,6 +20,7 @@ import { registeredQueryTypes } from "../queries/query-registry.js";
 import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
+  GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
   REALTIME_PUBLISHER,
@@ -50,6 +51,8 @@ export class CommandsController {
     // quando o último contexto migrar.
     @Inject(IDENTITY_UNIT_OF_WORK)
     private readonly identityUnitOfWork: IdentityUnitOfWork,
+    // O mundo é tabela, sempre (R-173/R-182) — raiz de tudo.
+    @Inject(GAME_WORLD_REPOSITORY) private readonly worlds: WorldRepository,
   ) {}
 
   @ApiOperation({
@@ -182,6 +185,7 @@ export class CommandsController {
       result = await handler({
         repository: this.repository,
         identityUnitOfWork: this.identityUnitOfWork,
+        worlds: this.worlds,
         envelope,
       });
     } catch (error) {

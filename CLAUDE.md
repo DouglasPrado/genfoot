@@ -8,7 +8,7 @@ Existe porque uma execução anterior fez *slices* e declarou features "concluí
 ## 1. O projeto em 30 segundos
 
 - Monorepo **pnpm + turbo**. Domínio puro em `packages/core` (não importa adapters).
-- Apps: `apps/api` (NestJS, `/api/v1`), `apps/mobile` (Expo), `apps/admin` (Next.js), `apps/simulator` (CLI), `apps/guide`.
+- Apps: `apps/api` (NestJS, `/api/v1`), `apps/mobile` (Expo), `apps/admin` (Next.js), `apps/guide`.
 - Pacotes: `core` (domínio), `shared`, `persistence` (adapter JSON), `api-client` (SDK), `design-system` (tokens), `assets`.
 - **Gate de qualidade** (TEM que estar verde antes de qualquer commit):
   ```bash

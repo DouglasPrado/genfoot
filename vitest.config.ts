@@ -19,7 +19,6 @@ const POSTGRES_TESTS = "packages/persistence/tests/{prisma-*,identity-commands}.
 
 const UNIT_TESTS = [
   "packages/**/*.test.ts",
-  "apps/simulator/**/*.test.ts",
   "apps/api/**/*.test.ts",
   "apps/mobile/**/*.test.ts",
   "apps/admin/**/*.test.ts",

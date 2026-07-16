@@ -3,6 +3,7 @@ import {
   InitializeNarrative,
   seedFanbaseSize,
 } from "@grinta/core";
+import type { WorldRepository } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -22,11 +23,12 @@ import type { GameWorldId } from "@grinta/shared";
  */
 export async function applyRebrandReaction(
   repository: JsonWorldRepository,
+  worlds: WorldRepository,
   worldId: GameWorldId,
   clubId: string,
   idempotencyKey: string,
 ): Promise<void> {
-  const world = await repository.findById(worldId);
+  const world = await worlds.findById(worldId);
   if (world === null) return;
   const portfolio = await repository.findClubPortfolioByWorldId(worldId);
   const club = portfolio?.clubs.find((candidate) => candidate.id === clubId);

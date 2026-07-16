@@ -12,9 +12,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "format": "prettier --write .",
-    "format:check": "prettier --check package.json pnpm-workspace.yaml turbo.json tsconfig.base.json eslint.config.js vitest.config.ts README.md packages apps/simulator",
-    "lint": "eslint packages apps/simulator",
-    "simulator": "pnpm --filter @grinta/simulator dev",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml turbo.json tsconfig.base.json eslint.config.js vitest.config.ts README.md packages",
+    "lint": "eslint packages",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "turbo run typecheck"

@@ -141,6 +141,7 @@ import {
   ReturnLoanedPlayer,
   type ClubCommand,
   type IdentityUnitOfWork,
+  type WorldRepository,
   type WorldMutationResult,
 } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
@@ -172,6 +173,8 @@ export interface CommandContext {
    * some e sobra este.
    */
   readonly identityUnitOfWork: IdentityUnitOfWork;
+  /** O mundo é tabela, sempre (R-173/R-182). Raiz de tudo: todo command o lê. */
+  readonly worlds: WorldRepository;
   readonly envelope: CommandEnvelope;
 }
 
@@ -209,7 +212,7 @@ const publishListingPayload = z.object({
 });
 
 async function loadWorld(
-  repository: CommandContext["repository"],
+  worlds: CommandContext["worlds"],
   rawWorldId: string | undefined,
 ) {
   if (rawWorldId === undefined) {
@@ -219,7 +222,7 @@ async function loadWorld(
   }
   const worldId = parseGameWorldId(rawWorldId);
   if (!worldId.ok) return worldId;
-  const world = await new InspectWorld(repository).execute(worldId.value);
+  const world = await new InspectWorld(worlds).execute(worldId.value);
   if (!world.ok) return world;
   return succeed({ worldId: worldId.value, snapshot: world.value });
 }
@@ -247,8 +250,8 @@ function wc(
   build: (repository: CommandContext["repository"]) => WorldInputUseCase,
   resourceKind = "world",
 ): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  return async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const payload =
       typeof envelope.payload === "object" && envelope.payload !== null
@@ -296,10 +299,10 @@ function wc(
 function ic(
   build: (unitOfWork: IdentityUnitOfWork) => IdentityUseCase,
 ): CommandHandler {
-  return async ({ repository, identityUnitOfWork, envelope }) => {
-    // O mundo ainda é lido do JSON: C2 não migrou. É de lá que saem `seed` e
-    // `currentDate` — e é por isso que R-182 (seed como coluna) segue devendo.
-    const world = await loadWorld(repository, envelope.worldId);
+  return async ({ worlds, identityUnitOfWork, envelope }) => {
+    // O mundo é tabela (R-182): `seed` e `currentDate` vêm do Postgres, e o
+    // mundo enfim é reproduzível a partir do banco.
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const payload =
       typeof envelope.payload === "object" && envelope.payload !== null
@@ -407,8 +410,8 @@ function wInit(
   build: (repository: CommandContext["repository"]) => WorldSnapshotUseCase,
   resourceKind: string,
 ): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  return async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     return guardRun(
       () => build(repository).execute(world.value.snapshot as never),
@@ -422,8 +425,8 @@ function wc1(
   build: (repository: CommandContext["repository"]) => SingleInputUseCase,
   resourceKind = "world",
 ): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  return async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const payload =
       typeof envelope.payload === "object" && envelope.payload !== null
@@ -487,14 +490,14 @@ function requireString(
 }
 
 const handlers: Record<string, CommandHandler> = {
-  "world:create": async ({ repository, envelope }) => {
+  "world:create": async ({ worlds, envelope }) => {
     const parsed = createWorldPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
     const startDate = WorldDate.parse(parsed.data.startDate);
     if (!startDate.ok) return startDate;
     const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
     if (!ruleset.ok) return ruleset;
-    const result = await new CreateWorld(repository).execute({
+    const result = await new CreateWorld(worlds).execute({
       seed: parsed.data.seed,
       startDate: startDate.value,
       rulesetVersion: ruleset.value,
@@ -506,7 +509,7 @@ const handlers: Record<string, CommandHandler> = {
     });
   },
 
-  "world:genesis": async ({ repository, envelope }) => {
+  "world:genesis": async ({ repository, worlds, envelope }) => {
     if (envelope.worldId === undefined) {
       return fail(
         new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
@@ -515,7 +518,7 @@ const handlers: Record<string, CommandHandler> = {
     const worldId = parseGameWorldId(envelope.worldId);
     if (!worldId.ok) return worldId;
     const result = await new GenerateWorldGenesis(
-      repository,
+      worlds,
       repository,
       undefined,
       repository,
@@ -523,7 +526,7 @@ const handlers: Record<string, CommandHandler> = {
     ).execute(worldId.value);
     if (!result.ok) return result;
 
-    const world = await repository.findById(worldId.value);
+    const world = await worlds.findById(worldId.value);
     const genesis = await repository.findByWorldId(worldId.value);
     if (world === null || genesis === null) {
       return fail(
@@ -559,7 +562,7 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `world:${worldId.value}` });
   },
 
-  "world:activate": async ({ repository, envelope }) => {
+  "world:activate": async ({ repository, worlds, envelope }) => {
     if (envelope.worldId === undefined) {
       return fail(
         new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
@@ -568,7 +571,7 @@ const handlers: Record<string, CommandHandler> = {
     const worldId = parseGameWorldId(envelope.worldId);
     if (!worldId.ok) return worldId;
     const result = await new ActivateProvisionedWorld(
-      repository,
+      worlds,
       repository,
       repository,
       repository,
@@ -581,7 +584,7 @@ const handlers: Record<string, CommandHandler> = {
     });
   },
 
-  "club:command": async ({ repository, envelope }) => {
+  "club:command": async ({ repository, worlds, envelope }) => {
     if (envelope.worldId === undefined) {
       return fail(
         new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
@@ -618,6 +621,7 @@ const handlers: Record<string, CommandHandler> = {
     if (parsed.data.command.type === "UpdateClubVisualIdentity") {
       await applyRebrandReaction(
         repository,
+        worlds,
         worldId.value,
         parsed.data.clubId,
         envelope.idempotencyKey,
@@ -626,8 +630,8 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
-  "market:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "market:initialize": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const genesis = await repository.findByWorldId(world.value.worldId);
     if (genesis === null) {
@@ -650,8 +654,8 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `market:${world.value.worldId}` });
   },
 
-  "ledger:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "ledger:initialize": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const genesis = await repository.findByWorldId(world.value.worldId);
     if (genesis === null) {
@@ -672,8 +676,8 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   // Inicializadores de contexto (execute(worldSnapshot))
-  "competition:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "competition:initialize": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const genesis = await repository.findByWorldId(world.value.worldId);
     if (genesis === null) {
@@ -696,8 +700,8 @@ const handlers: Record<string, CommandHandler> = {
     if (!matches.ok) return matches;
     return succeed({ resource: `competitions:${world.value.worldId}` });
   },
-  "match:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "match:initialize": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const competitions = await repository.findCompetitionsByWorldId(
       world.value.worldId,
@@ -725,8 +729,8 @@ const handlers: Record<string, CommandHandler> = {
     (r) => new StartInfrastructureProject(r),
     "infrastructure",
   ),
-  "infrastructure:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "infrastructure:resume": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const projectId = requireString(envelope.payload, "projectId");
     if (!projectId.ok) return projectId;
@@ -746,8 +750,8 @@ const handlers: Record<string, CommandHandler> = {
       `infrastructure:${projectId.value}`,
     );
   },
-  "infrastructure:abort": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "infrastructure:abort": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const projectId = requireString(envelope.payload, "projectId");
     if (!projectId.ok) return projectId;
@@ -771,8 +775,8 @@ const handlers: Record<string, CommandHandler> = {
     (r) => new BootstrapWorldScheduler(r),
     "scheduler",
   ),
-  "scheduler:cancel-task": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:cancel-task": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const taskId = requireString(envelope.payload, "taskId");
     if (!taskId.ok) return taskId;
@@ -785,8 +789,8 @@ const handlers: Record<string, CommandHandler> = {
       `scheduler:${world.value.worldId}`,
     );
   },
-  "scheduler:retry-task": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:retry-task": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const taskId = requireString(envelope.payload, "taskId");
     if (!taskId.ok) return taskId;
@@ -799,8 +803,8 @@ const handlers: Record<string, CommandHandler> = {
       `scheduler:${world.value.worldId}`,
     );
   },
-  "scheduler:schedule-tasks": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:schedule-tasks": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const inputs = (envelope.payload as Record<string, unknown> | undefined)
       ?.inputs;
@@ -818,13 +822,13 @@ const handlers: Record<string, CommandHandler> = {
       `scheduler:${world.value.worldId}`,
     );
   },
-  "scheduler:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:resume": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     return guardRun(
       () =>
         new ResumeWorldScheduler(
-          repository,
+          worlds,
           repository,
           taskHandlers(repository),
           API_WORKER,
@@ -833,8 +837,8 @@ const handlers: Record<string, CommandHandler> = {
       `scheduler:${world.value.worldId}`,
     );
   },
-  "scheduler:process-due": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:process-due": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const on = WorldDate.parse(world.value.snapshot.currentDate);
     if (!on.ok) return on;
@@ -847,15 +851,15 @@ const handlers: Record<string, CommandHandler> = {
       `scheduler:${world.value.worldId}`,
     );
   },
-  "scheduler:advance-days": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "scheduler:advance-days": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const payload = (envelope.payload ?? {}) as Record<string, unknown>;
     const days = typeof payload.days === "number" ? payload.days : 1;
     return guardRun(
       () =>
         new AdvanceScheduledWorldDays(
-          repository,
+          worlds,
           repository,
           taskHandlers(repository),
           API_WORKER,
@@ -864,8 +868,8 @@ const handlers: Record<string, CommandHandler> = {
       `world:${world.value.worldId}`,
     );
   },
-  "world:advance-day": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "world:advance-day": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const payload = (envelope.payload ?? {}) as Record<string, unknown>;
     const input = {
@@ -876,7 +880,7 @@ const handlers: Record<string, CommandHandler> = {
     return guardRun(
       () =>
         new AdvanceWorldDayCommand(
-          repository,
+          worlds,
           repository,
           taskHandlers(repository),
           API_WORKER,
@@ -887,8 +891,8 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   // Virada de temporada (SAGA-02) — resume com handlers/verifier sintéticos
-  "season:rollover:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "season:rollover:resume": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const rolloverId = requireString(envelope.payload, "rolloverId");
     if (!rolloverId.ok) return rolloverId;
@@ -906,8 +910,8 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   // Explicação de decisão de automação (X-001)
-  "automation:get-explanation": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "automation:get-explanation": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const decisionId = requireString(envelope.payload, "decisionId");
     if (!decisionId.ok) return decisionId;
@@ -921,8 +925,8 @@ const handlers: Record<string, CommandHandler> = {
     );
   },
 
-  "market:publish-listing": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
+  "market:publish-listing": async ({ repository, worlds, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const parsed = publishListingPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
@@ -945,7 +949,7 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `listing:${parsed.data.playerId}` });
   },
 
-  "world:advance-days": async ({ repository, envelope }) => {
+  "world:advance-days": async ({ worlds, envelope }) => {
     if (envelope.worldId === undefined) {
       return fail(
         new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
@@ -955,7 +959,7 @@ const handlers: Record<string, CommandHandler> = {
     if (!worldId.ok) return worldId;
     const parsed = advanceDaysPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const result = await new AdvanceWorldDays(repository).execute(
+    const result = await new AdvanceWorldDays(worlds).execute(
       worldId.value,
       parsed.data.days,
     );

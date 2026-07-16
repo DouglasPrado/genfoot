@@ -769,18 +769,38 @@ model RolePermission {
 // =============================================================================
 
 /// Raiz de partição do mundo: seu `id` é o valor de `gameWorldId` dos filhos.
+/// R-182. O que muda, e por quê:
+///
+/// - **`seed` e `startDate` passam a existir.** Não tinham coluna, e o
+///   determinismo e o replay são invariante canônica (context map:149): sem
+///   seed gravado, o mundo NÃO é reproduzível a partir do banco. O
+///   `GameWorldSnapshot` sempre os teve; era o físico que não.
+/// - **`currentDate` e `startDate` viram DATE** (R-177): o tempo do mundo é
+///   data, não instante.
+/// - **`rulesetVersion` é semver, não FK.** O domínio usa `RulesetVersion`
+///   ("1.0.0"); `currentRuleSetVersionId` apontava para uma tabela que não
+///   existe. A coluna FK fica, sem escritor, até haver catálogo de ruleset.
+/// - **`name`, `maxClubs`, `seasonDays`, `initialClubCashMinor` e `currencyId`
+///   viram NULLABLE.** Eram NOT NULL e o domínio não os produz — ou seja,
+///   nada conseguia inserir um mundo. R-182 já decidiu que eles são
+///   configuração (`GameRuleConfig`/`GameEconomyConfig`), não atributo do
+///   mundo; nullable é a dívida declarada até a config existir. Um default
+///   inventado seria pior: gravaria como fato o que é chute.
 model GameWorld {
-  id                      String      @id @default(uuid(7)) @db.Uuid
-  name                    String
+  id                      String      @id @db.Uuid
+  name                    String? // pendente: vai para GameRuleConfig (R-182)
+  seed                    String // R-182: sem ele não há replay
+  startDate               DateTime    @db.Date
   status                  WorldStatus @default(CREATING)
+  rulesetVersion          String // semver ("1.0.0"), como o domínio usa
   currentSeasonId         String?     @db.Uuid
-  currentRuleSetVersionId String?     @db.Uuid // versão de ruleset vigente
-  currentDate             DateTime // data virtual do mundo
+  currentRuleSetVersionId String?     @db.Uuid // sem escritor: não há catálogo de ruleset
+  currentDate             DateTime    @db.Date // data virtual do mundo (R-177)
   timezone                String      @default("America/Sao_Paulo")
-  maxClubs                Int
-  seasonDays              Int? // R-107: duração real da temporada por tamanho de mundo (16 clubes→~63d)
-  initialClubCashMinor    BigInt // caixa inicial em unidade mínima
-  currencyId              String      @db.Uuid // moeda-base do mundo (FK Currency)
+  maxClubs                Int? // pendente: GameRuleConfig (R-182)
+  seasonDays              Int? // R-107 · pendente: GameRuleConfig
+  initialClubCashMinor    BigInt? // pendente: GameEconomyConfig (R-182)
+  currencyId              String?     @db.Uuid // pendente: a model Currency não existe (R-181)
   createdAt               DateTime    @default(now())
   // R-182: o contador do mundo morava DENTRO da tabela de eventos
   // (`DomainEventLog.sequence`/`OutboxEvent.sequence`) e não tinha dono. É
@@ -2094,8 +2114,13 @@ model DomainEventLog {
   payloadJson         Json
   actorType           String?
   actorId             String?  @db.Uuid
-  correlationId       String?  @db.Uuid
-  causationId         String?  @db.Uuid
+  // Texto, não Uuid: `correlationId` e `causationId` vêm do CLIENTE (doc 08:
+  // "identificador de correlação para rastreio", sem tipo). Constranger a Uuid
+  // um valor que não controlamos não compra nada — só troca um rastreio por um
+  // erro de banco no primeiro cliente que mandar "c1". O contrato do envelope
+  // sempre disse `z.string().min(1)`; era o schema que divergia.
+  correlationId       String?
+  causationId         String?
   prevEventHash       String? // encadeamento de integridade
   eventHash           String?
   occurredAt          DateTime @default(now())

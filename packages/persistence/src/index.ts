@@ -7,4 +7,5 @@ export * from "./prisma-idempotency-repository.js";
 export * from "./prisma-identity-read-model.js";
 export * from "./prisma-identity-unit-of-work.js";
 export * from "./prisma-user-account-repository.js";
+export * from "./prisma-world-repository.js";
 export * from "./prisma-world-participant-repository.js";

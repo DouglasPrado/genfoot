@@ -5,8 +5,10 @@ import { JsonWorldRepository } from "@grinta/persistence";
 
 import { IdempotencyStore } from "./idempotency-store.js";
 import { LazyIdentityReadModel } from "./lazy-identity-read-model.js";
+import { LazyWorldRepository } from "./lazy-world-repository.js";
 import { LazyIdentityUnitOfWork } from "./lazy-identity-unit-of-work.js";
 import {
+  GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_READ_MODEL,
   IDENTITY_UNIT_OF_WORK,
@@ -45,12 +47,17 @@ import {
       provide: IDENTITY_READ_MODEL,
       useFactory: (): LazyIdentityReadModel => new LazyIdentityReadModel(),
     },
+    {
+      provide: GAME_WORLD_REPOSITORY,
+      useFactory: (): LazyWorldRepository => new LazyWorldRepository(),
+    },
   ],
   exports: [
     WORLD_REPOSITORY,
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,
     IDENTITY_READ_MODEL,
+    GAME_WORLD_REPOSITORY,
   ],
 })
 export class CoreModule {}

@@ -50,6 +50,10 @@ export async function seedWorld(client: PrismaClient): Promise<void> {
     data: {
       id: WORLD_ID,
       name: "Mundo de teste",
+      // R-182: sem seed gravado, o mundo não é reproduzível a partir do banco.
+      seed: WORLD_SEED,
+      rulesetVersion: "1.0.0",
+      startDate: new Date("2026-01-01T00:00:00.000Z"),
       currentDate: new Date("2026-01-02T00:00:00.000Z"),
       maxClubs: 16,
       initialClubCashMinor: 100_000_00n,

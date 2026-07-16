@@ -90,25 +90,32 @@ function snapshot(): GameWorldSnapshot {
 }
 
 describe("JsonWorldRepository", () => {
-  it("faz round-trip em um envelope versionado", async () => {
+  /**
+   * O envelope era criado por `save(world)`. Com o mundo em tabela
+   * (R-173/R-182), a porta `WorldRepository` saiu daqui e o arquivo passa a
+   * nascer quando o PRIMEIRO contexto grava. O round-trip do mundo mudou de
+   * casa: vive em `prisma-world-repository.test.ts`, contra o Postgres.
+   */
+  it("o arquivo nasce quando o primeiro contexto grava — não com o mundo", async () => {
     const store = await repository();
     const world = snapshot();
 
-    await store.value.save(world, null);
+    const ledger = WorldLedger.initialize(world);
+    if (!ledger.ok) throw ledger.error;
+    await store.value.saveLedger(ledger.value.snapshot(), null);
 
-    expect(await store.value.findById(world.id)).toEqual(world);
     const file = envelopeSchema.parse(
       JSON.parse(
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
     expect(file.schemaVersion).toBe(17);
+    expect(await store.value.findLedgerByWorldId(world.id)).not.toBeNull();
   });
 
   it("preserva seções inicializadas concorrentemente no mesmo mundo", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
 
     const ledger = WorldLedger.initialize(world);
     const market = WorldMarket.initialize(world);
@@ -130,16 +137,14 @@ describe("JsonWorldRepository", () => {
     ).not.toBeNull();
   });
 
-  it("persiste e recupera a gênese sem alterar o mundo", async () => {
+  it("persiste e recupera a gênese", async () => {
     const store = await repository();
     const world = snapshot();
     const genesis = new WorldGenesisGenerator().generate(world);
-    await store.value.save(world, null);
 
     await store.value.saveGenesis(genesis, world.version);
 
     expect(await store.value.findByWorldId(world.id)).toEqual(genesis);
-    expect(await store.value.findById(world.id)).toEqual(world);
   });
 
   it("persiste lifecycle de jogadores com controle de revisão", async () => {
@@ -148,7 +153,6 @@ describe("JsonWorldRepository", () => {
     const genesis = new WorldGenesisGenerator().generate(world);
     const lifecycle = WorldPlayerLifecycle.fromGenesis(world, genesis);
     if (!lifecycle.ok) throw lifecycle.error;
-    await store.value.save(world, null);
     await store.value.saveGenesis(genesis, world.version);
 
     await store.value.savePlayerLifecycle(lifecycle.value.snapshot(), null);
@@ -164,7 +168,6 @@ describe("JsonWorldRepository", () => {
   it("persiste o ledger C9 com dívida e período fechado (round-trip)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldLedger.initialize(world);
     if (!created.ok) throw created.error;
     const ledger = created.value;
@@ -234,7 +237,6 @@ describe("JsonWorldRepository", () => {
   it("retoma o ledger após restart sem duplicar (recovery/replay)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldLedger.initialize(world);
     if (!created.ok) throw created.error;
     await store.value.saveLedger(created.value.snapshot(), null);
@@ -298,7 +300,6 @@ describe("JsonWorldRepository", () => {
   it("persiste as competições C7 com standings e resultado (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldCompetitions.initialize(world);
     if (!created.ok) throw created.error;
     const competitions = created.value;
@@ -385,7 +386,6 @@ describe("JsonWorldRepository", () => {
   it("persiste a partida C8 ao vivo com command log e checkpoint (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldMatches.initialize(world);
     if (!created.ok) throw created.error;
     const matches = created.value;
@@ -472,7 +472,6 @@ describe("JsonWorldRepository", () => {
   it("persiste eventing X-002 com saga durável e projeção (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldEventing.initialize(world, 2);
     if (!created.ok) throw created.error;
     const eventing = created.value;
@@ -565,7 +564,6 @@ describe("JsonWorldRepository", () => {
   it("persiste o mercado C6 com transferência ao vivo (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldMarket.initialize(world);
     if (!created.ok) throw created.error;
     const market = created.value;
@@ -659,7 +657,6 @@ describe("JsonWorldRepository", () => {
   it("persiste o admin C12 com caso, correção e audit chain (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldAdmin.initialize(world);
     if (!created.ok) throw created.error;
     const admin = created.value;
@@ -733,7 +730,6 @@ describe("JsonWorldRepository", () => {
   it("persiste a narrativa C10 com promessa e mídia (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldNarrative.initialize(world);
     if (!created.ok) throw created.error;
     const narrative = created.value;
@@ -794,7 +790,6 @@ describe("JsonWorldRepository", () => {
   it("persiste a inbox C11 com notificação, entrega e projeção (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldInbox.initialize(world);
     if (!created.ok) throw created.error;
     const inbox = created.value;
@@ -867,7 +862,6 @@ describe("JsonWorldRepository", () => {
   it("persiste o staff C5 com contrato e alocação (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldStaff.initialize(world);
     if (!created.ok) throw created.error;
     const staff = created.value;
@@ -958,7 +952,6 @@ describe("JsonWorldRepository", () => {
     const store = await repository();
     const world = snapshot();
     const genesis = new WorldGenesisGenerator().generate(world);
-    await store.value.save(world, null);
     await store.value.saveGenesis(genesis, world.version);
     const created = WorldPlayerLifecycle.fromGenesis(world, genesis);
     if (!created.ok) throw created.error;
@@ -1031,7 +1024,6 @@ describe("JsonWorldRepository", () => {
   it("persiste a automação X-001 com regra e proposta (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const created = WorldAutomation.initialize(world);
     if (!created.ok) throw created.error;
     const automation = created.value;
@@ -1108,7 +1100,6 @@ describe("JsonWorldRepository", () => {
     const world = snapshot();
     const genesis = new WorldGenesisGenerator().generate(world);
     const portfolio = buildClubPortfolioFromGenesis(world, genesis);
-    await store.value.save(world, null);
     await store.value.saveGenesis(genesis, world.version);
 
     await store.value.saveClubPortfolio(portfolio, null);
@@ -1121,7 +1112,12 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "CLUB_PORTFOLIO_REVISION_CONFLICT" });
   });
 
-  it("lê snapshots v1 e os migra na próxima escrita", async () => {
+  /**
+   * O arquivo v1 tem `world` dentro. Ele é IGNORADO na leitura: o mundo é do
+   * Postgres agora (R-173/R-182), e um arquivo antigo não é fonte dele. O que a
+   * migração de schema ainda faz é trazer os CONTEXTOS que não migraram.
+   */
+  it("lê snapshots v1 e os migra na próxima escrita, ignorando o mundo do arquivo", async () => {
     const store = await repository();
     const world = snapshot();
     await writeFile(
@@ -1130,21 +1126,24 @@ describe("JsonWorldRepository", () => {
       "utf8",
     );
 
-    expect(await store.value.findById(world.id)).toEqual(world);
     expect(await store.value.findByWorldId(world.id)).toBeNull();
-    await store.value.save({ ...world, version: 2 }, 1);
+
+    const ledger = WorldLedger.initialize(world);
+    if (!ledger.ok) throw ledger.error;
+    await store.value.saveLedger(ledger.value.snapshot(), null);
+
     const migrated = envelopeSchema.parse(
       JSON.parse(
         await readFile(join(store.directory, `${world.id}.json`), "utf8"),
       ) as unknown,
     );
     expect(migrated.schemaVersion).toBe(17);
+    expect(migrated).not.toHaveProperty("world");
   });
 
   it("persiste scheduler v2 e materializa campos novos ao ler legado", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const scheduler = WorldScheduler.create(world.id, {
       rulesetVersion: world.rulesetVersion,
       maxTaskAttempts: 3,
@@ -1184,7 +1183,6 @@ describe("JsonWorldRepository", () => {
   it("persiste rollover interrompido para retomada por checkpoint", async () => {
     const store = await repository();
     const world = snapshot();
-    await store.value.save(world, null);
     const scheduler = WorldScheduler.create(world.id, {
       rulesetVersion: world.rulesetVersion,
       maxTaskAttempts: 3,
@@ -1231,22 +1229,9 @@ describe("JsonWorldRepository", () => {
     });
   });
 
-  it("retorna null para mundo inexistente", async () => {
-    const store = await repository();
-    expect(await store.value.findById(newGameWorldId())).toBeNull();
-  });
-
-  it("rejeita conflito de versão otimista", async () => {
-    const store = await repository();
-    const world = snapshot();
-    await store.value.save(world, null);
-
-    await expect(
-      store.value.save({ ...world, version: 2 }, 99),
-    ).rejects.toMatchObject({
-      code: "AGGREGATE_VERSION_CONFLICT",
-    });
-  });
+  // "mundo inexistente" e "conflito de versão do mundo" mudaram de casa: a
+  // porta WorldRepository saiu daqui e vive no Postgres
+  // (prisma-world-repository.test.ts).
 
   it("rejeita snapshot corrompido", async () => {
     const store = await repository();
@@ -1257,7 +1242,9 @@ describe("JsonWorldRepository", () => {
       "utf8",
     );
 
-    await expect(store.value.findById(world.id)).rejects.toMatchObject({
+    // Arquivo ilegível é corrupção, e qualquer leitura tem de acusar — não
+    // devolver "vazio", que o chamador leria como "este contexto não existe".
+    await expect(store.value.findLedgerByWorldId(world.id)).rejects.toMatchObject({
       code: "SNAPSHOT_CORRUPTED",
     });
   });

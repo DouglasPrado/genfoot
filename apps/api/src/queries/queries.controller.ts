@@ -8,14 +8,22 @@ import {
   Req,
 } from "@nestjs/common";
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { InspectWorld, type IdentityReadModel } from "@grinta/core";
+import {
+  InspectWorld,
+  type IdentityReadModel,
+  type WorldRepository,
+} from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import { parseGameWorldId } from "@grinta/shared";
 import type { Request } from "express";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { ApiException } from "../common/standard-error.js";
-import { IDENTITY_READ_MODEL, WORLD_REPOSITORY } from "../core/tokens.js";
+import {
+  GAME_WORLD_REPOSITORY,
+  IDENTITY_READ_MODEL,
+  WORLD_REPOSITORY,
+} from "../core/tokens.js";
 import { registeredQueryTypes, resolveQueryHandler } from "./query-registry.js";
 import {
   enforceWorldScope,
@@ -52,6 +60,8 @@ export class QueriesController {
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
+    // O mundo é tabela, sempre (R-173/R-182).
+    @Inject(GAME_WORLD_REPOSITORY) private readonly worlds: WorldRepository,
   ) {}
 
   @ApiOperation({ summary: "Snapshot do mundo (envelope de query)" })
@@ -66,7 +76,7 @@ export class QueriesController {
     if (!worldId.ok) throw invalidWorldId(worldId.error.message);
     enforceWorldScope(request.session, worldId.value);
 
-    const result = await new InspectWorld(this.repository).execute(
+    const result = await new InspectWorld(this.worlds).execute(
       worldId.value,
     );
     if (!result.ok) {
@@ -130,7 +140,7 @@ export class QueriesController {
         recoveryAction: null,
       });
     }
-    const world = await new InspectWorld(this.repository).execute(
+    const world = await new InspectWorld(this.worlds).execute(
       worldId.value,
     );
     if (!world.ok) {

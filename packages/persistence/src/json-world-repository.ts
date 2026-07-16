@@ -29,13 +29,10 @@ import {
   SeasonRolloverStepStatus,
   SeasonLifecycleState,
   SeasonStatus,
-  WorldStatus,
-  type GameWorldSnapshot,
   type ClubCommandReceipt,
   type ClubPortfolioRepository,
   type WorldGenesisRepository,
   type WorldGenesisSnapshot,
-  type WorldRepository,
   type SchedulingRepository,
   type PlayerLifecycleRepository,
   type WorldPlayerLifecycleSnapshot,
@@ -65,28 +62,9 @@ import {
 } from "@grinta/core";
 import {
   DomainError,
-  parseGameWorldId,
-  parseRulesetVersion,
   type GameWorldId,
 } from "@grinta/shared";
 import { z } from "zod";
-
-const worldSchema = z.object({
-  id: z.string(),
-  seed: z.string().min(1),
-  startDate: z.string(),
-  currentDate: z.string(),
-  rulesetVersion: z.string(),
-  status: z.enum([
-    WorldStatus.CREATING,
-    WorldStatus.ACTIVE,
-    WorldStatus.PAUSED,
-    WorldStatus.FINISHED,
-    WorldStatus.ARCHIVED,
-  ]),
-  worldSequence: z.number().int().nonnegative(),
-  version: z.number().int().positive(),
-});
 
 const identifierSchema = z.string().uuid();
 const playerPositionSchema = z.enum([
@@ -1562,35 +1540,30 @@ const worldAutomationSchema = z.object({
 });
 
 const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
-  z.object({ schemaVersion: z.literal(1), world: worldSchema }),
+  z.object({ schemaVersion: z.literal(1) }),
   z.object({
     schemaVersion: z.literal(2),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
   }),
   z.object({
     schemaVersion: z.literal(3),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
   }),
   z.object({
     schemaVersion: z.literal(4),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
   }),
   z.object({
     schemaVersion: z.literal(5),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
   }),
   z.object({
     schemaVersion: z.literal(6),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1598,7 +1571,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(7),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1607,7 +1579,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(8),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1617,7 +1588,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(9),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1628,7 +1598,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(10),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1640,7 +1609,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(11),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1653,7 +1621,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(12),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1666,7 +1633,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(13),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1680,7 +1646,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(14),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1695,7 +1660,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(15),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1711,7 +1675,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(16),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1728,7 +1691,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
   z.object({
     schemaVersion: z.literal(17),
-    world: worldSchema,
     genesis: genesisSchema.nullable(),
     scheduler: schedulerSchema.nullable(),
     playerLifecycle: playerLifecycleSchema.nullable(),
@@ -1746,8 +1708,11 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
   }),
 ]);
 
+/**
+ * O envelope JSON deixa de ter `world`: o mundo é do Postgres (R-173/R-182).
+ * Isto aqui é o saco dos contextos que ainda não migraram — e some com eles.
+ */
 interface LoadedEnvelope {
-  readonly world: GameWorldSnapshot;
   readonly genesis: WorldGenesisSnapshot | null;
   readonly scheduler: WorldSchedulerSnapshot | null;
   readonly playerLifecycle: WorldPlayerLifecycleSnapshot | null;
@@ -1764,9 +1729,31 @@ interface LoadedEnvelope {
   readonly automation: WorldAutomationSnapshot | null;
 }
 
+/**
+ * Envelope sem nada dentro. O arquivo era criado por `save(world)`; com o mundo
+ * em tabela (R-173/R-182), ele passa a nascer quando o primeiro contexto grava.
+ */
+function emptyEnvelope(): LoadedEnvelope {
+  return {
+    genesis: null,
+    scheduler: null,
+    playerLifecycle: null,
+    clubPortfolio: null,
+    ledger: null,
+    competitions: null,
+    matches: null,
+    eventing: null,
+    market: null,
+    admin: null,
+    narrative: null,
+    inbox: null,
+    staff: null,
+    automation: null,
+  };
+}
+
 export class JsonWorldRepository
   implements
-    WorldRepository,
     WorldGenesisRepository,
     SchedulingRepository,
     PlayerLifecycleRepository,
@@ -1784,70 +1771,22 @@ export class JsonWorldRepository
 {
   public constructor(private readonly baseDirectory: string) {}
 
-  public async findById(id: GameWorldId): Promise<GameWorldSnapshot | null> {
-    return (await this.load(id))?.world ?? null;
-  }
-
   public async findByWorldId(
     id: GameWorldId,
   ): Promise<WorldGenesisSnapshot | null> {
     return (await this.load(id))?.genesis ?? null;
   }
 
-  public async save(
-    snapshot: GameWorldSnapshot,
-    expectedVersion: number | null,
-  ): Promise<void> {
-    await mkdir(this.baseDirectory, { recursive: true });
-
-    const current = await this.load(snapshot.id);
-    if (expectedVersion === null && current !== null) {
-      throw new DomainError(
-        "WORLD_ALREADY_EXISTS",
-        "Já existe um mundo com este identificador.",
-        { id: snapshot.id },
-      );
-    }
-    if (
-      expectedVersion !== null &&
-      current?.world.version !== expectedVersion
-    ) {
-      throw versionConflict(expectedVersion, current?.world.version);
-    }
-
-    await this.write(snapshot.id, {
-      world: snapshot,
-      genesis: current?.genesis ?? null,
-      scheduler: current?.scheduler ?? null,
-      playerLifecycle: current?.playerLifecycle ?? null,
-      clubPortfolio: current?.clubPortfolio ?? null,
-      ledger: current?.ledger ?? null,
-      competitions: current?.competitions ?? null,
-      matches: current?.matches ?? null,
-      eventing: current?.eventing ?? null,
-      market: current?.market ?? null,
-      admin: current?.admin ?? null,
-      narrative: current?.narrative ?? null,
-      inbox: current?.inbox ?? null,
-      staff: current?.staff ?? null,
-      automation: current?.automation ?? null,
-    });
-  }
-
   public async saveGenesis(
     genesis: WorldGenesisSnapshot,
-    expectedWorldVersion: number,
+    // Era lock otimista contra a versão do MUNDO, feito de dentro de outro
+    // contexto — só existia porque tudo morava no mesmo blob. Com o mundo em
+    // tabela (R-182), quem o versiona é o PrismaWorldRepository. O parâmetro
+    // fica até a porta ser reescrita com o contexto.
+    _expectedWorldVersion: number,
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
-    const current = await this.load(genesis.gameWorldId);
-    if (current === null) {
-      throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", {
-        gameWorldId: genesis.gameWorldId,
-      });
-    }
-    if (current.world.version !== expectedWorldVersion) {
-      throw versionConflict(expectedWorldVersion, current.world.version);
-    }
+    const current = (await this.load(genesis.gameWorldId)) ?? emptyEnvelope();
     if (current.genesis !== null) {
       throw new DomainError(
         "WORLD_GENESIS_ALREADY_EXISTS",
@@ -1857,7 +1796,6 @@ export class JsonWorldRepository
     }
 
     await this.write(genesis.gameWorldId, {
-      world: current.world,
       genesis,
       scheduler: current.scheduler,
       playerLifecycle: current.playerLifecycle,
@@ -1898,12 +1836,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withSchedulingLock(scheduler.gameWorldId, async () => {
-      const current = await this.load(scheduler.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", {
-          gameWorldId: scheduler.gameWorldId,
-        });
-      }
+      const current = (await this.load(scheduler.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.scheduler !== null) {
         throw new DomainError(
           "SCHEDULER_ALREADY_EXISTS",
@@ -1939,10 +1872,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withSchedulingLock(playerLifecycle.gameWorldId, async () => {
-      const current = await this.load(playerLifecycle.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(playerLifecycle.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.playerLifecycle !== null) {
         throw new DomainError(
           "PLAYER_LIFECYCLE_ALREADY_EXISTS",
@@ -1992,10 +1922,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(clubPortfolio.gameWorldId, "clubs", async () => {
-      const current = await this.load(clubPortfolio.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(clubPortfolio.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.clubPortfolio !== null) {
         throw new DomainError(
           "CLUB_PORTFOLIO_ALREADY_EXISTS",
@@ -2034,10 +1961,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(ledger.gameWorldId, "ledger", async () => {
-      const current = await this.load(ledger.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(ledger.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.ledger !== null) {
         throw new DomainError("LEDGER_ALREADY_EXISTS", "O ledger já existe.");
       }
@@ -2073,10 +1997,7 @@ export class JsonWorldRepository
       competitions.gameWorldId,
       "competitions",
       async () => {
-        const current = await this.load(competitions.gameWorldId);
-        if (current === null) {
-          throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-        }
+        const current = (await this.load(competitions.gameWorldId)) ?? emptyEnvelope();
         if (expectedRevision === null && current.competitions !== null) {
           throw new DomainError(
             "COMPETITIONS_ALREADY_EXISTS",
@@ -2116,10 +2037,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(matches.gameWorldId, "matches", async () => {
-      const current = await this.load(matches.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(matches.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.matches !== null) {
         throw new DomainError(
           "MATCHES_ALREADY_EXISTS",
@@ -2155,10 +2073,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(eventing.gameWorldId, "eventing", async () => {
-      const current = await this.load(eventing.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(eventing.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.eventing !== null) {
         throw new DomainError(
           "EVENTING_ALREADY_EXISTS",
@@ -2194,10 +2109,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(market.gameWorldId, "market", async () => {
-      const current = await this.load(market.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(market.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.market !== null) {
         throw new DomainError("MARKET_ALREADY_EXISTS", "O mercado já existe.");
       }
@@ -2230,10 +2142,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(admin.gameWorldId, "admin", async () => {
-      const current = await this.load(admin.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(admin.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.admin !== null) {
         throw new DomainError("ADMIN_ALREADY_EXISTS", "O admin já existe.");
       }
@@ -2266,10 +2175,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(narrative.gameWorldId, "narrative", async () => {
-      const current = await this.load(narrative.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(narrative.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.narrative !== null) {
         throw new DomainError(
           "NARRATIVE_ALREADY_EXISTS",
@@ -2305,10 +2211,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(inbox.gameWorldId, "inbox", async () => {
-      const current = await this.load(inbox.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(inbox.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.inbox !== null) {
         throw new DomainError("INBOX_ALREADY_EXISTS", "A inbox já existe.");
       }
@@ -2341,10 +2244,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(staff.gameWorldId, "staff", async () => {
-      const current = await this.load(staff.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(staff.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.staff !== null) {
         throw new DomainError("STAFF_ALREADY_EXISTS", "O staff já existe.");
       }
@@ -2377,10 +2277,7 @@ export class JsonWorldRepository
   ): Promise<void> {
     await mkdir(this.baseDirectory, { recursive: true });
     await this.withNamedLock(automation.gameWorldId, "automation", async () => {
-      const current = await this.load(automation.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
+      const current = (await this.load(automation.gameWorldId)) ?? emptyEnvelope();
       if (expectedRevision === null && current.automation !== null) {
         throw new DomainError(
           "AUTOMATION_ALREADY_EXISTS",
@@ -2415,17 +2312,9 @@ export class JsonWorldRepository
     }
 
     try {
+      // O mundo NÃO é lido daqui: ele é tabela (R-173/R-182). Arquivos antigos
+      // ainda têm `world` dentro; ele é ignorado, e não é fonte de nada.
       const persisted = persistedSnapshotSchema.parse(JSON.parse(contents));
-      const parsedId = parseGameWorldId(persisted.world.id);
-      if (!parsedId.ok) throw parsedId.error;
-      const parsedRuleset = parseRulesetVersion(persisted.world.rulesetVersion);
-      if (!parsedRuleset.ok) throw parsedRuleset.error;
-
-      const world: GameWorldSnapshot = {
-        ...persisted.world,
-        id: parsedId.value,
-        rulesetVersion: parsedRuleset.value,
-      };
       const genesis =
         (persisted.schemaVersion === 2 ||
           persisted.schemaVersion === 3 ||
@@ -2598,7 +2487,6 @@ export class JsonWorldRepository
           ? (persisted.automation as unknown as WorldAutomationSnapshot)
           : null;
       return {
-        world,
         genesis,
         scheduler,
         playerLifecycle,
@@ -2635,7 +2523,6 @@ export class JsonWorldRepository
     const contents = `${JSON.stringify(
       {
         schemaVersion: 17,
-        world: envelope.world,
         genesis: envelope.genesis,
         scheduler: envelope.scheduler,
         playerLifecycle: envelope.playerLifecycle,
@@ -2708,17 +2595,6 @@ export class JsonWorldRepository
       await unlink(lockPath).catch(() => undefined);
     }
   }
-}
-
-function versionConflict(
-  expectedVersion: number,
-  actualVersion: number | undefined,
-): DomainError {
-  return new DomainError(
-    "AGGREGATE_VERSION_CONFLICT",
-    "O snapshot foi alterado desde a última leitura.",
-    { expectedVersion, actualVersion: actualVersion ?? null },
-  );
 }
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
