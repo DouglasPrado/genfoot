@@ -378,13 +378,13 @@
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">X-003 · Clientes mobile · spec 018</p>
+    <p class="eyebrow">Cliente mobile · docs/04-ui-ux</p>
     <h1>O que falta desenhar<br>e construir no app</h1>
     <p class="lede">O registro canônico cataloga <strong>114 telas mobile</strong>. O app Expo inteiro tem <strong>6 rotas</strong> — 5 abas e um onboarding — e <strong>6.187 linhas</strong>. Este é o mapa do que existe contra o que foi especificado. Cada célula apagada é uma tela que os docs já descrevem em detalhe e que ninguém construiu.</p>
 
     <div class="score">
       <div class="stat is-built">
-        <span class="stat-n">11</span>
+        <span class="stat-n">12</span>
         <span class="stat-l">Com tela — 9 parciais</span>
       </div>
       <div class="stat is-partial">
@@ -396,14 +396,14 @@
         <span class="stat-l">Fragmento de leitura</span>
       </div>
       <div class="stat is-missing">
-        <span class="stat-n">95</span>
+        <span class="stat-n">94</span>
         <span class="stat-l">Zero implementação</span>
       </div>
     </div>
 
-    <p class="lede" style="margin-top:28px">Só <strong>M-LINEUP</strong> e <strong>M-IDENTITY</strong> chegam perto de completas. Contando de forma conservadora, <strong>103 das 114</strong> telas não existem.</p>
+    <p class="lede" style="margin-top:28px">Só <strong>M-LINEUP</strong>, <strong>M-IDENTITY</strong> e <strong>M-SPLASH</strong> chegam perto de completas. Contando de forma conservadora, <strong>102 das 114</strong> telas não existem.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>bc2a7ba</b> · 11/114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>9ce106b</b> · 12/114</div>
   </header>
 
   <section>
@@ -459,10 +459,10 @@
         <span class="arch-id">L-M01</span>
         <span class="arch-name">Wizard — autenticação, onboarding, entrada</span>
         <span class="risk medium">Risco médio</span>
-        <span class="arch-count"><b>3</b> / 14</span>
+        <span class="arch-count"><b>4</b> / 14</span>
       </div>
       <div class="chips">
-        <div class="chip missing"><span class="chip-id">M-SPLASH</span><span class="chip-d">Splash / carregamento inicial</span></div>
+        <div class="chip built"><span class="chip-id">M-SPLASH</span><span class="chip-d">Bootstrap: checa contrato e roteia. Loading, erro com retry e bloqueio "atualize o app" verificados no simulador. Falta link à store e WebSocket/deep link</span><span class="tag">parcial · verificada</span></div>
         <div class="chip missing"><span class="chip-id">M-LOGIN</span><span class="chip-d">Login — a sessão abre com credencial fixa de dev</span></div>
         <div class="chip missing"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro — o command existe, a tela não</span></div>
         <div class="chip missing"><span class="chip-id">M-RECOVER</span><span class="chip-d">Recuperação de senha</span></div>
@@ -684,7 +684,11 @@
     <div class="blockers">
       <div class="blocker">
         <h3>O app não tem navegação de detalhe</h3>
-        <p>Toda chamada de rota no app é <code>router.replace</code> entre <code>/</code> e <code>/onboarding</code>. Não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. São <span class="num">6</span> rotas — 114 IDs não cabem em 6 rotas, e o que não está numa delas é cartão, não tela. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Abrir a árvore de navegação é pré-requisito de quase tudo aqui.</p>
+        <p><b>Ainda trava.</b> As <span class="num">4</span> chamadas de rota do app continuam sendo <code>router.replace</code>: não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. O M-SPLASH abriu a primeira divisão real — <code>/</code> virou o splash e a home foi para <code>/inicio</code>, levando a árvore de 6 para <span class="num">7</span> rotas — mas empilhar tela sobre tela ainda é impossível. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Continua pré-requisito de quase todo o L-M03.</p>
+      </div>
+      <div class="blocker">
+        <h3>Sem app publicado, telas que apontam para a loja não fecham</h3>
+        <p>O doc do M-SPLASH pede que o bloqueio de contrato <code>BREAKING</code> traga "link à store". O app não está publicado, então não existe URL para linkar — o bloqueio funciona e impede o uso, mas o jogador fica sem ação possível. Mesma trava atinge <code>M-STORE</code>, <code>M-SEASON-PASS</code> e a atualização forçada. Inventar um link seria fingir.</p>
       </div>
       <div class="blocker">
         <h3>O registro das telas não vigia nada</h3>
@@ -710,6 +714,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-16</span>
+        <span class="log-text"><b>M-SPLASH entra parcial</b> (<code>9ce106b</code>) — 11 → 12. Verificada no iPhone 17 Pro contra a API real: caminho feliz roteia para <code>/inicio</code>, API derrubada mostra erro com retry, servidor forçado em v2 bloqueia o app. Dois bugs achados exercitando, não lendo: <code>router.replace</code> em loop deixava a tela preta, e o rodapé dizia "CONECTADO" enquanto o painel dizia "SEM CONEXÃO". Falta link à store e WebSocket/deep link. Trava nova registrada: sem app publicado não há URL de loja.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-16</span>
         <span class="log-text"><b>Linha de base.</b> Leitura do código em <code>bc2a7ba</code>: 11 telas com alguma UI, 103 ausentes. Gate verde — typecheck limpo e 439/439 testes.</span>
