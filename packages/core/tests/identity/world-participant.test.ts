@@ -137,6 +137,76 @@ describe("WorldParticipant.rejoin", () => {
   });
 });
 
+/**
+ * Cooldown NÃO é agregado. O context map (:67) lista seis roots em C1 e ele não
+ * está entre eles — é responsabilidade ("Cooldowns de conta"), não entidade. E
+ * é 1 por (conta, mundo), que é exatamente 1 por participação: cabe como
+ * atributo. Dar-lhe tabela inventaria um root que o canônico não tem.
+ *
+ * O histórico de cooldowns anteriores vive no DomainEventLog (R-176).
+ */
+describe("WorldParticipant.startCooldown", () => {
+  it("registra até quando a conta está de castigo no mundo", () => {
+    const participant = join();
+    const result = participant.startCooldown("2026-04-09");
+    expect(result.ok).toBe(true);
+    expect(participant.snapshot().cooldownUntilOn).toBe("2026-04-09");
+    expect(participant.snapshot().version).toBe(2);
+  });
+
+  it("nasce sem cooldown", () => {
+    expect(join().snapshot().cooldownUntilOn).toBeNull();
+  });
+
+  it("o mesmo cooldown de novo é idempotente", () => {
+    const participant = join();
+    participant.startCooldown("2026-04-09");
+    participant.startCooldown("2026-04-09");
+    expect(participant.snapshot().version).toBe(2);
+  });
+
+  // Sair de novo durante o castigo estende; nunca encurta. Encurtar deixaria um
+  // comando reprocessado com data velha perdoar o castigo.
+  it("estende o cooldown, mas nunca o encurta", () => {
+    const participant = join();
+    participant.startCooldown("2026-04-09");
+    participant.startCooldown("2026-05-09");
+    expect(participant.snapshot().cooldownUntilOn).toBe("2026-05-09");
+    participant.startCooldown("2026-02-01");
+    expect(participant.snapshot().cooldownUntilOn).toBe("2026-05-09");
+  });
+
+  it("recusa data inválida", () => {
+    expect(join().startCooldown("09/04/2026").ok).toBe(false);
+  });
+});
+
+describe("WorldParticipant.isInCooldownOn", () => {
+  it("sem cooldown, nunca está de castigo", () => {
+    expect(join().isInCooldownOn("2026-04-09")).toBe(false);
+  });
+
+  it("está de castigo antes do fim", () => {
+    const participant = join();
+    participant.startCooldown("2026-04-09");
+    expect(participant.isInCooldownOn("2026-04-08")).toBe(true);
+  });
+
+  // O castigo vale até o fim do dia de `cooldownUntilOn` — mesma regra do prazo
+  // da reserva.
+  it("ainda está de castigo no último dia", () => {
+    const participant = join();
+    participant.startCooldown("2026-04-09");
+    expect(participant.isInCooldownOn("2026-04-09")).toBe(true);
+  });
+
+  it("está livre no dia seguinte", () => {
+    const participant = join();
+    participant.startCooldown("2026-04-09");
+    expect(participant.isInCooldownOn("2026-04-10")).toBe(false);
+  });
+});
+
 describe("WorldParticipant.fromSnapshot", () => {
   it("aceita snapshot válido", () => {
     expect(WorldParticipant.fromSnapshot(join().snapshot()).ok).toBe(true);

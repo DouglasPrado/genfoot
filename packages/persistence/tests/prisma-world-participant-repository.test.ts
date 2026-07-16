@@ -97,6 +97,23 @@ describe.skipIf(!hasDatabase)(
       ).toBe("2026-12-31");
     });
 
+    // Cooldown é atributo, não tabela: 1 por (conta, mundo) = 1 por
+    // participação, e não é aggregate root no context map (:67).
+    it("round-trip preserva o cooldown, e null atravessa como null", async () => {
+      const entity = participant();
+      await repository.saveParticipant(entity.snapshot(), null);
+      expect(
+        (await repository.findParticipantById(WORLD_ID, entity.snapshot().id))
+          ?.cooldownUntilOn,
+      ).toBeNull();
+
+      entity.startCooldown("2026-04-09");
+      await repository.saveParticipant(entity.snapshot(), 1);
+      const loaded = await repository.findParticipantById(WORLD_ID, entity.snapshot().id);
+      expect(loaded?.cooldownUntilOn).toBe("2026-04-09");
+      expect(loaded).toEqual(entity.snapshot());
+    });
+
     describe("concorrência otimista por linha (R-175)", () => {
       it("atualiza quando a versão confere", async () => {
         const entity = participant();

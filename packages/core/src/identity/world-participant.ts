@@ -34,6 +34,17 @@ export interface WorldParticipantSnapshot {
   /** Data do mundo (R-177), nunca o relógio da máquina. */
   readonly joinedOn: string;
   readonly leftOn: string | null;
+  /**
+   * Até quando a conta está de castigo NESTE mundo — vale até o fim do dia.
+   *
+   * Cooldown não é agregado: o context map (:67) lista seis roots em C1 e ele
+   * não está entre eles. É responsabilidade ("Cooldowns de conta"), não
+   * entidade — e é 1 por (conta, mundo), que é exatamente 1 por participação.
+   * Dar-lhe tabela inventaria um root que o canônico não tem, repetindo o erro
+   * do `PlayerClubLink` em C6. O histórico dos cooldowns anteriores vive no
+   * DomainEventLog (R-176).
+   */
+  readonly cooldownUntilOn: string | null;
   readonly version: number;
 }
 
@@ -66,6 +77,7 @@ export class WorldParticipant {
         status: ParticipationStatus.ACTIVE,
         joinedOn: date.value.toString(),
         leftOn: null,
+        cooldownUntilOn: null,
         version: 1,
       }),
     );
@@ -126,6 +138,38 @@ export class WorldParticipant {
       version: this.state.version + 1,
     };
     return succeed(this.state);
+  }
+
+  /**
+   * Põe a conta de castigo neste mundo até `untilOn`. Quem calcula a data é o
+   * caso de uso (`endedOn + cooldownDays`): `cooldownDays` é config do mundo e,
+   * por R-182, vai para `GameRuleConfig` — não é atributo da participação.
+   *
+   * Estende, nunca encurta: sair de novo durante o castigo o prolonga, e um
+   * comando reprocessado com data velha não perdoa o que já foi imposto.
+   */
+  public startCooldown(untilOn: string): Result<WorldParticipantSnapshot, DomainError> {
+    const date = WorldDate.parse(untilOn);
+    if (!date.ok) return date;
+
+    const value = date.value.toString();
+    if (this.state.cooldownUntilOn !== null && value <= this.state.cooldownUntilOn) {
+      return succeed(this.state);
+    }
+
+    this.state = {
+      ...this.state,
+      cooldownUntilOn: value,
+      version: this.state.version + 1,
+    };
+    return succeed(this.state);
+  }
+
+  /** O castigo vale até o FIM do dia de `cooldownUntilOn`. */
+  public isInCooldownOn(worldDate: string): boolean {
+    return (
+      this.state.cooldownUntilOn !== null && worldDate <= this.state.cooldownUntilOn
+    );
   }
 
   public snapshot(): WorldParticipantSnapshot {

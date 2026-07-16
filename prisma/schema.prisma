@@ -687,6 +687,11 @@ model WorldParticipant {
   status      WorldParticipantStatus @default(ACTIVE)
   joinedOn    DateTime               @db.Date
   leftOn      DateTime?              @db.Date
+  // Cooldown de conta é responsabilidade de C1 (context map:66) mas NÃO é
+  // aggregate root (:67 lista seis, e ele não está lá). É 1 por (conta, mundo)
+  // = 1 por participação: cabe como atributo. Tabela própria inventaria um root
+  // que o canônico não tem. O histórico fica no DomainEventLog (R-176).
+  cooldownUntilOn DateTime?          @db.Date
   version     Int                    @default(1)
 
   gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id])

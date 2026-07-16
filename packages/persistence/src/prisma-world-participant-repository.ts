@@ -47,6 +47,10 @@ export class PrismaWorldParticipantRepository implements WorldParticipantReposit
       status: snapshot.status,
       joinedOn: fromWorldDate(snapshot.joinedOn),
       leftOn: snapshot.leftOn === null ? null : fromWorldDate(snapshot.leftOn),
+      cooldownUntilOn:
+        snapshot.cooldownUntilOn === null
+          ? null
+          : fromWorldDate(snapshot.cooldownUntilOn),
       version: snapshot.version,
     };
 
@@ -89,6 +93,7 @@ interface WorldParticipantRow {
   readonly status: string;
   readonly joinedOn: Date;
   readonly leftOn: Date | null;
+  readonly cooldownUntilOn: Date | null;
   readonly version: number;
 }
 
@@ -104,6 +109,8 @@ function toSnapshot(
       row.status === "ENDED" ? ParticipationStatus.ENDED : ParticipationStatus.ACTIVE,
     joinedOn: toWorldDate(row.joinedOn),
     leftOn: row.leftOn === null ? null : toWorldDate(row.leftOn),
+    cooldownUntilOn:
+      row.cooldownUntilOn === null ? null : toWorldDate(row.cooldownUntilOn),
     version: row.version,
   };
 }
