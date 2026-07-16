@@ -22,6 +22,17 @@ config.resolver.nodeModulesPaths = [
 // react-native-helmet-async, dep do expo-router). Desligá-lo quebra o pnpm.
 config.resolver.unstable_enableSymlinks = true;
 
+// 3b. Subpath exports ("./internal" e afins) existem só no mapa `exports` do
+// package.json, sem arquivo correspondente no disco. Sem isto o Metro não
+// resolve `@clerk/react/internal`, importado por @clerk/expo.
+config.resolver.unstable_enablePackageExports = true;
+
+// 3c. Com package exports ligado, a condição `import` faz o Metro escolher o
+// build ESM de alguns pacotes — que usa `import.meta`, não suportado pelo
+// Hermes ("SyntaxError: 'import.meta' is currently unsupported"). Fixamos as
+// condições sem `import` para cair no build CJS.
+config.resolver.unstable_conditionNames = ["require", "react-native", "default"];
+
 // 4. React tem que ser UMA cópia só no bundle. Como o nodeModulesPaths inclui a
 // raiz do workspace (onde vivem react@19 + react-dom@19 do admin/guide), sem
 // isto algum `react` resolve lá em vez do React 18 do app — duas cópias = dois

@@ -463,9 +463,9 @@
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-SPLASH</span><span class="chip-d">Checa contrato e roteia. Loading, erro com retry e bloqueio "atualize o app" verificados no simulador. Não fecha: falta link à store e WebSocket/deep link</span><span class="tag">falta store + deep link</span></div>
-        <div class="chip missing"><span class="chip-id">M-LOGIN</span><span class="chip-d">Login — a sessão abre com credencial fixa de dev</span></div>
-        <div class="chip missing"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro — o command existe, a tela não</span></div>
-        <div class="chip missing"><span class="chip-id">M-RECOVER</span><span class="chip-d">Recuperação de senha</span></div>
+        <div class="chip missing"><span class="chip-id">M-LOGIN</span><span class="chip-d">Login — <b>travada no domínio</b>: não há e-mail na conta nem verificação de credencial</span></div>
+        <div class="chip missing"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro — <b>travada</b>: registerAccount não tem identificador de conta</span></div>
+        <div class="chip missing"><span class="chip-id">M-RECOVER</span><span class="chip-d">Recuperação de senha — <b>travada</b>: sem e-mail e sem envio</span></div>
         <div class="chip missing"><span class="chip-id">M-WORLD-PICK</span><span class="chip-d">Seleção de mundo — o mundo é uma constante</span></div>
         <div class="chip partial"><span class="chip-id">M-CLUB-PICK</span><span class="chip-d">Escolher clube — lista real, sem filtro nem região</span><span class="tag">parcial</span></div>
         <div class="chip missing"><span class="chip-id">M-CLUB-CREATE</span><span class="chip-d">Criar clube de expansão</span></div>
@@ -685,6 +685,10 @@
       <div class="blocker">
         <h3>O app não tem navegação de detalhe</h3>
         <p><b>Ainda trava.</b> As <span class="num">4</span> chamadas de rota do app continuam sendo <code>router.replace</code>: não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. O M-SPLASH abriu a primeira divisão real — <code>/</code> virou o splash e a home foi para <code>/inicio</code>, levando a árvore de 6 para <span class="num">7</span> rotas — mas empilhar tela sobre tela ainda é impossível. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Continua pré-requisito de quase todo o L-M03.</p>
+      </div>
+      <div class="blocker">
+        <h3>Não existe autenticação — M-LOGIN, M-SIGNUP, M-RECOVER e M-ACCOUNT estão travadas</h3>
+        <p>A palavra <code>email</code> não aparece em <code>packages/core/src</code> nem em <code>apps/api/src</code>: <code>AccountSnapshot</code> não tem identificador, então não há como achar uma conta. Nenhum command verifica credencial — <code>registerAccount</code> aceita <code>secretHash</code>, mas nada lê esse hash, e <code>startSession</code> recebe <code>accountId</code> + <code>tokenHash</code> e confia. <code>POST /auth/session</code> emite Bearer para qualquer <code>subject</code>; a doc do próprio endpoint diz que a verificação contra C1 "é evolução". Enquanto isso não existir, uma tela de login aceitaria qualquer senha — seria login falso, não tela parcial. É trava de domínio, não de UI.</p>
       </div>
       <div class="blocker">
         <h3>Sem app publicado, telas que apontam para a loja não fecham</h3>
