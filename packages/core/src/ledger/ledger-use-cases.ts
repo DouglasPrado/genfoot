@@ -8,6 +8,7 @@ import {
 } from "@grinta/shared";
 
 import type { GameWorldSnapshot } from "../world/world-types.js";
+import type { WorldGenesisSnapshot } from "../genesis/genesis-types.js";
 import type { LedgerRepository } from "./ledger-repository.js";
 import type {
   AccountingPeriodSnapshot,
@@ -22,6 +23,8 @@ import type {
   WorldLedgerSnapshot,
 } from "./ledger-types.js";
 import { WorldLedger } from "./world-ledger.js";
+
+export const INITIAL_CLUB_CASH_MINOR = 500_000_000;
 
 async function loadLedger(
   repository: LedgerRepository,
@@ -62,19 +65,77 @@ export class InitializeLedger {
   public async execute(
     world: GameWorldSnapshot,
     baseCurrency?: string,
+    genesis?: WorldGenesisSnapshot,
   ): Promise<Result<WorldLedgerSnapshot, DomainError>> {
     const existing = await this.repository.findLedgerByWorldId(world.id);
-    if (existing !== null) {
-      const validated = WorldLedger.fromSnapshot(existing);
-      return validated.ok ? succeed(validated.value.snapshot()) : validated;
+    const loaded =
+      existing === null
+        ? baseCurrency === undefined
+          ? WorldLedger.initialize(world)
+          : WorldLedger.initialize(world, baseCurrency)
+        : WorldLedger.fromSnapshot(existing);
+    if (!loaded.ok) return loaded;
+
+    const ledger = loaded.value;
+    const expectedRevision = existing?.revision ?? null;
+    if (genesis !== undefined) {
+      if (genesis.gameWorldId !== world.id) {
+        return fail(
+          new DomainError(
+            "LEDGER_GENESIS_WORLD_MISMATCH",
+            "O ledger e a gênese pertencem a mundos diferentes.",
+          ),
+        );
+      }
+      const faucet = ledger.openLedgerAccount({
+        name: "Emissão monetária da gênese",
+        type: "FAUCET",
+        rulesetVersion: world.rulesetVersion,
+        idempotencyKey: "genesis:money-supply",
+        worldSeed: world.seed,
+        worldDate: world.startDate,
+      });
+      if (!faucet.ok) return faucet;
+      for (const club of genesis.clubs) {
+        const cash = ledger.openLedgerAccount({
+          name: `Caixa · ${club.name} · ${club.id}`,
+          type: "ASSET",
+          rulesetVersion: world.rulesetVersion,
+          idempotencyKey: `genesis:club-cash:${club.id}`,
+          worldSeed: world.seed,
+          worldDate: world.startDate,
+        });
+        if (!cash.ok) return cash;
+        const funded = ledger.postTransaction({
+          transactionClass: "INITIAL_CLUB_CASH",
+          occurredOn: world.startDate,
+          entries: [
+            {
+              accountId: cash.value.id,
+              direction: "DEBIT",
+              amountMinor: INITIAL_CLUB_CASH_MINOR,
+            },
+            {
+              accountId: faucet.value.id,
+              direction: "CREDIT",
+              amountMinor: INITIAL_CLUB_CASH_MINOR,
+            },
+          ],
+          rulesetVersion: world.rulesetVersion,
+          idempotencyKey: `genesis:fund-club:${club.id}`,
+          worldSeed: world.seed,
+          worldDate: world.startDate,
+        });
+        if (!funded.ok) return funded;
+      }
     }
-    const created =
-      baseCurrency === undefined
-        ? WorldLedger.initialize(world)
-        : WorldLedger.initialize(world, baseCurrency);
-    if (!created.ok) return created;
-    await this.repository.saveLedger(created.value.snapshot(), null);
-    return succeed(created.value.snapshot());
+    if (
+      expectedRevision === null ||
+      ledger.snapshot().revision !== expectedRevision
+    ) {
+      await this.repository.saveLedger(ledger.snapshot(), expectedRevision);
+    }
+    return succeed(ledger.snapshot());
   }
 }
 
@@ -273,5 +334,12 @@ export class InspectLedger {
   ): Promise<Result<LedgerSummary, DomainError>> {
     const loaded = await loadLedger(this.repository, gameWorldId);
     return loaded.ok ? succeed(loaded.value.summary()) : loaded;
+  }
+
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldLedgerSnapshot, DomainError>> {
+    const loaded = await loadLedger(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
   }
 }

@@ -1,5 +1,12 @@
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import Svg, { Polygon, Line, Ellipse, Defs, LinearGradient, Stop } from "react-native-svg";
+import Svg, {
+  Polygon,
+  Line,
+  Ellipse,
+  Defs,
+  LinearGradient,
+  Stop,
+} from "react-native-svg";
 import { Icon } from "@/components/icon";
 import { color, radius, fontWeight } from "@/theme";
 import type { SquadPlayer, PositionGroup } from "./squad-data";
@@ -28,7 +35,10 @@ const COMPRESS_Y = 1;
 const COMPRESS_X = 1;
 
 /** Projeta coords normalizadas do slot no trapézio em perspectiva (comprimido). */
-function project(nx: number, ny: number): { xv: number; yv: number; depth: number } {
+function project(
+  nx: number,
+  ny: number,
+): { xv: number; yv: number; depth: number } {
   const nyc = 0.5 + (ny - 0.5) * COMPRESS_Y;
   const nxc = 0.5 + (nx - 0.5) * COMPRESS_X;
   const yv = lerp(TOP_Y, BOT_Y, nyc);
@@ -43,7 +53,13 @@ function stripe(y0: number, y1: number, fill: string) {
   const r0 = lerp(TOP_R, BOT_R, (y0 - TOP_Y) / (BOT_Y - TOP_Y));
   const l1 = lerp(TOP_L, BOT_L, (y1 - TOP_Y) / (BOT_Y - TOP_Y));
   const r1 = lerp(TOP_R, BOT_R, (y1 - TOP_Y) / (BOT_Y - TOP_Y));
-  return <Polygon key={y0} points={`${l0},${y0} ${r0},${y0} ${r1},${y1} ${l1},${y1}`} fill={fill} />;
+  return (
+    <Polygon
+      key={y0}
+      points={`${l0},${y0} ${r0},${y0} ${r1},${y1} ${l1},${y1}`}
+      fill={fill}
+    />
+  );
 }
 
 /** Campo em perspectiva (trapézio), grama clara com listras e linhas brancas. */
@@ -51,16 +67,29 @@ function Field() {
   const bands = 6;
   const step = (BOT_Y - TOP_Y) / bands;
   return (
-    <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 140" preserveAspectRatio="none">
+    <Svg
+      style={StyleSheet.absoluteFill}
+      viewBox="0 0 100 140"
+      preserveAspectRatio="none"
+    >
       <Defs>
         <LinearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#3fa85f" />
           <Stop offset="1" stopColor="#55c878" />
         </LinearGradient>
       </Defs>
-      <Polygon points={`${TOP_L},${TOP_Y} ${TOP_R},${TOP_Y} ${BOT_R},${BOT_Y} ${BOT_L},${BOT_Y}`} fill="url(#grass)" />
+      <Polygon
+        points={`${TOP_L},${TOP_Y} ${TOP_R},${TOP_Y} ${BOT_R},${BOT_Y} ${BOT_L},${BOT_Y}`}
+        fill="url(#grass)"
+      />
       {Array.from({ length: bands }).map((_, i) =>
-        i % 2 === 0 ? stripe(TOP_Y + i * step, TOP_Y + (i + 1) * step, "rgba(255,255,255,0.05)") : null,
+        i % 2 === 0
+          ? stripe(
+              TOP_Y + i * step,
+              TOP_Y + (i + 1) * step,
+              "rgba(255,255,255,0.05)",
+            )
+          : null,
       )}
       {/* Contorno */}
       <Polygon
@@ -70,14 +99,49 @@ function Field() {
         strokeWidth={0.8}
       />
       {/* Meio-campo + círculo central (elipse achatada pela perspectiva) */}
-      <Line x1={lerp(TOP_L, BOT_L, 0.5)} y1={70} x2={lerp(TOP_R, BOT_R, 0.5)} y2={70} stroke={LINE} strokeWidth={0.8} />
-      <Ellipse cx={50} cy={70} rx={11} ry={5.5} fill="none" stroke={LINE} strokeWidth={0.8} />
+      <Line
+        x1={lerp(TOP_L, BOT_L, 0.5)}
+        y1={70}
+        x2={lerp(TOP_R, BOT_R, 0.5)}
+        y2={70}
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
+      <Ellipse
+        cx={50}
+        cy={70}
+        rx={11}
+        ry={5.5}
+        fill="none"
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
       {/* Gol adversário (topo, longe) */}
-      <Polygon points="31,4 69,4 72,22 28,22" fill="none" stroke={LINE} strokeWidth={0.8} />
-      <Polygon points="39,4 61,4 62,11 38,11" fill="none" stroke={LINE} strokeWidth={0.8} />
+      <Polygon
+        points="31,4 69,4 72,22 28,22"
+        fill="none"
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
+      <Polygon
+        points="39,4 61,4 62,11 38,11"
+        fill="none"
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
       {/* Gol próprio (base, perto) */}
-      <Polygon points="16,112 84,112 90,136 10,136" fill="none" stroke={LINE} strokeWidth={0.8} />
-      <Polygon points="35,127 65,127 68,136 32,136" fill="none" stroke={LINE} strokeWidth={0.8} />
+      <Polygon
+        points="16,112 84,112 90,136 10,136"
+        fill="none"
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
+      <Polygon
+        points="35,127 65,127 68,136 32,136"
+        fill="none"
+        stroke={LINE}
+        strokeWidth={0.8}
+      />
     </Svg>
   );
 }
@@ -105,9 +169,24 @@ function Token({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={[styles.token, { left: `${xv}%`, top: `${(yv / 140) * 100}%`, transform: [{ scale }] }]}
+      accessibilityLabel={
+        player === undefined
+          ? `Posição ${slot.role} vazia`
+          : `${player.name}, ${slot.role}, overall ${player.ovr}`
+      }
+      accessibilityState={{ selected }}
+      style={[
+        styles.token,
+        { left: `${xv}%`, top: `${(yv / 140) * 100}%`, transform: [{ scale }] },
+      ]}
     >
-      <View style={[styles.photo, { borderColor: selected ? color.primary : tint }, selected ? styles.photoSelected : null]}>
+      <View
+        style={[
+          styles.photo,
+          { borderColor: selected ? color.primary : tint },
+          selected ? styles.photoSelected : null,
+        ]}
+      >
         <Icon name="person" size={22} color={color.textMuted} />
         <View style={styles.numberBadge}>
           <Text style={styles.numberText}>{player?.number ?? "?"}</Text>
@@ -120,7 +199,14 @@ function Token({
         </View>
       </View>
       <View style={styles.fitTrack}>
-        <View style={{ width: `${fit}%`, height: 4, backgroundColor: fitnessTint(fit), borderRadius: 2 }} />
+        <View
+          style={{
+            width: `${fit}%`,
+            height: 4,
+            backgroundColor: fitnessTint(fit),
+            borderRadius: 2,
+          }}
+        />
       </View>
       <Text style={styles.name} numberOfLines={1}>
         {player ? player.name.split(" ").slice(-1)[0] : "—"}
@@ -202,7 +288,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  numberText: { color: color.text, fontSize: 11, fontWeight: fontWeight.black as "800" },
+  numberText: {
+    color: color.text,
+    fontSize: 11,
+    fontWeight: fontWeight.black as "800",
+  },
   ovrBadge: {
     position: "absolute",
     bottom: -7,
@@ -215,8 +305,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  ovrText: { color: color.text, fontSize: 11, fontWeight: fontWeight.black as "800", fontStyle: "italic" },
-  fitTrack: { width: PHOTO - 8, height: 4, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 2, marginTop: 5, overflow: "hidden" },
+  ovrText: {
+    color: color.text,
+    fontSize: 11,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  fitTrack: {
+    width: PHOTO - 8,
+    height: 4,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 2,
+    marginTop: 5,
+    overflow: "hidden",
+  },
   roleBadge: {
     position: "absolute",
     top: -5,

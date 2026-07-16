@@ -64,6 +64,7 @@ import {
   InitializeInbox,
   InitializeLedger,
   InitializeMarket,
+  InitializeMarketPopulation,
   InitializeMatches,
   InitializeNarrative,
   InitializeStaff,
@@ -277,18 +278,27 @@ const nowMs = (): number => Date.now();
 function financingPort(): InfrastructureFinancingPort {
   return {
     reserve: (context) =>
-      Promise.resolve({ reservationRef: `api:${context.idempotencyKey}:reservation` }),
+      Promise.resolve({
+        reservationRef: `api:${context.idempotencyKey}:reservation`,
+      }),
     disburseMilestone: (context) =>
-      Promise.resolve({ disbursementRef: `api:${context.idempotencyKey}:disbursement` }),
+      Promise.resolve({
+        disbursementRef: `api:${context.idempotencyKey}:disbursement`,
+      }),
     releaseRemainder: (context) =>
-      Promise.resolve({ releaseFactRef: `api:${context.idempotencyKey}:release` }),
+      Promise.resolve({
+        releaseFactRef: `api:${context.idempotencyKey}:release`,
+      }),
   };
 }
 
 function licensingPort(): InfrastructureLicensingPort {
   return {
     inspect: (context) =>
-      Promise.resolve({ approved: true, inspectionRef: `api:${context.idempotencyKey}:license` }),
+      Promise.resolve({
+        approved: true,
+        inspectionRef: `api:${context.idempotencyKey}:license`,
+      }),
   };
 }
 
@@ -452,6 +462,40 @@ const handlers: Record<string, CommandHandler> = {
       repository,
     ).execute(worldId.value);
     if (!result.ok) return result;
+
+    const world = await repository.findById(worldId.value);
+    const genesis = await repository.findByWorldId(worldId.value);
+    if (world === null || genesis === null) {
+      return fail(
+        new DomainError(
+          "WORLD_GENESIS_NOT_FOUND",
+          "A gênese não pôde ser recarregada para concluir o bootstrap.",
+        ),
+      );
+    }
+    const ledger = await new InitializeLedger(repository).execute(
+      world,
+      undefined,
+      genesis,
+    );
+    if (!ledger.ok) return ledger;
+    const market = await new InitializeMarket(repository).execute(world);
+    if (!market.ok) return market;
+    const population = await new InitializeMarketPopulation(repository).execute(
+      world,
+      genesis.clubs.length,
+    );
+    if (!population.ok) return population;
+    const competitions = await new InitializeCompetitions(repository).execute(
+      world,
+      genesis,
+    );
+    if (!competitions.ok) return competitions;
+    const matches = await new InitializeMatches(repository).execute(
+      world,
+      competitions.value,
+    );
+    if (!matches.ok) return matches;
     return succeed({ resource: `world:${worldId.value}` });
   },
 
@@ -525,31 +569,95 @@ const handlers: Record<string, CommandHandler> = {
   "market:initialize": async ({ repository, envelope }) => {
     const world = await loadWorld(repository, envelope.worldId);
     if (!world.ok) return world;
+    const genesis = await repository.findByWorldId(world.value.worldId);
+    if (genesis === null) {
+      return fail(
+        new DomainError(
+          "WORLD_GENESIS_NOT_FOUND",
+          "Execute world:genesis antes de inicializar o mercado.",
+        ),
+      );
+    }
     const result = await new InitializeMarket(repository).execute(
       world.value.snapshot,
     );
     if (!result.ok) return result;
+    const population = await new InitializeMarketPopulation(repository).execute(
+      world.value.snapshot,
+      genesis.clubs.length,
+    );
+    if (!population.ok) return population;
     return succeed({ resource: `market:${world.value.worldId}` });
   },
 
   "ledger:initialize": async ({ repository, envelope }) => {
     const world = await loadWorld(repository, envelope.worldId);
     if (!world.ok) return world;
+    const genesis = await repository.findByWorldId(world.value.worldId);
+    if (genesis === null) {
+      return fail(
+        new DomainError(
+          "WORLD_GENESIS_NOT_FOUND",
+          "Execute world:genesis antes de inicializar o ledger.",
+        ),
+      );
+    }
     const result = await new InitializeLedger(repository).execute(
       world.value.snapshot,
+      undefined,
+      genesis,
     );
     if (!result.ok) return result;
     return succeed({ resource: `ledger:${world.value.worldId}` });
   },
 
   // Inicializadores de contexto (execute(worldSnapshot))
-  "competition:initialize": wInit((r) => new InitializeCompetitions(r), "competitions"),
-  "match:initialize": wInit((r) => new InitializeMatches(r), "matches"),
+  "competition:initialize": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const genesis = await repository.findByWorldId(world.value.worldId);
+    if (genesis === null) {
+      return fail(
+        new DomainError(
+          "WORLD_GENESIS_NOT_FOUND",
+          "Execute world:genesis antes de inicializar as competições.",
+        ),
+      );
+    }
+    const result = await new InitializeCompetitions(repository).execute(
+      world.value.snapshot,
+      genesis,
+    );
+    if (!result.ok) return result;
+    const matches = await new InitializeMatches(repository).execute(
+      world.value.snapshot,
+      result.value,
+    );
+    if (!matches.ok) return matches;
+    return succeed({ resource: `competitions:${world.value.worldId}` });
+  },
+  "match:initialize": async ({ repository, envelope }) => {
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const competitions = await repository.findCompetitionsByWorldId(
+      world.value.worldId,
+    );
+    const result = await new InitializeMatches(repository).execute(
+      world.value.snapshot,
+      competitions ?? undefined,
+    );
+    return result.ok
+      ? succeed({ resource: `matches:${world.value.worldId}` })
+      : result;
+  },
   "staff:initialize": wInit((r) => new InitializeStaff(r), "staff"),
   "narrative:initialize": wInit((r) => new InitializeNarrative(r), "narrative"),
   "inbox:initialize": wInit((r) => new InitializeInbox(r), "inbox"),
   "admin:initialize": wInit((r) => new InitializeAdmin(r), "admin"),
-  "automation:initialize": wInit((r) => new InitializeAutomation(r), "automation"),
+  "automation:initialize": wInit(
+    (r) => new InitializeAutomation(r),
+    "automation",
+  ),
   "identity:initialize": wInit((r) => new InitializeIdentity(r), "identity"),
   "eventing:initialize": wInit((r) => new InitializeEventing(r), "eventing"),
 
@@ -814,12 +922,30 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "staff:end-contract": wc((r) => new EndStaffContract(r), "staff"),
 
   // Competições (C7)
-  "competition:create-edition": wc((r) => new CreateCompetitionEdition(r), "competition"),
-  "competition:register-participant": wc((r) => new RegisterParticipant(r), "competition"),
-  "competition:generate-fixtures": wc((r) => new GenerateFixtures(r), "competition"),
-  "competition:record-result": wc((r) => new RecordOfficialResult(r), "competition"),
-  "competition:apply-discipline": wc((r) => new ApplyDiscipline(r), "competition"),
-  "competition:homologate": wc((r) => new HomologateCompetition(r), "competition"),
+  "competition:create-edition": wc(
+    (r) => new CreateCompetitionEdition(r),
+    "competition",
+  ),
+  "competition:register-participant": wc(
+    (r) => new RegisterParticipant(r),
+    "competition",
+  ),
+  "competition:generate-fixtures": wc(
+    (r) => new GenerateFixtures(r),
+    "competition",
+  ),
+  "competition:record-result": wc(
+    (r) => new RecordOfficialResult(r),
+    "competition",
+  ),
+  "competition:apply-discipline": wc(
+    (r) => new ApplyDiscipline(r),
+    "competition",
+  ),
+  "competition:homologate": wc(
+    (r) => new HomologateCompetition(r),
+    "competition",
+  ),
 
   // Ledger (C9)
   "ledger:open-account": wc((r) => new OpenLedgerAccount(r), "ledger"),
@@ -848,9 +974,18 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "narrative:make-promise": wc((r) => new MakePublicPromise(r), "narrative"),
   "narrative:evaluate-promise": wc((r) => new EvaluatePromise(r), "narrative"),
   "narrative:open-crisis": wc((r) => new OpenNarrativeCrisis(r), "narrative"),
-  "narrative:submit-recovery": wc((r) => new SubmitRecoveryPlan(r), "narrative"),
-  "narrative:resolve-crisis": wc((r) => new ResolveNarrativeCrisis(r), "narrative"),
-  "narrative:choose-conversation": wc((r) => new ChooseConversationOption(r), "narrative"),
+  "narrative:submit-recovery": wc(
+    (r) => new SubmitRecoveryPlan(r),
+    "narrative",
+  ),
+  "narrative:resolve-crisis": wc(
+    (r) => new ResolveNarrativeCrisis(r),
+    "narrative",
+  ),
+  "narrative:choose-conversation": wc(
+    (r) => new ChooseConversationOption(r),
+    "narrative",
+  ),
   "narrative:cancel-promise": wc((r) => new CancelPromise(r), "narrative"),
 
   // Notificações (C11)
@@ -881,37 +1016,76 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "identity:join-world": wc((r) => new JoinWorld(r), "identity"),
   "identity:revoke-session": wc((r) => new RevokeSessionFamily(r), "identity"),
   "identity:reserve-club": wc((r) => new ReserveClub(r), "identity"),
-  "identity:confirm-onboarding": wc((r) => new ConfirmOnboarding(r), "identity"),
-  "identity:release-club-reservation": wc((r) => new ReleaseClubReservation(r), "identity"),
+  "identity:confirm-onboarding": wc(
+    (r) => new ConfirmOnboarding(r),
+    "identity",
+  ),
+  "identity:release-club-reservation": wc(
+    (r) => new ReleaseClubReservation(r),
+    "identity",
+  ),
   "identity:end-club-control": wc((r) => new EndClubControl(r), "identity"),
   "identity:request-switch": wc((r) => new RequestClubSwitch(r), "identity"),
   "identity:start-session": wc((r) => new StartSession(r), "identity"),
   "identity:refresh-session": wc((r) => new RefreshSession(r), "identity"),
 
   // Automação / IA (X-001)
-  "automation:create-rule": wc((r) => new CreateAutomationRule(r), "automation"),
-  "automation:activate-rule": wc((r) => new ActivateAutomationRule(r), "automation"),
-  "automation:suspend-rule": wc((r) => new SuspendAutomationRule(r), "automation"),
-  "automation:revoke-rule": wc((r) => new RevokeAutomationRule(r), "automation"),
-  "automation:evaluate-decision": wc((r) => new EvaluateDecision(r), "automation"),
-  "automation:execute-proposal": wc((r) => new ExecuteDecisionProposal(r), "automation"),
-  "automation:disable-on-control-change": wc((r) => new DisableAutomationOnControlChange(r), "automation"),
+  "automation:create-rule": wc(
+    (r) => new CreateAutomationRule(r),
+    "automation",
+  ),
+  "automation:activate-rule": wc(
+    (r) => new ActivateAutomationRule(r),
+    "automation",
+  ),
+  "automation:suspend-rule": wc(
+    (r) => new SuspendAutomationRule(r),
+    "automation",
+  ),
+  "automation:revoke-rule": wc(
+    (r) => new RevokeAutomationRule(r),
+    "automation",
+  ),
+  "automation:evaluate-decision": wc(
+    (r) => new EvaluateDecision(r),
+    "automation",
+  ),
+  "automation:execute-proposal": wc(
+    (r) => new ExecuteDecisionProposal(r),
+    "automation",
+  ),
+  "automation:disable-on-control-change": wc(
+    (r) => new DisableAutomationOnControlChange(r),
+    "automation",
+  ),
 
   // Eventing / sagas (X-002)
   "eventing:publish-outbox": wc((r) => new PublishOutboxBatch(r), "eventing"),
   "eventing:consume-event": wc((r) => new ConsumeEvent(r), "eventing"),
   "eventing:retry-dead-letter": wc((r) => new RetryDeadLetter(r), "eventing"),
-  "eventing:register-event-type": wc((r) => new RegisterEventType(r), "eventing"),
+  "eventing:register-event-type": wc(
+    (r) => new RegisterEventType(r),
+    "eventing",
+  ),
   "eventing:start-saga": wc((r) => new StartSaga(r), "eventing"),
   "eventing:claim-saga": wc((r) => new ClaimSaga(r), "eventing"),
   "eventing:advance-saga-step": wc((r) => new AdvanceSagaStep(r), "eventing"),
   "eventing:compensate-saga": wc((r) => new CompensateSaga(r), "eventing"),
-  "eventing:rebuild-projection": wc((r) => new RebuildProjection(r), "eventing"),
-  "eventing:resume-realtime": wc((r) => new ResumeRealtimeStream(r), "eventing"),
+  "eventing:rebuild-projection": wc(
+    (r) => new RebuildProjection(r),
+    "eventing",
+  ),
+  "eventing:resume-realtime": wc(
+    (r) => new ResumeRealtimeStream(r),
+    "eventing",
+  ),
 
   // Scheduler + temporada — shape uniforme (C2 / SAGA-02)
   "scheduler:schedule-task": wc((r) => new ScheduleWorldTask(r), "scheduler"),
-  "scheduler:register-window": wc((r) => new RegisterTemporalWindow(r), "scheduler"),
+  "scheduler:register-window": wc(
+    (r) => new RegisterTemporalWindow(r),
+    "scheduler",
+  ),
   "season:rollover:start": wc((r) => new StartSeasonRollover(r), "rollover"),
 
   // Partida ao vivo (C8)
@@ -932,7 +1106,10 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "market:terminate-contract": wc((r) => new TerminateContract(r), "market"),
   "market:cancel-negotiation": wc((r) => new CancelNegotiation(r), "market"),
   "market:start-transfer": wc((r) => new StartTransfer(r), "market"),
-  "market:advance-transfer-step": wc((r) => new AdvanceTransferStep(r), "market"),
+  "market:advance-transfer-step": wc(
+    (r) => new AdvanceTransferStep(r),
+    "market",
+  ),
   "market:compensate-transfer": wc((r) => new CompensateTransfer(r), "market"),
   "market:start-loan": wc((r) => new StartLoan(r), "market"),
   "market:exercise-loan-option": wc((r) => new ExerciseLoanOption(r), "market"),

@@ -7,7 +7,9 @@ import { Platform } from "react-native";
  */
 export const API_BASE_URL: string =
   process.env.EXPO_PUBLIC_API_URL ??
-  (Platform.OS === "android" ? "http://10.0.2.2:3000" : "http://localhost:3000");
+  (Platform.OS === "android"
+    ? "http://10.0.2.2:3000"
+    : "http://localhost:3000");
 
 /**
  * Sujeito/credencial de desenvolvimento. Em produção a sessão vem de um fluxo
@@ -23,3 +25,7 @@ export const DEV_SUBJECT = "mobile-dev-player";
  */
 export const DEFAULT_WORLD_ID: string =
   process.env.EXPO_PUBLIC_WORLD_ID ?? "019f65eb-9ba4-707d-aa7c-426ceb5ea41b";
+
+/** Clube controlado no mundo demo; a seleção persistida da conta terá precedência. */
+export const MANAGED_CLUB_ID: string | null =
+  process.env.EXPO_PUBLIC_CLUB_ID ?? null;

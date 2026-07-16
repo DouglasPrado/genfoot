@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   GameWorld,
+  InitializeLedger,
   PostTransaction,
+  WorldGenesisGenerator,
   WorldLedger,
   type GameWorldSnapshot,
   type LedgerRepository,
@@ -103,6 +105,35 @@ function fundedLedger() {
 }
 
 describe("Economy and ledger", () => {
+  it("inicializa cada clube com o caixa canônico de R$ 5 milhões", async () => {
+    const gameWorld = world("ledger-bootstrap");
+    const genesis = new WorldGenesisGenerator().generate(gameWorld);
+    const repository = new MemoryLedgerRepository();
+    const useCase = new InitializeLedger(repository);
+
+    const initialized = await useCase.execute(gameWorld, undefined, genesis);
+
+    expect(initialized.ok).toBe(true);
+    if (!initialized.ok) throw initialized.error;
+    const cashAccounts = initialized.value.accounts.filter(
+      ({ idempotencyKey }) => idempotencyKey.startsWith("genesis:club-cash:"),
+    );
+    expect(cashAccounts).toHaveLength(16);
+    expect(
+      cashAccounts.every(({ balanceMinor }) => balanceMinor === 500_000_000),
+    ).toBe(true);
+    expect(initialized.value.transactions).toHaveLength(16);
+    const reloaded = WorldLedger.fromSnapshot(initialized.value);
+    expect(reloaded.ok).toBe(true);
+    if (!reloaded.ok) throw reloaded.error;
+    expect(reloaded.value.summary().residualMinor).toBe(0);
+
+    const revision = initialized.value.revision;
+    const repeated = await useCase.execute(gameWorld, undefined, genesis);
+    expect(repeated).toMatchObject({ ok: true, value: { revision } });
+    expect(repository.snapshot?.transactions).toHaveLength(16);
+  });
+
   it("abre conta e produz um único efeito ao repetir a chave", () => {
     const gameWorld = world();
     const created = WorldLedger.initialize(gameWorld);
@@ -116,7 +147,10 @@ describe("Economy and ledger", () => {
       worldSeed: gameWorld.seed,
       worldDate: "2026-01-01",
     });
-    expect(first).toMatchObject({ ok: true, value: { normalBalance: "DEBIT" } });
+    expect(first).toMatchObject({
+      ok: true,
+      value: { normalBalance: "DEBIT" },
+    });
     const revision = value.snapshot().revision;
     const repeated = value.openLedgerAccount({
       name: "Caixa",
@@ -270,7 +304,10 @@ describe("Economy and ledger", () => {
     const revision = repository.snapshot.revision;
     const repeated = await useCase.execute(gameWorld.id, input);
 
-    expect(first).toMatchObject({ ok: true, value: { transactionClass: "BONUS" } });
+    expect(first).toMatchObject({
+      ok: true,
+      value: { transactionClass: "BONUS" },
+    });
     expect(repeated).toEqual(first);
     expect(repository.snapshot.revision).toBe(revision);
     expect(repository.snapshot.transactions).toHaveLength(2);
@@ -342,7 +379,11 @@ describe("Economy and ledger", () => {
     const debt = value.accrueDebt(input);
     expect(debt).toMatchObject({
       ok: true,
-      value: { status: "ACTIVE", principalMinor: 10000, outstandingMinor: 11000 },
+      value: {
+        status: "ACTIVE",
+        principalMinor: 10000,
+        outstandingMinor: 11000,
+      },
     });
     // conservação preservada — dívida não é partida na razão
     expect(value.summary().residualMinor).toBe(0);
@@ -422,7 +463,10 @@ describe("Economy and ledger", () => {
         worldSeed: gameWorld.seed,
         worldDate: "2026-02-20",
       }),
-    ).toMatchObject({ ok: false, error: { code: "ACCOUNTING_PERIOD_OVERLAP" } });
+    ).toMatchObject({
+      ok: false,
+      error: { code: "ACCOUNTING_PERIOD_OVERLAP" },
+    });
   });
 
   it("expira reservas vencidas por data lógica, uma única vez", () => {

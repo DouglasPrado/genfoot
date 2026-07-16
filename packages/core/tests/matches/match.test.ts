@@ -10,11 +10,14 @@ import { describe, expect, it } from "vitest";
 import {
   FinalizeMatch,
   GameWorld,
+  InitializeMatches,
+  InspectMatches,
   WorldMatches,
   type GameWorldSnapshot,
   type MatchClubRef,
   type MatchFixtureRef,
   type MatchRepository,
+  type WorldCompetitionsSnapshot,
   type WorldMatchesSnapshot,
 } from "../../src/index.js";
 
@@ -167,6 +170,60 @@ function startAndFinalize(ctx: ReturnType<typeof createdMatch>) {
 }
 
 describe("Match runtime kernel", () => {
+  it("materializa fixtures oficiais ao inicializar e não duplica no retry", async () => {
+    const gameWorld = world("competition-bootstrap");
+    const repository = new MemoryMatchRepository();
+    const competitions = {
+      fixtures: [
+        {
+          id: FIXTURE,
+          homeClubId: HOME,
+          awayClubId: AWAY,
+          kickoffOn: "2026-01-08",
+        },
+      ],
+    } as unknown as WorldCompetitionsSnapshot;
+
+    const initialized = await new InitializeMatches(repository).execute(
+      gameWorld,
+      competitions,
+    );
+    const retried = await new InitializeMatches(repository).execute(
+      gameWorld,
+      competitions,
+    );
+
+    expect(initialized).toMatchObject({
+      ok: true,
+      value: {
+        matches: [
+          {
+            fixtureRef: FIXTURE,
+            status: "CREATED",
+            kickoffOn: "2026-01-08",
+          },
+        ],
+      },
+    });
+    expect(retried).toMatchObject({ ok: true });
+    expect(repository.snapshot?.matches).toHaveLength(1);
+  });
+
+  it("entrega o snapshot oficial completo para clientes de partida", async () => {
+    const ctx = createdMatch();
+    const repository = new MemoryMatchRepository();
+    repository.snapshot = ctx.value.snapshot();
+
+    const inspected = await new InspectMatches(repository).world(
+      ctx.gameWorld.id,
+    );
+
+    expect(inspected).toMatchObject({
+      ok: true,
+      value: { matches: [{ id: ctx.matchId, status: "CREATED" }] },
+    });
+  });
+
   it("cria manifesto e produz um único efeito ao repetir a chave", () => {
     const { gameWorld, value, matchId } = createdMatch();
     expect(value.findMatch(matchId)!.status).toBe("CREATED");
@@ -187,7 +244,10 @@ describe("Match runtime kernel", () => {
       worldSeed: gameWorld.seed,
       worldDate: "2026-02-01",
     });
-    expect(started).toMatchObject({ ok: true, value: { status: "IN_PROGRESS" } });
+    expect(started).toMatchObject({
+      ok: true,
+      value: { status: "IN_PROGRESS" },
+    });
     expect(
       value.startMatch({
         matchId,
@@ -279,7 +339,9 @@ describe("Match runtime kernel", () => {
     expect(replay).toMatchObject({ ok: true, value: { matchSequence: 1 } });
     expect(ctx.value.snapshot().revision).toBe(revisionAfterFirst);
     expect(
-      ctx.value.snapshot().events.filter((e) => e.type === "MatchCommandAccepted"),
+      ctx.value
+        .snapshot()
+        .events.filter((e) => e.type === "MatchCommandAccepted"),
     ).toHaveLength(1);
 
     // cooldown: mesmo actor no mesmo tick é rejeitado
@@ -319,7 +381,10 @@ describe("Match runtime kernel", () => {
         idempotencyKey: "cmd:gap",
         commandId: "c-gap",
       }),
-    ).toMatchObject({ ok: false, error: { code: "MATCH_COMMAND_SEQUENCE_GAP" } });
+    ).toMatchObject({
+      ok: false,
+      error: { code: "MATCH_COMMAND_SEQUENCE_GAP" },
+    });
 
     // fora da janela: após esgotar os ticks nenhum command é aceito
     const done = advance(ctx, 30);
@@ -414,7 +479,10 @@ describe("Match runtime kernel", () => {
         checkpointTick: 7,
         rulesetVersion: ctx.gameWorld.rulesetVersion,
       }),
-    ).toMatchObject({ ok: false, error: { code: "MATCH_CHECKPOINT_NOT_FOUND" } });
+    ).toMatchObject({
+      ok: false,
+      error: { code: "MATCH_CHECKPOINT_NOT_FOUND" },
+    });
   });
 
   it("command log altera o resultado e mantém replay ≡ execução com log", () => {

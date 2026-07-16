@@ -16,10 +16,7 @@ import type { Request } from "express";
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { ApiException } from "../common/standard-error.js";
 import { WORLD_REPOSITORY } from "../core/tokens.js";
-import {
-  registeredQueryTypes,
-  resolveQueryHandler,
-} from "./query-registry.js";
+import { registeredQueryTypes, resolveQueryHandler } from "./query-registry.js";
 import {
   enforceWorldScope,
   paginate,
@@ -66,7 +63,9 @@ export class QueriesController {
     if (!worldId.ok) throw invalidWorldId(worldId.error.message);
     enforceWorldScope(request.session, worldId.value);
 
-    const result = await new InspectWorld(this.repository).execute(worldId.value);
+    const result = await new InspectWorld(this.repository).execute(
+      worldId.value,
+    );
     if (!result.ok) {
       throw new ApiException(
         {
@@ -96,7 +95,8 @@ export class QueriesController {
     summary: "Query versionada por contexto",
     description:
       "queryType: club, competitions, matches, market, ledger, players, " +
-      "staff, narrative, inbox, admin, automation, eventing, identity, scheduler.",
+      "player-roster, staff, narrative, inbox, admin, automation, eventing, " +
+      "identity, identity-detail, scheduler.",
   })
   @ApiParam({ name: "worldId", description: "UUID do mundo" })
   @ApiParam({ name: "queryType", description: "Contexto a consultar" })
@@ -127,7 +127,9 @@ export class QueriesController {
         recoveryAction: null,
       });
     }
-    const world = await new InspectWorld(this.repository).execute(worldId.value);
+    const world = await new InspectWorld(this.repository).execute(
+      worldId.value,
+    );
     if (!world.ok) {
       throw new ApiException(
         {

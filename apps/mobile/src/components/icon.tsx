@@ -24,6 +24,8 @@ import {
   Alert02Icon,
   CubeIcon,
   Notification03Icon,
+  ChampionIcon,
+  ArrowReloadHorizontalIcon,
   TradeUpIcon,
   TradeDownIcon,
   MinusSignIcon,
@@ -38,10 +40,8 @@ import {
   ThermometerIcon,
   TShirtIcon,
   File01Icon,
-  WorkflowSquare01Icon,
   Bookmark01Icon,
   GlobeIcon,
-  AgreementIcon,
   Tag01Icon,
   PulseIcon,
   Wallet01Icon,
@@ -51,74 +51,85 @@ import {
   MortarboardIcon,
   Medicine01Icon,
 } from "@hugeicons/core-free-icons";
+import { Handshake, Workflow, type LucideIcon } from "lucide-react-native";
 import { color as palette } from "@/theme";
 
 /**
- * Ícones do app: Hugeicons (set free) como padrão. Um único wrapper mapeia
- * nomes semânticos → ícones Hugeicons, então as telas continuam usando nomes
- * estáveis (`<Icon name="football" />`) sem acoplar ao pacote de ícones.
+ * Ícones do app. Padrão: Hugeicons (set free). Quando o Hugeicons não tem o
+ * ícone certo (evitar substituto que não encaixa), usa-se Lucide como fallback.
+ * As telas seguem usando nomes semânticos estáveis (`<Icon name="football" />`),
+ * desacopladas de qual biblioteca serve cada ícone.
  */
+type HugeIcon = React.ComponentProps<typeof HugeiconsIcon>["icon"];
+type Entry = { readonly hi: HugeIcon } | { readonly lu: LucideIcon };
+
+const hi = (icon: HugeIcon): Entry => ({ hi: icon });
+const lu = (icon: LucideIcon): Entry => ({ lu: icon });
+
 const MAP = {
-  home: Home01Icon,
-  people: UserGroupIcon,
-  person: UserIcon,
-  football: FootballIcon,
-  cart: ShoppingCart01Icon,
-  shield: Shield01Icon,
-  "shield-half": Shield02Icon,
-  "logo-usd": CoinsDollarIcon,
-  diamond: DiamondIcon,
-  flash: EnergyIcon,
-  add: PlusSignIcon,
-  time: Clock01Icon,
-  "time-outline": Clock01Icon,
-  "chevron-forward": ArrowRight01Icon,
-  "chevron-down": ArrowDown01Icon,
-  "chevron-up": ArrowUp01Icon,
-  "arrow-back": ArrowLeft01Icon,
-  "arrow-forward": ArrowRight01Icon,
-  "arrow-up": ArrowUp01Icon,
-  "arrow-down": ArrowDown01Icon,
-  "arrow-up-circle": ArrowUp01Icon,
-  "arrow-down-circle": ArrowDown01Icon,
-  walk: RunningShoesIcon,
-  star: StarIcon,
-  "star-outline": StarIcon,
-  eye: ViewIcon,
-  "checkmark-circle": CheckmarkCircle01Icon,
-  ellipse: CircleIcon,
-  warning: Alert02Icon,
-  cube: CubeIcon,
-  notifications: Notification03Icon,
-  "notifications-outline": Notification03Icon,
-  "trending-up": TradeUpIcon,
-  "trending-down": TradeDownIcon,
-  remove: MinusSignIcon,
-  "swap-horizontal": Exchange01Icon,
-  locate: Target01Icon,
-  heart: FavouriteIcon,
-  grid: GridViewIcon,
-  search: Search01Icon,
-  "search-circle": Search01Icon,
-  options: FilterHorizontalIcon,
-  flame: FireIcon,
-  snow: SnowIcon,
-  thermometer: ThermometerIcon,
-  shirt: TShirtIcon,
-  "document-text": File01Icon,
-  "git-network": WorkflowSquare01Icon,
-  bookmark: Bookmark01Icon,
-  globe: GlobeIcon,
-  "hand-left": AgreementIcon,
-  pricetag: Tag01Icon,
-  pulse: PulseIcon,
-  wallet: Wallet01Icon,
-  construct: WrenchIcon,
-  business: Building01Icon,
-  barbell: DumbbellIcon,
-  school: MortarboardIcon,
-  medkit: Medicine01Icon,
-} as const;
+  home: hi(Home01Icon),
+  people: hi(UserGroupIcon),
+  person: hi(UserIcon),
+  football: hi(FootballIcon),
+  trophy: hi(ChampionIcon),
+  cart: hi(ShoppingCart01Icon),
+  transfer: hi(ArrowReloadHorizontalIcon),
+  shield: hi(Shield01Icon),
+  "shield-half": hi(Shield02Icon),
+  "logo-usd": hi(CoinsDollarIcon),
+  diamond: hi(DiamondIcon),
+  flash: hi(EnergyIcon),
+  add: hi(PlusSignIcon),
+  time: hi(Clock01Icon),
+  "time-outline": hi(Clock01Icon),
+  "chevron-forward": hi(ArrowRight01Icon),
+  "chevron-down": hi(ArrowDown01Icon),
+  "chevron-up": hi(ArrowUp01Icon),
+  "arrow-back": hi(ArrowLeft01Icon),
+  "arrow-forward": hi(ArrowRight01Icon),
+  "arrow-up": hi(ArrowUp01Icon),
+  "arrow-down": hi(ArrowDown01Icon),
+  "arrow-up-circle": hi(ArrowUp01Icon),
+  "arrow-down-circle": hi(ArrowDown01Icon),
+  walk: hi(RunningShoesIcon),
+  star: hi(StarIcon),
+  "star-outline": hi(StarIcon),
+  eye: hi(ViewIcon),
+  "checkmark-circle": hi(CheckmarkCircle01Icon),
+  ellipse: hi(CircleIcon),
+  warning: hi(Alert02Icon),
+  cube: hi(CubeIcon),
+  notifications: hi(Notification03Icon),
+  "notifications-outline": hi(Notification03Icon),
+  "trending-up": hi(TradeUpIcon),
+  "trending-down": hi(TradeDownIcon),
+  remove: hi(MinusSignIcon),
+  "swap-horizontal": hi(Exchange01Icon),
+  locate: hi(Target01Icon),
+  heart: hi(FavouriteIcon),
+  grid: hi(GridViewIcon),
+  search: hi(Search01Icon),
+  "search-circle": hi(Search01Icon),
+  options: hi(FilterHorizontalIcon),
+  flame: hi(FireIcon),
+  snow: hi(SnowIcon),
+  thermometer: hi(ThermometerIcon),
+  shirt: hi(TShirtIcon),
+  "document-text": hi(File01Icon),
+  bookmark: hi(Bookmark01Icon),
+  globe: hi(GlobeIcon),
+  pricetag: hi(Tag01Icon),
+  pulse: hi(PulseIcon),
+  wallet: hi(Wallet01Icon),
+  construct: hi(WrenchIcon),
+  business: hi(Building01Icon),
+  barbell: hi(DumbbellIcon),
+  school: hi(MortarboardIcon),
+  medkit: hi(Medicine01Icon),
+  // Fallbacks Lucide (Hugeicons sem ícone que encaixe):
+  "hand-left": lu(Handshake), // agentes livres
+  "git-network": lu(Workflow), // estratégia de mercado
+} satisfies Record<string, Entry>;
 
 export type IconName = keyof typeof MAP;
 
@@ -133,5 +144,10 @@ export function Icon({
   color?: string;
   strokeWidth?: number;
 }) {
-  return <HugeiconsIcon icon={MAP[name] ?? CircleIcon} size={size} color={color} strokeWidth={strokeWidth} />;
+  const entry: Entry = MAP[name] ?? { hi: CircleIcon };
+  if ("lu" in entry) {
+    const L = entry.lu;
+    return <L size={size} color={color} strokeWidth={strokeWidth} />;
+  }
+  return <HugeiconsIcon icon={entry.hi} size={size} color={color} strokeWidth={strokeWidth} />;
 }

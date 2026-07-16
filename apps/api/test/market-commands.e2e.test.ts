@@ -49,10 +49,22 @@ describe("API market commands (e2e)", () => {
     worldId = String(created.body.resource).slice("world:".length);
     await request(app.getHttpServer())
       .post("/api/v1/commands")
-      .send(command({ commandType: "world:genesis", worldId, idempotencyKey: "m-gen" }));
+      .send(
+        command({
+          commandType: "world:genesis",
+          worldId,
+          idempotencyKey: "m-gen",
+        }),
+      );
     await request(app.getHttpServer())
       .post("/api/v1/commands")
-      .send(command({ commandType: "world:activate", worldId, idempotencyKey: "m-act" }));
+      .send(
+        command({
+          commandType: "world:activate",
+          worldId,
+          idempotencyKey: "m-act",
+        }),
+      );
   });
 
   afterAll(async () => {
@@ -64,7 +76,8 @@ describe("API market commands (e2e)", () => {
     const before = await request(app.getHttpServer()).get(
       `/api/v1/worlds/${worldId}/market`,
     );
-    expect(before.status).toBe(404); // ainda não inicializado
+    expect(before.status).toBe(200); // a gênese já entrega o mercado jogável
+    expect(before.body.data.availablePlayerCount).toBe(160);
 
     const response = await request(app.getHttpServer())
       .post("/api/v1/commands")
@@ -84,6 +97,18 @@ describe("API market commands (e2e)", () => {
     );
     expect(after.status).toBe(200);
     expect(after.body.scope.queryType).toBe("market");
+    expect(after.body.data.availablePlayerCount).toBe(160);
+    expect(after.body.data.availablePlayers).toHaveLength(160);
+
+    const roster = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/player-roster`,
+    );
+    expect(roster.status).toBe(200);
+    const freeAgents = roster.body.data.players.filter(
+      (player: { careerStatus: string }) =>
+        player.careerStatus === "FREE_AGENT",
+    );
+    expect(freeAgents).toHaveLength(160);
   });
 
   it("market:publish-listing publica uma listagem (ACCEPTED) após o mercado existir", async () => {
@@ -96,14 +121,14 @@ describe("API market commands (e2e)", () => {
         idempotencyKey: "m-listing-1",
         correlationId: "corr-m",
         payload: {
-          playerId: "player-1",
+          playerId: "019f0000-0000-7000-8000-00000000f001",
           sellerClubId: "00000000-0000-7000-8000-000000000000",
           askingFeeMinor: 1_000_000,
         },
       });
     expect(response.status).toBe(201);
     expect(response.body.status).toBe("ACCEPTED");
-    expect(response.body.resource).toBe("listing:player-1");
+    expect(response.body.resource).toBe("listing:019f0000-0000-7000-8000-00000000f001");
 
     // idempotência: repetir a mesma key não republica
     const replay = await request(app.getHttpServer())
@@ -115,11 +140,45 @@ describe("API market commands (e2e)", () => {
         idempotencyKey: "m-listing-1",
         correlationId: "corr-m",
         payload: {
-          playerId: "player-1",
+          playerId: "019f0000-0000-7000-8000-00000000f001",
           sellerClubId: "00000000-0000-7000-8000-000000000000",
           askingFeeMinor: 1_000_000,
         },
       });
     expect(replay.body.status).toBe("ALREADY_APPLIED");
+  });
+
+  it("observa jogador livre e projeta o relatório oficial no mercado", async () => {
+    const [market, club] = await Promise.all([
+      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/market`),
+      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/club`),
+    ]);
+    const playerId = market.body.data.availablePlayers[0].id as string;
+    const observerClubId = club.body.data.clubs[0].id as string;
+
+    const observed = await request(app.getHttpServer())
+      .post("/api/v1/commands")
+      .send({
+        contractVersion: "v1",
+        commandType: "market:request-scouting",
+        worldId,
+        idempotencyKey: `scout:${playerId}:${observerClubId}`,
+        correlationId: "corr-scout-player",
+        payload: {
+          playerId,
+          observerClubId,
+          scoutingCapacity: 80,
+          observations: ["capacidade atual", "potencial"],
+          validUntil: "2027-01-01",
+        },
+      });
+    expect(observed.body.status).toBe("ACCEPTED");
+
+    const projected = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/market`,
+    );
+    expect(projected.body.data.scoutingReports).toEqual([
+      expect.objectContaining({ playerId, observerClubId, confidence: 80 }),
+    ]);
   });
 });

@@ -391,4 +391,11 @@ export class InspectMarket {
     const loaded = await loadMarket(this.repository, gameWorldId);
     return loaded.ok ? succeed(loaded.value.summary()) : loaded;
   }
+
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldMarketSnapshot, DomainError>> {
+    const loaded = await loadMarket(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
+  }
 }

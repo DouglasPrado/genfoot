@@ -1,5 +1,16 @@
 import type { QueryEnvelope } from "./types.js";
 
+/** Chave canônica de isolamento do cache derivado entre clientes. */
+export function clientScopeKey(
+  accountId: string,
+  worldId: string,
+  controlId: string | null,
+): string {
+  return [accountId, worldId, controlId ?? "no-control"]
+    .map(encodeURIComponent)
+    .join(":");
+}
+
 export interface CachedQuery<T = unknown> {
   readonly scopeKey: string;
   readonly queryType: string;
@@ -26,8 +37,7 @@ export class QueryCache {
     queryType: string,
   ): CachedQuery<T> | undefined {
     return this.entries.get(this.keyOf(scopeKey, queryType)) as
-      | CachedQuery<T>
-      | undefined;
+      CachedQuery<T> | undefined;
   }
 
   /** Grava a partir de um envelope; ignora versões mais antigas (imutabilidade). */

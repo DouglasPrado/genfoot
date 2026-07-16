@@ -17,6 +17,8 @@ interface SessionValue {
   readonly session: SessionResponse | null;
   readonly status: ConnectionStatus;
   readonly contractVersion: string | null;
+  readonly controlScope: string | null;
+  readonly setControlScope: (controlId: string | null) => void;
   readonly retry: () => void;
 }
 
@@ -32,6 +34,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [contractVersion, setContractVersion] = useState<string | null>(null);
   const [authedClient, setAuthedClient] = useState<GrintaClient | null>(null);
+  const [controlScope, setControlScope] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   // Client base (sem token) — estável entre renders.
@@ -50,7 +53,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const health = await base.health();
         if (cancelled) return;
         setContractVersion(health.contractVersion);
-        const opened = await base.session({ subject: DEV_SUBJECT, role: "user" });
+        const opened = await base.session({
+          subject: DEV_SUBJECT,
+          role: "user",
+        });
         if (cancelled) return;
         setSession(opened);
         setAuthedClient(base.withToken(opened.token));
@@ -68,11 +74,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   const value = useMemo<SessionValue>(
-    () => ({ client: authedClient, session, status, contractVersion, retry }),
-    [authedClient, session, status, contractVersion, retry],
+    () => ({
+      client: authedClient,
+      session,
+      status,
+      contractVersion,
+      controlScope,
+      setControlScope,
+      retry,
+    }),
+    [authedClient, session, status, contractVersion, controlScope, retry],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionValue {

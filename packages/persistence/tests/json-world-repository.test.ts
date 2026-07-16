@@ -107,6 +107,31 @@ describe("JsonWorldRepository", () => {
     expect(file.schemaVersion).toBe(17);
   });
 
+  it("preserva seções inicializadas concorrentemente no mesmo mundo", async () => {
+    const store = await repository();
+    const world = snapshot();
+    await store.value.save(world, null);
+
+    const ledger = WorldLedger.initialize(world);
+    const market = WorldMarket.initialize(world);
+    const competitions = WorldCompetitions.initialize(world);
+    if (!ledger.ok) throw ledger.error;
+    if (!market.ok) throw market.error;
+    if (!competitions.ok) throw competitions.error;
+
+    await Promise.all([
+      store.value.saveLedger(ledger.value.snapshot(), null),
+      store.value.saveMarket(market.value.snapshot(), null),
+      store.value.saveCompetitions(competitions.value.snapshot(), null),
+    ]);
+
+    expect(await store.value.findLedgerByWorldId(world.id)).not.toBeNull();
+    expect(await store.value.findMarketByWorldId(world.id)).not.toBeNull();
+    expect(
+      await store.value.findCompetitionsByWorldId(world.id),
+    ).not.toBeNull();
+  });
+
   it("persiste e recupera a gênese sem alterar o mundo", async () => {
     const store = await repository();
     const world = snapshot();
@@ -265,7 +290,10 @@ describe("JsonWorldRepository", () => {
     const persisted = await restarted.findLedgerByWorldId(world.id);
     expect(persisted!.transactions).toHaveLength(1);
     expect(
-      persisted!.accounts.reduce((sum, account) => sum + account.balanceMinor, 0),
+      persisted!.accounts.reduce(
+        (sum, account) => sum + account.balanceMinor,
+        0,
+      ),
     ).toBe(0);
   });
 
@@ -276,7 +304,8 @@ describe("JsonWorldRepository", () => {
     const created = WorldCompetitions.initialize(world);
     if (!created.ok) throw created.error;
     const competitions = created.value;
-    const season = "019f0000-0000-7000-8000-0000000000aa" as CompetitionSeasonRef;
+    const season =
+      "019f0000-0000-7000-8000-0000000000aa" as CompetitionSeasonRef;
     const clubs = [
       "019f0000-0000-7000-8000-0000000000c1",
       "019f0000-0000-7000-8000-0000000000c2",
@@ -347,9 +376,9 @@ describe("JsonWorldRepository", () => {
     const retry = await record.execute(world.id, retryInput);
     expect(retry).toMatchObject({ ok: true, value: { status: "FINAL" } });
     const reloaded = await restarted.findCompetitionsByWorldId(world.id);
-    expect(
-      reloaded!.fixtures.filter((f) => f.status === "FINAL"),
-    ).toHaveLength(1);
+    expect(reloaded!.fixtures.filter((f) => f.status === "FINAL")).toHaveLength(
+      1,
+    );
     await expect(
       store.value.saveCompetitions(competitions.snapshot(), 99),
     ).rejects.toMatchObject({ code: "COMPETITIONS_REVISION_CONFLICT" });
@@ -452,8 +481,16 @@ describe("JsonWorldRepository", () => {
     const published = eventing.publishOutboxBatch({
       stream: "transfers",
       messages: [
-        { eventType: "TransferOpened", payloadHash: "h1", occurredOn: "2026-01-02" },
-        { eventType: "TransferAgreed", payloadHash: "h2", occurredOn: "2026-01-02" },
+        {
+          eventType: "TransferOpened",
+          payloadHash: "h1",
+          occurredOn: "2026-01-02",
+        },
+        {
+          eventType: "TransferAgreed",
+          payloadHash: "h2",
+          occurredOn: "2026-01-02",
+        },
       ],
       rulesetVersion: world.rulesetVersion,
       idempotencyKey: "batch:1",

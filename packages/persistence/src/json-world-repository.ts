@@ -1118,7 +1118,13 @@ const worldMarketSchema = z.object({
         startsOn: z.string(),
         endsOn: z.string(),
         optionFeeMinor: z.number().int().nonnegative().nullable(),
-        status: z.enum(["AGREED", "ACTIVE", "RETURNED", "PURCHASED", "TERMINATED"]),
+        status: z.enum([
+          "AGREED",
+          "ACTIVE",
+          "RETURNED",
+          "PURCHASED",
+          "TERMINATED",
+        ]),
         contractId: identifierSchema,
         idempotencyKey: z.string().min(1),
         version: z.number().int().positive(),
@@ -1307,7 +1313,13 @@ const worldAdminSchema = z.object({
         expectedEffect: z.string(),
         requestedBy: z.string().min(1),
         approvedBy: z.string().nullable(),
-        status: z.enum(["REQUESTED", "APPROVED", "EXECUTED", "REJECTED", "FAILED"]),
+        status: z.enum([
+          "REQUESTED",
+          "APPROVED",
+          "EXECUTED",
+          "REJECTED",
+          "FAILED",
+        ]),
         compensatingFactRef: z.string().nullable(),
         idempotencyKey: z.string().min(1),
         version: z.number().int().positive(),
@@ -2187,7 +2199,10 @@ export class JsonWorldRepository
             },
           );
         }
-        await this.write(competitions.gameWorldId, { ...current, competitions });
+        await this.write(competitions.gameWorldId, {
+          ...current,
+          competitions,
+        });
       },
     );
   }
@@ -2813,24 +2828,32 @@ export class JsonWorldRepository
     name: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    const lockPath = join(this.baseDirectory, `${id}.${name}.lock`);
+    // Todas as seções vivem no mesmo arquivo JSON. Locks por seção permitiam
+    // que duas escritas partissem do mesmo envelope e a última substituísse a
+    // seção salva pela primeira. Serializa por mundo para preservar o envelope
+    // completo, inclusive quando inicializadores são disparados em paralelo.
+    const lockPath = join(this.baseDirectory, `${id}.world.lock`);
+    const lockDeadline = Date.now() + 5_000;
     let handle;
-    try {
-      handle = await open(lockPath, "wx");
-    } catch (error: unknown) {
-      if (isNodeError(error) && error.code === "EEXIST") {
+    while (handle === undefined) {
+      try {
+        handle = await open(lockPath, "wx");
+      } catch (error: unknown) {
+        if (!isNodeError(error) || error.code !== "EEXIST") throw error;
         const lockStat = await stat(lockPath).catch(() => null);
         if (lockStat !== null && Date.now() - lockStat.mtimeMs > 60_000) {
           await unlink(lockPath).catch(() => undefined);
-          handle = await open(lockPath, "wx");
-        } else {
+          continue;
+        }
+        if (Date.now() >= lockDeadline) {
           throw new DomainError(
             "WORLD_SECTION_WRITE_LOCKED",
             "Outra réplica está atualizando esta seção do mundo.",
-            { id },
+            { id, section: name },
           );
         }
-      } else throw error;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
     try {
       return await action();

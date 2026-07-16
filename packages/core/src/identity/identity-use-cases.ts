@@ -283,6 +283,13 @@ export class RefreshSession {
 export class InspectIdentity {
   public constructor(private readonly repository: IdentityRepository) {}
 
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldIdentitySnapshot, DomainError>> {
+    const loaded = await loadIdentity(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
+  }
+
   public async summary(
     gameWorldId: GameWorldId,
   ): Promise<Result<IdentitySummary, DomainError>> {

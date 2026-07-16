@@ -1,82 +1,465 @@
-import { ScrollView, View, Text, StyleSheet } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+} from "react-native";
+import { router } from "expo-router";
+import { CommandTrackingStatus } from "@grinta/core";
 import { Icon, type IconName } from "@/components/icon";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Refresh } from "@/components/refresh";
+import { ScreenStatePanel } from "@/components/screen-state-panel";
+import {
+  buildClubInfrastructure,
+  selectManagedClub,
+  type ClubPortfolioProjection,
+  type NarrativeProjection,
+} from "@/lib/club-projection";
+import { ClubCrest } from "@/screens/club/customization/crest";
+import { CustomizeClubModal, normalizeClubName } from "@/screens/club/customization/customize-modal";
+import {
+  defaultVisualIdentity,
+  type VisualIdentity,
+} from "@/screens/club/customization/visual-identity";
+import { deriveScreenState } from "@/lib/screen-state";
+import { useWorldQuery } from "@/lib/world";
+import { useWorldId } from "@/lib/world";
+import { useSession } from "@/lib/session";
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
+import {
+  addWorldDays,
+  deriveOnboardingStep,
+  type MobileIdentityProjection,
+} from "@/screens/onboarding/onboarding-model";
 import { Card, SectionHeader } from "@/components/card";
 import { ProgressBar } from "@/components/progress-bar";
-import { color, space, radius, fontSize, fontWeight, formatAmount } from "@/theme";
-import { CLUB_SEED } from "./club-data";
+import {
+  color,
+  space,
+  radius,
+  fontSize,
+  fontWeight,
+  formatAmount,
+} from "@/theme";
 
 type IoniconName = IconName;
 
-function FinanceRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <View style={styles.finRow}>
-      <Text style={styles.finLabel}>{label}</Text>
-      <Text style={[styles.finValue, strong ? styles.finStrong : null]}>{value}</Text>
-    </View>
-  );
+interface LedgerSummaryProjection {
+  readonly accountCount: number;
+  readonly transactionCount: number;
+  readonly activeReservationCount: number;
+  readonly activeDebtCount: number;
+  readonly closedPeriodCount: number;
+  readonly residualMinor: number;
+  readonly clubBalances: readonly {
+    readonly clubId: string;
+    readonly balanceMinor: number;
+  }[];
 }
 
 /** Tela de Clube: identidade, finanças e infraestrutura. */
 export function Club() {
-  const vm = CLUB_SEED;
+  const worldId = useWorldId();
+  const { client, session, contractVersion, status } = useSession();
+  const worldQuery = useWorldQuery<{ currentDate: string }>("world");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
+  const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
+  const identityQuery =
+    useWorldQuery<MobileIdentityProjection>("identity-detail");
+  const identity = identityQuery.state === "empty" ? null : identityQuery.data;
+  const controlStep = deriveOnboardingStep(
+    identity,
+    session?.subject ?? "",
+    worldQuery.data?.currentDate ?? "",
+  );
+  const managedClub = selectManagedClub(
+    clubQuery.data,
+    controlStep.kind === "complete" ? controlStep.clubId : null,
+  );
+  const vm =
+    managedClub === null
+      ? null
+      : {
+          name: managedClub.identity.name.toUpperCase(),
+          reputation: Math.min(
+            100,
+            Math.max(0, managedClub.reputationBand * 20),
+          ),
+          stadium: managedClub.stadium,
+          infrastructure: buildClubInfrastructure(managedClub),
+        };
+  const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [customizeTracking, setCustomizeTracking] =
+    useState<TrackedCommandResult | null>(null);
+
+  const visualIdentity =
+    managedClub?.identity.visualIdentity ??
+    (managedClub === null ? null : defaultVisualIdentity(managedClub.id));
+  const fanbaseSize =
+    narrativeQuery.data?.clubs?.find(
+      (entry) => entry.clubId === managedClub?.id,
+    )?.fanbaseSize ?? null;
+  const takenNames = (clubQuery.data?.clubs ?? [])
+    .filter((club) => club.id !== managedClub?.id)
+    .map((club) => normalizeClubName(club.identity.name));
+
+  const submitCustomize = useCallback(
+    (input: {
+      readonly name: string;
+      readonly shortCode: string;
+      readonly visualIdentity: VisualIdentity;
+    }) => {
+      if (
+        managedClub === null ||
+        client === null ||
+        contractVersion === null
+      ) {
+        return;
+      }
+      const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
+      const idempotencyKey = `rebrand:${managedClub.id}:${managedClub.version}`;
+      setCustomizeTracking({
+        status: CommandTrackingStatus.SUBMITTING,
+        commandId: null,
+        resource: null,
+        correlationId: `mobile:${idempotencyKey}`,
+        errorCode: null,
+      });
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "club:command",
+        worldId,
+        expectedVersion: managedClub.version,
+        payload: {
+          clubId: managedClub.id,
+          actorId: session?.subject ?? "mobile",
+          occurredAt: worldDate,
+          command: {
+            type: "UpdateClubVisualIdentity",
+            name: input.name,
+            shortCode: input.shortCode,
+            visualIdentity: input.visualIdentity,
+          },
+        },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setCustomizeTracking(result);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          clubQuery.refetch();
+          narrativeQuery.refetch();
+          setCustomizeOpen(false);
+        }
+      });
+    },
+    [
+      client,
+      clubQuery,
+      contractVersion,
+      managedClub,
+      narrativeQuery,
+      session?.subject,
+      worldId,
+      worldQuery.data?.currentDate,
+    ],
+  );
+
+  const endControl = useCallback(
+    (reason: "EXIT" | "SWITCH_REQUESTED") => {
+      if (
+        controlStep.kind !== "complete" ||
+        client === null ||
+        contractVersion === null
+      ) {
+        return;
+      }
+      const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
+      const cooldownUntil = addWorldDays(
+        worldDate,
+        identity?.cooldownDays ?? 30,
+      );
+      Alert.alert(
+        reason === "EXIT" ? "Deixar o clube?" : "Iniciar troca de clube?",
+        `O controle será encerrado agora. Você só poderá assumir outro clube a partir de ${cooldownUntil}. O histórico do clube será preservado.`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Encerrar controle",
+            style: "destructive",
+            onPress: () => {
+              const idempotencyKey = `end-control:${controlStep.controlId}:${reason}`;
+              setTracking({
+                status: CommandTrackingStatus.SUBMITTING,
+                commandId: null,
+                resource: null,
+                correlationId: `mobile:${idempotencyKey}`,
+                errorCode: null,
+              });
+              void submitTrackedCommand(client, {
+                clientContractVersion: "v1",
+                serverContractVersion: contractVersion,
+                commandType: "identity:end-club-control",
+                worldId,
+                payload: {
+                  controlId: controlStep.controlId,
+                  reason,
+                  endedOn: worldDate,
+                },
+                idempotencyKey,
+                correlationId: `mobile:${idempotencyKey}`,
+              }).then(async (result) => {
+                setTracking(result);
+                if (
+                  result.status === CommandTrackingStatus.ACCEPTED ||
+                  result.status === CommandTrackingStatus.APPLIED
+                ) {
+                  const official = await client.query<MobileIdentityProjection>(
+                    worldId,
+                    "identity-detail",
+                  );
+                  const applied = !official.data.controls.some(
+                    (control) =>
+                      control.id === controlStep.controlId &&
+                      control.status === "ACTIVE",
+                  );
+                  if (!applied) return;
+                  setTracking({
+                    ...result,
+                    status: CommandTrackingStatus.APPLIED,
+                  });
+                  identityQuery.refetch();
+                  router.replace("/onboarding");
+                }
+              });
+            },
+          },
+        ],
+      );
+    },
+    [
+      client,
+      contractVersion,
+      controlStep,
+      identity?.cooldownDays,
+      identityQuery.refetch,
+      worldId,
+      worldQuery.data?.currentDate,
+    ],
+  );
+
+  const refresh = useCallback(() => {
+    clubQuery.refetch();
+    identityQuery.refetch();
+    ledgerQuery.refetch();
+    worldQuery.refetch();
+  }, [
+    clubQuery.refetch,
+    identityQuery.refetch,
+    ledgerQuery.refetch,
+    worldQuery.refetch,
+  ]);
+  const screenState = deriveScreenState({
+    session: status,
+    hasCachedData: clubQuery.isStale || identityQuery.isStale,
+    query:
+      clubQuery.state === "loading" || identityQuery.state === "loading"
+        ? "loading"
+        : clubQuery.state === "offline" || identityQuery.state === "offline"
+          ? "offline"
+          : clubQuery.state === "error" || identityQuery.state === "error"
+            ? "error"
+            : clubQuery.state === "empty" || identityQuery.state === "empty"
+              ? "empty"
+              : "ready",
+  });
+
+  if (screenState !== "success" || vm === null) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.content}>
+          <ScreenStatePanel
+            state={screenState === "success" ? "empty" : screenState}
+            title={vm === null ? "CLUBE NÃO DISPONÍVEL" : undefined}
+            body={
+              vm === null
+                ? "Conclua a escolha de clube para acessar a administração."
+                : undefined
+            }
+            onRetry={refresh}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.hero}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<Refresh onRefresh={refresh} />}
+      >
+        <Pressable
+          style={styles.hero}
+          onPress={() => setCustomizeOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Personalizar clube"
+        >
           <View style={styles.crest}>
-            <Text style={styles.crestInitial}>{vm.name.charAt(0)}</Text>
+            <ClubCrest
+              templateId={
+                (visualIdentity ?? defaultVisualIdentity(vm.name))
+                  .crestTemplateId
+              }
+              primary={(visualIdentity ?? defaultVisualIdentity(vm.name)).primaryColor}
+              secondary={
+                (visualIdentity ?? defaultVisualIdentity(vm.name)).secondaryColor
+              }
+              tertiary={
+                (visualIdentity ?? defaultVisualIdentity(vm.name)).tertiaryColor
+              }
+              letter={vm.name.charAt(0)}
+              size={60}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{vm.name}</Text>
-            <Text style={styles.subtitle}>DIVISÃO {vm.division} · {vm.stadium.name}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>{vm.name}</Text>
+              <Icon name="shirt" size={16} color={color.primary} />
+            </View>
+            <Text style={styles.subtitle}>{vm.stadium.name}</Text>
             <View style={styles.repRow}>
               <Text style={styles.repLabel}>REPUTAÇÃO</Text>
               <View style={styles.repBar}>
                 <ProgressBar value={vm.reputation / 100} height={5} />
               </View>
             </View>
+            {fanbaseSize !== null ? (
+              <Text style={styles.fanbase}>
+                TORCIDA {formatAmount(fanbaseSize)} · toque para personalizar
+              </Text>
+            ) : (
+              <Text style={styles.fanbase}>Toque para personalizar</Text>
+            )}
           </View>
-        </View>
+        </Pressable>
 
         <Card>
-          <SectionHeader title="FINANÇAS" trailing={<Icon name="wallet" size={16} color={color.textMuted} />} />
-          <View style={styles.finGrid}>
-            <View style={styles.finBox}>
-              <Text style={styles.finBoxLabel}>SALDO</Text>
-              <Text style={styles.finBoxValue}>{vm.finances.balanceLabel}</Text>
+          <SectionHeader
+            title="FINANÇAS"
+            trailing={<Icon name="wallet" size={16} color={color.textMuted} />}
+          />
+          {ledgerQuery.state === "ready" && ledgerQuery.data !== null ? (
+            <View style={styles.financeContent}>
+              <View style={styles.finBalance}>
+                <Text style={styles.finBoxLabel}>CAIXA DISPONÍVEL</Text>
+                <Text style={styles.finBalanceValue}>
+                  R${" "}
+                  {formatAmount(
+                    (ledgerQuery.data.clubBalances.find(
+                      ({ clubId }) => clubId === managedClub?.id,
+                    )?.balanceMinor ?? 0) / 100,
+                  )}
+                </Text>
+              </View>
+              <View style={styles.finGrid}>
+                <View style={styles.finBox}>
+                  <Text style={styles.finBoxLabel}>CONTAS CONTÁBEIS</Text>
+                  <Text style={styles.finBoxValue}>
+                    {ledgerQuery.data.accountCount}
+                  </Text>
+                </View>
+                <View style={styles.finBox}>
+                  <Text style={styles.finBoxLabel}>LANÇAMENTOS</Text>
+                  <Text style={styles.finBoxValue}>
+                    {ledgerQuery.data.transactionCount}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.finBox}>
-              <Text style={styles.finBoxLabel}>ORÇAMENTO DE TRANSFERÊNCIAS</Text>
-              <Text style={styles.finBoxValue}>{vm.finances.transferBudgetLabel}</Text>
+          ) : (
+            <View style={styles.financeUnavailable}>
+              <Icon name="shield" size={18} color={color.warning} />
+              <Text style={styles.financeUnavailableText}>
+                {ledgerQuery.state === "loading"
+                  ? "Sincronizando o livro financeiro…"
+                  : "O financeiro do clube ainda não foi inicializado. Nenhum saldo estimado será exibido."}
+              </Text>
             </View>
-          </View>
-          <View style={styles.wageBlock}>
-            <FinanceRow label="Folha salarial" value={vm.finances.wageBudgetLabel} />
-            <ProgressBar value={vm.finances.wageUsedPct / 100} tint={vm.finances.wageUsedPct > 90 ? color.danger : color.primary} height={5} />
-            <Text style={styles.wageNote}>{vm.finances.wageUsedPct}% do teto usado</Text>
-          </View>
-          <View style={styles.flowRow}>
-            <View style={styles.flowItem}>
-              <Icon name="arrow-up-circle" size={14} color={color.success} />
-              <Text style={styles.flowLabel}>Receita</Text>
-              <Text style={styles.flowValue}>{vm.finances.incomeLabel}</Text>
-            </View>
-            <View style={styles.flowItem}>
-              <Icon name="arrow-down-circle" size={14} color={color.danger} />
-              <Text style={styles.flowLabel}>Despesa</Text>
-              <Text style={styles.flowValue}>{vm.finances.expenseLabel}</Text>
-            </View>
-          </View>
+          )}
         </Card>
 
+        {controlStep.kind === "complete" ? (
+          <Card>
+            <SectionHeader
+              title="SEU CONTROLE"
+              trailing={
+                <Icon name="shield" size={16} color={color.textMuted} />
+              }
+            />
+            <Text style={styles.controlNote}>
+              Você administra {vm.name}. Sair preserva o clube e inicia o
+              período obrigatório de espera.
+            </Text>
+            {tracking?.status === CommandTrackingStatus.REJECTED ? (
+              <Text style={styles.controlError}>
+                {tracking.errorCode ?? "COMMAND_REJECTED"}
+              </Text>
+            ) : null}
+            {tracking?.status === CommandTrackingStatus.SUBMITTING ? (
+              <ActivityIndicator color={color.primary} />
+            ) : (
+              <View style={styles.controlActions}>
+                <Pressable
+                  style={styles.switchButton}
+                  onPress={() => endControl("SWITCH_REQUESTED")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Iniciar troca de clube"
+                >
+                  <Text style={styles.switchText}>TROCAR DE CLUBE</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.exitButton}
+                  onPress={() => endControl("EXIT")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Deixar o clube"
+                >
+                  <Text style={styles.exitText}>DEIXAR CLUBE</Text>
+                </Pressable>
+              </View>
+            )}
+          </Card>
+        ) : null}
+
         <Card>
-          <SectionHeader title="INFRAESTRUTURA" trailing={<Icon name="construct" size={16} color={color.textMuted} />} />
+          <SectionHeader
+            title="INFRAESTRUTURA"
+            trailing={
+              <Icon name="construct" size={16} color={color.textMuted} />
+            }
+          />
           <View style={styles.infraList}>
             {vm.infrastructure.map((infra) => (
               <View key={infra.id} style={styles.infraRow}>
                 <View style={styles.infraIcon}>
-                  <Icon name={infra.icon as IoniconName} size={18} color={color.primary} />
+                  <Icon
+                    name={infra.icon as IoniconName}
+                    size={18}
+                    color={color.primary}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.infraName}>{infra.name}</Text>
@@ -84,7 +467,18 @@ export function Club() {
                 </View>
                 <View style={styles.levels}>
                   {Array.from({ length: infra.maxLevel }).map((_, i) => (
-                    <View key={i} style={[styles.pip, { backgroundColor: i < infra.level ? color.primary : color.surfaceRaised }]} />
+                    <View
+                      key={i}
+                      style={[
+                        styles.pip,
+                        {
+                          backgroundColor:
+                            i < infra.level
+                              ? color.primary
+                              : color.surfaceRaised,
+                        },
+                      ]}
+                    />
                   ))}
                 </View>
               </View>
@@ -93,13 +487,41 @@ export function Club() {
         </Card>
 
         <Card>
-          <SectionHeader title="ESTÁDIO" trailing={<Icon name="business" size={16} color={color.textMuted} />} />
+          <SectionHeader
+            title="ESTÁDIO"
+            trailing={
+              <Icon name="business" size={16} color={color.textMuted} />
+            }
+          />
           <View style={styles.stadiumRow}>
             <Text style={styles.stadiumName}>{vm.stadium.name}</Text>
-            <Text style={styles.stadiumCap}>{formatAmount(vm.stadium.capacity)} lugares</Text>
+            <Text style={styles.stadiumCap}>
+              {formatAmount(vm.stadium.capacity)} lugares
+            </Text>
           </View>
         </Card>
       </ScrollView>
+
+      {managedClub !== null ? (
+        <CustomizeClubModal
+          visible={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          clubId={managedClub.id}
+          clubName={managedClub.identity.name}
+          clubShortCode={managedClub.identity.shortCode}
+          initial={visualIdentity}
+          takenNames={takenNames}
+          submitting={
+            customizeTracking?.status === CommandTrackingStatus.SUBMITTING
+          }
+          errorCode={
+            customizeTracking?.status === CommandTrackingStatus.REJECTED
+              ? customizeTracking.errorCode
+              : null
+          }
+          onConfirm={submitCustomize}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -110,34 +532,129 @@ const styles = StyleSheet.create({
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
   crest: {
     width: 60,
-    height: 68,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: color.primary,
-    backgroundColor: color.surfaceRaised,
+    height: 60,
     alignItems: "center",
     justifyContent: "center",
   },
-  crestInitial: { color: color.primary, fontSize: fontSize.xl2, fontWeight: fontWeight.black as "800", fontStyle: "italic" },
-  title: { color: color.text, fontSize: fontSize.xl2, fontWeight: fontWeight.black as "800", fontStyle: "italic", letterSpacing: 0.5 },
-  subtitle: { color: color.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold as "600", marginTop: 1 },
-  repRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.sm },
-  repLabel: { color: color.textMuted, fontSize: 9, fontWeight: fontWeight.bold as "700", letterSpacing: 0.5 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  fanbase: {
+    color: color.textMuted,
+    fontSize: 10,
+    fontWeight: fontWeight.semibold as "600",
+    marginTop: space.sm,
+    letterSpacing: 0.3,
+  },
+  title: {
+    color: color.text,
+    fontSize: fontSize.xl2,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
+  subtitle: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold as "600",
+    marginTop: 1,
+  },
+  repRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    marginTop: space.sm,
+  },
+  repLabel: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
   repBar: { flex: 1 },
+  financeContent: { gap: space.sm },
   finGrid: { flexDirection: "row", gap: space.sm },
-  finBox: { flex: 1, backgroundColor: color.backgroundElevated, borderRadius: radius.sm, padding: space.md, gap: 2 },
-  finBoxLabel: { color: color.textMuted, fontSize: 9, fontWeight: fontWeight.bold as "700", letterSpacing: 0.3 },
-  finBoxValue: { color: color.text, fontSize: fontSize.lg, fontWeight: fontWeight.black as "800", fontStyle: "italic" },
+  finBalance: {
+    backgroundColor: color.primaryDim,
+    borderRadius: radius.sm,
+    padding: space.md,
+    gap: 2,
+  },
+  finBalanceValue: {
+    color: color.primary,
+    fontSize: fontSize.xl2,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  finBox: {
+    flex: 1,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.sm,
+    padding: space.md,
+    gap: 2,
+  },
+  finBoxLabel: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.3,
+  },
+  finBoxValue: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  financeUnavailable: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    padding: space.md,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.sm,
+  },
+  financeUnavailableText: {
+    flex: 1,
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    lineHeight: 19,
+  },
   wageBlock: { marginTop: space.md, gap: 4 },
-  finRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  finLabel: { color: color.textMuted, fontSize: fontSize.xs, fontWeight: fontWeight.semibold as "600" },
-  finValue: { color: color.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold as "700" },
+  finRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  finLabel: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold as "600",
+  },
+  finValue: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
   finStrong: { fontWeight: fontWeight.black as "800", fontStyle: "italic" },
-  wageNote: { color: color.textMuted, fontSize: 9, fontWeight: fontWeight.semibold as "600" },
+  wageNote: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.semibold as "600",
+  },
   flowRow: { flexDirection: "row", gap: space.sm, marginTop: space.md },
-  flowItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: color.backgroundElevated, borderRadius: radius.sm, padding: space.sm },
+  flowItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.sm,
+    padding: space.sm,
+  },
   flowLabel: { color: color.textMuted, fontSize: 10, flex: 1 },
-  flowValue: { color: color.text, fontSize: fontSize.xs, fontWeight: fontWeight.bold as "700" },
+  flowValue: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
   infraList: { gap: space.md },
   infraRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   infraIcon: {
@@ -149,11 +666,64 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  infraName: { color: color.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold as "700" },
+  infraName: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
   infraNote: { color: color.textMuted, fontSize: 10, marginTop: 1 },
   levels: { flexDirection: "row", gap: 3 },
   pip: { width: 8, height: 8, borderRadius: 2 },
-  stadiumRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  stadiumName: { color: color.text, fontSize: fontSize.md, fontWeight: fontWeight.bold as "700", fontStyle: "italic" },
-  stadiumCap: { color: color.textMuted, fontSize: fontSize.sm, fontWeight: fontWeight.semibold as "600" },
+  stadiumRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stadiumName: {
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold as "700",
+    fontStyle: "italic",
+  },
+  stadiumCap: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold as "600",
+  },
+  controlNote: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+  },
+  controlError: { color: color.danger, fontSize: fontSize.xs },
+  controlActions: { flexDirection: "row", gap: space.sm },
+  switchButton: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    backgroundColor: color.primary,
+    paddingHorizontal: space.sm,
+  },
+  switchText: {
+    color: color.primaryContrast,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+  },
+  exitButton: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: color.danger,
+    paddingHorizontal: space.sm,
+  },
+  exitText: {
+    color: color.danger,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+  },
 });

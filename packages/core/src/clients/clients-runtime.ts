@@ -5,8 +5,10 @@ import {
   CommandTrackingStatus,
   OfflineIntentStatus,
   RealtimeApply,
+  RealtimeRecoveryStatus,
   type OfflineIntent,
   type RealtimeApplyResult,
+  type ClientRealtimeCursorSnapshot,
 } from "./clients-types.js";
 
 /**
@@ -44,6 +46,76 @@ export function classifyRealtimeEvent(
     return { result: RealtimeApply.APPLIED, lastSequence: eventSequence };
   }
   return { result: RealtimeApply.GAP, lastSequence };
+}
+
+/**
+ * Cursor stateful usado pelos transportes dos clientes. Ele pausa a aplicação
+ * quando encontra um gap, aceita apenas delta contíguo e só troca por snapshot
+ * oficial sem retroceder a projeção já observada.
+ */
+export class RealtimeRecoveryCursor {
+  private status: RealtimeRecoveryStatus = RealtimeRecoveryStatus.CONNECTING;
+
+  public constructor(private lastSequence = 0) {
+    if (!Number.isInteger(lastSequence) || lastSequence < 0) {
+      throw new Error("lastSequence precisa ser um inteiro não negativo.");
+    }
+  }
+
+  public receive(eventSequence: number): RealtimeApplyResult {
+    const result = classifyRealtimeEvent(this.lastSequence, eventSequence);
+    if (result.result === RealtimeApply.APPLIED) {
+      this.lastSequence = result.lastSequence;
+      this.status = RealtimeRecoveryStatus.LIVE;
+    } else if (result.result === RealtimeApply.GAP) {
+      this.status = RealtimeRecoveryStatus.GAP;
+    }
+    return result;
+  }
+
+  public startRecovery(): ClientRealtimeCursorSnapshot {
+    this.status = RealtimeRecoveryStatus.RECOVERING;
+    return this.snapshot();
+  }
+
+  public applyDelta(
+    sequences: readonly number[],
+  ): ClientRealtimeCursorSnapshot {
+    this.status = RealtimeRecoveryStatus.RECOVERING;
+    for (const sequence of sequences) {
+      const result = classifyRealtimeEvent(this.lastSequence, sequence);
+      if (result.result === RealtimeApply.DUPLICATE) continue;
+      if (result.result === RealtimeApply.GAP) {
+        this.status = RealtimeRecoveryStatus.GAP;
+        return this.snapshot();
+      }
+      this.lastSequence = result.lastSequence;
+    }
+    this.status = RealtimeRecoveryStatus.LIVE;
+    return this.snapshot();
+  }
+
+  public replaceFromSnapshot(
+    lastSequence: number,
+  ): ClientRealtimeCursorSnapshot {
+    if (!Number.isInteger(lastSequence) || lastSequence < this.lastSequence) {
+      throw new Error(
+        "Snapshot oficial não pode retroceder o cursor realtime.",
+      );
+    }
+    this.lastSequence = lastSequence;
+    this.status = RealtimeRecoveryStatus.LIVE;
+    return this.snapshot();
+  }
+
+  public markOffline(): ClientRealtimeCursorSnapshot {
+    this.status = RealtimeRecoveryStatus.OFFLINE;
+    return this.snapshot();
+  }
+
+  public snapshot(): ClientRealtimeCursorSnapshot {
+    return { status: this.status, lastSequence: this.lastSequence };
+  }
 }
 
 /**
@@ -101,7 +173,23 @@ export class OfflineIntentQueue {
 
   public constructor(
     private readonly whitelist: readonly string[] = OFFLINE_COMMAND_WHITELIST,
-  ) {}
+    restored: readonly OfflineIntent[] = [],
+  ) {
+    this.intents = restored
+      .filter(
+        (intent) =>
+          isOfflineCommandAllowed(intent.commandType, whitelist) &&
+          Object.values(OfflineIntentStatus).includes(intent.status) &&
+          intent.expiresOn >= intent.createdOn,
+      )
+      .filter(
+        (intent, index, all) =>
+          all.findIndex(
+            (candidate) => candidate.idempotencyKey === intent.idempotencyKey,
+          ) === index,
+      )
+      .map((intent) => ({ ...intent }));
+  }
 
   public enqueue(
     input: Readonly<{
@@ -126,9 +214,7 @@ export class OfflineIntentQueue {
     );
     if (duplicate !== undefined) return succeed(duplicate);
     if (input.expiresOn < input.createdOn) {
-      return fail(
-        new DomainError("INVALID_INTENT", "TTL do intent inválido."),
-      );
+      return fail(new DomainError("INVALID_INTENT", "TTL do intent inválido."));
     }
     const intent: OfflineIntent = {
       id: input.id,

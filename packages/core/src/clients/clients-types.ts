@@ -29,6 +29,22 @@ export const RealtimeApply = {
 
 export type RealtimeApply = (typeof RealtimeApply)[keyof typeof RealtimeApply];
 
+export const RealtimeRecoveryStatus = {
+  CONNECTING: "CONNECTING",
+  LIVE: "LIVE",
+  GAP: "GAP",
+  RECOVERING: "RECOVERING",
+  OFFLINE: "OFFLINE",
+} as const;
+
+export type RealtimeRecoveryStatus =
+  (typeof RealtimeRecoveryStatus)[keyof typeof RealtimeRecoveryStatus];
+
+export interface ClientRealtimeCursorSnapshot {
+  readonly status: RealtimeRecoveryStatus;
+  readonly lastSequence: number;
+}
+
 export const OfflineIntentStatus = {
   QUEUED: "QUEUED",
   SUBMITTED: "SUBMITTED",

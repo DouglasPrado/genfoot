@@ -5,6 +5,7 @@ import {
   classifyRealtimeEvent,
   isOfflineCommandAllowed,
   OfflineIntentQueue,
+  RealtimeRecoveryCursor,
 } from "../../src/index.js";
 
 describe("Client contract runtime", () => {
@@ -23,7 +24,10 @@ describe("Client contract runtime", () => {
         createdOn: "2026-03-01",
         expiresOn: "2026-03-02",
       }),
-    ).toMatchObject({ ok: false, error: { code: "COMMAND_FORBIDDEN_OFFLINE" } });
+    ).toMatchObject({
+      ok: false,
+      error: { code: "COMMAND_FORBIDDEN_OFFLINE" },
+    });
   });
 
   it("deduplica e detecta gap no cursor de realtime", () => {
@@ -43,6 +47,41 @@ describe("Client contract runtime", () => {
       result: "GAP",
       lastSequence: 5,
     });
+  });
+
+  it("recupera realtime por delta sem aplicar duplicata", () => {
+    const cursor = new RealtimeRecoveryCursor(4);
+
+    expect(cursor.receive(5)).toMatchObject({ result: "APPLIED" });
+    expect(cursor.receive(5)).toMatchObject({ result: "DUPLICATE" });
+    expect(cursor.receive(8)).toMatchObject({ result: "GAP" });
+    expect(cursor.snapshot()).toEqual({ status: "GAP", lastSequence: 5 });
+
+    cursor.startRecovery();
+    expect(cursor.applyDelta([6, 7, 8])).toEqual({
+      status: "LIVE",
+      lastSequence: 8,
+    });
+    expect(cursor.receive(9)).toMatchObject({
+      result: "APPLIED",
+      lastSequence: 9,
+    });
+  });
+
+  it("mantém gap em delta descontínuo e aceita snapshot oficial", () => {
+    const cursor = new RealtimeRecoveryCursor(10);
+    cursor.receive(13);
+    cursor.startRecovery();
+
+    expect(cursor.applyDelta([11, 13])).toEqual({
+      status: "GAP",
+      lastSequence: 11,
+    });
+    expect(cursor.replaceFromSnapshot(20)).toEqual({
+      status: "LIVE",
+      lastSequence: 20,
+    });
+    expect(() => cursor.replaceFromSnapshot(19)).toThrow(/retroceder/i);
   });
 
   it("não presume sucesso no timeout do tracking de command", () => {
@@ -104,5 +143,30 @@ describe("Client contract runtime", () => {
     // segunda revalidação não reenvia o já submetido
     const again = queue.revalidate("2026-03-06");
     expect(again).toHaveLength(0);
+  });
+
+  it("restaura somente intents persistidos permitidos sem perder o status", () => {
+    const restored = new OfflineIntentQueue(undefined, [
+      {
+        id: "i-restored",
+        commandType: "MARK_NOTIFICATION_READ",
+        idempotencyKey: "read:1",
+        createdOn: "2026-01-01T00:00:00.000Z",
+        expiresOn: "2026-01-02T00:00:00.000Z",
+        status: "SUBMITTED",
+      },
+      {
+        id: "i-forbidden",
+        commandType: "market:submit-offer",
+        idempotencyKey: "offer:1",
+        createdOn: "2026-01-01T00:00:00.000Z",
+        expiresOn: "2026-01-02T00:00:00.000Z",
+        status: "QUEUED",
+      },
+    ]);
+
+    expect(restored.snapshot()).toEqual([
+      expect.objectContaining({ id: "i-restored", status: "SUBMITTED" }),
+    ]);
   });
 });

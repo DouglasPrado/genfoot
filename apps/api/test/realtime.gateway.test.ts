@@ -20,6 +20,7 @@ describe("RealtimeGateway sequence", () => {
     expect(first.map((event) => event.sequence)).toEqual([1, 2]);
     expect(first[0]?.streamId).toBe("world:w1");
     expect(first[0]?.eventType).toBe("WorldCreated");
+    expect(first[0]?.resumeToken).toMatch(/^[0-9a-f]{16}$/);
 
     const more = gw.publish("w1", "corr", [{ type: "WorldPaused" }]);
     expect(more[0]?.sequence).toBe(3);
@@ -85,14 +86,12 @@ describe("RealtimeGateway handshake (auth na conexão)", () => {
 describe("RealtimeGateway gap recovery (resync)", () => {
   it("delta: devolve eventos após fromSequence", () => {
     const gw = gateway();
-    gw.publish("w1", "corr", [
-      { type: "A" },
-      { type: "B" },
-      { type: "C" },
-    ]);
+    gw.publish("w1", "corr", [{ type: "A" }, { type: "B" }, { type: "C" }]);
     const outcome = gw.resync("w1", 1);
     expect(outcome.mode).toBe("delta");
     expect(outcome.events.map((event) => event.sequence)).toEqual([2, 3]);
+    expect(outcome.lastSequence).toBe(3);
+    expect(outcome.resumeToken).toMatch(/^[0-9a-f]{16}$/);
   });
 
   it("delta vazio quando o cliente já está atualizado", () => {
@@ -112,5 +111,19 @@ describe("RealtimeGateway gap recovery (resync)", () => {
     const outcome = gw.resync("w1", 1); // fromSequence muito antigo
     expect(outcome.mode).toBe("snapshot");
     expect(outcome.reason).toContain("API oficial");
+    expect(outcome.lastSequence).toBe(600);
+    expect(outcome.resumeToken).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("resume token inválido força snapshot oficial", () => {
+    const gw = gateway();
+    gw.publish("w1", "corr", [{ type: "A" }, { type: "B" }]);
+
+    const outcome = gw.resync("w1", 1, "token-adulterado");
+    expect(outcome).toMatchObject({
+      mode: "snapshot",
+      lastSequence: 2,
+      reason: "resume token inválido — re-consulte a API oficial",
+    });
   });
 });

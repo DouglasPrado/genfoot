@@ -19,7 +19,7 @@ Construir app Expo e admin Next.js sobre contracts/ui compartilhados, TanStack Q
 
 ## Constitution Check
 
-Constituição placeholder. Gates: cliente não autoritativo, contracts únicos, isolation, idempotência, accessibility/privacy. **Pre-design: PASS**.
+Constituição v1.0.0 ativa. Gates aplicáveis: backend autoritativo, contratos únicos, isolamento por mundo/conta/controle, idempotência, determinismo, TDD, acessibilidade e privacidade. **Pre-design: PASS**.
 
 ## Project Structure
 

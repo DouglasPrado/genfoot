@@ -10,6 +10,8 @@ import { describe, expect, it } from "vitest";
 import {
   CreateCompetitionEdition,
   GameWorld,
+  InitializeCompetitions,
+  WorldGenesisGenerator,
   WorldCompetitions,
   type CompetitionClubRef,
   type CompetitionRepository,
@@ -107,6 +109,29 @@ function editionWithParticipants(seed = "competitions-001") {
 }
 
 describe("Competitions and calendar", () => {
+  it("publica a Liga Inicial com 16 clubes e estreia após uma semana", async () => {
+    const gameWorld = world("competitions-bootstrap");
+    const genesis = new WorldGenesisGenerator().generate(gameWorld);
+    const repository = new MemoryCompetitionRepository();
+    const useCase = new InitializeCompetitions(repository);
+
+    const initialized = await useCase.execute(gameWorld, genesis);
+
+    expect(initialized.ok).toBe(true);
+    if (!initialized.ok) throw initialized.error;
+    expect(initialized.value.editions).toMatchObject([
+      { name: "Liga Inicial", startOn: "2026-01-08", status: "SCHEDULED" },
+    ]);
+    expect(initialized.value.participants).toHaveLength(16);
+    expect(initialized.value.fixtures).toHaveLength(240);
+    expect(initialized.value.fixtures[0]?.kickoffOn).toBe("2026-01-08");
+
+    const revision = initialized.value.revision;
+    const repeated = await useCase.execute(gameWorld, genesis);
+    expect(repeated).toMatchObject({ ok: true, value: { revision } });
+    expect(repository.snapshot?.fixtures).toHaveLength(240);
+  });
+
   it("cria edição e produz um único efeito ao repetir a chave", () => {
     const gameWorld = world();
     const created = WorldCompetitions.initialize(gameWorld);
@@ -124,7 +149,10 @@ describe("Competitions and calendar", () => {
       idempotencyKey: "edition:x",
       worldSeed: gameWorld.seed,
     });
-    expect(first).toMatchObject({ ok: true, value: { status: "REGISTRATION" } });
+    expect(first).toMatchObject({
+      ok: true,
+      value: { status: "REGISTRATION" },
+    });
     const revision = value.snapshot().revision;
     const repeated = value.createCompetitionEdition({
       seasonRef: SEASON,

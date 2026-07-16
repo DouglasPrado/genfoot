@@ -31,7 +31,11 @@ describe("API command catalog integrity (e2e)", () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
 
-    const send = (commandType: string, payload: Record<string, unknown>, key: string) =>
+    const send = (
+      commandType: string,
+      payload: Record<string, unknown>,
+      key: string,
+    ) =>
       request(app.getHttpServer())
         .post("/api/v1/commands")
         .send({
@@ -68,7 +72,10 @@ describe("API command catalog integrity (e2e)", () => {
     );
     expect(response.status).toBe(200);
     expect(response.body.commandCount).toBeGreaterThanOrEqual(120);
-    expect(response.body.queries.length).toBe(14);
+    expect(response.body.queries.length).toBe(17);
+    expect(response.body.queries).toContain("player-roster");
+    expect(response.body.queries).toContain("identity-detail");
+    expect(response.body.queries).toContain("matches-detail");
     expect(response.body.commands).toContain("infrastructure:start");
     expect(response.body.commands).toContain("scheduler:resume");
     expect(response.body.commands).toContain("match:submit-command");
@@ -94,8 +101,13 @@ describe("API command catalog integrity (e2e)", () => {
         failures.push(`${commandType} → HTTP ${response.status}`);
         continue;
       }
-      if (response.status === 201 && !VALID_STATUSES.has(response.body.status)) {
-        failures.push(`${commandType} → status inválido ${response.body.status}`);
+      if (
+        response.status === 201 &&
+        !VALID_STATUSES.has(response.body.status)
+      ) {
+        failures.push(
+          `${commandType} → status inválido ${response.body.status}`,
+        );
       }
     }
     expect(failures).toEqual([]);

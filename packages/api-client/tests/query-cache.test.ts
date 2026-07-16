@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { QueryCache, type QueryEnvelope } from "../src/index.js";
+import {
+  clientScopeKey,
+  QueryCache,
+  type QueryEnvelope,
+} from "../src/index.js";
 
-function envelope<T>(
-  data: T,
-  projectionVersion: number,
-): QueryEnvelope<T> {
+function envelope<T>(data: T, projectionVersion: number): QueryEnvelope<T> {
   return {
     data,
     asOf: "2026-01-01",
@@ -16,6 +17,15 @@ function envelope<T>(
 }
 
 describe("QueryCache (FR-009)", () => {
+  it("compõe escopo com conta, mundo e controle sem colisão", () => {
+    expect(clientScopeKey("operador-a", "world-1", null)).not.toBe(
+      clientScopeKey("operador-b", "world-1", null),
+    );
+    expect(clientScopeKey("operador-a", "world-1", "control-a")).not.toBe(
+      clientScopeKey("operador-a", "world-1", "control-b"),
+    );
+  });
+
   it("segrega por escopo — nunca mistura mundos", () => {
     const cache = new QueryCache();
     cache.put("world-A", "club", envelope({ n: "A" }, 1));

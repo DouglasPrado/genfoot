@@ -10,7 +10,7 @@ Envelope inclui data, asOf, projectionVersion, pagination e authorization scope.
 
 ## Realtime event
 
-eventId, worldId, streamId, sequence, eventType/version, occurredAt, correlationId e payload. Duplicata é ignorada; gap aciona delta/snapshot.
+eventId, worldId, streamId, sequence, resumeToken opaco, eventType/version, occurredAt, correlationId e payload. Duplicata é ignorada; gap aciona `resync` com cursor/token e recuperação por delta ou snapshot oficial.
 
 ## Standard error
 

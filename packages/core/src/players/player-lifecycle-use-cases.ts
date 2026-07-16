@@ -9,17 +9,21 @@ import {
 } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
-import type { WorldGenesisSnapshot } from "../genesis/genesis-types.js";
+import {
+  DominantFoot,
+  PlayerPosition,
+  type WorldGenesisSnapshot,
+} from "../genesis/genesis-types.js";
 import type { ScheduledTaskHandler } from "../scheduling/scheduling-types.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { PlayerLifecycleRepository } from "./player-lifecycle-repository.js";
-import type {
-  PlayerAttributeCode,
+import {
   PlayerGenerationSource,
-  PlayerInspection,
-  PlayerLifecycleSnapshot,
-  PlayerLifecycleSummary,
-  WorldPlayerLifecycleSnapshot,
+  type PlayerAttributeCode,
+  type PlayerInspection,
+  type PlayerLifecycleSnapshot,
+  type PlayerLifecycleSummary,
+  type WorldPlayerLifecycleSnapshot,
 } from "./player-lifecycle-types.js";
 import {
   WorldPlayerLifecycle,
@@ -44,6 +48,77 @@ export class InitializePlayerLifecycle {
     if (!created.ok) return created;
     await this.repository.savePlayerLifecycle(created.value.snapshot(), null);
     return succeed(created.value.snapshot());
+  }
+}
+
+const MARKET_PLAYERS_PER_CLUB = 10;
+const MARKET_POSITIONS = Object.values(PlayerPosition);
+
+export class InitializeMarketPopulation {
+  public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public async execute(
+    world: GameWorldSnapshot,
+    clubCount: number,
+  ): Promise<Result<WorldPlayerLifecycleSnapshot, DomainError>> {
+    if (!Number.isSafeInteger(clubCount) || clubCount < 1) {
+      return fail(
+        new DomainError(
+          "INVALID_MARKET_POPULATION",
+          "A população do mercado exige ao menos um clube.",
+        ),
+      );
+    }
+    const loaded = await loadLifecycle(this.repository, world.id);
+    if (!loaded.ok) return loaded;
+    const lifecycle = loaded.value;
+    const expectedRevision = lifecycle.snapshot().revision;
+    const target = clubCount * MARKET_PLAYERS_PER_CLUB;
+    const existing = lifecycle
+      .snapshot()
+      .generationEvents.filter(
+        ({ source }) => source === PlayerGenerationSource.MARKET_BALANCE,
+      ).length;
+    const startYear = Number(world.startDate.slice(0, 4));
+
+    for (let index = existing; index < target; index += 1) {
+      const position = MARKET_POSITIONS[index % MARKET_POSITIONS.length]!;
+      const attribute = 48 + (index % 13);
+      const generated = lifecycle.generatePlayer({
+        prospect: {
+          firstName: `Jogador ${String(index + 1).padStart(3, "0")}`,
+          lastName: "Livre",
+          birthDate: `${startYear - (19 + (index % 15))}-${String(
+            (index % 12) + 1,
+          ).padStart(2, "0")}-15`,
+          nationality: "BR",
+          primaryPosition: position,
+          dominantFoot:
+            index % 5 === 0 ? DominantFoot.LEFT : DominantFoot.RIGHT,
+          attributes: {
+            technical: position === PlayerPosition.GK ? 45 : attribute,
+            physical: attribute,
+            mental: 50 + (index % 11),
+            goalkeeping: position === PlayerPosition.GK ? attribute : 0,
+          },
+          potentialAbility: 65 + (index % 21),
+          seasonNumber: 1,
+        },
+        source: PlayerGenerationSource.MARKET_BALANCE,
+        worldDate: world.startDate,
+        rulesetVersion: world.rulesetVersion,
+        idempotencyKey: `market-balance:season:1:${index}`,
+        worldSeed: world.seed,
+      });
+      if (!generated.ok) return generated;
+    }
+    if (lifecycle.snapshot().revision !== expectedRevision) {
+      await this.repository.savePlayerLifecycle(
+        lifecycle.snapshot(),
+        expectedRevision,
+      );
+    }
+    return succeed(lifecycle.snapshot());
   }
 }
 
@@ -185,6 +260,13 @@ export class PromoteYouth {
 
 export class InspectPlayerLifecycle {
   public constructor(private readonly repository: PlayerLifecycleRepository) {}
+
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldPlayerLifecycleSnapshot, DomainError>> {
+    const loaded = await loadLifecycle(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
+  }
 
   public async summary(
     gameWorldId: GameWorldId,

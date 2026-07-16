@@ -3,6 +3,8 @@ export interface RealtimeEvent {
   readonly worldId: string;
   readonly streamId: string;
   readonly sequence: number;
+  /** Token opaco que permite retomar exatamente desta sequence. */
+  readonly resumeToken: string;
   readonly eventType: string;
   readonly eventVersion: number;
   readonly occurredAt: string;

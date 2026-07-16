@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   GameWorld,
+  InitializeMarketPopulation,
+  InspectPlayerLifecycle,
   ProcessPlayerDay,
   WorldGenesisGenerator,
   WorldPlayerLifecycle,
@@ -75,6 +77,48 @@ function lifecycle() {
 }
 
 describe("Player lifecycle", () => {
+  it("abastece o mercado com dez jogadores livres por clube sem duplicar", async () => {
+    const { gameWorld, value } = lifecycle();
+    const repository = new MemoryPlayerRepository();
+    repository.snapshot = value.snapshot();
+    const useCase = new InitializeMarketPopulation(repository);
+
+    const initialized = await useCase.execute(gameWorld, 16);
+
+    expect(initialized.ok).toBe(true);
+    if (!initialized.ok) throw initialized.error;
+    const marketPlayers = initialized.value.players.filter(
+      ({ generationSource }) => generationSource === "MARKET_BALANCE",
+    );
+    expect(marketPlayers).toHaveLength(160);
+    expect(
+      marketPlayers.every(({ careerStatus }) => careerStatus === "FREE_AGENT"),
+    ).toBe(true);
+    expect(
+      new Set(marketPlayers.map(({ primaryPosition }) => primaryPosition)).size,
+    ).toBeGreaterThanOrEqual(8);
+
+    const revision = initialized.value.revision;
+    const repeated = await useCase.execute(gameWorld, 16);
+    expect(repeated).toMatchObject({ ok: true, value: { revision } });
+    expect(repository.snapshot?.players).toHaveLength(528);
+  });
+
+  it("expõe o snapshot oficial para projeções de elenco", async () => {
+    const { value } = lifecycle();
+    const repository = new MemoryPlayerRepository();
+    repository.snapshot = value.snapshot();
+
+    const inspected = await new InspectPlayerLifecycle(repository).world(
+      repository.snapshot.gameWorldId,
+    );
+
+    expect(inspected.ok).toBe(true);
+    if (!inspected.ok) throw inspected.error;
+    expect(inspected.value.players).toHaveLength(368);
+    expect(inspected.value.persons).toHaveLength(368);
+  });
+
   it("materializa 368 pessoas/jogadores com uma origem única por atleta", () => {
     const { value } = lifecycle();
     const snapshot = value.snapshot();

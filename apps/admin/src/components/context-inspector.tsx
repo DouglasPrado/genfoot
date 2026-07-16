@@ -1,6 +1,6 @@
 "use client";
 
-import { GrintaApiError } from "@grinta/api-client";
+import { clientScopeKey, GrintaApiError } from "@grinta/api-client";
 import { useEffect, useState } from "react";
 
 import type { ContextName } from "@/components/context-pulse";
@@ -23,8 +23,8 @@ function isScalar(value: unknown): boolean {
 
 function ScalarGrid({ data }: { data: Record<string, unknown> }) {
   const scalars = Object.entries(data).filter(([, v]) => isScalar(v));
-  const collections = Object.entries(data).filter(
-    ([, v]) => Array.isArray(v),
+  const collections = Object.entries(data).filter(([, v]) =>
+    Array.isArray(v),
   ) as [string, unknown[]][];
 
   return (
@@ -32,7 +32,10 @@ function ScalarGrid({ data }: { data: Record<string, unknown> }) {
       {scalars.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {scalars.map(([key, value]) => (
-            <div key={key} className="rounded-sm border border-border bg-surface-2 p-2.5">
+            <div
+              key={key}
+              className="rounded-sm border border-border bg-surface-2 p-2.5"
+            >
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                 {key}
               </div>
@@ -70,7 +73,10 @@ function ClubsTable({ data }: { data: ClubData }) {
         </thead>
         <tbody>
           {clubs.map((club) => (
-            <tr key={club.id} className="border-b border-border/60 last:border-0">
+            <tr
+              key={club.id}
+              className="border-b border-border/60 last:border-0"
+            >
               <td className="px-3 py-2 font-medium">
                 {club.identity?.name ?? "—"}
               </td>
@@ -97,7 +103,12 @@ export function ContextInspector({
   context: ContextName;
   refreshKey?: number;
 }) {
-  const { api, cache } = useSession();
+  const { api, cache, session } = useSession();
+  const scopeKey = clientScopeKey(
+    session?.subject ?? "anonymous-admin",
+    worldId,
+    null,
+  );
   const [data, setData] = useState<unknown>(null);
   const [state, setState] = useState<"loading" | "ok" | "dormant" | "error">(
     "loading",
@@ -108,7 +119,7 @@ export function ContextInspector({
   useEffect(() => {
     let alive = true;
     // stale-while-revalidate: mostra o cache do escopo na hora, revalida depois.
-    const cached = cache.get(worldId, context);
+    const cached = cache.get(scopeKey, context);
     if (cached) {
       setData(cached.data);
       setState("ok");
@@ -120,7 +131,7 @@ export function ContextInspector({
       .query(worldId, context)
       .then((envelope) => {
         if (!alive) return;
-        cache.put(worldId, context, envelope);
+        cache.put(scopeKey, context, envelope);
         setData(envelope.data);
         setState("ok");
         setFromCache(false);
@@ -137,10 +148,14 @@ export function ContextInspector({
     return () => {
       alive = false;
     };
-  }, [api, cache, worldId, context, refreshKey]);
+  }, [api, cache, worldId, context, refreshKey, scopeKey]);
 
   if (state === "loading") {
-    return <p className="mono text-xs text-muted-foreground">carregando {context}…</p>;
+    return (
+      <p className="mono text-xs text-muted-foreground">
+        carregando {context}…
+      </p>
+    );
   }
   if (state === "dormant") {
     return (
@@ -153,7 +168,9 @@ export function ContextInspector({
     );
   }
   if (state === "error") {
-    return <p className="mono text-xs text-danger">falha ao consultar {context}</p>;
+    return (
+      <p className="mono text-xs text-danger">falha ao consultar {context}</p>
+    );
   }
 
   const record =
@@ -165,7 +182,9 @@ export function ContextInspector({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-heading text-sm text-foreground">{context}</span>
+          <span className="font-heading text-sm text-foreground">
+            {context}
+          </span>
           {fromCache ? (
             <span className="mono text-[10px] text-muted-foreground">
               cache · revalidando…

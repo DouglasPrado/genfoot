@@ -96,16 +96,103 @@ describe("API query catalog (e2e)", () => {
     },
   );
 
-  it.each(["competitions", "matches", "market", "ledger"])(
-    "query %s (contexto ainda não criado) → 404 erro-padrão",
-    async (queryType) => {
-      const response = await request(app.getHttpServer()).get(
-        `/api/v1/worlds/${worldId}/${queryType}`,
+  it("query player-roster entrega elenco e reserva oficial de mercado", async () => {
+    const response = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/player-roster`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.players).toHaveLength(528);
+    expect(response.body.data.persons).toHaveLength(528);
+    expect(response.body.data.players[0]).toMatchObject({
+      careerStatus: "ACTIVE",
+      availability: "AVAILABLE",
+    });
+    expect(response.body.data.persons[0]).toEqual(
+      expect.objectContaining({
+        firstName: expect.any(String),
+        lastName: expect.any(String),
+      }),
+    );
+    expect(
+      response.body.data.players.filter(
+        (player: { careerStatus: string }) =>
+          player.careerStatus === "FREE_AGENT",
+      ),
+    ).toHaveLength(160);
+  });
+
+  it("gênese materializa as 240 partidas oficiais da Liga Inicial", async () => {
+    const response = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/matches-detail`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.matches).toHaveLength(240);
+    expect(response.body.data.matches[0]).toMatchObject({
+      status: "CREATED",
+      kickoffOn: "2026-01-08",
+    });
+  });
+
+  it("query identity-detail entrega contas, reservas e controles oficiais", async () => {
+    await request(app.getHttpServer())
+      .post("/api/v1/commands")
+      .send(
+        command({
+          commandType: "identity:initialize",
+          worldId,
+          idempotencyKey: "q-identity-init",
+        }),
       );
-      expect(response.status).toBe(404);
-      expect(typeof response.body.code).toBe("string");
-    },
-  );
+
+    const response = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/identity-detail`,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      accounts: [],
+      reservations: [],
+      controls: [],
+      participations: [],
+      revision: 1,
+    });
+  });
+
+  it("query matches resume o calendário materializado", async () => {
+    const response = await request(app.getHttpServer()).get(
+      `/api/v1/worlds/${worldId}/matches`,
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      matchCount: 240,
+      finalCount: 0,
+    });
+  });
+
+  it("a gênese entrega economia, mercado e competição jogáveis", async () => {
+    const [ledger, market, competitions] = await Promise.all([
+      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/ledger`),
+      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/market`),
+      request(app.getHttpServer()).get(
+        `/api/v1/worlds/${worldId}/competitions`,
+      ),
+    ]);
+
+    expect(ledger.body.data).toMatchObject({
+      accountCount: 17,
+      transactionCount: 16,
+      residualMinor: 0,
+    });
+    expect(market.body.data.availablePlayerCount).toBe(160);
+    expect(competitions.body.data).toMatchObject({
+      editionCount: 1,
+      participantCount: 16,
+      fixtureCount: 240,
+      nextKickoffOn: "2026-01-08",
+    });
+  });
 
   it("envelope de query carrega paginação (limit/offset)", async () => {
     const response = await request(app.getHttpServer()).get(

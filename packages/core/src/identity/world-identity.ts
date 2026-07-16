@@ -49,6 +49,9 @@ export class WorldIdentity {
       gameWorldId: world.id,
       rulesetVersion: world.rulesetVersion,
       cooldownDays,
+      accounts: [],
+      credentials: [],
+      sessions: [],
       reservations: [],
       controls: [],
       participations: [],
@@ -65,7 +68,10 @@ export class WorldIdentity {
     if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1) {
       return fail(invalidIdentity("A revisão da identidade é inválida."));
     }
-    if (!Number.isSafeInteger(snapshot.cooldownDays) || snapshot.cooldownDays < 0) {
+    if (
+      !Number.isSafeInteger(snapshot.cooldownDays) ||
+      snapshot.cooldownDays < 0
+    ) {
       return fail(invalidIdentity("cooldownDays inválido."));
     }
     const activeControlsByClub = new Map<string, number>();
@@ -166,7 +172,11 @@ export class WorldIdentity {
           ]
         : credentials;
     const event: AccountRegisteredEvent = {
-      id: this.eventId(input.worldSeed, `account-registered:${input.idempotencyKey}`, date.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `account-registered:${input.idempotencyKey}`,
+        date.value.toString(),
+      ),
       type: "AccountRegistered",
       gameWorldId: this.state.gameWorldId,
       accountId,
@@ -248,7 +258,11 @@ export class WorldIdentity {
       participation,
     ];
     const event: WorldParticipationActivatedEvent = {
-      id: this.eventId(input.worldSeed, `participation-activated:${input.idempotencyKey}`, date.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `participation-activated:${input.idempotencyKey}`,
+        date.value.toString(),
+      ),
       type: "WorldParticipationActivated",
       gameWorldId: this.state.gameWorldId,
       accountId: input.accountId,
@@ -283,9 +297,13 @@ export class WorldIdentity {
     );
     if (index < 0) {
       return fail(
-        new DomainError("SESSION_NOT_FOUND", "Família de sessão não encontrada.", {
-          familyId: input.familyId,
-        }),
+        new DomainError(
+          "SESSION_NOT_FOUND",
+          "Família de sessão não encontrada.",
+          {
+            familyId: input.familyId,
+          },
+        ),
       );
     }
     if (
@@ -354,7 +372,11 @@ export class WorldIdentity {
       version: 1,
     };
     const event: ClubReservedEvent = {
-      id: this.eventId(input.worldSeed, `club-reserved:${input.idempotencyKey}`, date.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `club-reserved:${input.idempotencyKey}`,
+        date.value.toString(),
+      ),
       type: "ClubReserved",
       gameWorldId: this.state.gameWorldId,
       reservationId,
@@ -387,7 +409,9 @@ export class WorldIdentity {
     }
     const replay = this.findEvent("ClubControlActivated", input.idempotencyKey);
     if (replay !== undefined) {
-      const control = this.state.controls.find(({ id }) => id === replay.controlId);
+      const control = this.state.controls.find(
+        ({ id }) => id === replay.controlId,
+      );
       if (control !== undefined) return succeed(control);
     }
     const index = this.state.reservations.findIndex(
@@ -406,9 +430,13 @@ export class WorldIdentity {
     }
     if (this.hasActiveControl(reservation.clubId)) {
       return fail(
-        new DomainError("CONTROL_CONFLICT", "O clube já possui controle ativo.", {
-          clubId: reservation.clubId,
-        }),
+        new DomainError(
+          "CONTROL_CONFLICT",
+          "O clube já possui controle ativo.",
+          {
+            clubId: reservation.clubId,
+          },
+        ),
       );
     }
     const date = WorldDate.parse(input.worldDate);
@@ -448,7 +476,11 @@ export class WorldIdentity {
       participation,
     ];
     const event: ClubControlActivatedEvent = {
-      id: this.eventId(input.worldSeed, `control-activated:${input.idempotencyKey}`, date.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `control-activated:${input.idempotencyKey}`,
+        date.value.toString(),
+      ),
       type: "ClubControlActivated",
       gameWorldId: this.state.gameWorldId,
       controlId,
@@ -529,7 +561,9 @@ export class WorldIdentity {
     }
     const replay = this.findEvent("ClubControlEnded", input.idempotencyKey);
     if (replay !== undefined) {
-      const control = this.state.controls.find(({ id }) => id === replay.controlId);
+      const control = this.state.controls.find(
+        ({ id }) => id === replay.controlId,
+      );
       if (control !== undefined) return succeed(control);
     }
     const index = this.state.controls.findIndex(
@@ -572,7 +606,11 @@ export class WorldIdentity {
       },
     ];
     const endedEvent: ClubControlEndedEvent = {
-      id: this.eventId(input.worldSeed, `control-ended:${input.idempotencyKey}`, endedOn.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `control-ended:${input.idempotencyKey}`,
+        endedOn.value.toString(),
+      ),
       type: "ClubControlEnded",
       gameWorldId: this.state.gameWorldId,
       controlId: control.id,
@@ -582,7 +620,11 @@ export class WorldIdentity {
       idempotencyKey: input.idempotencyKey,
     };
     const cooldownEvent: CooldownStartedEvent = {
-      id: this.eventId(input.worldSeed, `cooldown-started:${input.idempotencyKey}`, endedOn.value.toString()),
+      id: this.eventId(
+        input.worldSeed,
+        `cooldown-started:${input.idempotencyKey}`,
+        endedOn.value.toString(),
+      ),
       type: "CooldownStarted",
       gameWorldId: this.state.gameWorldId,
       accountId: control.accountId,
@@ -623,10 +665,14 @@ export class WorldIdentity {
     );
     if (cooldown !== undefined && date.value.toString() < cooldown.untilOn) {
       return fail(
-        new DomainError("COOLDOWN_ACTIVE", "Troca bloqueada durante o cooldown.", {
-          accountId: input.accountId,
-          untilOn: cooldown.untilOn,
-        }),
+        new DomainError(
+          "COOLDOWN_ACTIVE",
+          "Troca bloqueada durante o cooldown.",
+          {
+            accountId: input.accountId,
+            untilOn: cooldown.untilOn,
+          },
+        ),
       );
     }
     return this.reserveClub({
@@ -659,7 +705,9 @@ export class WorldIdentity {
       context: `session-family:${input.idempotencyKey}`,
       timestampMilliseconds: timestampOf(input.worldDate),
     });
-    const existing = this.state.sessionFamilies.find(({ id }) => id === familyId);
+    const existing = this.state.sessionFamilies.find(
+      ({ id }) => id === familyId,
+    );
     if (existing !== undefined) return succeed(existing);
     if (input.tokenHash.trim() === "") {
       return fail(new DomainError("INVALID_SESSION", "tokenHash obrigatório."));
@@ -718,9 +766,13 @@ export class WorldIdentity {
     );
     if (index < 0) {
       return fail(
-        new DomainError("SESSION_NOT_FOUND", "Família de sessão não encontrada.", {
-          familyId: input.familyId,
-        }),
+        new DomainError(
+          "SESSION_NOT_FOUND",
+          "Família de sessão não encontrada.",
+          {
+            familyId: input.familyId,
+          },
+        ),
       );
     }
     const family = this.state.sessionFamilies[index]!;
@@ -798,7 +850,11 @@ export class WorldIdentity {
         : session,
     );
     const event: SessionFamilyRevokedEvent = {
-      id: this.eventId(input.worldSeed, `session-revoked:${input.idempotencyKey}`, input.worldDate),
+      id: this.eventId(
+        input.worldSeed,
+        `session-revoked:${input.idempotencyKey}`,
+        input.worldDate,
+      ),
       type: "SessionFamilyRevoked",
       gameWorldId: this.state.gameWorldId,
       familyId: family.id,

@@ -88,3 +88,4 @@ export * from "./world/world-repository.js";
 export * from "./world/world-types.js";
 export * from "./world/world-use-cases.js";
 export * from "./clients/screen-registry.js";
+export * from "./clients/golden-path-registry.js";

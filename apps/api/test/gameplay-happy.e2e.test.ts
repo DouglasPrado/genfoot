@@ -28,7 +28,11 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
     app.setGlobalPrefix(API_PREFIX);
     await app.init();
 
-    const send = (commandType: string, key: string, payload: Record<string, unknown> = {}) =>
+    const send = (
+      commandType: string,
+      key: string,
+      payload: Record<string, unknown> = {},
+    ) =>
       request(app.getHttpServer())
         .post("/api/v1/commands")
         .send({
@@ -65,7 +69,7 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
         correlationId: "corr-hp",
         payload: {},
       });
-    expect(init.body.status).toBe("ACCEPTED");
+    expect(init.body.status, JSON.stringify(init.body)).toBe("ACCEPTED");
 
     const response = await request(app.getHttpServer())
       .post("/api/v1/commands")
@@ -86,6 +90,11 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
       `/api/v1/worlds/${worldId}/ledger`,
     );
     expect(query.status).toBe(200);
+    expect(query.body.data).toMatchObject({
+      accountCount: 18,
+      transactionCount: 16,
+      residualMinor: 0,
+    });
   });
 
   it("os inicializadores de contexto <ctx>:initialize destravam suas queries (404→200)", async () => {
@@ -112,12 +121,22 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
           correlationId: "corr-hp",
           payload: {},
         });
-      expect(init.body.status, `${commandType}`).toBe("ACCEPTED");
+      expect(
+        init.body.status,
+        `${commandType}: ${JSON.stringify(init.body)}`,
+      ).toBe("ACCEPTED");
 
       const query = await request(app.getHttpServer()).get(
         `/api/v1/worlds/${worldId}/${queryType}`,
       );
       expect(query.status, `query ${queryType}`).toBe(200);
+      if (queryType === "competitions") {
+        expect(query.body.data).toMatchObject({
+          editionCount: 1,
+          participantCount: 16,
+          fixtureCount: 240,
+        });
+      }
     }
   });
 });

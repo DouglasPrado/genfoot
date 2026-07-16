@@ -792,7 +792,10 @@ export class WorldPlayerLifecycle {
     }
     if (input.prospects.length === 0) {
       return fail(
-        new DomainError("INVALID_YOUTH_COHORT", "A coorte precisa de prospectos."),
+        new DomainError(
+          "INVALID_YOUTH_COHORT",
+          "A coorte precisa de prospectos.",
+        ),
       );
     }
     const cohortKeys = input.prospects.map(
@@ -805,7 +808,9 @@ export class WorldPlayerLifecycle {
       return succeed(
         already
           .map((event) => this.findPlayer(event.playerId))
-          .filter((player): player is PlayerLifecycleSnapshot => player !== null),
+          .filter(
+            (player): player is PlayerLifecycleSnapshot => player !== null,
+          ),
       );
     }
     const persons = [...this.state.persons];
@@ -933,7 +938,10 @@ export class WorldPlayerLifecycle {
       !Object.values(prospect.attributes).every(validGenScore)
     ) {
       return fail(
-        new DomainError("INVALID_PLAYER_GENERATION", "Dados do prospecto inválidos."),
+        new DomainError(
+          "INVALID_PLAYER_GENERATION",
+          "Dados do prospecto inválidos.",
+        ),
       );
     }
     const birthDate = WorldDate.parse(prospect.birthDate);
@@ -955,7 +963,10 @@ export class WorldPlayerLifecycle {
     const mean = Math.round(
       (attrs.technical + attrs.physical + attrs.mental + attrs.goalkeeping) / 4,
     );
-    const currentAbility = Math.max(0, Math.min(prospect.potentialAbility, mean));
+    const currentAbility = Math.max(
+      0,
+      Math.min(prospect.potentialAbility, mean),
+    );
     const person: PersonLifecycleSnapshot = {
       id: personId,
       gameWorldId: this.state.gameWorldId,
@@ -974,7 +985,10 @@ export class WorldPlayerLifecycle {
         ? { secondaryPosition: prospect.secondaryPosition }
         : {}),
       dominantFoot: prospect.dominantFoot,
-      careerStatus: PlayerCareerStatus.ACTIVE,
+      careerStatus:
+        input.source === PlayerGenerationSource.MARKET_BALANCE
+          ? PlayerCareerStatus.FREE_AGENT
+          : PlayerCareerStatus.ACTIVE,
       availability: PlayerAvailability.AVAILABLE,
       generationSource: input.source,
       generatedAtSeasonNumber: prospect.seasonNumber,

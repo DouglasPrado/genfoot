@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { Inject } from "@nestjs/common";
 import {
@@ -13,10 +13,7 @@ import type { Server, Socket } from "socket.io";
 
 import { SESSION_STORE } from "../core/tokens.js";
 import { SessionStore } from "../auth/session-store.js";
-import type {
-  RealtimeEvent,
-  RealtimePublisher,
-} from "./realtime-publisher.js";
+import type { RealtimeEvent, RealtimePublisher } from "./realtime-publisher.js";
 
 function roomOf(worldId: string): string {
   return `world:${worldId}`;
@@ -27,7 +24,16 @@ const BUFFER_LIMIT = 500;
 export interface ResyncOutcome {
   readonly mode: "delta" | "snapshot";
   readonly events: readonly RealtimeEvent[];
+  readonly lastSequence: number;
+  readonly resumeToken: string;
   readonly reason?: string;
+}
+
+function resumeTokenOf(worldId: string, sequence: number): string {
+  return createHash("sha256")
+    .update(`${worldId}|${sequence}`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**
@@ -38,17 +44,13 @@ export interface ResyncOutcome {
  * verdade; o gateway apenas acelera a entrega, docs §08).
  */
 @WebSocketGateway({ namespace: "/realtime", cors: true })
-export class RealtimeGateway
-  implements RealtimePublisher, OnGatewayConnection
-{
+export class RealtimeGateway implements RealtimePublisher, OnGatewayConnection {
   @WebSocketServer() private readonly server?: Server;
 
   private readonly sequences = new Map<string, number>();
   private readonly buffers = new Map<string, RealtimeEvent[]>();
 
-  constructor(
-    @Inject(SESSION_STORE) private readonly sessions: SessionStore,
-  ) {}
+  constructor(@Inject(SESSION_STORE) private readonly sessions: SessionStore) {}
 
   /** Handshake: admite o socket somente com token de sessão válido. */
   handleConnection(client: Socket): void {
@@ -83,48 +85,98 @@ export class RealtimeGateway
   onSubscribe(
     @MessageBody() body: { worldId?: unknown },
     @ConnectedSocket() client: Socket,
-  ): { subscribed: string | null; lastSequence: number } {
+  ): {
+    subscribed: string | null;
+    lastSequence: number;
+    resumeToken: string | null;
+  } {
     if (typeof body?.worldId !== "string") {
-      return { subscribed: null, lastSequence: 0 };
+      return { subscribed: null, lastSequence: 0, resumeToken: null };
     }
     void client.join(roomOf(body.worldId));
+    const lastSequence = this.sequences.get(body.worldId) ?? 0;
     return {
       subscribed: body.worldId,
-      lastSequence: this.sequences.get(body.worldId) ?? 0,
+      lastSequence,
+      resumeToken: resumeTokenOf(body.worldId, lastSequence),
     };
   }
 
   @SubscribeMessage("resync")
-  onResync(@MessageBody() body: {
-    worldId?: unknown;
-    fromSequence?: unknown;
-  }): ResyncOutcome {
+  onResync(
+    @MessageBody()
+    body: {
+      worldId?: unknown;
+      fromSequence?: unknown;
+      resumeToken?: unknown;
+    },
+  ): ResyncOutcome {
+    const worldId =
+      typeof body?.worldId === "string" ? body.worldId : "invalid";
     if (
       typeof body?.worldId !== "string" ||
       typeof body?.fromSequence !== "number"
     ) {
-      return { mode: "snapshot", events: [], reason: "invalid resync request" };
+      const lastSequence = this.sequences.get(worldId) ?? 0;
+      return {
+        mode: "snapshot",
+        events: [],
+        lastSequence,
+        resumeToken: resumeTokenOf(worldId, lastSequence),
+        reason: "invalid resync request",
+      };
     }
-    return this.resync(body.worldId, body.fromSequence);
+    return this.resync(
+      body.worldId,
+      body.fromSequence,
+      typeof body.resumeToken === "string" ? body.resumeToken : undefined,
+    );
   }
 
   /** Decisão pura de recuperação de gap (delta vs snapshot). */
-  resync(worldId: string, fromSequence: number): ResyncOutcome {
+  resync(
+    worldId: string,
+    fromSequence: number,
+    resumeToken?: string,
+  ): ResyncOutcome {
     const buffer = this.buffers.get(worldId) ?? [];
+    const lastSequence = this.sequences.get(worldId) ?? 0;
+    const currentResumeToken = resumeTokenOf(worldId, lastSequence);
+    if (
+      resumeToken !== undefined &&
+      resumeToken !== resumeTokenOf(worldId, fromSequence)
+    ) {
+      return {
+        mode: "snapshot",
+        events: [],
+        lastSequence,
+        resumeToken: currentResumeToken,
+        reason: "resume token inválido — re-consulte a API oficial",
+      };
+    }
     const oldest = buffer[0]?.sequence ?? 0;
     if (buffer.length === 0 || fromSequence >= (buffer.at(-1)?.sequence ?? 0)) {
-      return { mode: "delta", events: [] }; // já atualizado
+      return {
+        mode: "delta",
+        events: [],
+        lastSequence,
+        resumeToken: currentResumeToken,
+      }; // já atualizado
     }
     if (fromSequence < oldest - 1) {
       return {
         mode: "snapshot",
         events: [],
+        lastSequence,
+        resumeToken: currentResumeToken,
         reason: "gap maior que o buffer — re-consulte a API oficial",
       };
     }
     return {
       mode: "delta",
       events: buffer.filter((event) => event.sequence > fromSequence),
+      lastSequence,
+      resumeToken: currentResumeToken,
     };
   }
 
@@ -144,6 +196,7 @@ export class RealtimeGateway
         worldId,
         streamId: roomOf(worldId),
         sequence,
+        resumeToken: resumeTokenOf(worldId, sequence),
         eventType: String(event.type ?? event.eventType ?? "domain.event"),
         eventVersion: 1,
         occurredAt,

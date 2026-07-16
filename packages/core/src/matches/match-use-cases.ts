@@ -8,6 +8,7 @@ import {
 } from "@grinta/shared";
 
 import type { GameWorldSnapshot } from "../world/world-types.js";
+import type { WorldCompetitionsSnapshot } from "../competitions/competition-types.js";
 import type { MatchRepository } from "./match-repository.js";
 import type {
   MatchClubRef,
@@ -57,16 +58,41 @@ export class InitializeMatches {
 
   public async execute(
     world: GameWorldSnapshot,
+    competitions?: WorldCompetitionsSnapshot,
   ): Promise<Result<WorldMatchesSnapshot, DomainError>> {
     const existing = await this.repository.findMatchesByWorldId(world.id);
-    if (existing !== null) {
-      const validated = WorldMatches.fromSnapshot(existing);
-      return validated.ok ? succeed(validated.value.snapshot()) : validated;
+    const loaded =
+      existing === null
+        ? WorldMatches.initialize(world)
+        : WorldMatches.fromSnapshot(existing);
+    if (!loaded.ok) return loaded;
+
+    if (competitions !== undefined) {
+      for (const fixture of competitions.fixtures) {
+        const created = loaded.value.createMatchManifest({
+          fixtureRef: fixture.id,
+          homeClubId: fixture.homeClubId,
+          awayClubId: fixture.awayClubId,
+          kickoffOn: fixture.kickoffOn,
+          seed: `${world.seed}:fixture:${fixture.id}`,
+          engineBuild: "kernel@1",
+          timestepChances: 90,
+          homeStrength: 60,
+          awayStrength: 60,
+          worldDate: world.currentDate,
+          rulesetVersion: world.rulesetVersion,
+          idempotencyKey: `competition-fixture:${fixture.id}`,
+          worldSeed: world.seed,
+        });
+        if (!created.ok) return created;
+      }
     }
-    const created = WorldMatches.initialize(world);
-    if (!created.ok) return created;
-    await this.repository.saveMatches(created.value.snapshot(), null);
-    return succeed(created.value.snapshot());
+
+    const snapshot = loaded.value.snapshot();
+    if (existing === null || snapshot.revision !== existing.revision) {
+      await this.repository.saveMatches(snapshot, existing?.revision ?? null);
+    }
+    return succeed(snapshot);
   }
 }
 
@@ -222,5 +248,12 @@ export class InspectMatches {
   ): Promise<Result<MatchSummary, DomainError>> {
     const loaded = await loadMatches(this.repository, gameWorldId);
     return loaded.ok ? succeed(loaded.value.summary()) : loaded;
+  }
+
+  public async world(
+    gameWorldId: GameWorldId,
+  ): Promise<Result<WorldMatchesSnapshot, DomainError>> {
+    const loaded = await loadMatches(this.repository, gameWorldId);
+    return loaded.ok ? succeed(loaded.value.snapshot()) : loaded;
   }
 }

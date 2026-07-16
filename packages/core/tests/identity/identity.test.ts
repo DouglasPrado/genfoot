@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   ConfirmOnboarding,
   GameWorld,
+  InspectIdentity,
   WorldIdentity,
   type GameWorldSnapshot,
   type IdentityAccountRef,
@@ -97,14 +98,30 @@ function reserve(
 }
 
 describe("Identity and club control", () => {
+  it("expõe snapshot oficial para onboarding e troca de clube no cliente", async () => {
+    const { value } = identity();
+    const repository = new MemoryIdentityRepository();
+    repository.snapshot = value.snapshot();
+
+    const inspected = await new InspectIdentity(repository).world(
+      repository.snapshot.gameWorldId,
+    );
+
+    expect(inspected).toMatchObject({
+      ok: true,
+      value: { accounts: [], reservations: [], controls: [], revision: 1 },
+    });
+  });
+
   it("garante exclusividade da reserva e um único controle ativo por clube", () => {
     const { gameWorld, value } = identity();
     const first = reserve(value, gameWorld, ACCOUNT_A, CLUB, "res:a");
     expect(first).toMatchObject({ ok: true, value: { status: "HELD" } });
 
-    expect(
-      reserve(value, gameWorld, ACCOUNT_B, CLUB, "res:b"),
-    ).toMatchObject({ ok: false, error: { code: "CLUB_ALREADY_RESERVED" } });
+    expect(reserve(value, gameWorld, ACCOUNT_B, CLUB, "res:b")).toMatchObject({
+      ok: false,
+      error: { code: "CLUB_ALREADY_RESERVED" },
+    });
 
     if (!first.ok) throw first.error;
     const control = value.confirmOnboarding({
@@ -282,7 +299,9 @@ describe("Identity and club control", () => {
     });
     expect(joined).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
     expect(
-      value.snapshot().events.filter((e) => e.type === "WorldParticipationActivated"),
+      value
+        .snapshot()
+        .events.filter((e) => e.type === "WorldParticipationActivated"),
     ).toHaveLength(1);
 
     // registro idempotente
@@ -296,7 +315,10 @@ describe("Identity and club control", () => {
       worldSeed: gameWorld.seed,
       worldDate: "2026-01-02",
     });
-    expect(repeated).toMatchObject({ ok: true, value: { id: account.value.id } });
+    expect(repeated).toMatchObject({
+      ok: true,
+      value: { id: account.value.id },
+    });
     expect(value.snapshot().revision).toBe(revision);
   });
 
