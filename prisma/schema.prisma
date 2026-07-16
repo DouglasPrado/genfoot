@@ -83,6 +83,13 @@ enum UserAccountStatus {
   ANONYMIZED
 }
 
+/// R-175: era `String @default("ACTIVE")` — texto livre aceita "ACITVE" e o
+/// banco não reclama. O estado da participação tem dois valores; o tipo diz.
+enum WorldParticipantStatus {
+  ACTIVE
+  ENDED
+}
+
 enum WorldStatus {
   CREATING
   ACTIVE
@@ -659,14 +666,19 @@ model UserSession {
 }
 
 /// Vínculo usuário <-> mundo (§6.3.1). Substitui a antiga visão `ClubUser`.
+///
+/// R-177: o tempo do mundo é DATA, não instante — `@db.Date`, e sem
+/// `@default(now())`: a data vem do domínio. Um default de relógio de máquina
+/// inventaria a data quando o domínio esquecesse de mandá-la, e o mundo
+/// deixaria de ser reproduzível (R-182).
 model WorldParticipant {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  gameWorldId String    @db.Uuid
-  userId      String    @db.Uuid
-  status      String    @default("ACTIVE")
-  joinedAt    DateTime  @default(now())
-  leftAt      DateTime?
-  version     Int       @default(1)
+  id          String                 @id @db.Uuid
+  gameWorldId String                 @db.Uuid
+  userId      String                 @db.Uuid
+  status      WorldParticipantStatus @default(ACTIVE)
+  joinedOn    DateTime               @db.Date
+  leftOn      DateTime?              @db.Date
+  version     Int                    @default(1)
 
   gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id])
   user         UserAccount   @relation(fields: [userId], references: [id])

@@ -61,6 +61,8 @@ export * from "./identity/world-identity.js";
 export * from "./identity/user-account.js";
 export * from "./identity/user-account-repository.js";
 export * from "./identity/user-account-use-cases.js";
+export * from "./identity/world-participant.js";
+export * from "./identity/world-participant-repository.js";
 export * from "./narrative/narrative-repository.js";
 export * from "./narrative/narrative-types.js";
 export * from "./narrative/narrative-use-cases.js";
