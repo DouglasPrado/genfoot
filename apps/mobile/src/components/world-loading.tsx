@@ -1,4 +1,5 @@
 import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from "react-native";
+import Constants from "expo-constants";
 
 import { ProgressBar } from "@/components/progress-bar";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
@@ -6,6 +7,9 @@ import type { BootStep } from "@/screens/splash/boot-model";
 import { bootProgress } from "@/screens/splash/boot-model";
 
 const BACKGROUND = require("../../assets/loading-stadium.png") as number;
+
+/** O doc do M-SPLASH exige a versão do cliente à vista. */
+const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
 
 /**
  * Tela de carregamento do mundo. As etapas são as reais do boot e a barra é a
@@ -54,6 +58,8 @@ export function WorldLoading({ steps }: { steps: readonly BootStep[] }) {
               </View>
             ))}
           </View>
+
+          <Text style={styles.version}>VERSÃO {CLIENT_VERSION}</Text>
         </View>
       </View>
     </ImageBackground>
@@ -101,4 +107,10 @@ const styles = StyleSheet.create({
   dotDone: { backgroundColor: color.primary },
   stepText: { color: color.textFaint, fontSize: fontSize.xs },
   stepDone: { color: color.textMuted },
+  version: {
+    color: color.textFaint,
+    fontSize: fontSize.xs,
+    letterSpacing: 0.5,
+    marginTop: space.sm,
+  },
 });
