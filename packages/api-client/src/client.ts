@@ -110,10 +110,16 @@ export class GrintaClient {
     ).body;
   }
 
+  /**
+   * Abre sessão na API. Sessão de usuário exige `clerkToken` (R-171): o
+   * servidor verifica e deriva o subject do `sub`, ignorando o daqui. `subject`
+   * só vale para bootstrap admin ou com a porta de desenvolvimento aberta.
+   */
   async session(input: {
     subject: string;
     role?: Role;
     adminKey?: string;
+    clerkToken?: string;
     worldScope?: readonly string[];
   }): Promise<SessionResponse> {
     return (

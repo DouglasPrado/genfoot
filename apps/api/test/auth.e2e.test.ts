@@ -29,6 +29,8 @@ describe("API auth guard + RBAC (e2e)", () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiauth-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     delete process.env.GRINTA_API_ALLOW_ANONYMOUS; // guard real, sem bypass
+// Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.
+    process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -66,6 +68,36 @@ describe("API auth guard + RBAC (e2e)", () => {
       "/api/v1/worlds/00000000-0000-7000-8000-000000000000",
     );
     expect(response.status).toBe(401);
+  });
+
+  // Regressão do buraco: /auth/session emitia Bearer para qualquer `subject`
+  // do corpo, sem prova. Autenticar no Clerk não era autenticar no jogo, e
+  // quem falasse direto com a API passava por cima do login inteiro.
+  it("com a porta de desenvolvimento FECHADA, recusa sessão sem prova", async () => {
+    delete process.env.GRINTA_API_ALLOW_DEV_SESSIONS;
+    try {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/auth/session")
+        .send({ subject: "qualquer-um", role: "user" });
+      expect(response.status).toBe(401);
+      expect(response.body.code).toBe("UNAUTHENTICATED");
+      expect(response.body.recoveryAction).toBe("AUTHENTICATE");
+    } finally {
+      process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
+    }
+  });
+
+  it("com a porta fechada, token do provedor inválido também é recusado", async () => {
+    delete process.env.GRINTA_API_ALLOW_DEV_SESSIONS;
+    try {
+      const response = await request(app.getHttpServer())
+        .post("/api/v1/auth/session")
+        .send({ subject: "ignorado", role: "user", clerkToken: "nao-e-um-jwt" });
+      expect(response.status).toBe(401);
+      expect(response.body.code).toBe("UNAUTHENTICATED");
+    } finally {
+      process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
+    }
   });
 
   it("emite token de usuário e aceita command autenticado", async () => {

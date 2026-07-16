@@ -37,6 +37,8 @@ describe("API query world-scope enforcement (e2e)", () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiscope-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     delete process.env.GRINTA_API_ALLOW_ANONYMOUS;
+// Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.
+    process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

@@ -30,6 +30,8 @@ describe("API query catalog (e2e)", () => {
   beforeAll(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiq-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
+    // Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.
+    process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
     process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],

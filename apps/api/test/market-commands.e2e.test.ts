@@ -31,6 +31,8 @@ describe("API market commands (e2e)", () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apim-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
+// Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.
+    process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
