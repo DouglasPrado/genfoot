@@ -137,7 +137,9 @@ describe("API query catalog (e2e)", () => {
     });
   });
 
-  it("query identity-detail entrega contas, reservas e controles oficiais", async () => {
+  // Sem `accounts`: a conta é de plataforma (R-172) e não vive no agregado do
+  // mundo. O que é do mundo é o vínculo — participação, reserva, controle.
+  it("query identity-detail entrega reservas, controles e participações do mundo", async () => {
     await request(app.getHttpServer())
       .post("/api/v1/commands")
       .send(
@@ -154,12 +156,12 @@ describe("API query catalog (e2e)", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toMatchObject({
-      accounts: [],
       reservations: [],
       controls: [],
       participations: [],
       revision: 1,
     });
+    expect(response.body.data).not.toHaveProperty("accounts");
   });
 
   it("query matches resume o calendário materializado", async () => {

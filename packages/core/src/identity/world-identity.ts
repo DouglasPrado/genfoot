@@ -13,7 +13,6 @@ import {
   ControlStatus,
   ParticipationStatus,
   ClubReservationStatus,
-  type AccountRegisteredEvent,
   type ClubControlActivatedEvent,
   type ClubControlEndedEvent,
   type ClubControlSnapshot,
@@ -24,7 +23,6 @@ import {
   type IdentityClubRef,
   type IdentityDomainEvent,
   type IdentitySummary,
-  type SessionFamilyRevokedEvent,
   type WorldIdentitySnapshot,
   type WorldParticipationActivatedEvent,
   type WorldParticipationSnapshot,
@@ -637,11 +635,4 @@ function controlNotFound(controlId: string): DomainError {
   });
 }
 
-function sessionRevoked(familyId: string): DomainError {
-  return new DomainError(
-    "SESSION_REVOKED",
-    "A família de sessão está revogada.",
-    { familyId },
-  );
-}
 

@@ -1139,40 +1139,9 @@ const worldIdentitySchema = z.object({
   gameWorldId: identifierSchema,
   rulesetVersion: z.string(),
   cooldownDays: z.number().int().nonnegative(),
-  accounts: z
-    .array(
-      z.object({
-        id: identifierSchema,
-        gameWorldId: identifierSchema,
-        status: z.enum(["ACTIVE", "SUSPENDED"]),
-        locale: z.string().min(1),
-        createdOn: z.string(),
-        idempotencyKey: z.string().min(1),
-        version: z.number().int().positive(),
-      }),
-    )
-    .optional(),
-  credentials: z
-    .array(
-      z.object({
-        accountId: identifierSchema,
-        kind: z.string().min(1),
-        secretHash: z.string().min(1),
-        verifiedOn: z.string().nullable(),
-      }),
-    )
-    .optional(),
-  sessions: z
-    .array(
-      z.object({
-        id: identifierSchema,
-        familyId: identifierSchema,
-        accountId: identifierSchema,
-        expiresOn: z.string(),
-        revokedOn: z.string().nullable(),
-      }),
-    )
-    .optional(),
+  // Conta, credencial e sessão saíram deste agregado: a conta é global (R-172)
+  // e o ciclo de token é do Clerk (R-174). O que sobra aqui é o que de fato é
+  // do mundo.
   reservations: z.array(
     z.object({
       id: identifierSchema,
@@ -1212,14 +1181,6 @@ const worldIdentitySchema = z.object({
       accountId: identifierSchema,
       gameWorldId: identifierSchema,
       untilOn: z.string(),
-    }),
-  ),
-  sessionFamilies: z.array(
-    z.object({
-      id: identifierSchema,
-      accountId: identifierSchema,
-      currentTokenHash: z.string().min(1),
-      status: z.enum(["ACTIVE", "REVOKED"]),
     }),
   ),
   events: z.array(z.record(z.unknown())),

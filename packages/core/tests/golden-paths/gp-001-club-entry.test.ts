@@ -150,7 +150,6 @@ describe("GP-001 Club entry (convergence)", () => {
       // R-172: a conta é de plataforma, não do mundo.
       email: "acc-entry@exemplo.com",
       name: "Gestor",
-      locale: "pt-BR",
       occurredOn: "2026-01-02",
       idempotencySeed: gameWorld.seed,
     });
@@ -253,7 +252,6 @@ describe("GP-001 Club entry (convergence)", () => {
       // R-172: a conta é de plataforma, não do mundo.
       email: "acc-reject@exemplo.com",
       name: "Gestor",
-      locale: "pt-BR",
       occurredOn: "2026-01-02",
       idempotencySeed: gameWorld.seed,
     });
@@ -313,7 +311,6 @@ describe("GP-001 Club entry (convergence)", () => {
       // R-172: a conta é de plataforma, não do mundo.
       email: "acc-newclub@exemplo.com",
       name: "Gestor",
-      locale: "pt-BR",
       occurredOn: "2026-01-02",
       idempotencySeed: gameWorld.seed,
     });

@@ -474,4 +474,19 @@ A definição completa, as consequências aceitas e as pendências abertas vivem
 
 A definição completa, as consequências e as pendências vivem em [`conta-global-e-postgres-2026-07-16.md`](conta-global-e-postgres-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-174 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.
+### R-175..R-182 — Reescrita do core: agregados, eventos, tempo, dinheiro · RATIFICADAS em 2026-07-16
+
+R-173 tornou o Postgres o único armazenamento, e a primeira porta migrada revelou que a divergência era estrutural: o domínio construiu **16 mega-agregados** (`World<X>`, um por mundo) onde o context map define **~70 roots por entidade**. Um levantamento dos 16 contextos (snapshot × context map × schema) mostrou que **nenhuma das três fontes é confiável sozinha** — o schema viola o próprio canon em `Player.clubId` e `StaffContract.club`, e o doc nomeia roots que não existem em lado nenhum.
+
+- **R-175 — O agregado é a entidade, não o mundo. `revision` morre.** Cada root vira carregável/salvável isoladamente com `version` por linha. Hoje qualquer escrita em qualquer jogador de um mundo contende no mesmo inteiro.
+- **R-176 — Eventos vivem em `DomainEventLog`, tipados, com hash sobre o payload. Corrige R-133.** O `events[]` dentro do estado (12 snapshots) nunca é drenado e cresce sem limite. `OutboxEvent` passa a carregar `payloadJson`, não só o hash — hoje o outbox é estruturalmente incapaz de publicar. Evento é união discriminada tipada, não `type: string` + payload opaco.
+- **R-177 — O tempo do mundo é data (`YYYY-MM-DD`); tick existe só dentro da partida.** E tick não é minuto: o domínio o chama de *chance*. Converter seria lossy.
+- **R-178 — Só partidas dobradas; `FinancialTransaction` morre.** Havia duas contabilidades concorrentes no schema, e nada impedia lançar dinheiro fora do razão balanceado. `balanceMinor` sai do agregado: saldo deriva do ledger (Decisão 19.10).
+- **R-179 — Jogador tem 32 atributos granulares.** Os 4 grupos viram rollup derivado. Com 4, scouting/treino/tática não têm sobre o que operar.
+- **R-180 — IA é a ausência de controle, não um tipo de controle.** `ClubControl.controlType` exigia um `WorldParticipant` fantasma numa FK NOT NULL.
+- **R-181 — Dinheiro é `bigint` + `currencyId`; a `model Currency` passa a existir.** O domínio usava `number` (double IEEE-754) para todo dinheiro; 17 colunas `currencyId` apontavam para uma tabela inexistente.
+- **R-182 — Seed, data inicial e sequência do mundo são colunas.** `GameWorld.seed` não tinha coluna — sem ele não há replay, que é invariante canônica. E o mundo inicial deixa de ser literal de tipo (`rounds: 30`, `generatedClubCount: 16`).
+
+A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
+
+> **Estado consolidado:** R-01..R-182 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige.

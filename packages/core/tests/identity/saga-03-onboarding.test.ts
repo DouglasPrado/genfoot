@@ -54,7 +54,6 @@ describe("SAGA-03 onboarding (C1 + X-002)", () => {
       // R-172: a conta é de plataforma, não do mundo.
       email: "acc-1@exemplo.com",
       name: "Gestor",
-      locale: "pt-BR",
       occurredOn: "2026-01-02",
       idempotencySeed: gameWorld.seed,
     });

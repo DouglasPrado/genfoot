@@ -1,4 +1,6 @@
+export * from "./foundation/canonical-json.js";
 export * from "./foundation/deterministic-uuid.js";
+export * from "./foundation/event-chain.js";
 export * from "./foundation/seeded-random.js";
 export * from "./clubs/club-bootstrap.js";
 export * from "./clubs/visual-identity-catalog.js";
