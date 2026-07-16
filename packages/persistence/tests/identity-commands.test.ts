@@ -144,7 +144,7 @@ describe.skipIf(!hasDatabase)(
           attemptKey: "t2",
         });
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.error.code).toBe("CLUB_TAKEN");
+        if (!result.ok) expect(result.error.code).toBe("CLUB_SLOT_UNAVAILABLE");
       });
 
       it("recusa clube que já tem gestor", async () => {
@@ -160,7 +160,7 @@ describe.skipIf(!hasDatabase)(
           attemptKey: "t2",
         });
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.error.code).toBe("CLUB_TAKEN");
+        if (!result.ok) expect(result.error.code).toBe("CLUB_ALREADY_CONTROLLED");
       });
 
       it("recusa quem não participa do mundo", async () => {
@@ -199,7 +199,7 @@ describe.skipIf(!hasDatabase)(
           reservationId: reservation.id,
         });
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.error.code).toBe("RESERVATION_EXPIRED");
+        if (!result.ok) expect(result.error.code).toBe("CLUB_SLOT_RESERVATION_EXPIRED");
       });
 
       it("recusa reserva inexistente", async () => {
@@ -249,7 +249,7 @@ describe.skipIf(!hasDatabase)(
           attemptKey: "t4",
         });
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.error.code).toBe("ACCOUNT_IN_COOLDOWN");
+        if (!result.ok) expect(result.error.code).toBe("ACCOUNT_COOLDOWN_ACTIVE");
       });
 
       it("depois do castigo, dá para assumir outro clube", async () => {

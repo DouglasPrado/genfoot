@@ -1,4 +1,4 @@
-# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-184
+# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-186
 
 > **Status:** CANÔNICO / RATIFICADO · **Data:** 2026-07-16 · **Autoridade:** decisão do dono do produto · **Escopo:** `packages/core`, `prisma/schema.prisma`, todos os 16 contextos
 
@@ -169,6 +169,30 @@ A dívida declarada em R-176 era "a `IdempotencyKey` está provada e não ligada
 | **Reúso vence FAILED** | A ordem é regra, não estilo: um comando divergente não pode reabrir a chave de um comando que falhou e rodar no lugar dele. Erro do cliente vale qualquer que seja o desfecho do primeiro. |
 
 O nome inventado `IDEMPOTENCY_KEY_CONFLICT` (`world-club-portfolio.ts`, `world-scheduler.ts`, `scheduling-use-cases.ts`) morre junto com os mega-agregados que o usam — o canon nunca o conheceu.
+
+### R-186 — O barramento valida o payload. Os errorCodes passam a ser os do catálogo.
+
+Achado ao provar `identity:confirm-onboarding` por HTTP — 544 testes verdes não o pegaram, porque **as fixtures montavam o input à mão** e nunca atravessavam a borda.
+
+**Os commands de C1 não validavam payload.** O `ic()` repassava `...payload` como `never` direto ao caso de uso. Campo obrigatório ausente não virava `COMMAND_PAYLOAD_INVALID`: descia até o Prisma e voltava como crash — **com o caminho do arquivo e o código-fonte do adapter dentro da resposta HTTP**. Vazar o interior do servidor para quem chamou é o defeito mais grave dos quatro, e era invisível.
+
+| Decisão | Por quê |
+|---|---|
+| Schema zod por command de C1, na borda | O catálogo já fixa o payload de cada um (`10-catalogo-de-commands.md`). Sem schema, o contrato existia só no papel. |
+| A mensagem da exceção **não vai** para o cliente | Vai para o log, onde tem dono. O cliente recebe `COMMAND_EXECUTION_FAILED` seco. |
+| `acceptInheritedState` é `literal(true)`, não `boolean` | O catálogo (`:81`) o define como confirmação de assumir o clube **com o estado herdado** (dívidas, contratos, promessas), e marca o command como risco alto. `false` não é "outro caminho", é ausência de consentimento — recusá-lo na borda deixa o domínio livre de um flag que só pode valer `true`. |
+
+**Os errorCodes eram inventados.** O domínio nomeava por conta própria o que o catálogo já fixara:
+
+| Domínio (inventado) | Catálogo | O que mudou |
+|---|---|---|
+| `RESERVATION_EXPIRED` | `CLUB_SLOT_RESERVATION_EXPIRED` | nome |
+| `ACCOUNT_IN_COOLDOWN` | `ACCOUNT_COOLDOWN_ACTIVE` | nome |
+| `CLUB_TAKEN` | `CLUB_SLOT_UNAVAILABLE` **ou** `CLUB_ALREADY_CONTROLLED` | **semântica** |
+
+O último não é cosmético. `CLUB_TAKEN` **fundia dois códigos canônicos em um**: o domínio já distinguia "reservado por outro" de "já tem gestor" em branches separados (`identity-commands.ts:447,454`) e emitia o mesmo código. Reserva é retenção **mole com prazo** (R-25) — o clube volta em minutos; controle ativo é dono. O cliente não tinha como saber se esperava ou desistia. Nenhum cliente dependia dos nomes antigos (grep em `apps/mobile`, `apps/admin`, `api-client`: zero), então alinhar não quebrou ninguém.
+
+**A lição, que já é a quinta vez:** teste verde concorda consigo mesmo. A borda só se prova atravessando-a.
 
 ---
 

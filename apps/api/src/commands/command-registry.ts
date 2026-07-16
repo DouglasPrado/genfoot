@@ -98,6 +98,44 @@ interface IdentityUseCase {
 }
 
 /**
+ * Os payloads de C1, conforme `10-catalogo-de-commands.md`.
+ *
+ * Isto NÃO existia, e o buraco era real: o `ic()` repassava `...payload` como
+ * `never` direto ao caso de uso. Um campo obrigatório ausente não virava
+ * `COMMAND_PAYLOAD_INVALID` — descia até o Prisma e voltava como crash, com o
+ * caminho do arquivo e o CÓDIGO-FONTE do adapter dentro da resposta HTTP.
+ *
+ * `acceptInheritedState` é `literal(true)`, não `boolean`: o catálogo o define
+ * como a confirmação de assumir o clube COM o estado herdado — dívidas,
+ * contratos, promessas — e marca o command como risco alto. Um `false` não é
+ * "outro caminho", é ausência de consentimento; recusá-lo na borda deixa o
+ * domínio livre de um flag que só pode valer `true`.
+ */
+const identityPayloads: Record<string, z.ZodType> = {
+  "identity:join-world": z.object({ accountId: z.string().uuid() }),
+  "identity:reserve-club": z.object({
+    accountId: z.string().uuid(),
+    clubId: z.string().uuid(),
+    expiresOn: z.string(),
+  }),
+  "identity:confirm-onboarding": z.object({
+    reservationId: z.string().uuid(),
+    acceptInheritedState: z.literal(true),
+  }),
+  "identity:release-club-reservation": z.object({
+    reservationId: z.string().uuid(),
+  }),
+  "identity:end-club-control": z.object({
+    accountId: z.string().uuid(),
+    clubId: z.string().uuid(),
+  }),
+  "identity:request-switch": z.object({
+    accountId: z.string().uuid(),
+    clubId: z.string().uuid(),
+  }),
+};
+
+/**
  * Adapter dos commands de C1.
  *
  * Sem `idempotencyKey` no input: cada comando é naturalmente idempotente pela
@@ -113,16 +151,24 @@ function ic(
   build: (unitOfWork: IdentityUnitOfWork) => IdentityUseCase,
 ): CommandHandler {
   return async ({ worlds, identityUnitOfWork, envelope }) => {
+    const schema = identityPayloads[envelope.commandType];
+    if (schema === undefined) {
+      return fail(
+        new DomainError(
+          "COMMAND_PAYLOAD_INVALID",
+          `Sem contrato de payload para ${envelope.commandType}.`,
+        ),
+      );
+    }
+    const parsed = schema.safeParse(envelope.payload ?? {});
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
     // O mundo é tabela (R-182): `seed` e `currentDate` vêm do Postgres, e o
     // mundo enfim é reproduzível a partir do banco.
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
-    const payload =
-      typeof envelope.payload === "object" && envelope.payload !== null
-        ? (envelope.payload as Record<string, unknown>)
-        : {};
     const input = {
-      ...payload,
+      ...(parsed.data as Record<string, unknown>),
       gameWorldId: world.value.worldId,
       worldSeed: world.value.snapshot.seed,
       occurredOn: world.value.snapshot.currentDate,
@@ -134,11 +180,13 @@ function ic(
       if (!result.ok) return result;
       return succeed({ resource: `identity:${world.value.worldId}` });
     } catch (error) {
+      // A mensagem do erro NÃO vai para o cliente. Um erro do Prisma carrega o
+      // caminho do arquivo e um trecho do código-fonte do adapter — vazar isso
+      // numa resposta HTTP entrega o interior do servidor a quem chamou. O
+      // detalhe vai para o log, onde tem dono.
+      console.error(`[${envelope.commandType}] falhou:`, error);
       return fail(
-        new DomainError(
-          "COMMAND_EXECUTION_FAILED",
-          error instanceof Error ? error.message : "Falha ao executar command.",
-        ),
+        new DomainError("COMMAND_EXECUTION_FAILED", "Falha ao executar command."),
       );
     }
   };

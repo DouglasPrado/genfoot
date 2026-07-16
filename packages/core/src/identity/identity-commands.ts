@@ -140,7 +140,7 @@ export class ReserveClub {
       if (loaded.value.isInCooldownOn(input.occurredOn)) {
         return fail(
           new DomainError(
-            "ACCOUNT_IN_COOLDOWN",
+            "ACCOUNT_COOLDOWN_ACTIVE",
             "A conta está em cooldown neste mundo.",
             { untilOn: participant.value.cooldownUntilOn },
           ),
@@ -203,7 +203,7 @@ export class ConfirmOnboarding {
         input.occurredOn > reservation.expiresOn
       ) {
         return fail(
-          new DomainError("RESERVATION_EXPIRED", "A reserva venceu.", {
+          new DomainError("CLUB_SLOT_RESERVATION_EXPIRED", "A reserva venceu.", {
             expiresOn: reservation.expiresOn,
           }),
         );
@@ -444,14 +444,20 @@ async function clubIsTaken(
     clubId,
   );
   if (held !== null) {
-    return fail(new DomainError("CLUB_TAKEN", "O clube já está reservado.", { clubId }));
+    // Reserva de outro é retenção MOLE com prazo (R-25): o clube pode voltar em
+    // minutos. É diferente de ter dono.
+    return fail(
+      new DomainError("CLUB_SLOT_UNAVAILABLE", "O clube já está reservado.", { clubId }),
+    );
   }
   const control = await repositories.controls.findActiveControlForClub(
     gameWorldId,
     clubId,
   );
   if (control !== null && control.status === ControlStatus.ACTIVE) {
-    return fail(new DomainError("CLUB_TAKEN", "O clube já tem gestor.", { clubId }));
+    return fail(
+      new DomainError("CLUB_ALREADY_CONTROLLED", "O clube já tem gestor.", { clubId }),
+    );
   }
   return succeed(true);
 }

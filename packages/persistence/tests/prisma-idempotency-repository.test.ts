@@ -112,10 +112,10 @@ describe.skipIf(!hasDatabase)(
 
       it("falhar guarda o errorCode", async () => {
         await repository.tryClaim(claim());
-        await repository.fail(ACTOR, "cadastro-1", "CLUB_TAKEN");
+        await repository.fail(ACTOR, "cadastro-1", "CLUB_SLOT_UNAVAILABLE");
         const record = await repository.find(ACTOR, "cadastro-1");
         expect(record?.status).toBe("FAILED");
-        expect(record?.errorCode).toBe("CLUB_TAKEN");
+        expect(record?.errorCode).toBe("CLUB_SLOT_UNAVAILABLE");
       });
 
       /**
@@ -125,7 +125,7 @@ describe.skipIf(!hasDatabase)(
        */
       it("falha libera a chave para nova tentativa", async () => {
         await repository.tryClaim(claim());
-        await repository.fail(ACTOR, "cadastro-1", "CLUB_TAKEN");
+        await repository.fail(ACTOR, "cadastro-1", "CLUB_SLOT_UNAVAILABLE");
         expect((await repository.tryClaim(claim())).claimed).toBe(true);
         expect((await repository.find(ACTOR, "cadastro-1"))?.status).toBe("PENDING");
       });
@@ -170,7 +170,7 @@ describe.skipIf(!hasDatabase)(
        */
       it("pedido divergente não reabre chave que falhou", async () => {
         await repository.tryClaim(claim());
-        await repository.fail(ACTOR, "cadastro-1", "CLUB_TAKEN");
+        await repository.fail(ACTOR, "cadastro-1", "CLUB_SLOT_UNAVAILABLE");
         const outcome = await repository.tryClaim(
           claim({ requestFingerprint: commandFingerprint({ accountId: "outro" }) }),
         );
