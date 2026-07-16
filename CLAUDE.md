@@ -67,7 +67,7 @@ Faltou um estado ou uma ação? Então é **parcial** — diga isso, não marque
 - ❌ Usar dado fictício/seed como fallback silencioso quando a API falha.
 - ❌ Mascarar falha de teste (`pnpm test | tail && git commit`). Rode o teste, cheque o exit, commite depois.
 - ❌ Tratar contador de leitura como "tela pronta" — cartão com número não é a tela.
-- ❌ Marcar tela como entregue no artefato sem o usuário ter testado no app rodando (ver §5.1).
+- ❌ Pintar tela de verde no artefato sem ela cumprir o doc por inteiro E o usuário ter testado no app rodando (ver §5.1). Faltou um item: **amarelo**.
 - ❌ Contar linha de teste unitário como prova de que a tela funciona. Não é.
 
 ---
@@ -79,8 +79,24 @@ URL publicada (**sempre a mesma — nunca crie outra**): https://claude.ai/code/
 
 O artefato mapeia as **114 telas mobile** do `screen-registry.ts` contra o que existe de fato em `apps/mobile`. É a evidência de progresso do cliente mobile.
 
-**Uma tela só muda de estado no artefato quando TODAS estas condições valerem:**
+### Verde só com 100%. Parcial é amarelo.
 
+O mapa tem quatro estados, e a diferença entre os dois primeiros é a regra mais importante deste arquivo:
+
+| Cor | Significa |
+|---|---|
+| 🟢 **Verde — pronta** | O doc da tela cumprido **por inteiro**: todos os estados, todas as ações, todos os componentes. Exercitada no app rodando e **confirmada pelo usuário**. |
+| 🟡 **Amarelo — parcial** | Tem caminho real, mas **não fecha o doc**. Falta um estado, uma ação, um componente. |
+| 🔵 **Azul — fragmento** | Contador/rótulo na tela de outro. Não é tela. |
+| ⚫ **Apagado — ausente** | Não existe. |
+
+**Faltou UMA coisa do doc? É amarelo.** Não importa que o gate esteja verde, que você tenha exercitado no simulador, nem que o usuário tenha dito "funcionou" — "funcionou" descreve o que ele viu, não certifica completude. Pintar de verde o que falta item é o slice-e-declara-pronto que o §5 proíbe.
+
+O chip amarelo **tem que dizer o que falta**, na descrição e na tag. "Parcial" sem o gap nomeado não serve.
+
+**Para uma tela virar 🟢 verde, TODAS estas condições valem:**
+
+0. **A tela está 100% completa** conforme o doc dela em `docs/04-ui-ux/`.
 1. Gate verde: `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 2. App **rodando de verdade** contra a API real — não mock, não seed:
    ```bash
@@ -99,7 +115,7 @@ Depois disso: republique o mesmo `file_path` (mantém a URL), atualize a contage
 - **Achou trava nova?** **Acrescente-a**, com evidência (`arquivo:linha`) e o que ela impede. Vale para lacuna de domínio, query que não existe, comando ausente, dado hardcoded — qualquer coisa que impeça uma tela de ser real.
 - Trava parcialmente resolvida continua listada, com o que já caiu e o que sobrou. Nunca remova uma trava por otimismo — só por prova.
 
-**Proibido:** marcar por leitura de código, por teste unitário verde, por "deve funcionar" ou por typecheck limpo. A contagem do artefato é medida de comportamento observado, não de código escrito. Na dúvida, **não marque** — diga ao usuário o que falta provar.
+**Proibido:** pintar de verde por leitura de código, por teste unitário verde, por "deve funcionar" ou por typecheck limpo. A contagem do artefato é medida de comportamento observado, não de código escrito. Na dúvida entre verde e amarelo, **é amarelo** — e diga ao usuário o que falta provar.
 
 > Não existe harness E2E no Expo (`apps/mobile/package.json` não tem script de teste, e o vitest só inclui `.test.ts`, então nenhum componente é renderizado). É por isso que a confirmação do usuário é obrigatória: hoje ela é a única prova que temos.
 
