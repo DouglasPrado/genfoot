@@ -1,150 +1,19 @@
-import { randomUUID } from "node:crypto";
-
 import {
-  AcceptOffer,
-  AcceptStaffContract,
-  AccrueDebt,
-  ActivateAutomationRule,
-  ActivateContract,
   ActivateProvisionedWorld,
-  AdvanceSagaStep,
-  AdvanceTransferStep,
-  AdvanceWorldDays,
-  ApplyDailyDevelopment,
-  ApplyDiscipline,
-  ApplyNarrativeFact,
-  ApproveCorrection,
-  ApproveSanction,
-  AssignStaff,
-  BuildDigest,
-  CancelNegotiation,
-  CancelPromise,
-  ChooseConversationOption,
-  ClaimSaga,
-  CloseAccountingPeriod,
-  CompensateSaga,
-  CompensateTransfer,
-  AbortInfrastructureProject,
-  AdvanceMatchTicks,
-  AdvanceScheduledWorldDays,
-  AdvanceWorldDayCommand,
-  BootstrapWorldScheduler,
-  CancelScheduledTask,
-  CheckpointMatch,
-  ConsumeEvent,
-  CreateAutomationRule,
-  CreateCompetitionEdition,
-  CreateMatchManifest,
-  CreateStaffMember,
+  ConfirmOnboarding,
   CreateWorld,
-  FinalizeMatch,
-  DecideAppeal,
-  DismissNotification,
   EndClubControl,
-  EndStaffContract,
-  EvaluateDecision,
-  EvaluatePromise,
-  ExecuteClubCommand,
-  ExecuteDecisionProposal,
-  ExerciseLoanOption,
-  ExpireReservations,
-  FileAppeal,
-  GenerateFixtures,
-  GeneratePlayer,
-  GenerateReport,
   GenerateWorldGenesis,
-  GenerateYouthCohort,
-  GetDecisionExplanation,
-  HomologateCompetition,
-  InitializeAdmin,
-  InitializeAutomation,
-  InitializeCompetitions,
-  InitializeEventing,
-  InitializeInbox,
-  InitializeLedger,
-  InitializeMarket,
-  InitializeMarketPopulation,
-  InitializeMatches,
-  InitializeNarrative,
-  InitializeStaff,
   InspectWorld,
   JoinWorld,
-  ProcessDueWorldTasks,
-  RegisterTemporalWindow,
-  ResumeInfrastructureProject,
-  ResumeSeasonRollover,
-  ResumeWorldScheduler,
-  ScheduleWorldTask,
-  ScheduleWorldTasks,
-  RetryScheduledTask,
-  SEASON_ROLLOVER_STEPS,
-  StartInfrastructureProject,
-  StartSeasonRollover,
-  createClubMaintenanceTaskHandler,
-  createPlayerDayTaskHandler,
-  type InfrastructureFinancingPort,
-  type InfrastructureLicensingPort,
-  MakePublicPromise,
-  MarkNotificationRead,
-  OfferStaffContract,
-  OpenCase,
-  OpenLedgerAccount,
-  OpenMedicalCase,
-  OpenNarrativeCrisis,
-  OpenNegotiation,
-  OpenSupportCase,
-  PlaceQuarantine,
-  PostTransaction,
-  ProcessPlayerDay,
-  ProjectNotification,
-  PromoteYouth,
-  ProposeSanction,
-  PublishListing,
-  PublishOutboxBatch,
-  ReassessMedicalCase,
-  RebuildInboxProjection,
-  RebuildProjection,
-  ReconcileWorldLedger,
-  RecordOfficialResult,
-  RecordRiskSignal,
-  RegisterEventType,
-  RegisterParticipant,
   ReleaseClubReservation,
-  ReleaseReservation,
   RequestClubSwitch,
-  RequestCorrection,
-  RequestReprocessing,
-  RequestScouting,
   ReserveClub,
-  ReserveFunds,
-  ResolveNarrativeCrisis,
-  ResolveSupportCase,
-  ResumeMatch,
-  ResumeRealtimeStream,
-  RetirePlayer,
-  RetryDeadLetter,
-  RetryDelivery,
-  RevokeAutomationRule,
-  SetTrainingDirection,
-  SettleReservation,
-  StartLoan,
-  StartMatch,
-  StartSaga,
-  StartTransfer,
-  SubmitMatchCommand,
-  SubmitOffer,
-  SubmitRecoveryPlan,
-  SuspendAutomationRule,
-  TerminateContract,
-  ConfirmOnboarding,
-  DisableAutomationOnControlChange,
-  ReturnLoanedPlayer,
-  type ClubCommand,
+  type ClubRepository,
   type IdentityUnitOfWork,
-  type WorldRepository,
   type WorldMutationResult,
+  type WorldRepository,
 } from "@grinta/core";
-import type { JsonWorldRepository } from "@grinta/persistence";
 import {
   DomainError,
   WorldDate,
@@ -157,7 +26,22 @@ import {
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
-import { applyRebrandReaction } from "./rebrand-reaction.js";
+
+/**
+ * O barramento de commands depois do extermínio da arquitetura morta (R-175).
+ *
+ * Eram ~148 commands sobre 16 mega-agregados e o adapter JSON. **Sobraram 9** —
+ * os que uma vertical viva exige hoje: o admin criando um mundo, gerando os
+ * clubes e ativando; e o jogador entrando e escolhendo clube.
+ *
+ * Os outros não foram adiados: foram APAGADOS, com os contextos que os serviam.
+ * Voltam um a um, já em agregado por entidade sobre Postgres, quando uma tela
+ * precisar deles — e aí nascem certos na primeira vez. Construir 148 commands
+ * antes de qualquer cliente provar que eram os certos foi o que produziu 16
+ * contextos completos convivendo com 11 de 114 telas.
+ *
+ * Não há mais `repository: JsonWorldRepository` no contexto. Só Postgres.
+ */
 
 export interface CommandOutcome {
   readonly resource: string | null;
@@ -165,16 +49,12 @@ export interface CommandOutcome {
 }
 
 export interface CommandContext {
-  readonly repository: JsonWorldRepository;
-  /**
-   * Escopo transacional de C1 (R-175/R-176). Caminho separado do `repository`
-   * porque C1 já migrou para o Postgres e os outros quinze contextos não —
-   * transitório e declarado (R-173). Quando o último migrar, o `repository`
-   * some e sobra este.
-   */
+  /** Escopo transacional de C1 (R-175/R-176): agregado e evento no mesmo commit. */
   readonly identityUnitOfWork: IdentityUnitOfWork;
   /** O mundo é tabela, sempre (R-173/R-182). Raiz de tudo: todo command o lê. */
   readonly worlds: WorldRepository;
+  /** C3 — o clube é tabela. É o que destrava `identity:reserve-club`. */
+  readonly clubs: ClubRepository;
   readonly envelope: CommandEnvelope;
 }
 
@@ -192,109 +72,42 @@ const createWorldPayload = z.object({
   rulesetVersion: z.string().default("1.0.0"),
 });
 
-const advanceDaysPayload = z.object({
-  days: z.number().int().positive(),
-});
-
-const clubCommandPayload = z.object({
-  clubId: z.string().uuid(),
-  actorId: z.string().min(1),
-  occurredAt: z.string(),
-  rulesetVersion: z.string().default("1.0.0"),
-  command: z.record(z.unknown()),
-});
-
-const publishListingPayload = z.object({
-  playerId: z.string().min(1),
-  sellerClubId: z.string().min(1),
-  askingFeeMinor: z.number().int().nonnegative(),
-  rulesetVersion: z.string().default("1.0.0"),
-});
+function requireWorldId(
+  rawWorldId: string | undefined,
+): Result<string, DomainError> {
+  return rawWorldId === undefined
+    ? fail(new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."))
+    : succeed(rawWorldId);
+}
 
 async function loadWorld(
   worlds: CommandContext["worlds"],
   rawWorldId: string | undefined,
 ) {
-  if (rawWorldId === undefined) {
-    return fail(
-      new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-    );
-  }
-  const worldId = parseGameWorldId(rawWorldId);
+  const raw = requireWorldId(rawWorldId);
+  if (!raw.ok) return raw;
+  const worldId = parseGameWorldId(raw.value);
   if (!worldId.ok) return worldId;
   const world = await new InspectWorld(worlds).execute(worldId.value);
   if (!world.ok) return world;
   return succeed({ worldId: worldId.value, snapshot: world.value });
 }
 
-/** Caso de uso com o shape uniforme `execute(worldId, input)`. */
-interface WorldInputUseCase {
-  execute(
-    worldId: import("@grinta/shared").GameWorldId,
-    input: never,
-  ): Promise<Result<unknown, DomainError>>;
-}
-
-/** C1 (R-175): o mundo vai dentro do input — não há agregado por mundo para escopar. */
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
 
 /**
- * Factory genérico para os commands com shape `execute(worldId, input)`: carrega o
- * snapshot do mundo, injeta o contexto determinístico (idempotencyKey, rulesetVersion,
- * worldSeed, worldDate) e mescla o payload específico. Erros de domínio viram REJECTED;
- * exceções inesperadas viram COMMAND_EXECUTION_FAILED (nunca 500).
- */
-function wc(
-  build: (repository: CommandContext["repository"]) => WorldInputUseCase,
-  resourceKind = "world",
-): CommandHandler {
-  return async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const payload =
-      typeof envelope.payload === "object" && envelope.payload !== null
-        ? (envelope.payload as Record<string, unknown>)
-        : {};
-    const input = {
-      ...payload,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    };
-    try {
-      const result = await build(repository).execute(
-        world.value.worldId,
-        input as never,
-      );
-      if (!result.ok) return result;
-      return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
-    } catch (error) {
-      return fail(
-        new DomainError(
-          "COMMAND_EXECUTION_FAILED",
-          error instanceof Error ? error.message : "Falha ao executar command.",
-        ),
-      );
-    }
-  };
-}
-
-/**
- * Comandos de C1 (R-175). Diferente do `wc`, que envolve um use case
- * `execute(worldId, input)` sobre o repositório JSON:
+ * Adapter dos commands de C1.
  *
- * - o caso de uso recebe o `IdentityUnitOfWork`, não um repositório — agregado e
- *   evento vão no mesmo commit (Decisão 19.10);
- * - `gameWorldId` vai DENTRO do input: não há mais um agregado por mundo para
- *   escopar por fora;
- * - sem `rulesetVersion`: era checado contra o mega-agregado, que morreu. Volta
- *   com `GameRuleConfig` (R-182);
- * - sem `idempotencyKey` no input: cada comando é naturalmente idempotente pela
- *   chave natural do banco. A tabela `IdempotencyKey` (R-176) é do barramento,
- *   não do caso de uso — está registrado abaixo como pendência.
+ * Sem `idempotencyKey` no input: cada comando é naturalmente idempotente pela
+ * chave natural do banco. O `idempotencyKey` do envelope entra como
+ * `attemptKey` — semente do id determinístico dos roots que são 1-por-VEZ
+ * (reserva, controle), e é o que faz o retry devolver o mesmo id em vez de
+ * criar uma segunda reserva.
+ *
+ * A tabela `IdempotencyKey` (R-176/R-184) é do barramento, não do caso de uso, e
+ * ainda não está ligada aqui — pendência declarada.
  */
 function ic(
   build: (unitOfWork: IdentityUnitOfWork) => IdentityUseCase,
@@ -313,9 +126,6 @@ function ic(
       gameWorldId: world.value.worldId,
       worldSeed: world.value.snapshot.seed,
       occurredOn: world.value.snapshot.currentDate,
-      // Semente do id determinístico dos roots que são 1-por-vez (reserva,
-      // controle). Reenviar o mesmo comando devolve o mesmo id — que é o que
-      // faz o retry não criar uma segunda reserva.
       attemptKey: envelope.idempotencyKey,
       correlationId: envelope.correlationId,
     };
@@ -332,161 +142,6 @@ function ic(
       );
     }
   };
-}
-
-// --- Portas/handlers sintéticos (adapter) para os use cases com dependências ---
-const API_WORKER = "api-worker";
-const nowMs = (): number => Date.now();
-
-function financingPort(): InfrastructureFinancingPort {
-  return {
-    reserve: (context) =>
-      Promise.resolve({
-        reservationRef: `api:${context.idempotencyKey}:reservation`,
-      }),
-    disburseMilestone: (context) =>
-      Promise.resolve({
-        disbursementRef: `api:${context.idempotencyKey}:disbursement`,
-      }),
-    releaseRemainder: (context) =>
-      Promise.resolve({
-        releaseFactRef: `api:${context.idempotencyKey}:release`,
-      }),
-  };
-}
-
-function licensingPort(): InfrastructureLicensingPort {
-  return {
-    inspect: (context) =>
-      Promise.resolve({
-        approved: true,
-        inspectionRef: `api:${context.idempotencyKey}:license`,
-      }),
-  };
-}
-
-function taskHandlers(repository: CommandContext["repository"]) {
-  return {
-    "players:process-day": createPlayerDayTaskHandler(repository),
-    "clubs:process-day": createClubMaintenanceTaskHandler(repository),
-  };
-}
-
-function rolloverHandlers() {
-  return Object.fromEntries(
-    SEASON_ROLLOVER_STEPS.map((stepId) => [
-      stepId,
-      () =>
-        Promise.resolve({
-          status: "COMPLETED" as const,
-          evidence: { source: "api" },
-        }),
-    ]),
-  );
-}
-
-function rolloverVerifier() {
-  return () =>
-    Promise.resolve({
-      standingsConsistent: true,
-      ledgerBalanced: true,
-      populationInBand: true,
-      evidence: { source: "api" },
-    });
-}
-
-/** Use case com shape `execute(input)` (input carrega o gameWorldId). */
-interface SingleInputUseCase {
-  execute(input: never): Promise<Result<unknown, DomainError>>;
-}
-
-/** Inicializador de contexto com shape `execute(worldSnapshot)`. */
-interface WorldSnapshotUseCase {
-  execute(world: never): Promise<Result<unknown, DomainError>>;
-}
-
-/** Factory para inicializadores de contexto `<ctx>:initialize`. */
-function wInit(
-  build: (repository: CommandContext["repository"]) => WorldSnapshotUseCase,
-  resourceKind: string,
-): CommandHandler {
-  return async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    return guardRun(
-      () => build(repository).execute(world.value.snapshot as never),
-      `${resourceKind}:${world.value.worldId}`,
-    );
-  };
-}
-
-/** Factory para use cases `execute(input)` — injeta gameWorldId + contexto. */
-function wc1(
-  build: (repository: CommandContext["repository"]) => SingleInputUseCase,
-  resourceKind = "world",
-): CommandHandler {
-  return async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const payload =
-      typeof envelope.payload === "object" && envelope.payload !== null
-        ? (envelope.payload as Record<string, unknown>)
-        : {};
-    const input = {
-      ...payload,
-      gameWorldId: world.value.worldId,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    };
-    try {
-      const result = await build(repository).execute(input as never);
-      if (!result.ok) return result;
-      return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
-    } catch (error) {
-      return fail(
-        new DomainError(
-          "COMMAND_EXECUTION_FAILED",
-          error instanceof Error ? error.message : "Falha ao executar command.",
-        ),
-      );
-    }
-  };
-}
-
-/** Executa um caso de uso e converte exceções em REJECTED (nunca 500). */
-async function guardRun(
-  run: () => Promise<Result<unknown, DomainError>>,
-  resource: string,
-): Promise<Result<CommandOutcome, DomainError>> {
-  try {
-    const result = await run();
-    if (!result.ok) return result;
-    return succeed({ resource });
-  } catch (error) {
-    return fail(
-      new DomainError(
-        "COMMAND_EXECUTION_FAILED",
-        error instanceof Error ? error.message : "Falha ao executar command.",
-      ),
-    );
-  }
-}
-
-function requireString(
-  payload: unknown,
-  field: string,
-): Result<string, DomainError> {
-  const value =
-    typeof payload === "object" && payload !== null
-      ? (payload as Record<string, unknown>)[field]
-      : undefined;
-  return typeof value === "string"
-    ? succeed(value)
-    : fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", `${field} é obrigatório.`),
-      );
 }
 
 const handlers: Record<string, CommandHandler> = {
@@ -509,459 +164,29 @@ const handlers: Record<string, CommandHandler> = {
     });
   },
 
-  "world:genesis": async ({ repository, worlds, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
+  /**
+   * A gênese não é guardada (R-185): é função pura do `seed`, que R-182 tornou
+   * coluna. O que este command persiste é o EFEITO dela — as linhas de `Club`.
+   */
+  "world:genesis": async ({ worlds, clubs, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new GenerateWorldGenesis(
-      worlds,
-      repository,
-      undefined,
-      repository,
-      repository,
-    ).execute(worldId.value);
+    const result = await new GenerateWorldGenesis(worlds, clubs).execute(
+      worldId.value,
+    );
     if (!result.ok) return result;
-
-    const world = await worlds.findById(worldId.value);
-    const genesis = await repository.findByWorldId(worldId.value);
-    if (world === null || genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "A gênese não pôde ser recarregada para concluir o bootstrap.",
-        ),
-      );
-    }
-    const ledger = await new InitializeLedger(repository).execute(
-      world,
-      undefined,
-      genesis,
-    );
-    if (!ledger.ok) return ledger;
-    const market = await new InitializeMarket(repository).execute(world);
-    if (!market.ok) return market;
-    const population = await new InitializeMarketPopulation(repository).execute(
-      world,
-      genesis.clubs.length,
-    );
-    if (!population.ok) return population;
-    const competitions = await new InitializeCompetitions(repository).execute(
-      world,
-      genesis,
-    );
-    if (!competitions.ok) return competitions;
-    const matches = await new InitializeMatches(repository).execute(
-      world,
-      competitions.value,
-    );
-    if (!matches.ok) return matches;
     return succeed({ resource: `world:${worldId.value}` });
   },
 
-  "world:activate": async ({ repository, worlds, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
+  "world:activate": async ({ worlds, clubs, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new ActivateProvisionedWorld(
-      worlds,
-      repository,
-      repository,
-      repository,
-      repository,
-    ).execute(worldId.value);
-    if (!result.ok) return result;
-    return succeed({
-      resource: `world:${worldId.value}`,
-      mutation: result.value,
-    });
-  },
-
-  "club:command": async ({ repository, worlds, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    if (envelope.expectedVersion === undefined) {
-      return fail(
-        new DomainError(
-          "COMMAND_PAYLOAD_INVALID",
-          "expectedVersion é obrigatório para club:command.",
-        ),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
-    if (!worldId.ok) return worldId;
-    const parsed = clubCommandPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
-    if (!ruleset.ok) return ruleset;
-    const command = {
-      commandId: randomUUID(),
-      idempotencyKey: envelope.idempotencyKey,
-      gameWorldId: worldId.value,
-      clubId: parsed.data.clubId as ClubCommand["clubId"],
-      expectedVersion: envelope.expectedVersion,
-      occurredAt: parsed.data.occurredAt,
-      rulesetVersion: ruleset.value,
-      actorId: parsed.data.actorId,
-      ...parsed.data.command,
-    } as ClubCommand;
-    const result = await new ExecuteClubCommand(repository).execute(command);
-    if (!result.ok) return result;
-    // Rebranding (C3) → reação da torcida (C10): queda de 10–15% no headcount.
-    if (parsed.data.command.type === "UpdateClubVisualIdentity") {
-      await applyRebrandReaction(
-        repository,
-        worlds,
-        worldId.value,
-        parsed.data.clubId,
-        envelope.idempotencyKey,
-      );
-    }
-    return succeed({ resource: `club:${parsed.data.clubId}` });
-  },
-
-  "market:initialize": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar o mercado.",
-        ),
-      );
-    }
-    const result = await new InitializeMarket(repository).execute(
-      world.value.snapshot,
-    );
-    if (!result.ok) return result;
-    const population = await new InitializeMarketPopulation(repository).execute(
-      world.value.snapshot,
-      genesis.clubs.length,
-    );
-    if (!population.ok) return population;
-    return succeed({ resource: `market:${world.value.worldId}` });
-  },
-
-  "ledger:initialize": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar o ledger.",
-        ),
-      );
-    }
-    const result = await new InitializeLedger(repository).execute(
-      world.value.snapshot,
-      undefined,
-      genesis,
-    );
-    if (!result.ok) return result;
-    return succeed({ resource: `ledger:${world.value.worldId}` });
-  },
-
-  // Inicializadores de contexto (execute(worldSnapshot))
-  "competition:initialize": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar as competições.",
-        ),
-      );
-    }
-    const result = await new InitializeCompetitions(repository).execute(
-      world.value.snapshot,
-      genesis,
-    );
-    if (!result.ok) return result;
-    const matches = await new InitializeMatches(repository).execute(
-      world.value.snapshot,
-      result.value,
-    );
-    if (!matches.ok) return matches;
-    return succeed({ resource: `competitions:${world.value.worldId}` });
-  },
-  "match:initialize": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const competitions = await repository.findCompetitionsByWorldId(
-      world.value.worldId,
-    );
-    const result = await new InitializeMatches(repository).execute(
-      world.value.snapshot,
-      competitions ?? undefined,
-    );
-    return result.ok
-      ? succeed({ resource: `matches:${world.value.worldId}` })
-      : result;
-  },
-  "staff:initialize": wInit((r) => new InitializeStaff(r), "staff"),
-  "narrative:initialize": wInit((r) => new InitializeNarrative(r), "narrative"),
-  "inbox:initialize": wInit((r) => new InitializeInbox(r), "inbox"),
-  "admin:initialize": wInit((r) => new InitializeAdmin(r), "admin"),
-  "automation:initialize": wInit(
-    (r) => new InitializeAutomation(r),
-    "automation",
-  ),
-  "eventing:initialize": wInit((r) => new InitializeEventing(r), "eventing"),
-
-  // Infraestrutura de estádio (SAGA-04) — portas sintéticas de financiamento/licença
-  "infrastructure:start": wc1(
-    (r) => new StartInfrastructureProject(r),
-    "infrastructure",
-  ),
-  "infrastructure:resume": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const projectId = requireString(envelope.payload, "projectId");
-    if (!projectId.ok) return projectId;
-    return guardRun(
-      () =>
-        new ResumeInfrastructureProject(
-          repository,
-          financingPort(),
-          licensingPort(),
-          API_WORKER,
-          nowMs,
-        ).execute(
-          world.value.worldId,
-          projectId.value,
-          world.value.snapshot.currentDate,
-        ),
-      `infrastructure:${projectId.value}`,
-    );
-  },
-  "infrastructure:abort": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const projectId = requireString(envelope.payload, "projectId");
-    if (!projectId.ok) return projectId;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const reason =
-      typeof payload.reason === "string" ? payload.reason : "aborted-via-api";
-    return guardRun(
-      () =>
-        new AbortInfrastructureProject(
-          repository,
-          financingPort(),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, projectId.value, reason),
-      `infrastructure:${projectId.value}`,
-    );
-  },
-
-  // Scheduler do mundo (C2)
-  "scheduler:bootstrap": wc1(
-    (r) => new BootstrapWorldScheduler(r),
-    "scheduler",
-  ),
-  "scheduler:cancel-task": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const taskId = requireString(envelope.payload, "taskId");
-    if (!taskId.ok) return taskId;
-    return guardRun(
-      () =>
-        new CancelScheduledTask(repository).execute(
-          world.value.worldId,
-          taskId.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:retry-task": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const taskId = requireString(envelope.payload, "taskId");
-    if (!taskId.ok) return taskId;
-    return guardRun(
-      () =>
-        new RetryScheduledTask(repository).execute(
-          world.value.worldId,
-          taskId.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:schedule-tasks": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const inputs = (envelope.payload as Record<string, unknown> | undefined)
-      ?.inputs;
-    if (!Array.isArray(inputs)) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "inputs[] é obrigatório."),
-      );
-    }
-    return guardRun(
-      () =>
-        new ScheduleWorldTasks(repository).execute(
-          world.value.worldId,
-          inputs as never,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:resume": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    return guardRun(
-      () =>
-        new ResumeWorldScheduler(
-          worlds,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:process-due": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const on = WorldDate.parse(world.value.snapshot.currentDate);
-    if (!on.ok) return on;
-    return guardRun(
-      () =>
-        new ProcessDueWorldTasks(repository, taskHandlers(repository)).execute(
-          world.value.worldId,
-          on.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:advance-days": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const days = typeof payload.days === "number" ? payload.days : 1;
-    return guardRun(
-      () =>
-        new AdvanceScheduledWorldDays(
-          worlds,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, days),
-      `world:${world.value.worldId}`,
-    );
-  },
-  "world:advance-day": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const input = {
-      ...payload,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-    };
-    return guardRun(
-      () =>
-        new AdvanceWorldDayCommand(
-          worlds,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, input as never),
-      `world:${world.value.worldId}`,
-    );
-  },
-
-  // Virada de temporada (SAGA-02) — resume com handlers/verifier sintéticos
-  "season:rollover:resume": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const rolloverId = requireString(envelope.payload, "rolloverId");
-    if (!rolloverId.ok) return rolloverId;
-    return guardRun(
-      () =>
-        new ResumeSeasonRollover(
-          repository,
-          rolloverHandlers() as never,
-          rolloverVerifier() as never,
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, rolloverId.value),
-      `rollover:${rolloverId.value}`,
-    );
-  },
-
-  // Explicação de decisão de automação (X-001)
-  "automation:get-explanation": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const decisionId = requireString(envelope.payload, "decisionId");
-    if (!decisionId.ok) return decisionId;
-    return guardRun(
-      () =>
-        new GetDecisionExplanation(repository).execute(
-          world.value.worldId,
-          decisionId.value,
-        ),
-      `decision:${decisionId.value}`,
-    );
-  },
-
-  "market:publish-listing": async ({ repository, worlds, envelope }) => {
-    const world = await loadWorld(worlds, envelope.worldId);
-    if (!world.ok) return world;
-    const parsed = publishListingPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
-    if (!ruleset.ok) return ruleset;
-    const input = {
-      playerId: parsed.data.playerId,
-      sellerClubId: parsed.data.sellerClubId,
-      askingFeeMinor: parsed.data.askingFeeMinor,
-      rulesetVersion: ruleset.value,
-      idempotencyKey: envelope.idempotencyKey,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    } as Parameters<PublishListing["execute"]>[1];
-    const result = await new PublishListing(repository).execute(
-      world.value.worldId,
-      input,
-    );
-    if (!result.ok) return result;
-    return succeed({ resource: `listing:${parsed.data.playerId}` });
-  },
-
-  "world:advance-days": async ({ worlds, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
-    if (!worldId.ok) return worldId;
-    const parsed = advanceDaysPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const result = await new AdvanceWorldDays(worlds).execute(
+    const result = await new ActivateProvisionedWorld(worlds, clubs).execute(
       worldId.value,
-      parsed.data.days,
     );
     if (!result.ok) return result;
     return succeed({
@@ -969,214 +194,21 @@ const handlers: Record<string, CommandHandler> = {
       mutation: result.value,
     });
   },
-};
 
-/**
- * Catálogo de gameplay com shape uniforme `execute(worldId, input)`, wirado pelo
- * factory `wc`. Cobre staff, competições, ledger, jogador/médico, narrativa,
- * notificações, admin, identidade, automação, eventing e o restante do mercado.
- */
-const gameplayHandlers: Record<string, CommandHandler> = {
-  // Staff (C5)
-  "staff:create": wc((r) => new CreateStaffMember(r), "staff"),
-  "staff:offer-contract": wc((r) => new OfferStaffContract(r), "staff"),
-  "staff:accept-contract": wc((r) => new AcceptStaffContract(r), "staff"),
-  "staff:assign": wc((r) => new AssignStaff(r), "staff"),
-  "staff:end-contract": wc((r) => new EndStaffContract(r), "staff"),
-
-  // Competições (C7)
-  "competition:create-edition": wc(
-    (r) => new CreateCompetitionEdition(r),
-    "competition",
-  ),
-  "competition:register-participant": wc(
-    (r) => new RegisterParticipant(r),
-    "competition",
-  ),
-  "competition:generate-fixtures": wc(
-    (r) => new GenerateFixtures(r),
-    "competition",
-  ),
-  "competition:record-result": wc(
-    (r) => new RecordOfficialResult(r),
-    "competition",
-  ),
-  "competition:apply-discipline": wc(
-    (r) => new ApplyDiscipline(r),
-    "competition",
-  ),
-  "competition:homologate": wc(
-    (r) => new HomologateCompetition(r),
-    "competition",
-  ),
-
-  // Ledger (C9)
-  "ledger:open-account": wc((r) => new OpenLedgerAccount(r), "ledger"),
-  "ledger:post-transaction": wc((r) => new PostTransaction(r), "ledger"),
-  "ledger:reserve": wc((r) => new ReserveFunds(r), "ledger"),
-  "ledger:settle-reservation": wc((r) => new SettleReservation(r), "ledger"),
-  "ledger:release-reservation": wc((r) => new ReleaseReservation(r), "ledger"),
-  "ledger:reconcile": wc((r) => new ReconcileWorldLedger(r), "ledger"),
-  "ledger:accrue-debt": wc((r) => new AccrueDebt(r), "ledger"),
-  "ledger:close-period": wc((r) => new CloseAccountingPeriod(r), "ledger"),
-  "ledger:expire-reservations": wc((r) => new ExpireReservations(r), "ledger"),
-
-  // Jogador + médico (C4)
-  "player:process-day": wc((r) => new ProcessPlayerDay(r), "player"),
-  "player:generate": wc((r) => new GeneratePlayer(r), "player"),
-  "player:set-training": wc((r) => new SetTrainingDirection(r), "player"),
-  "player:apply-development": wc((r) => new ApplyDailyDevelopment(r), "player"),
-  "player:generate-youth": wc((r) => new GenerateYouthCohort(r), "player"),
-  "player:promote-youth": wc((r) => new PromoteYouth(r), "player"),
-  "player:open-medical-case": wc((r) => new OpenMedicalCase(r), "player"),
-  "player:reassess-medical": wc((r) => new ReassessMedicalCase(r), "player"),
-  "player:retire": wc((r) => new RetirePlayer(r), "player"),
-
-  // Narrativa (C10)
-  "narrative:apply-fact": wc((r) => new ApplyNarrativeFact(r), "narrative"),
-  "narrative:make-promise": wc((r) => new MakePublicPromise(r), "narrative"),
-  "narrative:evaluate-promise": wc((r) => new EvaluatePromise(r), "narrative"),
-  "narrative:open-crisis": wc((r) => new OpenNarrativeCrisis(r), "narrative"),
-  "narrative:submit-recovery": wc(
-    (r) => new SubmitRecoveryPlan(r),
-    "narrative",
-  ),
-  "narrative:resolve-crisis": wc(
-    (r) => new ResolveNarrativeCrisis(r),
-    "narrative",
-  ),
-  "narrative:choose-conversation": wc(
-    (r) => new ChooseConversationOption(r),
-    "narrative",
-  ),
-  "narrative:cancel-promise": wc((r) => new CancelPromise(r), "narrative"),
-
-  // Notificações (C11)
-  "inbox:project": wc((r) => new ProjectNotification(r), "inbox"),
-  "inbox:mark-read": wc((r) => new MarkNotificationRead(r), "inbox"),
-  "inbox:dismiss": wc((r) => new DismissNotification(r), "inbox"),
-  "inbox:build-digest": wc((r) => new BuildDigest(r), "inbox"),
-  "inbox:generate-report": wc((r) => new GenerateReport(r), "inbox"),
-  "inbox:rebuild-projection": wc((r) => new RebuildInboxProjection(r), "inbox"),
-  "inbox:retry-delivery": wc((r) => new RetryDelivery(r), "inbox"),
-
-  // Admin / anti-abuso (C12)
-  "admin:record-risk": wc((r) => new RecordRiskSignal(r), "admin"),
-  "admin:propose-sanction": wc((r) => new ProposeSanction(r), "admin"),
-  "admin:approve-sanction": wc((r) => new ApproveSanction(r), "admin"),
-  "admin:file-appeal": wc((r) => new FileAppeal(r), "admin"),
-  "admin:decide-appeal": wc((r) => new DecideAppeal(r), "admin"),
-  "admin:open-case": wc((r) => new OpenCase(r), "admin"),
-  "admin:place-quarantine": wc((r) => new PlaceQuarantine(r), "admin"),
-  "admin:request-correction": wc((r) => new RequestCorrection(r), "admin"),
-  "admin:approve-correction": wc((r) => new ApproveCorrection(r), "admin"),
-  "admin:request-reprocessing": wc((r) => new RequestReprocessing(r), "admin"),
-  "admin:open-support": wc((r) => new OpenSupportCase(r), "admin"),
-  "admin:resolve-support": wc((r) => new ResolveSupportCase(r), "admin"),
-
-  // Identidade (C1) — agregados por entidade sobre Postgres (R-175/R-173).
-  // `identity:initialize` não existe mais: não há agregado de identidade do
-  // mundo para inicializar; os roots nascem quando o jogador age.
   "identity:join-world": ic((u) => new JoinWorld(u)),
   "identity:reserve-club": ic((u) => new ReserveClub(u)),
   "identity:confirm-onboarding": ic((u) => new ConfirmOnboarding(u)),
   "identity:release-club-reservation": ic((u) => new ReleaseClubReservation(u)),
   "identity:end-club-control": ic((u) => new EndClubControl(u)),
   "identity:request-switch": ic((u) => new RequestClubSwitch(u)),
-
-  // Automação / IA (X-001)
-  "automation:create-rule": wc(
-    (r) => new CreateAutomationRule(r),
-    "automation",
-  ),
-  "automation:activate-rule": wc(
-    (r) => new ActivateAutomationRule(r),
-    "automation",
-  ),
-  "automation:suspend-rule": wc(
-    (r) => new SuspendAutomationRule(r),
-    "automation",
-  ),
-  "automation:revoke-rule": wc(
-    (r) => new RevokeAutomationRule(r),
-    "automation",
-  ),
-  "automation:evaluate-decision": wc(
-    (r) => new EvaluateDecision(r),
-    "automation",
-  ),
-  "automation:execute-proposal": wc(
-    (r) => new ExecuteDecisionProposal(r),
-    "automation",
-  ),
-  "automation:disable-on-control-change": wc(
-    (r) => new DisableAutomationOnControlChange(r),
-    "automation",
-  ),
-
-  // Eventing / sagas (X-002)
-  "eventing:publish-outbox": wc((r) => new PublishOutboxBatch(r), "eventing"),
-  "eventing:consume-event": wc((r) => new ConsumeEvent(r), "eventing"),
-  "eventing:retry-dead-letter": wc((r) => new RetryDeadLetter(r), "eventing"),
-  "eventing:register-event-type": wc(
-    (r) => new RegisterEventType(r),
-    "eventing",
-  ),
-  "eventing:start-saga": wc((r) => new StartSaga(r), "eventing"),
-  "eventing:claim-saga": wc((r) => new ClaimSaga(r), "eventing"),
-  "eventing:advance-saga-step": wc((r) => new AdvanceSagaStep(r), "eventing"),
-  "eventing:compensate-saga": wc((r) => new CompensateSaga(r), "eventing"),
-  "eventing:rebuild-projection": wc(
-    (r) => new RebuildProjection(r),
-    "eventing",
-  ),
-  "eventing:resume-realtime": wc(
-    (r) => new ResumeRealtimeStream(r),
-    "eventing",
-  ),
-
-  // Scheduler + temporada — shape uniforme (C2 / SAGA-02)
-  "scheduler:schedule-task": wc((r) => new ScheduleWorldTask(r), "scheduler"),
-  "scheduler:register-window": wc(
-    (r) => new RegisterTemporalWindow(r),
-    "scheduler",
-  ),
-  "season:rollover:start": wc((r) => new StartSeasonRollover(r), "rollover"),
-
-  // Partida ao vivo (C8)
-  "match:create-manifest": wc((r) => new CreateMatchManifest(r), "match"),
-  "match:start": wc((r) => new StartMatch(r), "match"),
-  "match:submit-command": wc((r) => new SubmitMatchCommand(r), "match"),
-  "match:advance-ticks": wc((r) => new AdvanceMatchTicks(r), "match"),
-  "match:checkpoint": wc((r) => new CheckpointMatch(r), "match"),
-  "match:resume": wc((r) => new ResumeMatch(r), "match"),
-  "match:finalize": wc((r) => new FinalizeMatch(r), "match"),
-
-  // Mercado — restante (C6)
-  "market:request-scouting": wc((r) => new RequestScouting(r), "market"),
-  "market:open-negotiation": wc((r) => new OpenNegotiation(r), "market"),
-  "market:submit-offer": wc((r) => new SubmitOffer(r), "market"),
-  "market:accept-offer": wc((r) => new AcceptOffer(r), "market"),
-  "market:activate-contract": wc((r) => new ActivateContract(r), "market"),
-  "market:terminate-contract": wc((r) => new TerminateContract(r), "market"),
-  "market:cancel-negotiation": wc((r) => new CancelNegotiation(r), "market"),
-  "market:start-transfer": wc((r) => new StartTransfer(r), "market"),
-  "market:advance-transfer-step": wc(
-    (r) => new AdvanceTransferStep(r),
-    "market",
-  ),
-  "market:compensate-transfer": wc((r) => new CompensateTransfer(r), "market"),
-  "market:start-loan": wc((r) => new StartLoan(r), "market"),
-  "market:exercise-loan-option": wc((r) => new ExerciseLoanOption(r), "market"),
-  "market:return-loaned-player": wc((r) => new ReturnLoanedPlayer(r), "market"),
 };
 
 export function resolveCommandHandler(
   commandType: string,
 ): CommandHandler | undefined {
-  return handlers[commandType] ?? gameplayHandlers[commandType];
+  return handlers[commandType];
 }
 
 export function registeredCommandTypes(): readonly string[] {
-  return [...Object.keys(handlers), ...Object.keys(gameplayHandlers)];
+  return Object.keys(handlers);
 }

@@ -62,8 +62,31 @@ describe("API command catalog integrity (e2e)", () => {
     await rm(dataDirectory, { recursive: true, force: true });
   });
 
-  it("expõe um catálogo amplo de commands (>= 120 tipos)", () => {
-    expect(registeredCommandTypes().length).toBeGreaterThanOrEqual(120);
+  /**
+   * O que este teste media antes: `registeredCommandTypes().length >= 120`.
+   *
+   * Era a métrica que produziu o problema. Largura de catálogo não é progresso:
+   * os 148 commands foram construídos sobre 16 mega-agregados antes de qualquer
+   * cliente provar que eram os certos, e o resultado foi 16 contextos completos
+   * convivendo com 11 de 114 telas. Um teste que exige ≥120 PREMIA seguir
+   * construindo às cegas e falha quando se apaga o que não se usa.
+   *
+   * O que ele mede agora: que o catálogo é exatamente o que uma vertical viva
+   * exige, e que cada command nele é alcançável (o teste abaixo). Quando um
+   * contexto voltar, este número sobe junto — nunca antes.
+   */
+  it("o catálogo é exatamente o que a vertical viva exige", () => {
+    expect([...registeredCommandTypes()].sort()).toEqual([
+      "identity:confirm-onboarding",
+      "identity:end-club-control",
+      "identity:join-world",
+      "identity:release-club-reservation",
+      "identity:request-switch",
+      "identity:reserve-club",
+      "world:activate",
+      "world:create",
+      "world:genesis",
+    ]);
   });
 
   it("GET /commands/catalog lista commands e queries para descoberta", async () => {
@@ -71,14 +94,15 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBeGreaterThanOrEqual(120);
-    expect(response.body.queries.length).toBe(17);
-    expect(response.body.queries).toContain("player-roster");
-    expect(response.body.queries).toContain("identity-detail");
-    expect(response.body.queries).toContain("matches-detail");
-    expect(response.body.commands).toContain("infrastructure:start");
-    expect(response.body.commands).toContain("scheduler:resume");
-    expect(response.body.commands).toContain("match:submit-command");
+    expect(response.body.commandCount).toBe(9);
+    expect(response.body.commands).toContain("world:genesis");
+    expect(response.body.commands).toContain("identity:reserve-club");
+    expect([...response.body.queries].sort()).toEqual([
+      "club",
+      "club-detail",
+      "identity",
+      "identity-detail",
+    ]);
   });
 
   it("todo command registrado é alcançável e devolve um CommandResponse válido (nunca 500)", async () => {

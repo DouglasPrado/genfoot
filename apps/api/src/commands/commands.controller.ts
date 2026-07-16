@@ -10,12 +10,15 @@ import {
   Req,
 } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { IdentityUnitOfWork, WorldRepository } from "@grinta/core";
-import type { JsonWorldRepository } from "@grinta/persistence";
+import type {
+  ClubRepository,
+  IdentityUnitOfWork,
+  WorldRepository,
+} from "@grinta/core";
 import type { Request } from "express";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
-import { registeredQueryTypes } from "../queries/query-registry.js";
+import { registeredQueryNames } from "../queries/query-registry.js";
 
 import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
@@ -24,7 +27,7 @@ import {
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
   REALTIME_PUBLISHER,
-  WORLD_REPOSITORY,
+  CLUB_REPOSITORY,
 } from "../core/tokens.js";
 import type { RealtimePublisher } from "../realtime/realtime-publisher.js";
 import {
@@ -43,7 +46,7 @@ const SUPPORTED_CONTRACT_VERSIONS = new Set(["v1"]);
 @Controller("commands")
 export class CommandsController {
   constructor(
-    @Inject(WORLD_REPOSITORY) private readonly repository: JsonWorldRepository,
+    @Inject(CLUB_REPOSITORY) private readonly clubs: ClubRepository,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
     // C1 já está no Postgres (R-173/R-175); os outros quinze contextos seguem
@@ -69,7 +72,7 @@ export class CommandsController {
     const commands = registeredCommandTypes();
     return {
       commands,
-      queries: registeredQueryTypes(),
+      queries: registeredQueryNames(),
       commandCount: commands.length,
     };
   }
@@ -183,7 +186,7 @@ export class CommandsController {
     let result;
     try {
       result = await handler({
-        repository: this.repository,
+        clubs: this.clubs,
         identityUnitOfWork: this.identityUnitOfWork,
         worlds: this.worlds,
         envelope,

@@ -1,61 +1,22 @@
+// O core depois do extermínio da arquitetura morta (R-175).
+//
+// Sumiram 12 contextos inteiros de mega-agregado (`World<X>` + `revision` +
+// `save<X>ByWorldId`) e o adapter JSON que os servia: ~22.800 linhas. Não foram
+// "adiados" — foram construídos antes de qualquer cliente provar que eram o
+// backend certo, e é por isso que 16 contextos completos conviviam com 11 de 114
+// telas. Voltam um a um, já em agregado por entidade sobre Postgres, quando uma
+// vertical viva os exigir.
+//
+// Sobrevive aqui o que é agregado por entidade, regra pura, ou fundação.
+
 export * from "./foundation/canonical-json.js";
 export * from "./foundation/deterministic-uuid.js";
 export * from "./foundation/domain-event-log.js";
 export * from "./foundation/event-chain.js";
 export * from "./foundation/idempotency.js";
 export * from "./foundation/seeded-random.js";
-export * from "./clubs/club-bootstrap.js";
-export * from "./clubs/visual-identity-catalog.js";
-export * from "./clubs/club-maintenance.js";
-export * from "./clubs/club-repository.js";
-export * from "./clubs/club-types.js";
-export * from "./clubs/club-use-cases.js";
-export * from "./clubs/club.js";
-export * from "./clubs/infrastructure-project-types.js";
-export * from "./clubs/infrastructure-project-use-cases.js";
-export * from "./clubs/infrastructure-project.js";
-export * from "./clubs/squad.js";
-export * from "./clubs/world-club-portfolio.js";
-export * from "./genesis/genesis-types.js";
-export * from "./genesis/world-genesis-generator.js";
-export * from "./genesis/world-genesis-repository.js";
-export * from "./genesis/world-genesis-use-cases.js";
-export * from "./genesis/world-genesis-validator.js";
-export * from "./players/player-lifecycle-repository.js";
-export * from "./players/player-lifecycle-types.js";
-export * from "./players/player-lifecycle-use-cases.js";
-export * from "./players/player-medical-career-use-cases.js";
-export * from "./staff/staff-repository.js";
-export * from "./staff/staff-types.js";
-export * from "./staff/staff-use-cases.js";
-export * from "./staff/world-staff.js";
-export * from "./competitions/competition-repository.js";
-export * from "./competitions/competition-types.js";
-export * from "./competitions/competition-use-cases.js";
-export * from "./competitions/world-competitions.js";
-export * from "./matches/match-kernel.js";
-export * from "./matches/match-repository.js";
-export * from "./matches/match-types.js";
-export * from "./matches/match-use-cases.js";
-export * from "./matches/world-matches.js";
-export * from "./ledger/ledger-repository.js";
-export * from "./ledger/ledger-types.js";
-export * from "./ledger/ledger-use-cases.js";
-export * from "./ledger/world-ledger.js";
-export * from "./eventing/eventing-repository.js";
-export * from "./eventing/eventing-types.js";
-export * from "./eventing/eventing-use-cases.js";
-export * from "./eventing/world-eventing.js";
-export * from "./market/market-repository.js";
-export * from "./market/market-types.js";
-export * from "./market/market-use-cases.js";
-export * from "./market/world-market.js";
-export * from "./automation/automation-repository.js";
-export * from "./automation/automation-types.js";
-export * from "./automation/automation-use-cases.js";
-export * from "./automation/world-automation.js";
-export * from "./calibration/calibration-types.js";
-export * from "./calibration/calibration.js";
+
+// C1 — identidade. Migrado: agregados por entidade, Postgres, UnitOfWork.
 export * from "./identity/identity-types.js";
 export * from "./identity/user-account.js";
 export * from "./identity/user-account-repository.js";
@@ -70,36 +31,47 @@ export * from "./identity/identity-unit-of-work.js";
 export * from "./identity/identity-events.js";
 export * from "./identity/identity-read-model.js";
 export * from "./identity/identity-commands.js";
-export * from "./narrative/narrative-repository.js";
-export * from "./narrative/narrative-types.js";
-export * from "./narrative/narrative-use-cases.js";
-export * from "./narrative/world-narrative.js";
-export * from "./notifications/notifications-repository.js";
-export * from "./notifications/notifications-types.js";
-export * from "./notifications/notifications-use-cases.js";
-export * from "./notifications/world-inbox.js";
-export * from "./admin/admin-repository.js";
-export * from "./admin/admin-types.js";
-export * from "./admin/admin-use-cases.js";
-export * from "./admin/world-admin.js";
-export * from "./clients/clients-types.js";
-export * from "./clients/clients-runtime.js";
-export * from "./platform/platform-types.js";
-export * from "./platform/platform.js";
-export * from "./players/player.js";
-export * from "./players/world-player-lifecycle.js";
-export * from "./scheduling/scheduling-repository.js";
-export * from "./scheduling/scheduling-types.js";
-export * from "./scheduling/scheduling-use-cases.js";
-export * from "./scheduling/season-rollover-types.js";
-export * from "./scheduling/season-rollover.js";
-export * from "./scheduling/season-rollover-use-cases.js";
-export * from "./scheduling/time-window.js";
-export * from "./scheduling/season.js";
-export * from "./scheduling/world-scheduler.js";
+
+// C2 — mundo. `GameWorld` é tabela (R-182); o `WorldScheduler` morreu com o
+// resto e volta quando o relógio precisar andar.
 export * from "./world/game-world.js";
 export * from "./world/world-repository.js";
 export * from "./world/world-types.js";
 export * from "./world/world-use-cases.js";
+
+// C3 — clube. Os agregados por entidade e a porta nova; o `WorldClubPortfolio`
+// (672 linhas embrulhando os 16 clubes numa revisão só) morreu.
+export * from "./clubs/club.js";
+export * from "./clubs/club-repository.js";
+export * from "./clubs/club-types.js";
+export * from "./clubs/club-bootstrap.js";
+export * from "./clubs/visual-identity-catalog.js";
+export * from "./clubs/squad.js";
+export * from "./clubs/infrastructure-project.js";
+export * from "./clubs/infrastructure-project-types.js";
+
+// Gênese — gera o mundo inicial. É o que o admin usa para criar clubes.
+export * from "./genesis/genesis-types.js";
+export * from "./genesis/world-genesis-generator.js";
+export * from "./genesis/world-genesis-use-cases.js";
+export * from "./genesis/world-genesis-validator.js";
+
+// Regras puras resgatadas dos mega-agregados. Morreu o embrulho, não a regra:
+// `match-kernel` é a simulação de partida e só depende de `SeededRandom`.
+export * from "./matches/match-kernel.js";
+export * from "./matches/match-types.js";
+export * from "./players/player.js";
+export * from "./players/player-lifecycle-types.js";
+export * from "./scheduling/season.js";
+export * from "./scheduling/scheduling-types.js";
+export * from "./scheduling/time-window.js";
+
+export * from "./calibration/calibration-types.js";
+export * from "./calibration/calibration.js";
+export * from "./platform/platform-types.js";
+export * from "./platform/platform.js";
+export * from "./clients/clients-types.js";
+export * from "./clients/clients-runtime.js";
 export * from "./clients/screen-registry.js";
 export * from "./clients/golden-path-registry.js";
+export * from "./clubs/club-read-model.js";

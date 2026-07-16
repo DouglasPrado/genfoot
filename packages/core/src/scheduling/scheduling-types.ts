@@ -1,7 +1,5 @@
 import type { GameWorldId, RulesetVersion } from "@grinta/shared";
 
-import type { SeasonRolloverSnapshot } from "./season-rollover-types.js";
-
 export const SeasonStatus = {
   PLANNED: "PLANNED",
   ACTIVE: "ACTIVE",
@@ -114,23 +112,10 @@ export interface WorldClockSnapshot {
   readonly fencingToken: number;
 }
 
-export interface WorldSchedulerSnapshot {
-  readonly schemaVersion: 2;
-  readonly gameWorldId: GameWorldId;
-  readonly config: WorldSchedulerConfig;
-  readonly seasons: readonly SeasonSnapshot[];
-  readonly tasks: readonly ScheduledTaskSnapshot[];
-  readonly windows: readonly TemporalWindowSnapshot[];
-  readonly commandReceipts: readonly WorldCommandReceipt[];
-  readonly rollovers: readonly SeasonRolloverSnapshot[];
-  readonly clock: WorldClockSnapshot;
-  readonly runtimeEpoch: number;
-  readonly revision: number;
-}
-
-export interface SchedulingEnvelope {
-  readonly scheduler: WorldSchedulerSnapshot;
-}
+// `WorldSchedulerSnapshot` e `SchedulingEnvelope` moravam aqui: o mega-agregado
+// do relógio (R-175), com `revision` serializando avançar o dia contra salvar
+// uma temporada. Morreram. O relógio volta em agregado por entidade quando uma
+// vertical precisar do tempo andar.
 
 export interface TaskExecutionContext {
   readonly gameWorldId: GameWorldId;

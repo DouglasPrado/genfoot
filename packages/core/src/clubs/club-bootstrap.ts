@@ -6,87 +6,79 @@ import {
   ClubStatus,
   StadiumLicenseStatus,
   type ClubDepartmentSnapshot,
-  type WorldClubPortfolioSnapshot,
+  type ClubSnapshot,
 } from "./club-types.js";
 
 const departmentKinds = Object.values(ClubDepartmentKind);
 
-export function buildClubPortfolioFromGenesis(
+/**
+ * Os clubes iniciais do mundo, a partir da gênese.
+ *
+ * Devolve CLUBES, não um portfólio: o `WorldClubPortfolioSnapshot` que isto
+ * montava embrulhava os 16 clubes numa revisão só (R-175) e morreu junto com o
+ * resto da arquitetura morta. Elencos e projetos voltam quando uma vertical
+ * viva os exigir.
+ *
+ * Puro: nada de `Date.now()`/`Math.random()`. Os ids saem do seed do mundo, e é
+ * isso que faz o replay ser possível (R-182).
+ */
+export function buildClubsFromGenesis(
   world: GameWorldSnapshot,
   genesis: WorldGenesisSnapshot,
-): WorldClubPortfolioSnapshot {
+): readonly ClubSnapshot[] {
   const timestampMilliseconds = Date.parse(`${world.startDate}T00:00:00.000Z`);
-  return {
-    schemaVersion: 1,
-    gameWorldId: world.id,
-    rulesetVersion: world.rulesetVersion,
-    clubs: genesis.clubs.map((generated, index) => {
-      const identity = {
-        id: deterministicUuidV7<"ClubIdentityPeriod">({
-          worldSeed: world.seed,
-          context: `club:${generated.id}:identity:1`,
-          timestampMilliseconds,
-        }),
-        name: generated.name,
-        shortCode: generated.shortCode,
-        effectiveFrom: world.startDate,
-        effectiveThrough: null,
-        rulesetVersion: world.rulesetVersion,
-      } as const;
-      return {
-        id: generated.id,
-        gameWorldId: world.id,
-        identity,
-        identityHistory: [identity],
-        regionId: `BR-R${String(index + 1).padStart(2, "0")}`,
-        reputationBand: 1,
-        status: ClubStatus.ACTIVE,
-        departments: departmentKinds.map((kind): ClubDepartmentSnapshot => ({
+  return genesis.clubs.map((generated, index) => {
+    // A identidade é um PERÍODO com vigência, não coluna: o rebranding (BC-003)
+    // abre um novo em vez de sobrescrever, e o histórico sobrevive.
+    const identity = {
+      id: deterministicUuidV7<"ClubIdentityPeriod">({
+        worldSeed: world.seed,
+        context: `club:${generated.id}:identity:1`,
+        timestampMilliseconds,
+      }),
+      name: generated.name,
+      shortCode: generated.shortCode,
+      effectiveFrom: world.startDate,
+      effectiveThrough: null,
+      rulesetVersion: world.rulesetVersion,
+    } as const;
+    return {
+      id: generated.id,
+      gameWorldId: world.id,
+      identity,
+      identityHistory: [identity],
+      regionId: `BR-R${String(index + 1).padStart(2, "0")}`,
+      reputationBand: 1,
+      status: ClubStatus.ACTIVE,
+      departments: departmentKinds.map(
+        (kind): ClubDepartmentSnapshot => ({
           kind,
           level: 1,
           targetLevel: 1,
           capacity: 10,
           condition: 100,
           maintenanceDueOn: null,
-        })),
-        stadium: {
-          id: deterministicUuidV7<"Stadium">({
-            worldSeed: world.seed,
-            context: `club:${generated.id}:stadium`,
-            timestampMilliseconds,
-          }),
-          name: `Estádio ${generated.name}`,
-          tenure: "OWNED",
-          capacity: 10_000,
-          pitchQuality: 60,
-          condition: 100,
-          licenseStatus: StadiumLicenseStatus.LICENSED,
-          maintenanceDueOn: null,
-          version: 1,
-        },
-        ticketPolicies: [],
-        commercialAgreements: [],
-        boardDecisions: [],
+        }),
+      ),
+      stadium: {
+        id: deterministicUuidV7<"Stadium">({
+          worldSeed: world.seed,
+          context: `club:${generated.id}:stadium`,
+          timestampMilliseconds,
+        }),
+        name: `Estádio ${generated.name}`,
+        tenure: "OWNED",
+        capacity: 10_000,
+        pitchQuality: 60,
+        condition: 100,
+        licenseStatus: StadiumLicenseStatus.LICENSED,
+        maintenanceDueOn: null,
         version: 1,
-      };
-    }),
-    squads: genesis.squads.map((generated) => ({
-      id: generated.id,
-      gameWorldId: world.id,
-      clubId: generated.clubId,
-      capacity: 23,
-      memberships: generated.playerIds.map((playerId, index) => ({
-        playerId,
-        slot: `S${String(index + 1).padStart(2, "0")}`,
-        category: "SENIOR" as const,
-        effectiveFrom: world.startDate,
-      })),
+      },
+      ticketPolicies: [],
+      commercialAgreements: [],
+      boardDecisions: [],
       version: 1,
-    })),
-    projects: [],
-    commandReceipts: [],
-    events: [],
-    processedMaintenanceDayKeys: [],
-    revision: 1,
-  };
+    };
+  });
 }

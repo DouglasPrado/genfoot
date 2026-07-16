@@ -98,11 +98,15 @@ describe("API command/query transport (e2e)", () => {
     const response = await request(app.getHttpServer())
       .post("/api/v1/commands")
       .send(
+        // `world:advance-days` morreu com o `WorldScheduler` (R-175). O que este
+        // teste prova não é o command: é que erro de DOMÍNIO vira REJECTED com
+        // código, e não 500. `world:genesis` num mundo inexistente prova o
+        // mesmo, e é um command que existe.
         envelope({
-          commandType: "world:advance-days",
+          commandType: "world:genesis",
           worldId: "00000000-0000-7000-8000-000000000000",
-          payload: { days: 1 },
-          idempotencyKey: "advance-nonexistent",
+          payload: {},
+          idempotencyKey: "genesis-nonexistent",
         }),
       );
     expect(response.body.status).toBe("REJECTED");

@@ -1,3 +1,4 @@
+import type { ClubReadModel } from "@grinta/core";
 import {
   Controller,
   Get,
@@ -13,7 +14,6 @@ import {
   type IdentityReadModel,
   type WorldRepository,
 } from "@grinta/core";
-import type { JsonWorldRepository } from "@grinta/persistence";
 import { parseGameWorldId } from "@grinta/shared";
 import type { Request } from "express";
 
@@ -22,9 +22,9 @@ import { ApiException } from "../common/standard-error.js";
 import {
   GAME_WORLD_REPOSITORY,
   IDENTITY_READ_MODEL,
-  WORLD_REPOSITORY,
+  CLUB_READ_MODEL,
 } from "../core/tokens.js";
-import { registeredQueryTypes, resolveQueryHandler } from "./query-registry.js";
+import { registeredQueryNames, resolveQueryHandler } from "./query-registry.js";
 import {
   enforceWorldScope,
   paginate,
@@ -56,7 +56,7 @@ function invalidWorldId(messageKey: string): ApiException {
 @Controller("worlds")
 export class QueriesController {
   constructor(
-    @Inject(WORLD_REPOSITORY) private readonly repository: JsonWorldRepository,
+    @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -134,7 +134,7 @@ export class QueriesController {
         correlationId: "unknown",
         retryable: false,
         fieldErrors: [
-          { field: "queryType", messageKey: registeredQueryTypes().join(",") },
+          { field: "queryType", messageKey: registeredQueryNames().join(",") },
         ],
         blockingReason: "QUERY_UNKNOWN",
         recoveryAction: null,
@@ -158,7 +158,7 @@ export class QueriesController {
       );
     }
     const result = await handler(
-      { repository: this.repository, identityReadModel: this.identityReadModel },
+      { identityReadModel: this.identityReadModel, clubReadModel: this.clubReadModel },
       worldId.value,
     );
     if (!result.ok) {

@@ -1,4 +1,3 @@
-export * from "./json-world-repository.js";
 export * from "./prisma-connection.js";
 export * from "./prisma-club-control-repository.js";
 export * from "./prisma-club-entry-reservation-repository.js";
@@ -9,3 +8,5 @@ export * from "./prisma-identity-unit-of-work.js";
 export * from "./prisma-user-account-repository.js";
 export * from "./prisma-world-repository.js";
 export * from "./prisma-world-participant-repository.js";
+export * from "./prisma-club-repository.js";
+export * from "./prisma-club-read-model.js";
