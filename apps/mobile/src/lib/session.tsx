@@ -32,6 +32,11 @@ const SessionContext = createContext<SessionValue | null>(null);
  */
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  // O efeito lê getToken por ref: se a identidade da função mudar a cada
+  // render, tê-la nas deps reabriria a sessão em loop — status preso em
+  // "connecting" e todas as queries eternamente em loading.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [contractVersion, setContractVersion] = useState<string | null>(null);
@@ -60,7 +65,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         // Sem conta, não há sessão de jogo: o splash manda ao login (MF-00).
         // Antes abríamos uma sessão de desenvolvimento aqui, e por isso o app
         // mostrava clube e caixa para quem estava deslogado.
-        const clerkToken = await getToken();
+        const clerkToken = await getTokenRef.current();
         if (cancelled) return;
         if (clerkToken === null) {
           setSession(null);
@@ -88,7 +93,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
     // `isLoaded`/`isSignedIn` nas deps: ao entrar ou sair, a sessão do jogo é
     // reaberta ou descartada junto.
-  }, [attempt, getToken, isLoaded, isSignedIn]);
+  }, [attempt, isLoaded, isSignedIn]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
