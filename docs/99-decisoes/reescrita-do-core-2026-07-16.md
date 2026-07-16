@@ -1,4 +1,4 @@
-# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-182
+# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-183
 
 > **Status:** CANÔNICO / RATIFICADO · **Data:** 2026-07-16 · **Autoridade:** decisão do dono do produto · **Escopo:** `packages/core`, `prisma/schema.prisma`, todos os 16 contextos
 
@@ -134,15 +134,32 @@ Consequência aceita: `StaffContractSnapshot.compensationRef: string` (`staff-ty
 
 E o **mundo inicial deixa de ser literal de tipo**: `GeneratedCompetition.name: "Liga Inicial"`, `seasonNumber: 1`, `rounds: 30` (`genesis-types.ts:76-78`) e `WorldProvisioningEvidence` com `generatedClubCount: 16`, `generatedPlayerCount: 368` (`world-types.ts:25-32`) são **literais no tipo** — um mundo de 20 clubes não compila. Viram configuração (`GameRuleConfig`/`GameEconomyConfig`), com os campos que o schema já previu e o domínio não tem: `maxClubs`, `seasonDays` (R-107), `initialClubCashMinor`.
 
+### R-183 — Nem todo root do context map é root. Departamento e estádio são filhos do clube.
+
+**Contraria [context map:77](../02-tecnico/12-context-map-e-blueprint.md), que lista `ClubDepartment` e `Stadium`/`Facility` como aggregate roots.** Está aqui porque contrariar o canon exige decisão nova, não mensagem de commit.
+
+R-175 quebrou o mega-agregado por um motivo específico: **contenção**. Dois jogadores mexendo em clubes diferentes travavam um ao outro porque o mundo inteiro era um agregado. Esse motivo **não existe** entre um clube e o seu departamento: ninguém disputa o departamento de um clube com outro clube. O que existe é o contrário — `Club.setDepartmentPlan` (`club.ts:110`) muta o departamento, ou seja, ele já está dentro da fronteira de consistência do clube. Root com dono é contradição.
+
+Consequências, cada uma com evidência:
+
+| O quê | Decisão | Por quê |
+|---|---|---|
+| `ClubDepartmentSnapshot.version` | **morre** | Ninguém o comparava — `club-maintenance.ts:50` e `world-club-portfolio.ts:501` só incrementavam, e nenhum teste o assertava. Concorrência otimista que nada checa é ruído com nome de invariante. Quem versiona o departamento é o `Club`. |
+| `ClubDepartment.id` (coluna) | **morre** | Uuid sintético que nada referencia: o `InfrastructureProject` aponta o alvo pelo `kind`, e o domínio nunca teve `ClubDepartmentId`. A chave natural `(gameWorldId, clubId, type)` vira a primária — "um departamento de cada tipo por clube" deixa de ser convenção e vira constraint. |
+| `DepartmentType` | **10 → os 6 do domínio** | `STADIUM` virou entidade (não pode ser as duas coisas); `INFRASTRUCTURE` colide com o root `InfrastructureProject`; `BOARD` é governança e `FINANCE` é do C9 — não são coisas de que se sobe o nível; `COMMUNICATION`/`DATA_ANALYSIS` não têm command. `maxLevel` **fica**: sem ele a invariante `level ≤ maxLevel` (context map:154) é inexpressável. |
+| **Estádio** | **entidade, 1 por clube** | O domínio o tem como campo obrigatório, não lista (`club-types.ts:122`). Vira tabela própria com `@@unique([gameWorldId, clubId])` — mas segue **dentro** da fronteira do clube: `operateInfrastructureProject` muta `club.stadium` **e** `club.version` juntos (`world-club-portfolio.ts:475-483`). Entidade ≠ root. |
+| **Identidade do clube** | **período, não coluna** | O rebranding (BC-003) apagaria o histórico se o nome fosse coluna. A unicidade de nome muda de casa: vira **índice único parcial** sobre o período vigente (`WHERE effectiveThrough IS NULL`), o que substitui a varredura de array em `world-club-portfolio.ts:157`. Parcial de propósito — um unique total proibiria o nome abandonado de voltar ao pool. |
+
+`ClubStatus` fica com o do domínio (`ACTIVE|SUSPENDED|DISSOLVED`): `BANKRUPT` é do C9, `BOT_RESERVED` morreu com R-180, `INACTIVE` era vago.
+
+**A regra geral que isto estabelece:** o context map lista ~70 roots, e a lista foi feita por *vocabulário*, não por fronteira de consistência. Root é o que precisa de fronteira própria por contenção ou por invariante que ninguém de fora garante. Todo contexto seguinte deve reexaminar a sua lista com esse critério, em vez de materializar 70 tabelas versionadas.
+
 ---
 
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.
 
-- **Departamentos: quais existem?** Domínio tem 6 (`FOOTBALL|TRAINING|MEDICAL|SCOUTING|YOUTH|COMMERCIAL`), schema tem 10 (`…|COMMUNICATION|BOARD|FINANCE|INFRASTRUCTURE|STADIUM|DATA_ANALYSIS`). **Coincidem 3.** É decisão de game design, não de modelagem.
-- **`ClubStatus`: a interseção é `{ACTIVE}`.** Domínio: `ACTIVE|SUSPENDED|DISSOLVED`. Schema: `ACTIVE|INACTIVE|BANKRUPT|BOT_RESERVED`. `BANKRUPT` é conceito de produto que o domínio não conhece; `DISSOLVED`/`SUSPENDED` o schema não conhece.
-- **Estádio é entidade ou departamento?** O domínio tem `StadiumSnapshot` obrigatório, 1 por clube. O schema só tem `DepartmentType.STADIUM`. Clube pode ter 0 ou 2 estádios?
 - **`BoardPromise`: três modelos incompatíveis do mesmo conceito.** O canônico pede **promessa verificável** (command `MakePublicPromise`); o domínio entrega **decisão registrada** (`BoardDecisionSnapshot` — isso é auditoria, não promessa: não há o que verificar); o schema entrega **dois escalares de humor** (`boardPatience`, `pressureLevel`). Nenhum dos três é o outro.
 - **`UserSession.isOnline` é estado de jogo, não de auth** (`schema.prisma:649` — "habilita interação na partida ao vivo"). [R-174](conta-global-e-postgres-2026-07-16.md) entregou sessão ao Clerk; se a tabela morre junto, **C8 perde o sinal de presença ao vivo**. Presença precisa de lar próprio.
 - **Contrato comercial não sabe quanto vale.** `CommercialAgreementSnapshot` não tem **nenhum** valor monetário nem referência a valor. O dinheiro é do C9, mas sem sequer uma referência o patrocínio é um contrato sem preço.

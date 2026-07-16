@@ -74,7 +74,8 @@ Para cada contexto: **responsabilidade** (o que é dele), **aggregate roots** (d
 
 #### C3 · Clube/Estrutura (`clubs`)
 - **Responsabilidade:** clube como instituição permanente; departamentos/peças investíveis, estádio e obras (`infrastructure`), políticas de bilhete, contratos comerciais (`commercial`), governança de diretoria (objetivos, promessas de board, plano de recuperação), perfil de IA/offline e identidade visual. Composição de **elenco** (§2.1).
-- **Aggregate roots:** `Club`, `ClubDepartment`, `InfrastructureProject`, `Stadium`/`Facility`, `TicketPricePolicy`, `MaintenancePlan`, `SponsorshipAgreement`, `BoardPromise`/`ClubGovernance`, `ClubAIProfile`, `ClubIdentityPeriod`, `Squad`/`SquadMembership`.
+- **Aggregate roots:** `Club`, ~~`ClubDepartment`~~, `InfrastructureProject`, ~~`Stadium`/`Facility`~~, `TicketPricePolicy`, `MaintenancePlan`, `SponsorshipAgreement`, `BoardPromise`/`ClubGovernance`, `ClubAIProfile`, `ClubIdentityPeriod`, `Squad`/`SquadMembership`.
+  > **[R-183](../99-decisoes/reescrita-do-core-2026-07-16.md) rebaixou `ClubDepartment` e `Stadium` a filhos do `Club`**: ambos vivem dentro da fronteira de consistência dele (`Club.setDepartmentPlan` os muta) e não sofrem contenção entre clubes, que foi o motivo de R-175 quebrar o mega-agregado. Esta lista foi feita por **vocabulário**, não por fronteira de consistência — cada contexto deve reexaminar a sua com esse critério antes de materializar tabela versionada.
 - **NÃO é dele:** o **ledger** e os pagamentos (C9 — o clube define orçamento/obra, mas quem lança caixa é Economia); os **jogadores** (C4); a **inscrição** em competição (C7). O clube nunca escreve `Player` nem `LedgerEntry`.
 
 #### C4 · Jogador/Desenvolvimento (`players`)
@@ -151,7 +152,7 @@ Tabela canônica: **agregado → contexto dono (quem escreve) → command(s) de 
 | `Season` | C2 | `season:check-start-end` (job) | 1 temporada ativa por mundo; transições válidas | `(gameWorldId, id)` |
 | `GameRuleConfig` / `GameEconomyConfig` | C2 | *(admin, versionado)* | regra muda por versão + data efetiva | `(gameWorldId, id)` |
 | `Club` | C3 | `CreateClub`, `SetTransferStrategy`, `ApplyClubIdentity` | slug único por mundo; identidade oficial ativa única | `(gameWorldId, id)` |
-| `ClubDepartment` | C3 | `UpgradeDepartment` | `level ≤ maxLevel`; 1 upgrade em curso/depto | `(gameWorldId, id)` |
+| `ClubDepartment` | C3 | `UpgradeDepartment` | `level ≤ maxLevel`; 1 upgrade em curso/depto | ~~`(gameWorldId, id)`~~ → `(gameWorldId, clubId, type)` — [R-183](../99-decisoes/reescrita-do-core-2026-07-16.md): filho do `Club`, sem id próprio (nada o referencia por id; o `InfrastructureProject` aponta o alvo pelo `kind`) |
 | `InfrastructureProject` | C3 | `StartStadiumWorks`, `ScheduleMaintenance` | sem obra conflitante no mesmo ativo | `(gameWorldId, id)` |
 | `TicketPricePolicy` | C3 | `SetTicketPrices` | preço na faixa plausível (R-27) | `(gameWorldId, id)` |
 | `SponsorshipAgreement` | C3 | `SignCommercialDeal` | sem 2 direitos exclusivos sobrepostos por ativo | `(gameWorldId, id)` |
