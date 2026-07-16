@@ -2325,6 +2325,17 @@ model IdempotencyKey {
   gameWorldId    String?   @db.Uuid
   actorId        String?   @db.Uuid
   idempotencyKey String
+  // Identifica o PEDIDO — distingue reenvio de reúso. Sem ele a chave só sabia
+  // que já fora usada, não com o quê, e `IDEMPOTENCY_KEY_REUSED`
+  // (`10-catalogo-de-commands.md:61`, errorCode comum de TODA mutação) era
+  // indetectável. É a serialização canônica do payload, não hash: comparação
+  // exata, e o core roda no React Native, sem `node:crypto`.
+  //
+  // Sem `@default`: um insert que esquecesse o campo pegaria o default calado e
+  // toda chave com fingerprint vazio casaria com toda outra — reúso viraria
+  // replay. A migration usa um default temporário só para preencher as linhas
+  // que já existem, e o derruba em seguida.
+  requestFingerprint String
   commandId      String?   @db.Uuid
   commandType    String?
   status         String    @default("PENDING")

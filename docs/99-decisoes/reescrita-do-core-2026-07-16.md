@@ -1,4 +1,4 @@
-# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-183
+# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-184
 
 > **Status:** CANÔNICO / RATIFICADO · **Data:** 2026-07-16 · **Autoridade:** decisão do dono do produto · **Escopo:** `packages/core`, `prisma/schema.prisma`, todos os 16 contextos
 
@@ -153,6 +153,22 @@ Consequências, cada uma com evidência:
 `ClubStatus` fica com o do domínio (`ACTIVE|SUSPENDED|DISSOLVED`): `BANKRUPT` é do C9, `BOT_RESERVED` morreu com R-180, `INACTIVE` era vago.
 
 **A regra geral que isto estabelece:** o context map lista ~70 roots, e a lista foi feita por *vocabulário*, não por fronteira de consistência. Root é o que precisa de fronteira própria por contenção ou por invariante que ninguém de fora garante. Todo contexto seguinte deve reexaminar a sua lista com esse critério, em vez de materializar 70 tabelas versionadas.
+
+### R-184 — A idempotência guarda o fingerprint do PEDIDO. `IDEMPOTENCY_KEY_REUSED` passa a existir.
+
+O [catálogo de commands](../02-tecnico/10-catalogo-de-commands.md) fixa, na linha 61, um errorCode **comum a toda mutação**: `IDEMPOTENCY_KEY_REUSED` — *"mesma `idempotencyKey` com payload divergente"*. Ele **não existia em lugar nenhum do código**, e a `IdempotencyKey` não tinha como detectá-lo: sem o fingerprint do pedido, a chave sabia que já fora usada, mas não **com o quê**.
+
+A dívida declarada em R-176 era "a `IdempotencyKey` está provada e não ligada". Estava errada: ela também estava **incompleta**.
+
+| Decisão | Por quê |
+|---|---|
+| Coluna `requestFingerprint`, **NOT NULL sem default** | O default `''` da migration é temporário e cai em seguida. Se sobrevivesse, um insert que esquecesse o campo pegaria `''` calado — e toda chave com fingerprint vazio casaria com toda outra, transformando reúso em replay. |
+| O fingerprint é **serialização canônica, não hash** | Comparação exata, zero superfície de colisão, e o core roda no React Native, sem `node:crypto`. O custo é uma coluna TEXT maior — a esta escala, não paga uma dependência criptográfica. |
+| `canonicalJson`, **nunca `JSON.stringify`** | `world-club-portfolio.ts:78` usava `stringify`, cuja ordem de chaves segue a **inserção**: o mesmo comando montado por outro caminho produzia outro fingerprint, e um reenvio legítimo seria recusado como reúso. |
+| `IdempotencyOutcome` vira **união discriminada** | Com `{ claimed: boolean }` o chamador podia ignorar o reúso sem o compilador reclamar. Ignorá-lo é devolver ao cliente o resultado de um comando que ele não pediu. |
+| **Reúso vence FAILED** | A ordem é regra, não estilo: um comando divergente não pode reabrir a chave de um comando que falhou e rodar no lugar dele. Erro do cliente vale qualquer que seja o desfecho do primeiro. |
+
+O nome inventado `IDEMPOTENCY_KEY_CONFLICT` (`world-club-portfolio.ts`, `world-scheduler.ts`, `scheduling-use-cases.ts`) morre junto com os mega-agregados que o usam — o canon nunca o conheceu.
 
 ---
 

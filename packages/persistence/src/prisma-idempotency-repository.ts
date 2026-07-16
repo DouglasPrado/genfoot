@@ -35,19 +35,29 @@ export class PrismaIdempotencyRepository implements IdempotencyRepository {
           idempotencyKey: claim.idempotencyKey,
           gameWorldId: claim.gameWorldId,
           commandType: claim.commandType,
+          requestFingerprint: claim.requestFingerprint,
           status: "PENDING",
         },
       ],
       skipDuplicates: true,
     });
-    if (inserted.count === 1) return { claimed: true, existing: null };
+    if (inserted.count === 1) return { claimed: true };
 
-    // Já existe: ou o comando rodou, ou falhou.
-    //
-    // FAILED é reabrível — o jogador tem de poder tentar de novo depois de
-    // "clube já tomado", e travar a chave transformaria erro recuperável em
-    // bloqueio permanente. A linha permanece (é ela que registra o último
-    // erro); o que muda é o status.
+    const existing = await this.find(claim.actorId, claim.idempotencyKey);
+    if (existing === null) throw new Error("Colisão sem registro correspondente.");
+
+    // Reúso vem ANTES de reabrir FAILED, e a ordem é a regra, não estilo: um
+    // comando divergente não pode reabrir a chave de um comando que falhou e
+    // rodar no lugar dele. `IDEMPOTENCY_KEY_REUSED` é erro do cliente, e vale
+    // qualquer que seja o desfecho do primeiro.
+    if (existing.requestFingerprint !== claim.requestFingerprint) {
+      return { claimed: false, reused: true, existing };
+    }
+
+    // Mesmo pedido. FAILED é reabrível — o jogador tem de poder tentar de novo
+    // depois de "clube já tomado", e travar a chave transformaria erro
+    // recuperável em bloqueio permanente. A linha permanece (é ela que registra
+    // o último erro); o que muda é o status.
     //
     // O update é CONDICIONAL (`status: "FAILED"` no where) e conta as linhas:
     // duas retentativas simultâneas disputam a mesma linha, e só uma vê
@@ -60,11 +70,9 @@ export class PrismaIdempotencyRepository implements IdempotencyRepository {
       },
       data: { status: "PENDING", errorCode: null, completedAt: null },
     });
-    if (reopened.count === 1) return { claimed: true, existing: null };
+    if (reopened.count === 1) return { claimed: true };
 
-    const existing = await this.find(claim.actorId, claim.idempotencyKey);
-    if (existing === null) throw new Error("Colisão sem registro correspondente.");
-    return { claimed: false, existing };
+    return { claimed: false, reused: false, existing };
   }
 
   public async complete(
@@ -125,6 +133,7 @@ interface IdempotencyKeyRow {
   readonly idempotencyKey: string;
   readonly gameWorldId: string | null;
   readonly commandType: string | null;
+  readonly requestFingerprint: string;
   readonly status: string;
   readonly resultHash: string | null;
   readonly errorCode: string | null;
@@ -136,6 +145,7 @@ function toRecord(row: IdempotencyKeyRow): IdempotencyRecord {
     idempotencyKey: row.idempotencyKey,
     gameWorldId: row.gameWorldId,
     commandType: row.commandType ?? "",
+    requestFingerprint: row.requestFingerprint,
     status: row.status as IdempotencyStatus,
     resultHash: row.resultHash,
     errorCode: row.errorCode,

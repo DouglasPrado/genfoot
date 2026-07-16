@@ -1,3 +1,4 @@
+import { commandFingerprint, type IdempotencyOutcome } from "@grinta/core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaIdempotencyRepository } from "../src/prisma-idempotency-repository.js";
@@ -12,8 +13,15 @@ function claim(over: Record<string, unknown> = {}) {
     idempotencyKey: "cadastro-1",
     gameWorldId: WORLD_ID,
     commandType: "identity:join-world",
+    requestFingerprint: commandFingerprint({ accountId: ACTOR, worldId: WORLD_ID }),
     ...over,
   };
+}
+
+/** Estreita a união: o teste só chega aqui quando a chave NÃO foi reservada. */
+function taken(outcome: IdempotencyOutcome) {
+  if (outcome.claimed) throw new Error("Esperava a chave já reservada.");
+  return outcome;
 }
 
 describe.skipIf(!hasDatabase)(
@@ -51,8 +59,8 @@ describe.skipIf(!hasDatabase)(
       await repository.tryClaim(claim());
       const outcome = await repository.tryClaim(claim());
       expect(outcome.claimed).toBe(false);
-      expect(outcome.existing?.commandType).toBe("identity:join-world");
-      expect(outcome.existing?.status).toBe("PENDING");
+      expect(taken(outcome).existing.commandType).toBe("identity:join-world");
+      expect(taken(outcome).existing.status).toBe("PENDING");
     });
 
     it("chaves diferentes do mesmo ator convivem", async () => {
@@ -98,8 +106,8 @@ describe.skipIf(!hasDatabase)(
         await repository.complete(ACTOR, "cadastro-1", "abc123");
         const outcome = await repository.tryClaim(claim());
         expect(outcome.claimed).toBe(false);
-        expect(outcome.existing?.status).toBe("COMPLETED");
-        expect(outcome.existing?.resultHash).toBe("abc123");
+        expect(taken(outcome).existing.status).toBe("COMPLETED");
+        expect(taken(outcome).existing.resultHash).toBe("abc123");
       });
 
       it("falhar guarda o errorCode", async () => {
@@ -125,6 +133,67 @@ describe.skipIf(!hasDatabase)(
 
     it("devolve null para chave que não existe", async () => {
       expect(await repository.find(ACTOR, "nao-existe")).toBeNull();
+    });
+
+    /**
+     * `IDEMPOTENCY_KEY_REUSED` — errorCode COMUM de toda mutação no catálogo
+     * canônico (`10-catalogo-de-commands.md:61`): "mesma `idempotencyKey` com
+     * payload divergente". Não existia em lugar nenhum do código, e a tabela não
+     * tinha como detectá-lo: sem o fingerprint do PEDIDO, a chave só sabia que
+     * já fora usada, não com o quê.
+     *
+     * Isto é o oposto do replay: reenviar o MESMO comando devolve o mesmo
+     * resultado; reenviar OUTRO comando com a mesma chave é erro do cliente, e
+     * atendê-lo silenciosamente devolveria o resultado de um comando que o
+     * cliente não pediu.
+     */
+    describe("payload divergente na mesma chave", () => {
+      it("mesma chave + mesmo pedido = replay, não reúso", async () => {
+        await repository.tryClaim(claim());
+        const outcome = await repository.tryClaim(claim());
+        expect(outcome.claimed).toBe(false);
+        expect(taken(outcome).reused).toBe(false);
+      });
+
+      it("mesma chave + pedido divergente = IDEMPOTENCY_KEY_REUSED", async () => {
+        await repository.tryClaim(claim());
+        const outcome = await repository.tryClaim(
+          claim({ requestFingerprint: commandFingerprint({ accountId: "outro" }) }),
+        );
+        expect(outcome.claimed).toBe(false);
+        expect(taken(outcome).reused).toBe(true);
+      });
+
+      /**
+       * Reúso vence FAILED. Sem esta ordem, um comando divergente reabriria a
+       * chave de um comando que falhou e rodaria no lugar dele.
+       */
+      it("pedido divergente não reabre chave que falhou", async () => {
+        await repository.tryClaim(claim());
+        await repository.fail(ACTOR, "cadastro-1", "CLUB_TAKEN");
+        const outcome = await repository.tryClaim(
+          claim({ requestFingerprint: commandFingerprint({ accountId: "outro" }) }),
+        );
+        expect(outcome.claimed).toBe(false);
+        expect(taken(outcome).reused).toBe(true);
+      });
+
+      /**
+       * A razão de o fingerprint ser serialização CANÔNICA e não
+       * `JSON.stringify` — que é o que `world-club-portfolio.ts:78` usava. O
+       * `stringify` preserva ordem de inserção: o mesmo comando montado com as
+       * chaves em outra ordem produziria outro fingerprint, e um replay legítimo
+       * seria recusado como reúso.
+       */
+      it("a ordem das chaves do payload não muda o fingerprint", async () => {
+        await repository.tryClaim(
+          claim({ requestFingerprint: commandFingerprint({ a: 1, b: 2 }) }),
+        );
+        const outcome = await repository.tryClaim(
+          claim({ requestFingerprint: commandFingerprint({ b: 2, a: 1 }) }),
+        );
+        expect(taken(outcome).reused).toBe(false);
+      });
     });
 
     /**
