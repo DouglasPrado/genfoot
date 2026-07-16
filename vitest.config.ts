@@ -22,7 +22,7 @@ export default defineConfig({
       "apps/simulator/**/*.test.ts",
       "apps/api/**/*.test.ts",
       "apps/mobile/**/*.test.ts",
-      "scripts/roadmap/**/*.test.ts",
+      "apps/admin/**/*.test.ts",
     ],
     coverage: {
       reporter: ["text", "json", "html"],

@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, Globe2, LogOut, ShieldAlert, Terminal } from "lucide-react";
+import { FlaskConical, Globe2, LogOut, ShieldAlert, Terminal, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -11,6 +11,7 @@ import { useSession } from "@/lib/session";
 
 const NAV = [
   { href: "/worlds", label: "Mundos", icon: Globe2 },
+  { href: "/usuarios", label: "Usuários", icon: Users },
   { href: "/console", label: "Console", icon: Terminal },
   { href: "/anti-abuse", label: "Anti-abuso", icon: ShieldAlert },
   { href: "/laboratorio", label: "Laboratório", icon: FlaskConical },

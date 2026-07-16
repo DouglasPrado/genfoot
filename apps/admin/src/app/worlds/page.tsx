@@ -25,6 +25,8 @@ export default function WorldsPage() {
   const [startDate, setStartDate] = useState("2026-01-01");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState("");
+  const [openError, setOpenError] = useState<string | null>(null);
 
   async function createWorld() {
     setBusy(true);
@@ -58,6 +60,21 @@ export default function WorldsPage() {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Registra um mundo que já existe na API mas este navegador não conhece —
+  // ex.: o mundo demo criado pelo seed. Valida antes de lembrar.
+  async function openExisting() {
+    const id = openId.trim();
+    if (id === "") return;
+    setOpenError(null);
+    try {
+      const env = await api.query<{ seed?: string }>(id);
+      remember({ id, seed: env.data?.seed ?? "externo" });
+      setOpenId("");
+    } catch {
+      setOpenError("Mundo não encontrado na API.");
     }
   }
 
@@ -108,7 +125,32 @@ export default function WorldsPage() {
           )}
         </section>
 
-        <aside>
+        <aside className="space-y-4">
+          <Card>
+            <CardContent className="space-y-3">
+              <h2 className="font-heading text-sm">Abrir mundo existente</h2>
+              <div className="space-y-1.5">
+                <Label htmlFor="openId">World ID</Label>
+                <Input
+                  id="openId"
+                  value={openId}
+                  onChange={(e) => setOpenId(e.target.value)}
+                  placeholder="019f6bc4-…"
+                  className="mono"
+                />
+              </div>
+              {openError === null ? null : (
+                <p className="text-xs text-red-400">{openError}</p>
+              )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => void openExisting()}
+              >
+                Abrir
+              </Button>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="space-y-4">
               <h2 className="font-heading text-sm">Novo mundo</h2>
