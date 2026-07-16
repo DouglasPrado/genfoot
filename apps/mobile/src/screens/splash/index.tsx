@@ -6,12 +6,13 @@ import Constants from "expo-constants";
 import { CONTRACT_VERSION } from "@grinta/api-client";
 import { useAuth } from "@clerk/expo";
 
-import { ProgressBar } from "@/components/progress-bar";
+import { WorldLoading } from "@/components/world-loading";
 import { useSession } from "@/lib/session";
 import { useWorldQuery } from "@/lib/world";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import type { MobileIdentityProjection } from "@/screens/onboarding/onboarding-model";
 import { mobileAccountKey } from "@/screens/onboarding/onboarding-model";
+import { bootSteps } from "./boot-model";
 import { connectionLabel, deriveSplashDecision } from "./splash-model";
 
 const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
@@ -59,6 +60,15 @@ export function SplashScreen() {
       identityQuery.state === "error" || identityQuery.state === "offline",
   });
 
+  const steps = bootSteps({
+    status,
+    serverContractVersion: contractVersion,
+    clientContractVersion: CONTRACT_VERSION,
+    accountLoaded: clerkLoaded,
+    signedIn: isSignedIn === true,
+    identityResolved: hasActiveControl !== null,
+  });
+
   // Alvo estável: `decision` é um objeto novo a cada render, então depender dele
   // dispararia replace em loop. A string (ou null) só muda quando a rota muda.
   const target = decision.kind === "route" ? decision.to : null;
@@ -66,16 +76,14 @@ export function SplashScreen() {
     if (target !== null) router.replace(target);
   }, [target, router]);
 
+  if (decision.kind === "loading" || decision.kind === "route") {
+    return <WorldLoading steps={steps} />;
+  }
+
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       <View style={styles.center}>
         <Text style={styles.logo}>GRINTA</Text>
-
-        {decision.kind === "loading" || decision.kind === "route" ? (
-          <View style={styles.progress} accessibilityRole="progressbar">
-            <ProgressBar value={status === "online" ? 0.75 : 0.25} height={3} />
-          </View>
-        ) : null}
 
         {decision.kind === "network-error" ? (
           <View style={styles.panel}>
@@ -135,9 +143,6 @@ const styles = StyleSheet.create({
     ...display,
     fontSize: 44,
     letterSpacing: 2,
-  },
-  progress: {
-    width: 140,
   },
   panel: {
     alignItems: "center",

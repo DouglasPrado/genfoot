@@ -12,6 +12,9 @@ import { useRouter } from "expo-router";
 import * as AuthSession from "expo-auth-session";
 import { useSSO, useSignIn } from "@clerk/expo";
 
+import { WorldLoading } from "@/components/world-loading";
+import { bootSteps } from "@/screens/splash/boot-model";
+import { CONTRACT_VERSION } from "@grinta/api-client";
 import { useSession } from "@/lib/session";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import {
@@ -37,7 +40,7 @@ export function Login() {
   const router = useRouter();
   const { signIn, fetchStatus } = useSignIn();
   const { startSSOFlow } = useSSO();
-  const { status: connection } = useSession();
+  const { status: connection, contractVersion } = useSession();
 
   const [form, setForm] = useState<LoginForm>(EMPTY);
   const [errors, setErrors] = useState<readonly FieldError[]>([]);
@@ -100,6 +103,23 @@ export function Login() {
 
   const formError = errorFor(visible, "form");
 
+  if (step === "complete" && formError === null) {
+    // Entrou: mostra o carregamento do mundo enquanto o finalize corre e o
+    // splash assume. Sem este ramo, `complete` cairia no formulário.
+    return (
+      <WorldLoading
+        steps={bootSteps({
+          status: connection,
+          serverContractVersion: contractVersion,
+          clientContractVersion: CONTRACT_VERSION,
+          accountLoaded: true,
+          signedIn: true,
+          identityResolved: false,
+        })}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
@@ -109,14 +129,7 @@ export function Login() {
       >
         <Text style={styles.logo}>GRINTA</Text>
 
-        {step === "complete" ? (
-          <>
-            <Text style={styles.heading}>ENTRANDO…</Text>
-            {formError === null ? null : (
-              <Text style={styles.formError}>{formError}</Text>
-            )}
-          </>
-        ) : step === "needs-mfa" ? (
+        {step === "needs-mfa" ? (
           <>
             <Text style={styles.heading}>VERIFICAÇÃO EM DUAS ETAPAS</Text>
             {/* Não fingimos sucesso: a conta exige um segundo fator e esta tela
