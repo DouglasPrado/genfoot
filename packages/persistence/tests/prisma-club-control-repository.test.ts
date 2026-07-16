@@ -28,6 +28,7 @@ describe.skipIf(!hasDatabase)(
         clubId: over.clubId ?? CLUB_ID,
         worldParticipantId: participantId,
         worldSeed: WORLD_SEED,
+        attemptKey: "t1",
         occurredOn: over.occurredOn ?? "2026-01-05",
       });
       if (!result.ok) throw result.error;
@@ -139,6 +140,7 @@ describe.skipIf(!hasDatabase)(
           clubId: CLUB_ID,
           worldParticipantId: outroParticipantId,
           worldSeed: WORLD_SEED,
+        attemptKey: "t1",
           occurredOn: "2026-02-01",
         });
         if (!rival.ok) throw rival.error;
@@ -163,6 +165,7 @@ describe.skipIf(!hasDatabase)(
           clubId: CLUB_ID,
           worldParticipantId: outroParticipantId,
           worldSeed: WORLD_SEED,
+        attemptKey: "t1",
           occurredOn: "2026-06-02",
         });
         if (!sucessor.ok) throw sucessor.error;

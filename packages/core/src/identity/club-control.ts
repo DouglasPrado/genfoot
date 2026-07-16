@@ -51,6 +51,13 @@ export interface StartClubControlInput {
   readonly worldParticipantId: WorldParticipantId | string;
   readonly worldSeed: string;
   readonly occurredOn: string;
+  /**
+   * Discrimina TENTATIVAS — semente do id, não estado (ver
+   * `ClubEntryReservation.attemptKey`). Um clube tem 1 controle ATIVO, mas
+   * muitos ao longo do tempo: A assume, sai, e pode voltar. Sem discriminador,
+   * o segundo controle de A no mesmo clube e dia repetiria o id do primeiro.
+   */
+  readonly attemptKey: string;
 }
 
 export class ClubControl {
@@ -64,7 +71,7 @@ export class ClubControl {
       new ClubControl({
         id: deterministicUuidV7<"ClubControl">({
           worldSeed: input.worldSeed,
-          context: `club-control:${input.gameWorldId}:${input.clubId}:${input.worldParticipantId}`,
+          context: `club-control:${input.gameWorldId}:${input.clubId}:${input.worldParticipantId}:${input.attemptKey}`,
           timestampMilliseconds: timestampOf(date.value.toString()),
         }),
         gameWorldId: input.gameWorldId as GameWorldId,

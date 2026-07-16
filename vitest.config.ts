@@ -15,7 +15,7 @@ const alias = {
 };
 
 /** Testes que falam com o Postgres de verdade (R-173). */
-const POSTGRES_TESTS = "packages/persistence/tests/prisma-*.test.ts";
+const POSTGRES_TESTS = "packages/persistence/tests/{prisma-*,identity-commands}.test.ts";
 
 const UNIT_TESTS = [
   "packages/**/*.test.ts",

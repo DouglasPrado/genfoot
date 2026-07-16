@@ -4,13 +4,23 @@ import { Module } from "@nestjs/common";
 import { JsonWorldRepository } from "@grinta/persistence";
 
 import { IdempotencyStore } from "./idempotency-store.js";
-import { IDEMPOTENCY_STORE, WORLD_REPOSITORY } from "./tokens.js";
+import { LazyIdentityReadModel } from "./lazy-identity-read-model.js";
+import { LazyIdentityUnitOfWork } from "./lazy-identity-unit-of-work.js";
+import {
+  IDEMPOTENCY_STORE,
+  IDENTITY_READ_MODEL,
+  IDENTITY_UNIT_OF_WORK,
+  WORLD_REPOSITORY,
+} from "./tokens.js";
 
 /**
- * Fronteira domínio↔infra da API. Provê o repositório de persistência (adapter
- * JSON — o roadmap fecha o Prisma por último) e o store de idempotência de
- * transporte, ambos por token explícito (DI sem metadados). Nenhuma regra vive
- * aqui: a API só orquestra os casos de uso de `@grinta/core`.
+ * Fronteira domínio↔infra da API. Nenhuma regra vive aqui: a API só orquestra
+ * os casos de uso de `@grinta/core`.
+ *
+ * Hoje há DOIS armazenamentos, e isso é transitório e declarado (R-173): C1 já
+ * está no Postgres, por agregados (R-175); os outros quinze contextos seguem no
+ * adapter JSON, que é condenado. Enquanto durar, o estado é PARCIAL — não
+ * "pronto".
  */
 @Module({
   providers: [
@@ -27,7 +37,20 @@ import { IDEMPOTENCY_STORE, WORLD_REPOSITORY } from "./tokens.js";
       provide: IDEMPOTENCY_STORE,
       useFactory: (): IdempotencyStore => new IdempotencyStore(),
     },
+    {
+      provide: IDENTITY_UNIT_OF_WORK,
+      useFactory: (): LazyIdentityUnitOfWork => new LazyIdentityUnitOfWork(),
+    },
+    {
+      provide: IDENTITY_READ_MODEL,
+      useFactory: (): LazyIdentityReadModel => new LazyIdentityReadModel(),
+    },
   ],
-  exports: [WORLD_REPOSITORY, IDEMPOTENCY_STORE],
+  exports: [
+    WORLD_REPOSITORY,
+    IDEMPOTENCY_STORE,
+    IDENTITY_UNIT_OF_WORK,
+    IDENTITY_READ_MODEL,
+  ],
 })
 export class CoreModule {}

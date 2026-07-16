@@ -10,6 +10,7 @@ const base: {
   worldSeed: string;
   occurredOn: string;
   expiresOn: string;
+  attemptKey: string;
 } = {
   gameWorldId: "019b76da-a800-7787-9462-49c009be1111",
   clubId: "019b76da-a800-7787-9462-49c009be3333",
@@ -17,6 +18,7 @@ const base: {
   worldSeed: "grinta-demo",
   occurredOn: "2026-01-05",
   expiresOn: "2026-01-07",
+  attemptKey: "t1",
 };
 
 function hold(over: Partial<typeof base> = {}) {
@@ -60,6 +62,26 @@ describe("ClubEntryReservation.hold", () => {
 
   it("o id é determinístico", () => {
     expect(hold().snapshot().id).toBe(hold().snapshot().id);
+  });
+
+  /**
+   * O defeito que o teste do `ReleaseClubReservation` pegou, aqui na origem.
+   * A reserva é 1 por VEZ e muitas ao longo do tempo: o clube circula. Sem
+   * discriminador, soltar e reservar o mesmo clube no mesmo dia repetiria o id.
+   */
+  it("tentativas diferentes no mesmo clube e dia têm ids diferentes", () => {
+    expect(hold({ attemptKey: "t1" }).snapshot().id).not.toBe(
+      hold({ attemptKey: "t2" }).snapshot().id,
+    );
+  });
+
+  // O id é escopado por participação: a chave de tentativa vem do CLIENTE, e
+  // sem o escopo dois jogadores que mandassem a mesma chave colidiriam.
+  it("participações diferentes com a mesma tentativa têm ids diferentes", () => {
+    expect(hold().snapshot().id).not.toBe(
+      hold({ worldParticipantId: "019b76da-a800-7787-9462-49c009be7777" }).snapshot()
+        .id,
+    );
   });
 
   it("recusa datas inválidas", () => {

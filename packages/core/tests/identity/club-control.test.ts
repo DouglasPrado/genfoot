@@ -9,12 +9,14 @@ const base: {
   worldParticipantId: string;
   worldSeed: string;
   occurredOn: string;
+  attemptKey: string;
 } = {
   gameWorldId: "019b76da-a800-7787-9462-49c009be1111",
   clubId: "019b76da-a800-7787-9462-49c009be3333",
   worldParticipantId: "019b76da-a800-7787-9462-49c009be2222",
   worldSeed: "grinta-demo",
   occurredOn: "2026-01-05",
+  attemptKey: "t1",
 };
 
 function start(over: Partial<typeof base> = {}) {
@@ -51,6 +53,38 @@ describe("ClubControl.start", () => {
   it("clubes diferentes têm controles com ids diferentes", () => {
     expect(start().snapshot().id).not.toBe(
       start({ clubId: "019b76da-a800-7787-9462-49c009be9999" }).snapshot().id,
+    );
+  });
+
+  /**
+   * O defeito que o teste do `ReleaseClubReservation` pegou, aqui na origem.
+   *
+   * Um clube tem 1 controle ATIVO, mas muitos ao longo do tempo: A assume, sai,
+   * e pode voltar. Sem discriminador de tentativa, o segundo controle de A no
+   * mesmo clube e no mesmo dia repetiria o id do primeiro e colidiria na chave
+   * primária. Ao contrário do `WorldParticipant`, que é 1 por (mundo, conta) e
+   * pode derivar o id da chave natural.
+   */
+  it("tentativas diferentes no mesmo clube e dia têm ids diferentes", () => {
+    expect(start({ attemptKey: "t1" }).snapshot().id).not.toBe(
+      start({ attemptKey: "t2" }).snapshot().id,
+    );
+  });
+
+  // E a mesma tentativa devolve o mesmo id: é isso que faz um comando
+  // reprocessado não criar um segundo controle.
+  it("a mesma tentativa devolve o mesmo id", () => {
+    expect(start({ attemptKey: "t9" }).snapshot().id).toBe(
+      start({ attemptKey: "t9" }).snapshot().id,
+    );
+  });
+
+  // O id é escopado por participação: a chave de tentativa vem do CLIENTE, e
+  // sem o escopo dois jogadores que mandassem a mesma chave colidiriam.
+  it("participações diferentes com a mesma tentativa têm ids diferentes", () => {
+    expect(start().snapshot().id).not.toBe(
+      start({ worldParticipantId: "019b76da-a800-7787-9462-49c009be7777" }).snapshot()
+        .id,
     );
   });
 

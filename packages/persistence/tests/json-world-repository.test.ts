@@ -13,7 +13,6 @@ import {
   WorldAdmin,
   WorldCompetitions,
   WorldEventing,
-  WorldIdentity,
   WorldLedger,
   WorldMarket,
   WorldInbox,
@@ -26,7 +25,6 @@ import {
   CancelPromise,
   EndStaffContract,
   ExecuteDecisionProposal,
-  JoinWorld,
   RetryDelivery,
   SeasonRollover,
   WorldGenesisGenerator,
@@ -656,52 +654,6 @@ describe("JsonWorldRepository", () => {
     await expect(
       store.value.saveMarket(market.snapshot(), 99),
     ).rejects.toMatchObject({ code: "MARKET_REVISION_CONFLICT" });
-  });
-
-  it("persiste a identidade C1 do mundo (round-trip + recovery)", async () => {
-    const store = await repository();
-    const world = snapshot();
-    await store.value.save(world, null);
-    const created = WorldIdentity.initialize(world);
-    if (!created.ok) throw created.error;
-    const identity = created.value;
-
-    // R-172: a conta é de plataforma e não passa pelo agregado do mundo. Aqui
-    // só entra o vínculo — participação, reserva, controle.
-    const accountId = "019b76da-a800-7787-9462-49c009be300a" as never;
-    const joined = identity.joinWorld({
-      accountId,
-      gameWorldId: world.id,
-      rulesetVersion: world.rulesetVersion,
-      idempotencyKey: "join:1",
-      worldSeed: world.seed,
-      worldDate: "2026-01-03",
-    });
-    if (!joined.ok) throw joined.error;
-
-    await store.value.saveIdentity(identity.snapshot(), null);
-    // round-trip: participações, reservas, controles e events sem stripping
-    expect(await store.value.findIdentityByWorldId(world.id)).toEqual(
-      identity.snapshot(),
-    );
-
-    // recovery: retry de joinWorld após restart = efeito único
-    const restarted = new JsonWorldRepository(store.directory);
-    const join = new JoinWorld(restarted);
-    const retry = await join.execute(world.id, {
-      accountId,
-      gameWorldId: world.id,
-      rulesetVersion: world.rulesetVersion,
-      idempotencyKey: "join:1",
-      worldSeed: world.seed,
-      worldDate: "2026-01-03",
-    });
-    expect(retry).toMatchObject({ ok: true });
-    const reloaded = await restarted.findIdentityByWorldId(world.id);
-    expect(reloaded!.participations).toHaveLength(1);
-    await expect(
-      store.value.saveIdentity(identity.snapshot(), 99),
-    ).rejects.toMatchObject({ code: "IDENTITY_REVISION_CONFLICT" });
   });
 
   it("persiste o admin C12 com caso, correção e audit chain (round-trip + recovery)", async () => {

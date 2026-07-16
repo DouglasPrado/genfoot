@@ -10,6 +10,7 @@ import {
   Req,
 } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { IdentityUnitOfWork } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import type { Request } from "express";
 
@@ -20,6 +21,7 @@ import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
   IDEMPOTENCY_STORE,
+  IDENTITY_UNIT_OF_WORK,
   REALTIME_PUBLISHER,
   WORLD_REPOSITORY,
 } from "../core/tokens.js";
@@ -43,6 +45,11 @@ export class CommandsController {
     @Inject(WORLD_REPOSITORY) private readonly repository: JsonWorldRepository,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
+    // C1 já está no Postgres (R-173/R-175); os outros quinze contextos seguem
+    // no `repository` JSON. Dois caminhos é transitório e declarado — some
+    // quando o último contexto migrar.
+    @Inject(IDENTITY_UNIT_OF_WORK)
+    private readonly identityUnitOfWork: IdentityUnitOfWork,
   ) {}
 
   @ApiOperation({
@@ -172,7 +179,11 @@ export class CommandsController {
     const commandId = randomUUID();
     let result;
     try {
-      result = await handler({ repository: this.repository, envelope });
+      result = await handler({
+        repository: this.repository,
+        identityUnitOfWork: this.identityUnitOfWork,
+        envelope,
+      });
     } catch (error) {
       // Rede de segurança: nenhum command derruba a API com 500. Qualquer
       // exceção do domínio/adapter vira REJECTED com correlationId preservado.

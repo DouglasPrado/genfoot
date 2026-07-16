@@ -7,10 +7,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyRealtimeEvent,
+  ClubControl,
+  ClubEntryReservation,
   GameWorld,
   WorldEventing,
-  WorldIdentity,
   WorldInbox,
+  WorldParticipant,
   type GameWorldSnapshot,
   type IdentityAccountRef,
   type IdentityClubRef,
@@ -41,72 +43,79 @@ function world(): GameWorldSnapshot {
 }
 
 describe("GP-002 Return after absence (convergence)", () => {
+  /**
+   * R-175: os agregados são por entidade, e o mega-agregado `WorldIdentity`
+   * não existe mais. Este teste segue puro — exercita a REGRA de cada root.
+   *
+   * O que ele deixou de cobrir, de propósito: as invariantes que cruzam
+   * agregados (clube já tomado, cooldown barrando a reserva) saíram do domínio
+   * para o caso de uso, e valem contra o Postgres — quem as prova agora é
+   * `packages/persistence/tests/identity-commands.test.ts`, onde os índices
+   * únicos parciais existem de verdade. Aqui, um `.some()` num array em memória
+   * só provaria que o array em memória concorda consigo mesmo.
+   */
   it("retoma após o cooldown e recupera o realtime sem duplicar", () => {
     const gameWorld = world();
-    const ruleset = gameWorld.rulesetVersion;
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
-    if (!identityR.ok) throw identityR.error;
-    const identity = identityR.value;
-
-    const reservation = identity.reserveClub({
-      clubId: CLUB,
+    const participantR = WorldParticipant.join({
+      gameWorldId: gameWorld.id,
       accountId: ACCOUNT,
-      expiresOn: "2026-01-10",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:1",
       worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
+      occurredOn: "2026-01-05",
+    });
+    if (!participantR.ok) throw participantR.error;
+    const participant = participantR.value;
+
+    const reservation = ClubEntryReservation.hold({
+      gameWorldId: gameWorld.id,
+      clubId: CLUB,
+      worldParticipantId: participant.snapshot().id,
+      worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+      occurredOn: "2026-01-05",
+      expiresOn: "2026-01-10",
     });
     if (!reservation.ok) throw reservation.error;
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:1",
+    expect(reservation.value.confirm().ok).toBe(true);
+
+    const controlR = ClubControl.start({
+      gameWorldId: gameWorld.id,
+      clubId: CLUB,
+      worldParticipantId: participant.snapshot().id,
       worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
+        attemptKey: "t1",
+      occurredOn: "2026-01-06",
     });
-    if (!control.ok) throw control.error;
+    if (!controlR.ok) throw controlR.error;
+    const control = controlR.value;
 
-    // O gestor se ausenta: encerra o controle e entra em cooldown.
-    const ended = identity.endClubControl({
-      controlId: control.value.id,
-      reason: "SABBATICAL",
-      endedOn: "2026-06-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "end:1",
+    // O gestor se ausenta: encerra o controle e entra em cooldown de 30 dias.
+    expect(control.end("SABBATICAL", "2026-06-01")).toMatchObject({
+      ok: true,
+      value: { status: "ENDED", endedReason: "SABBATICAL" },
+    });
+    expect(participant.startCooldown("2026-07-01").ok).toBe(true);
+
+    // Durante o cooldown, a volta é barrada; depois dele, liberada.
+    expect(participant.isInCooldownOn("2026-06-10")).toBe(true);
+    expect(participant.isInCooldownOn("2026-08-01")).toBe(false);
+
+    const returned = ClubEntryReservation.hold({
+      gameWorldId: gameWorld.id,
+      clubId: CLUB2,
+      worldParticipantId: participant.snapshot().id,
       worldSeed: gameWorld.seed,
-      worldDate: "2026-06-01",
-    });
-    expect(ended).toMatchObject({ ok: true, value: { status: "ENDED" } });
-
-    // Tenta retornar durante o cooldown → bloqueado sem escrita parcial.
-    expect(
-      identity.requestClubSwitch({
-        accountId: ACCOUNT,
-        targetClubId: CLUB2,
-        expiresOn: "2026-06-20",
-        rulesetVersion: ruleset,
-        idempotencyKey: "return:early",
-        worldSeed: gameWorld.seed,
-        worldDate: "2026-06-10",
-      }),
-    ).toMatchObject({ ok: false, error: { code: "COOLDOWN_ACTIVE" } });
-
-    // Retorna após o cooldown → nova reserva íntegra (fatos anteriores preservados).
-    const returned = identity.requestClubSwitch({
-      accountId: ACCOUNT,
-      targetClubId: CLUB2,
+        attemptKey: "t1",
+      occurredOn: "2026-08-01",
       expiresOn: "2026-08-15",
-      rulesetVersion: ruleset,
-      idempotencyKey: "return:ok",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-08-01",
     });
-    expect(returned).toMatchObject({ ok: true, value: { status: "HELD" } });
-    // O controle anterior encerrado permanece no histórico.
-    expect(
-      identity.snapshot().controls.some((c) => c.status === "ENDED"),
-    ).toBe(true);
+    expect(returned).toMatchObject({ ok: true });
+    // O controle anterior permanece encerrado, com o motivo — que antes existia
+    // no evento e evaporava na gravação, por falta de coluna.
+    expect(control.snapshot()).toMatchObject({
+      status: "ENDED",
+      endedOn: "2026-06-01",
+      endedReason: "SABBATICAL",
+    });
 
     // Reconexão do cliente: aplica o próximo evento, ignora duplicata, detecta gap.
     expect(classifyRealtimeEvent(41, 42).result).toBe("APPLIED");

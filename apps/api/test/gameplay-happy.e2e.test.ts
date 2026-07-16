@@ -106,7 +106,6 @@ describe("API gameplay happy-path via wc factory (e2e)", () => {
       ["inbox:initialize", "inbox"],
       ["admin:initialize", "admin"],
       ["automation:initialize", "automation"],
-      ["identity:initialize", "identity"],
       ["eventing:initialize", "eventing"],
       ["market:initialize", "market"],
     ];

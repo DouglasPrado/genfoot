@@ -49,8 +49,6 @@ import {
   type WorldEventingSnapshot,
   type MarketRepository,
   type WorldMarketSnapshot,
-  type IdentityRepository,
-  type WorldIdentitySnapshot,
   type AdminRepository,
   type WorldAdminSnapshot,
   type NarrativeRepository,
@@ -1135,58 +1133,6 @@ const worldMarketSchema = z.object({
   revision: z.number().int().positive(),
 });
 
-const worldIdentitySchema = z.object({
-  gameWorldId: identifierSchema,
-  rulesetVersion: z.string(),
-  cooldownDays: z.number().int().nonnegative(),
-  // Conta, credencial e sessão saíram deste agregado: a conta é global (R-172)
-  // e o ciclo de token é do Clerk (R-174). O que sobra aqui é o que de fato é
-  // do mundo.
-  reservations: z.array(
-    z.object({
-      id: identifierSchema,
-      gameWorldId: identifierSchema,
-      clubId: identifierSchema,
-      accountId: identifierSchema,
-      status: z.enum(["HELD", "CONFIRMED", "EXPIRED", "RELEASED"]),
-      heldOn: z.string(),
-      expiresOn: z.string(),
-      idempotencyKey: z.string().min(1),
-      version: z.number().int().positive(),
-    }),
-  ),
-  controls: z.array(
-    z.object({
-      id: identifierSchema,
-      gameWorldId: identifierSchema,
-      clubId: identifierSchema,
-      accountId: identifierSchema,
-      status: z.enum(["ACTIVE", "ENDED"]),
-      activeFrom: z.string(),
-      endedOn: z.string().nullable(),
-      endedReason: z.string().nullable(),
-      version: z.number().int().positive(),
-    }),
-  ),
-  participations: z.array(
-    z.object({
-      accountId: identifierSchema,
-      gameWorldId: identifierSchema,
-      status: z.enum(["ACTIVE", "ENDED"]),
-      activatedOn: z.string(),
-    }),
-  ),
-  cooldowns: z.array(
-    z.object({
-      accountId: identifierSchema,
-      gameWorldId: identifierSchema,
-      untilOn: z.string(),
-    }),
-  ),
-  events: z.array(z.record(z.unknown())),
-  revision: z.number().int().positive(),
-});
-
 const worldAdminSchema = z.object({
   gameWorldId: identifierSchema,
   rulesetVersion: z.string(),
@@ -1717,7 +1663,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
   }),
   z.object({
     schemaVersion: z.literal(13),
@@ -1731,7 +1676,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
     admin: worldAdminSchema.nullable(),
   }),
   z.object({
@@ -1746,7 +1690,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
     admin: worldAdminSchema.nullable(),
     narrative: worldNarrativeSchema.nullable(),
   }),
@@ -1762,7 +1705,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
     admin: worldAdminSchema.nullable(),
     narrative: worldNarrativeSchema.nullable(),
     inbox: worldInboxSchema.nullable(),
@@ -1779,7 +1721,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
     admin: worldAdminSchema.nullable(),
     narrative: worldNarrativeSchema.nullable(),
     inbox: worldInboxSchema.nullable(),
@@ -1797,7 +1738,6 @@ const persistedSnapshotSchema = z.discriminatedUnion("schemaVersion", [
     matches: worldMatchesSchema.nullable(),
     eventing: worldEventingSchema.nullable(),
     market: worldMarketSchema.nullable(),
-    identity: worldIdentitySchema.nullable(),
     admin: worldAdminSchema.nullable(),
     narrative: worldNarrativeSchema.nullable(),
     inbox: worldInboxSchema.nullable(),
@@ -1817,7 +1757,6 @@ interface LoadedEnvelope {
   readonly matches: WorldMatchesSnapshot | null;
   readonly eventing: WorldEventingSnapshot | null;
   readonly market: WorldMarketSnapshot | null;
-  readonly identity: WorldIdentitySnapshot | null;
   readonly admin: WorldAdminSnapshot | null;
   readonly narrative: WorldNarrativeSnapshot | null;
   readonly inbox: WorldInboxSnapshot | null;
@@ -1837,7 +1776,6 @@ export class JsonWorldRepository
     MatchRepository,
     EventingRepository,
     MarketRepository,
-    IdentityRepository,
     AdminRepository,
     NarrativeRepository,
     InboxRepository,
@@ -1888,7 +1826,6 @@ export class JsonWorldRepository
       matches: current?.matches ?? null,
       eventing: current?.eventing ?? null,
       market: current?.market ?? null,
-      identity: current?.identity ?? null,
       admin: current?.admin ?? null,
       narrative: current?.narrative ?? null,
       inbox: current?.inbox ?? null,
@@ -1930,7 +1867,6 @@ export class JsonWorldRepository
       matches: current.matches,
       eventing: current.eventing,
       market: current.market,
-      identity: current.identity,
       admin: current.admin,
       narrative: current.narrative,
       inbox: current.inbox,
@@ -2282,45 +2218,6 @@ export class JsonWorldRepository
     });
   }
 
-  public async findIdentityByWorldId(
-    id: GameWorldId,
-  ): Promise<WorldIdentitySnapshot | null> {
-    return (await this.load(id))?.identity ?? null;
-  }
-
-  public async saveIdentity(
-    identity: WorldIdentitySnapshot,
-    expectedRevision: number | null,
-  ): Promise<void> {
-    await mkdir(this.baseDirectory, { recursive: true });
-    await this.withNamedLock(identity.gameWorldId, "identity", async () => {
-      const current = await this.load(identity.gameWorldId);
-      if (current === null) {
-        throw new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.");
-      }
-      if (expectedRevision === null && current.identity !== null) {
-        throw new DomainError(
-          "IDENTITY_ALREADY_EXISTS",
-          "A identidade já existe.",
-        );
-      }
-      if (
-        expectedRevision !== null &&
-        current.identity?.revision !== expectedRevision
-      ) {
-        throw new DomainError(
-          "IDENTITY_REVISION_CONFLICT",
-          "A identidade foi alterada desde a última leitura.",
-          {
-            expectedRevision,
-            actualRevision: current.identity?.revision ?? null,
-          },
-        );
-      }
-      await this.write(identity.gameWorldId, { ...current, identity });
-    });
-  }
-
   public async findAdminByWorldId(
     id: GameWorldId,
   ): Promise<WorldAdminSnapshot | null> {
@@ -2667,16 +2564,6 @@ export class JsonWorldRepository
         persisted.market !== null
           ? (persisted.market as unknown as WorldMarketSnapshot)
           : null;
-      const identity =
-        (persisted.schemaVersion === 12 ||
-          persisted.schemaVersion === 13 ||
-          persisted.schemaVersion === 14 ||
-          persisted.schemaVersion === 15 ||
-          persisted.schemaVersion === 16 ||
-          persisted.schemaVersion === 17) &&
-        persisted.identity !== null
-          ? (persisted.identity as unknown as WorldIdentitySnapshot)
-          : null;
       const admin =
         (persisted.schemaVersion === 13 ||
           persisted.schemaVersion === 14 ||
@@ -2721,7 +2608,6 @@ export class JsonWorldRepository
         matches,
         eventing,
         market,
-        identity,
         admin,
         narrative,
         inbox,
@@ -2759,7 +2645,6 @@ export class JsonWorldRepository
         matches: envelope.matches,
         eventing: envelope.eventing,
         market: envelope.market,
-        identity: envelope.identity,
         admin: envelope.admin,
         narrative: envelope.narrative,
         inbox: envelope.inbox,

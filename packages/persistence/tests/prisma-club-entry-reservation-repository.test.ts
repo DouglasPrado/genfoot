@@ -30,6 +30,7 @@ describe.skipIf(!hasDatabase)(
         clubId: over.clubId ?? CLUB_ID,
         worldParticipantId: over.participantId ?? participantId,
         worldSeed: WORLD_SEED,
+        attemptKey: "t1",
         occurredOn: "2026-01-05",
         expiresOn: over.expiresOn ?? "2026-01-07",
       });

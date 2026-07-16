@@ -60,7 +60,6 @@ import {
   InitializeAutomation,
   InitializeCompetitions,
   InitializeEventing,
-  InitializeIdentity,
   InitializeInbox,
   InitializeLedger,
   InitializeMarket,
@@ -141,6 +140,7 @@ import {
   DisableAutomationOnControlChange,
   ReturnLoanedPlayer,
   type ClubCommand,
+  type IdentityUnitOfWork,
   type WorldMutationResult,
 } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
@@ -165,6 +165,13 @@ export interface CommandOutcome {
 
 export interface CommandContext {
   readonly repository: JsonWorldRepository;
+  /**
+   * Escopo transacional de C1 (R-175/R-176). Caminho separado do `repository`
+   * porque C1 já migrou para o Postgres e os outros quinze contextos não —
+   * transitório e declarado (R-173). Quando o último migrar, o `repository`
+   * some e sobra este.
+   */
+  readonly identityUnitOfWork: IdentityUnitOfWork;
   readonly envelope: CommandEnvelope;
 }
 
@@ -225,6 +232,11 @@ interface WorldInputUseCase {
   ): Promise<Result<unknown, DomainError>>;
 }
 
+/** C1 (R-175): o mundo vai dentro do input — não há agregado por mundo para escopar. */
+interface IdentityUseCase {
+  execute(input: never): Promise<Result<unknown, DomainError>>;
+}
+
 /**
  * Factory genérico para os commands com shape `execute(worldId, input)`: carrega o
  * snapshot do mundo, injeta o contexto determinístico (idempotencyKey, rulesetVersion,
@@ -256,6 +268,58 @@ function wc(
       );
       if (!result.ok) return result;
       return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
+    } catch (error) {
+      return fail(
+        new DomainError(
+          "COMMAND_EXECUTION_FAILED",
+          error instanceof Error ? error.message : "Falha ao executar command.",
+        ),
+      );
+    }
+  };
+}
+
+/**
+ * Comandos de C1 (R-175). Diferente do `wc`, que envolve um use case
+ * `execute(worldId, input)` sobre o repositório JSON:
+ *
+ * - o caso de uso recebe o `IdentityUnitOfWork`, não um repositório — agregado e
+ *   evento vão no mesmo commit (Decisão 19.10);
+ * - `gameWorldId` vai DENTRO do input: não há mais um agregado por mundo para
+ *   escopar por fora;
+ * - sem `rulesetVersion`: era checado contra o mega-agregado, que morreu. Volta
+ *   com `GameRuleConfig` (R-182);
+ * - sem `idempotencyKey` no input: cada comando é naturalmente idempotente pela
+ *   chave natural do banco. A tabela `IdempotencyKey` (R-176) é do barramento,
+ *   não do caso de uso — está registrado abaixo como pendência.
+ */
+function ic(
+  build: (unitOfWork: IdentityUnitOfWork) => IdentityUseCase,
+): CommandHandler {
+  return async ({ repository, identityUnitOfWork, envelope }) => {
+    // O mundo ainda é lido do JSON: C2 não migrou. É de lá que saem `seed` e
+    // `currentDate` — e é por isso que R-182 (seed como coluna) segue devendo.
+    const world = await loadWorld(repository, envelope.worldId);
+    if (!world.ok) return world;
+    const payload =
+      typeof envelope.payload === "object" && envelope.payload !== null
+        ? (envelope.payload as Record<string, unknown>)
+        : {};
+    const input = {
+      ...payload,
+      gameWorldId: world.value.worldId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      // Semente do id determinístico dos roots que são 1-por-vez (reserva,
+      // controle). Reenviar o mesmo comando devolve o mesmo id — que é o que
+      // faz o retry não criar uma segunda reserva.
+      attemptKey: envelope.idempotencyKey,
+      correlationId: envelope.correlationId,
+    };
+    try {
+      const result = await build(identityUnitOfWork).execute(input as never);
+      if (!result.ok) return result;
+      return succeed({ resource: `identity:${world.value.worldId}` });
     } catch (error) {
       return fail(
         new DomainError(
@@ -654,7 +718,6 @@ const handlers: Record<string, CommandHandler> = {
     (r) => new InitializeAutomation(r),
     "automation",
   ),
-  "identity:initialize": wInit((r) => new InitializeIdentity(r), "identity"),
   "eventing:initialize": wInit((r) => new InitializeEventing(r), "eventing"),
 
   // Infraestrutura de estádio (SAGA-04) — portas sintéticas de financiamento/licença
@@ -1007,19 +1070,15 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "admin:open-support": wc((r) => new OpenSupportCase(r), "admin"),
   "admin:resolve-support": wc((r) => new ResolveSupportCase(r), "admin"),
 
-  // Identidade (C1)
-  "identity:join-world": wc((r) => new JoinWorld(r), "identity"),
-  "identity:reserve-club": wc((r) => new ReserveClub(r), "identity"),
-  "identity:confirm-onboarding": wc(
-    (r) => new ConfirmOnboarding(r),
-    "identity",
-  ),
-  "identity:release-club-reservation": wc(
-    (r) => new ReleaseClubReservation(r),
-    "identity",
-  ),
-  "identity:end-club-control": wc((r) => new EndClubControl(r), "identity"),
-  "identity:request-switch": wc((r) => new RequestClubSwitch(r), "identity"),
+  // Identidade (C1) — agregados por entidade sobre Postgres (R-175/R-173).
+  // `identity:initialize` não existe mais: não há agregado de identidade do
+  // mundo para inicializar; os roots nascem quando o jogador age.
+  "identity:join-world": ic((u) => new JoinWorld(u)),
+  "identity:reserve-club": ic((u) => new ReserveClub(u)),
+  "identity:confirm-onboarding": ic((u) => new ConfirmOnboarding(u)),
+  "identity:release-club-reservation": ic((u) => new ReleaseClubReservation(u)),
+  "identity:end-club-control": ic((u) => new EndClubControl(u)),
+  "identity:request-switch": ic((u) => new RequestClubSwitch(u)),
 
   // Automação / IA (X-001)
   "automation:create-rule": wc(

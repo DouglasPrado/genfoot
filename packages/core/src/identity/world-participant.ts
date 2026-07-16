@@ -48,7 +48,7 @@ export interface WorldParticipantSnapshot {
   readonly version: number;
 }
 
-export interface JoinWorldInput {
+export interface WorldParticipantJoinInput {
   readonly gameWorldId: GameWorldId | string;
   readonly accountId: IdentityAccountRef | string;
   readonly worldSeed: string;
@@ -58,7 +58,7 @@ export interface JoinWorldInput {
 export class WorldParticipant {
   private constructor(private state: WorldParticipantSnapshot) {}
 
-  public static join(input: JoinWorldInput): Result<WorldParticipant, DomainError> {
+  public static join(input: WorldParticipantJoinInput): Result<WorldParticipant, DomainError> {
     const date = WorldDate.parse(input.occurredOn);
     if (!date.ok) return date;
 

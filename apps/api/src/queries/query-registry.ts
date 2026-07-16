@@ -4,7 +4,6 @@ import {
   InspectClubPortfolio,
   InspectCompetitions,
   InspectEventing,
-  InspectIdentity,
   InspectInbox,
   InspectLedger,
   InspectMarket,
@@ -13,6 +12,7 @@ import {
   InspectStaff,
   InspectWorldScheduler,
 } from "@grinta/core";
+import type { IdentityReadModel } from "@grinta/core";
 import type { JsonWorldRepository } from "@grinta/persistence";
 import {
   succeed,
@@ -24,19 +24,26 @@ import {
 import { composeNarrativeProjection } from "./narrative-projection.js";
 
 /**
- * Registry de queries do X-003. Cada tipo mapeia para um caso de uso de inspeção
- * de `@grinta/core` sobre o `worldId` — o adapter JSON implementa todas as portas.
- * Somente leitura: nunca muta estado.
+ * Registry de queries do X-003. Somente leitura: nunca muta estado.
+ *
+ * Dois caminhos de leitura, e isso é transitório e declarado (R-173): C1 lê do
+ * Postgres pelo `identityReadModel`; os outros quinze contextos leem do adapter
+ * JSON, que é condenado. Quando o último migrar, o `repository` some.
  */
+export interface QueryContext {
+  readonly repository: JsonWorldRepository;
+  readonly identityReadModel: IdentityReadModel;
+}
+
 export type QueryHandler = (
-  repository: JsonWorldRepository,
+  context: QueryContext,
   worldId: GameWorldId,
 ) => Promise<Result<unknown, DomainError>>;
 
 const handlers: Record<string, QueryHandler> = {
-  club: (repository, worldId) =>
+  club: ({ repository }, worldId) =>
     new InspectClubPortfolio(repository).world(worldId),
-  competitions: async (repository, worldId) => {
+  competitions: async ({ repository }, worldId) => {
     const inspector = new InspectCompetitions(repository);
     const summary = await inspector.summary(worldId);
     if (!summary.ok) return summary;
@@ -68,11 +75,11 @@ const handlers: Record<string, QueryHandler> = {
       })),
     });
   },
-  matches: (repository, worldId) =>
+  matches: ({ repository }, worldId) =>
     new InspectMatches(repository).summary(worldId),
-  "matches-detail": (repository, worldId) =>
+  "matches-detail": ({ repository }, worldId) =>
     new InspectMatches(repository).world(worldId),
-  market: async (repository, worldId) => {
+  market: async ({ repository }, worldId) => {
     const inspector = new InspectMarket(repository);
     const market = await inspector.summary(worldId);
     if (!market.ok) return market;
@@ -135,7 +142,7 @@ const handlers: Record<string, QueryHandler> = {
       loans: marketWorld.value.loans ?? [],
     });
   },
-  ledger: async (repository, worldId) => {
+  ledger: async ({ repository }, worldId) => {
     const inspector = new InspectLedger(repository);
     const summary = await inspector.summary(worldId);
     if (!summary.ok) return summary;
@@ -151,24 +158,28 @@ const handlers: Record<string, QueryHandler> = {
       }));
     return succeed({ ...summary.value, clubBalances });
   },
-  players: (repository, worldId) =>
+  players: ({ repository }, worldId) =>
     new InspectPlayerLifecycle(repository).summary(worldId),
-  "player-roster": (repository, worldId) =>
+  "player-roster": ({ repository }, worldId) =>
     new InspectPlayerLifecycle(repository).world(worldId),
-  staff: (repository, worldId) => new InspectStaff(repository).summary(worldId),
-  narrative: (repository, worldId) =>
+  staff: ({ repository }, worldId) => new InspectStaff(repository).summary(worldId),
+  narrative: ({ repository }, worldId) =>
     composeNarrativeProjection(repository, worldId),
-  inbox: (repository, worldId) => new InspectInbox(repository).summary(worldId),
-  admin: (repository, worldId) => new InspectAdmin(repository).summary(worldId),
-  automation: (repository, worldId) =>
+  inbox: ({ repository }, worldId) => new InspectInbox(repository).summary(worldId),
+  admin: ({ repository }, worldId) => new InspectAdmin(repository).summary(worldId),
+  automation: ({ repository }, worldId) =>
     new InspectAutomation(repository).summary(worldId),
-  eventing: (repository, worldId) =>
+  eventing: ({ repository }, worldId) =>
     new InspectEventing(repository).summary(worldId),
-  identity: (repository, worldId) =>
-    new InspectIdentity(repository).summary(worldId),
-  "identity-detail": (repository, worldId) =>
-    new InspectIdentity(repository).world(worldId),
-  scheduler: (repository, worldId) =>
+  // C1 (R-175): não existe mais "snapshot da identidade do mundo" para
+  // devolver — o mega-agregado morreu. Isto é read model sobre as quatro
+  // tabelas, e o join traduz `worldParticipantId` em `accountId`, que é o que
+  // o cliente conhece.
+  identity: async ({ identityReadModel }, worldId) =>
+    succeed(await identityReadModel.summary(worldId)),
+  "identity-detail": async ({ identityReadModel }, worldId) =>
+    succeed(await identityReadModel.worldView(worldId)),
+  scheduler: ({ repository }, worldId) =>
     new InspectWorldScheduler(repository).execute(worldId),
 };
 

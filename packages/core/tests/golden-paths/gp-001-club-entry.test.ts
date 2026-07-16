@@ -1,16 +1,13 @@
-import {
-  newGameWorldId,
-  parseRulesetVersion,
-  WorldDate,
-  type RulesetVersion,
-} from "@grinta/shared";
+import { newGameWorldId, parseRulesetVersion, WorldDate } from "@grinta/shared";
 import { describe, expect, it } from "vitest";
 
 import {
   GameWorld,
   WorldAdmin,
   WorldEventing,
-  WorldIdentity,
+  ClubControl,
+  ClubEntryReservation,
+  WorldParticipant,
   UserAccount,
   type GameWorldSnapshot,
   type IdentityAccountRef,
@@ -22,7 +19,6 @@ import {
 // última vaga é resolvida por um único vencedor; repetir a intenção não duplica.
 
 const ACCOUNT_A = "019f0000-0000-7000-8000-0000000000a1" as IdentityAccountRef;
-const ACCOUNT_B = "019f0000-0000-7000-8000-0000000000b1" as IdentityAccountRef;
 const CLUB = "019f0000-0000-7000-8000-0000000000c1" as IdentityClubRef;
 
 function world(): GameWorldSnapshot {
@@ -63,82 +59,144 @@ function eligibilityOf(
   return !assessment.value.flagged;
 }
 
+/**
+ * Reserva + confirma + ativa controle, com os agregados por entidade (R-175).
+ * O que era `identity.reserveClub`/`confirmOnboarding` sobre um mega-agregado
+ * agora são três roots independentes — e quem os costura numa transação é o
+ * caso de uso, provado contra Postgres em `identity-commands.test.ts`.
+ */
+function assumeClub(
+  gameWorld: GameWorldSnapshot,
+  accountId: string,
+  clubId: IdentityClubRef,
+  occurredOn: string,
+) {
+  const participant = WorldParticipant.join({
+    gameWorldId: gameWorld.id,
+    accountId,
+    worldSeed: gameWorld.seed,
+    occurredOn,
+  });
+  if (!participant.ok) throw participant.error;
+  const participantId = participant.value.snapshot().id;
+
+  const reservation = ClubEntryReservation.hold({
+    gameWorldId: gameWorld.id,
+    clubId,
+    worldParticipantId: participantId,
+    worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+    occurredOn,
+    expiresOn: "2026-02-01",
+  });
+  if (!reservation.ok) throw reservation.error;
+
+  return { participantId, reservation: reservation.value };
+}
+
+function activateControl(
+  gameWorld: GameWorldSnapshot,
+  participantId: string,
+  clubId: IdentityClubRef,
+  occurredOn: string,
+) {
+  const control = ClubControl.start({
+    gameWorldId: gameWorld.id,
+    clubId,
+    worldParticipantId: participantId,
+    worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+    occurredOn,
+  });
+  if (!control.ok) throw control.error;
+  return control.value;
+}
+
 describe("GP-001 Club entry (convergence)", () => {
-  it("uma conta elegível reserva e assume o controle uma única vez", () => {
+  /**
+   * R-175 mudou onde este golden path mora, e é uma mudança de fundo.
+   *
+   * As asserções de "UMA única vez" — B perde a disputa, o controle é único,
+   * repetir o onboarding não duplica — eram sobre invariantes que o
+   * mega-agregado sustentava varrendo arrays em memória. Elas agora são do
+   * Postgres: índices únicos PARCIAIS (`ClubControl_um_ativo_por_clube`,
+   * `ClubEntryReservation_uma_retida_por_clube`), e são provadas em
+   * `packages/persistence/tests/identity-commands.test.ts`, contra o banco.
+   *
+   * Afirmá-las aqui provaria só que um array em memória concorda consigo mesmo
+   * — que era exatamente a fragilidade que o JSON escondia. O que sobra neste
+   * teste é o que É puro: elegibilidade (C12) e a regra de cada agregado.
+   */
+  it("uma conta elegível reserva e assume o controle", () => {
     const gameWorld = world();
-    const ruleset: RulesetVersion = gameWorld.rulesetVersion;
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
     const adminR = WorldAdmin.initialize(gameWorld);
-    if (!identityR.ok) throw identityR.error;
     if (!adminR.ok) throw adminR.error;
-    const identity = identityR.value;
     const admin = adminR.value;
 
-    // C12: conta A é elegível (risco baixo); conta B seria elegível também.
+    // C12: conta A é elegível (risco baixo).
     expect(eligibilityOf(admin, gameWorld, ACCOUNT_A, 10)).toBe(true);
 
-    // C1: A reserva a vaga.
-    const reservation = identity.reserveClub({
-      clubId: CLUB,
+    const participantR = WorldParticipant.join({
+      gameWorldId: gameWorld.id,
       accountId: ACCOUNT_A,
+      worldSeed: gameWorld.seed,
+      occurredOn: "2026-01-05",
+    });
+    if (!participantR.ok) throw participantR.error;
+    const participantId = participantR.value.snapshot().id;
+
+    // C1: A reserva a vaga, com prazo (R-25).
+    const reservation = ClubEntryReservation.hold({
+      gameWorldId: gameWorld.id,
+      clubId: CLUB,
+      worldParticipantId: participantId,
+      worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+      occurredOn: "2026-01-05",
       expiresOn: "2026-01-10",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:A",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
     });
-    expect(reservation).toMatchObject({ ok: true, value: { status: "HELD" } });
+    expect(reservation).toMatchObject({ ok: true, value: {} });
     if (!reservation.ok) throw reservation.error;
+    expect(reservation.value.snapshot().status).toBe("HELD");
 
-    // Disputa: B tenta a mesma (última) vaga e perde de forma estável.
-    expect(
-      identity.reserveClub({
-        clubId: CLUB,
-        accountId: ACCOUNT_B,
-        expiresOn: "2026-01-10",
-        rulesetVersion: ruleset,
-        idempotencyKey: "reserve:B",
-        worldSeed: gameWorld.seed,
-        worldDate: "2026-01-05",
-      }),
-    ).toMatchObject({ ok: false, error: { code: "CLUB_ALREADY_RESERVED" } });
-
-    // C1: A conclui o onboarding e ativa o controle (único).
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:A",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
+    // C1: A conclui o onboarding e ativa o controle.
+    expect(reservation.value.confirm()).toMatchObject({
+      ok: true,
+      value: { status: "CONFIRMED" },
     });
-    expect(control).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
-    expect(identity.activeControlForClub(CLUB)!.accountId).toBe(ACCOUNT_A);
-    expect(identity.summary().activeControlCount).toBe(1);
-
-    // Idempotência: repetir o onboarding com a mesma chave não duplica efeito.
-    const revision = identity.snapshot().revision;
-    const repeated = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:A",
+    const control = ClubControl.start({
+      gameWorldId: gameWorld.id,
+      clubId: CLUB,
+      worldParticipantId: participantId,
       worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
+        attemptKey: "t1",
+      occurredOn: "2026-01-06",
     });
-    expect(repeated).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
-    expect(identity.snapshot().revision).toBe(revision);
-    expect(identity.summary().activeControlCount).toBe(1);
+    expect(control).toMatchObject({ ok: true, value: {} });
+    if (!control.ok) throw control.error;
+    expect(control.value.snapshot()).toMatchObject({
+      status: "ACTIVE",
+      clubId: CLUB,
+      // Aponta para a participação, não para a conta: a conta é global (R-172)
+      // e não sabe de mundo.
+      worldParticipantId: participantId,
+    });
+
+    // Terminal é terminal: a reserva confirmada não volta a ser liberada, senão
+    // a vaga que já foi para A seria dada de novo.
+    expect(reservation.value.release()).toMatchObject({
+      ok: false,
+      error: { code: "RESERVA_TERMINAL" },
+    });
   });
 
   it("orquestra a entrada via SAGA-03 (C1 + C12 risco + X-002) com compensação e clube novo", () => {
     const gameWorld = world();
     const ruleset = gameWorld.rulesetVersion;
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
     const eventingR = WorldEventing.initialize(gameWorld);
     const adminR = WorldAdmin.initialize(gameWorld);
-    if (!identityR.ok) throw identityR.error;
     if (!eventingR.ok) throw eventingR.error;
     if (!adminR.ok) throw adminR.error;
-    const identity = identityR.value;
     const eventing = eventingR.value;
     const admin = adminR.value;
 
@@ -154,25 +212,7 @@ describe("GP-001 Club entry (convergence)", () => {
       idempotencySeed: gameWorld.seed,
     });
     if (!account.ok) throw account.error;
-    const joined = identity.joinWorld({
-      accountId: account.value.snapshot().id,
-      gameWorldId: gameWorld.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "join:entry",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-03",
-    });
-    if (!joined.ok) throw joined.error;
-    const reservation = identity.reserveClub({
-      clubId: CLUB,
-      accountId: account.value.snapshot().id,
-      expiresOn: "2026-02-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:entry",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-04",
-    });
-    if (!reservation.ok) throw reservation.error;
+    const entry = assumeClub(gameWorld, account.value.snapshot().id, CLUB, "2026-01-04");
     journey.push("RESERVED");
 
     // X-002: a jornada roda como saga durável arrendada (lease/fencing).
@@ -219,15 +259,9 @@ describe("GP-001 Club entry (convergence)", () => {
     if (!riskStep.ok) throw riskStep.error;
     journey.push("RISK_OK");
 
-    // Passo confirm: C1 ativa o controle único e a saga conclui.
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:entry",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
-    });
-    if (!control.ok) throw control.error;
+    // Passo confirm: C1 ativa o controle e a saga conclui.
+    if (!entry.reservation.confirm().ok) throw new Error("confirmação falhou");
+    const control = activateControl(gameWorld, entry.participantId, CLUB, "2026-01-05");
     const confirmStep = eventing.advanceSagaStep({
       sagaId: saga.value.id,
       fencingToken: claim.value.fencingToken,
@@ -240,7 +274,7 @@ describe("GP-001 Club entry (convergence)", () => {
     if (!confirmStep.ok) throw confirmStep.error;
     journey.push("CONTROL_ACTIVE");
 
-    expect(identity.activeControlForClub(CLUB)!.accountId).toBe(account.value.snapshot().id);
+    expect(control.snapshot().worldParticipantId).toBe(entry.participantId);
     expect(eventing.findSaga(saga.value.id)!.status).toBe("COMPLETED");
     expect(admin.verifyAuditChain()).toBe(true);
     // Screen contract (X-003): a sequência de estados da jornada é determinística.
@@ -256,16 +290,7 @@ describe("GP-001 Club entry (convergence)", () => {
       idempotencySeed: gameWorld.seed,
     });
     if (!account2.ok) throw account2.error;
-    const reservation2 = identity.reserveClub({
-      clubId: CLUB2,
-      accountId: account2.value.snapshot().id,
-      expiresOn: "2026-02-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:reject",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-04",
-    });
-    if (!reservation2.ok) throw reservation2.error;
+    const rejected = assumeClub(gameWorld, account2.value.snapshot().id, CLUB2, "2026-01-04");
     const saga2 = eventing.startSaga({
       sagaType: "SAGA-03",
       correlationKey: `onboarding:${account2.value.snapshot().id}`,
@@ -284,14 +309,11 @@ describe("GP-001 Club entry (convergence)", () => {
       rulesetVersion: ruleset,
     });
     if (!claim2.ok) throw claim2.error;
-    const released = identity.releaseReservation({
-      reservationId: reservation2.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "release:reject",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
+    // Risco rejeitado: a vaga volta ao pool sem nunca ter virado controle.
+    expect(rejected.reservation.release()).toMatchObject({
+      ok: true,
+      value: { status: "RELEASED" },
     });
-    expect(released).toMatchObject({ ok: true, value: { status: "RELEASED" } });
     const compensated = eventing.compensateSaga({
       sagaId: saga2.value.id,
       fencingToken: claim2.value.fencingToken,
@@ -302,7 +324,8 @@ describe("GP-001 Club entry (convergence)", () => {
       worldDate: "2026-01-05",
     });
     expect(compensated).toMatchObject({ ok: true, value: { status: "COMPENSATED" } });
-    expect(identity.activeControlForClub(CLUB2)).toBeNull();
+    // Nenhum controle nasceu para CLUB2 — a compensação é justamente isso.
+    expect(rejected.reservation.snapshot().status).toBe("RELEASED");
 
     // Programa de Clube Novo (T004): uma terceira conta assume um clube distinto
     // sem conflitar com os anteriores.
@@ -315,24 +338,23 @@ describe("GP-001 Club entry (convergence)", () => {
       idempotencySeed: gameWorld.seed,
     });
     if (!account3.ok) throw account3.error;
-    const reservation3 = identity.reserveClub({
+    const newClub = assumeClub(
+      gameWorld,
+      account3.value.snapshot().id,
+      CLUB_NEW,
+      "2026-01-06",
+    );
+    expect(newClub.reservation.confirm().ok).toBe(true);
+    const controlNew = activateControl(
+      gameWorld,
+      newClub.participantId,
+      CLUB_NEW,
+      "2026-01-07",
+    );
+    expect(controlNew.snapshot()).toMatchObject({
+      status: "ACTIVE",
       clubId: CLUB_NEW,
-      accountId: account3.value.snapshot().id,
-      expiresOn: "2026-02-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:newclub",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
+      worldParticipantId: newClub.participantId,
     });
-    if (!reservation3.ok) throw reservation3.error;
-    const controlNew = identity.confirmOnboarding({
-      reservationId: reservation3.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:newclub",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-07",
-    });
-    expect(controlNew).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
-    expect(identity.activeControlForClub(CLUB_NEW)!.accountId).toBe(account3.value.snapshot().id);
   });
 });

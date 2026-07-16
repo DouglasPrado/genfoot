@@ -137,32 +137,35 @@ describe("API query catalog (e2e)", () => {
     });
   });
 
-  // Sem `accounts`: a conta é de plataforma (R-172) e não vive no agregado do
-  // mundo. O que é do mundo é o vínculo — participação, reserva, controle.
-  it("query identity-detail entrega reservas, controles e participações do mundo", async () => {
-    await request(app.getHttpServer())
-      .post("/api/v1/commands")
-      .send(
-        command({
-          commandType: "identity:initialize",
-          worldId,
-          idempotencyKey: "q-identity-init",
-        }),
+  /**
+   * C1 já migrou para o Postgres (R-173/R-175), então esta query exige banco —
+   * é read model sobre quatro tabelas, não mais o snapshot de um mega-agregado.
+   * Sem `DATABASE_URL` ela é PULADA e diz por quê, em vez de passar em silêncio
+   * dando a impressão de que foi verificada.
+   *
+   * Sem `revision`: não existe mais revisão de mundo (R-175), é `version` por
+   * linha. Sem `accounts`: a conta é de plataforma (R-172) e não vive no mundo.
+   * Sem `identity:initialize`: não há agregado de identidade para inicializar —
+   * os roots nascem quando o jogador age.
+   */
+  it.skipIf(process.env.DATABASE_URL === undefined)(
+    "query identity-detail entrega reservas, controles e participações do mundo",
+    async () => {
+      const response = await request(app.getHttpServer()).get(
+        `/api/v1/worlds/${worldId}/identity-detail`,
       );
 
-    const response = await request(app.getHttpServer()).get(
-      `/api/v1/worlds/${worldId}/identity-detail`,
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body.data).toMatchObject({
-      reservations: [],
-      controls: [],
-      participations: [],
-      revision: 1,
-    });
-    expect(response.body.data).not.toHaveProperty("accounts");
-  });
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({
+        participations: [],
+        reservations: [],
+        controls: [],
+        cooldowns: [],
+      });
+      expect(response.body.data).not.toHaveProperty("accounts");
+      expect(response.body.data).not.toHaveProperty("revision");
+    },
+  );
 
   it("query matches resume o calendário materializado", async () => {
     const response = await request(app.getHttpServer()).get(

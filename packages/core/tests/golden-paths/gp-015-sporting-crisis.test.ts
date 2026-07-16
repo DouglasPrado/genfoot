@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   GameWorld,
   WorldEventing,
-  WorldIdentity,
+  ClubControl,
+  ClubEntryReservation,
+  WorldParticipant,
   WorldMatches,
   WorldNarrative,
   type GameWorldSnapshot,
@@ -116,28 +118,39 @@ describe("GP-015 Sporting crisis (convergence)", () => {
     const account = "019f0000-0000-7000-8000-0000000000a1" as IdentityAccountRef;
     const identityClub = "019f0000-0000-7000-8000-0000000000c1" as IdentityClubRef;
 
-    // C1: um gestor assume o controle do clube antes da crise.
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
-    if (!identityR.ok) throw identityR.error;
-    const identity = identityR.value;
-    const reservation = identity.reserveClub({
-      clubId: identityClub,
+    // C1: um gestor assume o controle do clube antes da crise (R-175: roots por
+    // entidade; o mega-agregado `WorldIdentity` não existe mais).
+    const participantR = WorldParticipant.join({
+      gameWorldId: gameWorld.id,
       accountId: account,
-      expiresOn: "2026-01-20",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:crisis",
       worldSeed: gameWorld.seed,
-      worldDate: "2026-01-10",
+      occurredOn: "2026-01-10",
+    });
+    if (!participantR.ok) throw participantR.error;
+    const participant = participantR.value;
+
+    const reservation = ClubEntryReservation.hold({
+      gameWorldId: gameWorld.id,
+      clubId: identityClub,
+      worldParticipantId: participant.snapshot().id,
+      worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+      occurredOn: "2026-01-10",
+      expiresOn: "2026-01-20",
     });
     if (!reservation.ok) throw reservation.error;
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:crisis",
+    if (!reservation.value.confirm().ok) throw new Error("confirmação falhou");
+
+    const controlR = ClubControl.start({
+      gameWorldId: gameWorld.id,
+      clubId: identityClub,
+      worldParticipantId: participant.snapshot().id,
       worldSeed: gameWorld.seed,
-      worldDate: "2026-01-11",
+        attemptKey: "t1",
+      occurredOn: "2026-01-11",
     });
-    if (!control.ok) throw control.error;
+    if (!controlR.ok) throw controlR.error;
+    const control = controlR.value;
 
     // X-002: os MatchResultOfficial (C8) entram no outbox e alimentam a narrativa.
     const eventingR = WorldEventing.initialize(gameWorld);
@@ -198,21 +211,16 @@ describe("GP-015 Sporting crisis (convergence)", () => {
     });
     expect(crisis).toMatchObject({ ok: true, value: { status: "OPEN" } });
 
-    // C1: sob a crise, a diretoria encerra o controle → cooldown (risco de fim de controle).
-    const ended = identity.endClubControl({
-      controlId: control.value.id,
-      reason: "BOARD_PRESSURE",
-      endedOn: "2026-06-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "end:crisis",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-06-01",
+    // C1: sob a crise, a diretoria encerra o controle → cooldown.
+    expect(control.end("BOARD_PRESSURE", "2026-06-01")).toMatchObject({
+      ok: true,
+      value: { status: "ENDED", endedReason: "BOARD_PRESSURE" },
     });
-    expect(ended).toMatchObject({ ok: true, value: { status: "ENDED" } });
-    expect(identity.activeControlForClub(identityClub)).toBeNull();
-    expect(
-      identity.snapshot().events.some((e) => e.type === "CooldownStarted"),
-    ).toBe(true);
+    // O clube fica sem gestor — e por R-180 é isso que o entrega à IA: não
+    // existe `controlType = AI`, existe ausência de controle ativo.
+    expect(control.snapshot().status).toBe("ENDED");
+    expect(participant.startCooldown("2026-07-01").ok).toBe(true);
+    expect(participant.isInCooldownOn("2026-06-10")).toBe(true);
   });
 
   it("consome MatchResultOfficial (C8) via X-002 alimentando a narrativa (C10)", () => {

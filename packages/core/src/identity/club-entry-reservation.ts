@@ -46,6 +46,20 @@ export interface HoldClubEntryInput {
   readonly worldSeed: string;
   readonly occurredOn: string;
   readonly expiresOn: string;
+  /**
+   * Discrimina TENTATIVAS. Não é estado — não entra no snapshot (R-176: a
+   * idempotência de command é linha na `IdempotencyKey`); é semente do id.
+   *
+   * Sem ele, o id sairia de (mundo, clube, participação, data) e a mesma pessoa
+   * soltando e reservando o mesmo clube no mesmo dia geraria o MESMO id, com
+   * colisão de chave primária. Ao contrário do `WorldParticipant` — que é 1 por
+   * (mundo, conta), e cujo id pode sair da chave natural —, a reserva é 1 por
+   * VEZ e muitas ao longo do tempo: o clube circula, e quem saiu pode voltar.
+   *
+   * Repetir a mesma chave devolve o mesmo id: é isso que faz um comando
+   * reprocessado não criar uma segunda reserva.
+   */
+  readonly attemptKey: string;
 }
 
 export class ClubEntryReservation {
@@ -70,7 +84,7 @@ export class ClubEntryReservation {
       new ClubEntryReservation({
         id: deterministicUuidV7<"ClubReservation">({
           worldSeed: input.worldSeed,
-          context: `club-reservation:${input.gameWorldId}:${input.clubId}:${input.worldParticipantId}`,
+          context: `club-reservation:${input.gameWorldId}:${input.clubId}:${input.worldParticipantId}:${input.attemptKey}`,
           timestampMilliseconds: timestampOf(heldOn.value.toString()),
         }),
         gameWorldId: input.gameWorldId as GameWorldId,

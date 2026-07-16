@@ -8,7 +8,9 @@ import { describe, expect, it } from "vitest";
 import {
   GameWorld,
   WorldEventing,
-  WorldIdentity,
+  ClubControl,
+  ClubEntryReservation,
+  WorldParticipant,
   WorldInbox,
   type GameWorldSnapshot,
   type IdentityAccountRef,
@@ -38,123 +40,104 @@ function world(): GameWorldSnapshot {
   return created.value.snapshot();
 }
 
+/** R-175: roots por entidade. O `WorldIdentity` que os continha não existe mais. */
+function participantOf(
+  gameWorld: GameWorldSnapshot,
+  accountId: string,
+  occurredOn: string,
+): string {
+  const joined = WorldParticipant.join({
+    gameWorldId: gameWorld.id,
+    accountId,
+    worldSeed: gameWorld.seed,
+    occurredOn,
+  });
+  if (!joined.ok) throw joined.error;
+  return joined.value.snapshot().id;
+}
+
+function controlOf(
+  gameWorld: GameWorldSnapshot,
+  worldParticipantId: string,
+  clubId: IdentityClubRef,
+  occurredOn: string,
+): ClubControl {
+  const reservation = ClubEntryReservation.hold({
+    gameWorldId: gameWorld.id,
+    clubId,
+    worldParticipantId,
+    worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+    occurredOn,
+    expiresOn: "2026-12-31",
+  });
+  if (!reservation.ok) throw reservation.error;
+  if (!reservation.value.confirm().ok) throw new Error("confirmação falhou");
+
+  const control = ClubControl.start({
+    gameWorldId: gameWorld.id,
+    clubId,
+    worldParticipantId,
+    worldSeed: gameWorld.seed,
+        attemptKey: "t1",
+    occurredOn,
+  });
+  if (!control.ok) throw control.error;
+  return control.value;
+}
+
 describe("GP-003 Club exit or switch (convergence)", () => {
-  it("a saída libera a vaga e um novo controlador assume uma única vez", () => {
+  /**
+   * "Uma única vez" saiu daqui, e é o ponto da R-175.
+   *
+   * Que o clube não possa ser reservado enquanto A controla, e que só um
+   * assuma depois que A sai, são invariantes que o mega-agregado sustentava
+   * varrendo arrays. Hoje são índices únicos PARCIAIS no Postgres
+   * (`WHERE status = 'ACTIVE'` / `WHERE status = 'HELD'`), e quem as prova é
+   * `packages/persistence/tests/identity-commands.test.ts` — inclusive o
+   * handover ("o clube liberado pode ser assumido por outro"), que é
+   * literalmente este golden path contra o banco.
+   *
+   * Sobra aqui a mecânica pura: a saída é registrada com motivo e data, e o
+   * sucessor é outra participação.
+   */
+  it("a saída registra motivo e data, e o sucessor é outra participação", () => {
     const gameWorld = world();
-    const ruleset = gameWorld.rulesetVersion;
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
-    if (!identityR.ok) throw identityR.error;
-    const identity = identityR.value;
+    const saindo = participantOf(gameWorld, OUTGOING, "2026-01-05");
+    const control = controlOf(gameWorld, saindo, CLUB, "2026-01-06");
 
-    const reservation = identity.reserveClub({
-      clubId: CLUB,
-      accountId: OUTGOING,
-      expiresOn: "2026-01-10",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:out",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
+    // A sai: o motivo é obrigatório — antes ele existia no evento e evaporava
+    // na gravação, por falta de coluna.
+    expect(control.end("EXIT", "2026-03-01")).toMatchObject({
+      ok: true,
+      value: { status: "ENDED", endedOn: "2026-03-01", endedReason: "EXIT" },
     });
-    if (!reservation.ok) throw reservation.error;
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:out",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
-    });
-    if (!control.ok) throw control.error;
+    expect(control.end("  ", "2026-03-02")).toMatchObject({ ok: true });
 
-    // Enquanto A controla, o clube não pode ser reservado por B.
-    expect(
-      identity.reserveClub({
-        clubId: CLUB,
-        accountId: INCOMING,
-        expiresOn: "2026-02-10",
-        rulesetVersion: ruleset,
-        idempotencyKey: "reserve:in-blocked",
-        worldSeed: gameWorld.seed,
-        worldDate: "2026-02-01",
-      }),
-    ).toMatchObject({ ok: false, error: { code: "CLUB_ALREADY_RESERVED" } });
-
-    // A sai: encerra o controle (libera a vaga e entra em cooldown).
-    const exit = identity.endClubControl({
-      controlId: control.value.id,
-      reason: "EXIT",
-      endedOn: "2026-03-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "end:out",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-03-01",
+    // Handover: B assume, e é um controle NOVO, de outra participação.
+    const entrando = participantOf(gameWorld, INCOMING, "2026-03-05");
+    const newControl = controlOf(gameWorld, entrando, CLUB, "2026-03-06");
+    expect(newControl.snapshot()).toMatchObject({
+      status: "ACTIVE",
+      worldParticipantId: entrando,
     });
-    expect(exit).toMatchObject({ ok: true, value: { status: "ENDED" } });
-    expect(identity.activeControlForClub(CLUB)).toBeNull();
+    expect(newControl.snapshot().id).not.toBe(control.snapshot().id);
 
-    // Handover: B reserva e assume o clube vago uma única vez.
-    const handover = identity.reserveClub({
-      clubId: CLUB,
-      accountId: INCOMING,
-      expiresOn: "2026-03-20",
-      rulesetVersion: ruleset,
-      idempotencyKey: "reserve:in",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-03-05",
+    // Histórico do controlador anterior preservado, com o porquê.
+    expect(control.snapshot()).toMatchObject({
+      status: "ENDED",
+      endedReason: "EXIT",
     });
-    if (!handover.ok) throw handover.error;
-    const newControl = identity.confirmOnboarding({
-      reservationId: handover.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "onboard:in",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-03-06",
-    });
-    expect(newControl).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
-    expect(identity.activeControlForClub(CLUB)!.accountId).toBe(INCOMING);
-    expect(identity.summary().activeControlCount).toBe(1);
-
-    // Histórico do controlador anterior preservado.
-    expect(
-      identity.snapshot().controls.filter((c) => c.status === "ENDED"),
-    ).toHaveLength(1);
   });
 
   it("orquestra o handover via SAGA (X-002), transfere pendências (C11) e cooldown", () => {
     const gameWorld = world();
     const ruleset = gameWorld.rulesetVersion;
-    const identityR = WorldIdentity.initialize(gameWorld, 30);
-    if (!identityR.ok) throw identityR.error;
-    const identity = identityR.value;
+    const saindo = participantOf(gameWorld, OUTGOING, "2026-01-05");
+    const control = controlOf(gameWorld, saindo, CLUB, "2026-01-06");
 
-    const reservation = identity.reserveClub({
-      clubId: CLUB,
-      accountId: OUTGOING,
-      expiresOn: "2026-01-10",
-      rulesetVersion: ruleset,
-      idempotencyKey: "h:reserve",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-05",
-    });
-    if (!reservation.ok) throw reservation.error;
-    const control = identity.confirmOnboarding({
-      reservationId: reservation.value.id,
-      rulesetVersion: ruleset,
-      idempotencyKey: "h:onboard",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-06",
-    });
-    if (!control.ok) throw control.error;
-
-    // A sai: encerra o controle e entra em cooldown.
-    const exit = identity.endClubControl({
-      controlId: control.value.id,
-      reason: "SABBATICAL",
-      endedOn: "2026-06-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "h:end",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-06-01",
-    });
+    // A sai: encerra o controle.
+    const exit = control.end("SABBATICAL", "2026-06-01");
     if (!exit.ok) throw exit.error;
 
     // X-002: o handover roda como saga durável (end-control → transfer-pendings).
@@ -188,7 +171,7 @@ describe("GP-003 Club exit or switch (convergence)", () => {
       recipientScope: "manager:incoming",
       category: "HANDOVER",
       priority: "NORMAL",
-      sourceRef: `control-ended:${control.value.id}`,
+      sourceRef: `control-ended:${control.snapshot().id}`,
       rulesetVersion: ruleset,
       idempotencyKey: "handover:pendings",
       worldSeed: gameWorld.seed,
@@ -210,28 +193,18 @@ describe("GP-003 Club exit or switch (convergence)", () => {
     }
     expect(eventing.findSaga(saga.value.id)!.status).toBe("COMPLETED");
 
-    // Troca bloqueada no cooldown, liberada depois (limite de trocas).
-    expect(
-      identity.requestClubSwitch({
-        accountId: OUTGOING,
-        targetClubId: "019f0000-0000-7000-8000-0000000000c2" as IdentityClubRef,
-        expiresOn: "2026-06-20",
-        rulesetVersion: ruleset,
-        idempotencyKey: "switch:early",
-        worldSeed: gameWorld.seed,
-        worldDate: "2026-06-10",
-      }),
-    ).toMatchObject({ ok: false, error: { code: "COOLDOWN_ACTIVE" } });
-    const afterCooldown = identity.requestClubSwitch({
+    // Cooldown de quem saiu: bloqueia a troca, e libera depois. O castigo é
+    // atributo da participação (não agregado — não é root no context map:67).
+    const joined = WorldParticipant.join({
+      gameWorldId: gameWorld.id,
       accountId: OUTGOING,
-      targetClubId: "019f0000-0000-7000-8000-0000000000c2" as IdentityClubRef,
-      expiresOn: "2026-09-01",
-      rulesetVersion: ruleset,
-      idempotencyKey: "switch:ok",
       worldSeed: gameWorld.seed,
-      worldDate: "2026-08-01",
+      occurredOn: "2026-01-05",
     });
-    expect(afterCooldown).toMatchObject({ ok: true, value: { status: "HELD" } });
+    if (!joined.ok) throw joined.error;
+    expect(joined.value.startCooldown("2026-07-01").ok).toBe(true);
+    expect(joined.value.isInCooldownOn("2026-06-10")).toBe(true);
+    expect(joined.value.isInCooldownOn("2026-08-01")).toBe(false);
   });
 
   it("compensa um handover interrompido com auditoria consistente (X-002)", () => {
