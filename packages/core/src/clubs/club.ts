@@ -126,12 +126,10 @@ export class Club {
       return fail(invalidClub("Plano de departamento fora dos limites."));
     }
     const departments = [...this.state.departments];
-    const current = departments[index]!;
     departments[index] = {
-      ...current,
+      ...departments[index]!,
       targetLevel: input.targetLevel,
       capacity: input.capacity,
-      version: current.version + 1,
     };
     this.state = {
       ...this.state,

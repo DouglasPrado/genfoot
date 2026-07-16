@@ -1192,7 +1192,10 @@ model ClubControl {
 /// `maxLevel` vem do schema e FICA — sem ele a invariante canônica
 /// `level ≤ maxLevel` (doc:154) é inexprimível, e era.
 model ClubDepartment {
-  id               String         @id @db.Uuid
+  // Sem `id`: o departamento não tem identidade própria no domínio — ele É o
+  // par (clube, tipo), e ninguém o referencia por id (o InfrastructureProject
+  // aponta o alvo pelo `kind`). Um uuid sintético aqui seria cerimônia: uma
+  // chave que nada usa e que o agregado teria de inventar a cada save.
   gameWorldId      String         @db.Uuid
   clubId           String         @db.Uuid
   type             DepartmentType
@@ -1211,8 +1214,9 @@ model ClubDepartment {
 
   club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
 
-  @@unique([clubId, type])
-  @@index([gameWorldId, clubId])
+  // A chave natural É a chave primária: um clube tem no máximo um departamento
+  // de cada tipo, e isso deixa de ser convenção para virar constraint.
+  @@id([gameWorldId, clubId, type])
 }
 
 model ClubAIProfile {

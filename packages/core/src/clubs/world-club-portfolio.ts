@@ -498,7 +498,6 @@ export class WorldClubPortfolio {
         ...departments[departmentIndex]!,
         level: project.target.targetValue,
         targetLevel: project.target.targetValue,
-        version: departments[departmentIndex]!.version + 1,
       };
       updated = { ...club, departments, version: club.version + 1 };
     } else {

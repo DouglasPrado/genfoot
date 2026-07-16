@@ -47,7 +47,6 @@ export function processClubMaintenanceDay(
             department.condition - 1 <= 70
               ? worldDate
               : department.maintenanceDueOn,
-          version: department.version + 1,
         })),
         stadium: {
           ...club.stadium,

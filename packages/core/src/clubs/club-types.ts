@@ -60,6 +60,14 @@ export interface ClubIdentityPeriodSnapshot {
   readonly visualIdentity?: VisualIdentitySnapshot;
 }
 
+/**
+ * O departamento é FILHO do clube, não root: quem o versiona é o `Club`, dentro
+ * de cuja fronteira de consistência ele vive (`Club.setDepartmentPlan` o muta).
+ *
+ * Ele não tem `version` próprio: o que existia era um contador que ninguém
+ * comparava — só incrementava. Concorrência otimista que nada checa não é
+ * concorrência otimista, é ruído com nome de invariante.
+ */
 export interface ClubDepartmentSnapshot {
   readonly kind: ClubDepartmentKind;
   readonly level: number;
@@ -67,7 +75,6 @@ export interface ClubDepartmentSnapshot {
   readonly capacity: number;
   readonly condition: number;
   readonly maintenanceDueOn: string | null;
-  readonly version: number;
 }
 
 export interface StadiumSnapshot {

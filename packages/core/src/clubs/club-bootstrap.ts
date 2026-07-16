@@ -48,7 +48,6 @@ export function buildClubPortfolioFromGenesis(
           capacity: 10,
           condition: 100,
           maintenanceDueOn: null,
-          version: 1,
         })),
         stadium: {
           id: deterministicUuidV7<"Stadium">({

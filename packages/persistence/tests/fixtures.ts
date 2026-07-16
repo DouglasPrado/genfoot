@@ -23,6 +23,22 @@ export const IDENTITY_TABLES = [
   "ClubControl",
 ];
 
+/**
+ * C3. `Club` com CASCADE já derruba os filhos, mas listá-los é a documentação
+ * de quais tabelas o agregado ocupa — e o TRUNCATE não fica dependendo de a FK
+ * estar declarada com o cascade certo.
+ */
+export const CLUB_TABLES = [
+  "GameWorld",
+  "Club",
+  "ClubIdentityPeriod",
+  "Stadium",
+  "ClubDepartment",
+  "TicketPricePolicy",
+  "CommercialAgreement",
+  "BoardDecision",
+];
+
 export function accountSnapshot(email = "douglas@exemplo.com") {
   const result = UserAccount.register({
     email,
