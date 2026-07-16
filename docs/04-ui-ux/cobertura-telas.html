@@ -1,0 +1,723 @@
+<title>Grinta — Cobertura das 114 telas mobile</title>
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --bg-elev: #101216;
+    --surface: #14171c;
+    --surface-raised: #1b1f26;
+    --border: #2a2f38;
+    --border-strong: #3a4150;
+    --primary: #c2f74a;
+    --primary-dim: #9ac531;
+    --primary-contrast: #0a0b0d;
+    --text: #f4f6f8;
+    --text-muted: #8b929c;
+    --text-faint: #5b616b;
+    --warning: #f5a623;
+    --danger: #ef4444;
+    --info: #5c7ce0;
+    --display: ui-sans-serif, "Helvetica Neue", "Arial Narrow", system-ui, sans-serif;
+    --body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  header {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 0.72rem;
+    color: var(--primary);
+    margin: 0 0 18px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.015em;
+    font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+    line-height: 0.98;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  .lede {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 62ch;
+    margin: 0;
+  }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  /* ---------- score ---------- */
+  .score {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 36px 0 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 16px 20px;
+    flex: 1 1 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat-n {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    font-size: 2rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-l {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: var(--text-faint);
+  }
+  .stat.is-built { border-left: 3px solid var(--primary); }
+  .stat.is-built .stat-n { color: var(--primary); }
+  .stat.is-partial { border-left: 3px solid var(--warning); }
+  .stat.is-partial .stat-n { color: var(--warning); }
+  .stat.is-read { border-left: 3px solid var(--info); }
+  .stat.is-read .stat-n { color: var(--info); }
+  .stat.is-missing { border-left: 3px solid var(--border-strong); }
+  .stat.is-missing .stat-n { color: var(--text-faint); }
+
+  /* ---------- sections ---------- */
+  section { margin: 64px 0 0; }
+  h2 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-size: 1.4rem;
+    margin: 0 0 8px;
+  }
+  .sub {
+    color: var(--text-muted);
+    margin: 0 0 28px;
+    max-width: 66ch;
+    font-size: 0.94rem;
+  }
+
+  /* ---------- legend ---------- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding: 14px 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 28px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+  .swatch {
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    flex: none;
+  }
+  .swatch.built { background: var(--primary); }
+  .swatch.partial { background: var(--warning); }
+  .swatch.read { background: var(--info); }
+  .swatch.missing { background: transparent; border: 1px dashed var(--text-faint); }
+
+  /* ---------- archetype blocks ---------- */
+  .arch {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .arch-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+  }
+  .arch-id {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.04em;
+  }
+  .arch-name {
+    font-size: 0.86rem;
+    color: var(--text-muted);
+    flex: 1;
+    min-width: 180px;
+  }
+  .arch-count {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .arch-count b { color: var(--primary); font-weight: 700; }
+  .risk {
+    font-family: var(--display);
+    text-transform: uppercase;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    padding: 3px 7px;
+    border-radius: 2px;
+    border: 1px solid;
+  }
+  .risk.low { color: var(--text-faint); border-color: var(--border-strong); }
+  .risk.medium { color: var(--info); border-color: color-mix(in srgb, var(--info) 45%, transparent); }
+  .risk.high { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 50%, transparent); }
+  .risk.irreversible { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+
+  .chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 1px;
+    background: var(--border);
+  }
+  .chip {
+    background: var(--surface);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 46px;
+    justify-content: center;
+  }
+  .chip-id {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .chip-d {
+    font-size: 0.72rem;
+    color: var(--text-faint);
+    line-height: 1.35;
+  }
+  .chip.missing { background: #0d0f12; }
+  .chip.missing .chip-id { color: var(--text-faint); }
+  .chip.built { background: color-mix(in srgb, var(--primary) 9%, var(--surface)); }
+  .chip.built .chip-id { color: var(--primary); }
+  .chip.built .chip-d { color: var(--text-muted); }
+  .chip.partial { background: color-mix(in srgb, var(--warning) 8%, var(--surface)); }
+  .chip.partial .chip-id { color: var(--warning); }
+  .chip.partial .chip-d { color: var(--text-muted); }
+  .chip.read { background: color-mix(in srgb, var(--info) 8%, var(--surface)); }
+  .chip.read .chip-id { color: var(--info); }
+  .chip.read .chip-d { color: var(--text-muted); }
+  .tag {
+    font-family: var(--display);
+    text-transform: uppercase;
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    margin-top: 2px;
+  }
+  .chip.built .tag { color: var(--primary-dim); }
+  .chip.partial .tag { color: var(--warning); }
+  .chip.read .tag { color: var(--info); }
+
+  /* ---------- GP table ---------- */
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; min-width: 560px; }
+  th {
+    font-family: var(--display);
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-size: 0.64rem;
+    font-weight: 800;
+    color: var(--text-faint);
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--surface-raised);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    background: var(--surface);
+  }
+  tr:last-child td { border-bottom: none; }
+  td.gp { font-family: var(--mono); font-size: 0.76rem; color: var(--text-muted); white-space: nowrap; }
+  td.what { color: var(--text); }
+  td.note { color: var(--text-faint); font-size: 0.8rem; }
+  .pill {
+    display: inline-block;
+    font-family: var(--display);
+    text-transform: uppercase;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .pill.ok { background: var(--primary); color: var(--primary-contrast); }
+  .pill.part { background: color-mix(in srgb, var(--warning) 20%, transparent); color: var(--warning); border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent); }
+  .pill.ro { background: color-mix(in srgb, var(--info) 18%, transparent); color: var(--info); border: 1px solid color-mix(in srgb, var(--info) 45%, transparent); }
+  .pill.no { background: transparent; color: var(--text-faint); border: 1px dashed var(--border-strong); }
+
+  /* ---------- blockers ---------- */
+  .blockers { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 3px; }
+  .blocker { background: var(--surface); padding: 18px 20px; }
+  .blocker h3 {
+    font-family: var(--display);
+    font-style: italic;
+    text-transform: uppercase;
+    font-size: 0.92rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+    letter-spacing: 0.02em;
+  }
+  .blocker p { margin: 0; color: var(--text-muted); font-size: 0.88rem; max-width: 74ch; }
+  .blocker code {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    color: var(--primary-dim);
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+  .num {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 800;
+    color: var(--primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-faint);
+    font-size: 0.78rem;
+  }
+  footer code { font-family: var(--mono); color: var(--text-muted); }
+
+  /* ---------- update log ---------- */
+  .stamp {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 3px;
+    padding: 7px 13px;
+    margin-top: 28px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp b { color: var(--primary); font-weight: 600; }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--primary);
+    flex: none;
+  }
+  .log { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 3px; }
+  .log-row { background: var(--surface); padding: 13px 18px; display: flex; gap: 16px; align-items: baseline; flex-wrap: wrap; }
+  .log-date {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--text-faint);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .log-text { font-size: 0.86rem; color: var(--text-muted); flex: 1; min-width: 240px; }
+  .log-text b { color: var(--text); font-weight: 600; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .chip { transition: background 0.15s ease; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">X-003 · Clientes mobile · spec 018</p>
+    <h1>O que falta desenhar<br>e construir no app</h1>
+    <p class="lede">O registro canônico cataloga <strong>114 telas mobile</strong>. O app Expo inteiro tem <strong>6 rotas</strong> — 5 abas e um onboarding — e <strong>6.187 linhas</strong>. Este é o mapa do que existe contra o que foi especificado. Cada célula apagada é uma tela que os docs já descrevem em detalhe e que ninguém construiu.</p>
+
+    <div class="score">
+      <div class="stat is-built">
+        <span class="stat-n">11</span>
+        <span class="stat-l">Com tela — 9 parciais</span>
+      </div>
+      <div class="stat is-partial">
+        <span class="stat-n">2</span>
+        <span class="stat-l">Só o command, sem tela</span>
+      </div>
+      <div class="stat is-read">
+        <span class="stat-n">6</span>
+        <span class="stat-l">Fragmento de leitura</span>
+      </div>
+      <div class="stat is-missing">
+        <span class="stat-n">95</span>
+        <span class="stat-l">Zero implementação</span>
+      </div>
+    </div>
+
+    <p class="lede" style="margin-top:28px">Só <strong>M-LINEUP</strong> e <strong>M-IDENTITY</strong> chegam perto de completas. Contando de forma conservadora, <strong>103 das 114</strong> telas não existem.</p>
+
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>bc2a7ba</b> · 11/114</div>
+  </header>
+
+  <section>
+    <h2>Os 16 golden paths</h2>
+    <p class="sub">Os fluxos de UX <code>MF-01…MF-16</code> mapeiam 1:1 com <code>GP-001…016</code>. Sete deles não têm tela alguma; três só têm cartão de leitura sem ação possível.</p>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>GP</th>
+            <th>Jornada</th>
+            <th>Estado</th>
+            <th>O que existe hoje</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="gp">GP-001</td><td class="what">Entrada no clube</td><td><span class="pill part">Parcial</span></td><td class="note">Wizard com commands reais; sem login, sem escolha de mundo, sem revisão inicial</td></tr>
+          <tr><td class="gp">GP-002</td><td class="what">Retorno após ausência</td><td><span class="pill ro">Fragmento</span></td><td class="note">3 números num cartão da Home</td></tr>
+          <tr><td class="gp">GP-003</td><td class="what">Saída / troca de clube</td><td><span class="pill part">Parcial</span></td><td class="note">Encerra controle com cooldown, via Alert</td></tr>
+          <tr><td class="gp">GP-004</td><td class="what">Início de temporada</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhum command ou query no app</td></tr>
+          <tr><td class="gp">GP-005</td><td class="what">Ciclo semanal</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhuma central de decisões</td></tr>
+          <tr><td class="gp">GP-006</td><td class="what">Virada de temporada</td><td><span class="pill no">Ausente</span></td><td class="note">Sem wizard de encerramento</td></tr>
+          <tr><td class="gp">GP-007</td><td class="what">Jornada de partida</td><td><span class="pill part">Parcial</span></td><td class="note">Ao vivo + área técnica; falta pré-jogo, intervalo e pós-jogo</td></tr>
+          <tr><td class="gp">GP-008</td><td class="what">Contratação</td><td><span class="pill part">Parcial</span></td><td class="note">Termos fixos no código; transferência nunca é formalizada</td></tr>
+          <tr><td class="gp">GP-009</td><td class="what">Venda</td><td><span class="pill no">Ausente</span></td><td class="note">Rotula listagens próprias; sem ação de vender</td></tr>
+          <tr><td class="gp">GP-010</td><td class="what">Empréstimo</td><td><span class="pill no">Ausente</span></td><td class="note">Só um contador de empréstimos ativos</td></tr>
+          <tr><td class="gp">GP-011</td><td class="what">Base / juvenil</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhuma tela</td></tr>
+          <tr><td class="gp">GP-012</td><td class="what">Lesão e recuperação</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhuma tela</td></tr>
+          <tr><td class="gp">GP-013</td><td class="what">Finanças mensais</td><td><span class="pill ro">Fragmento</span></td><td class="note">Saldo e 2 contadores no Clube; nenhuma ação</td></tr>
+          <tr><td class="gp">GP-014</td><td class="what">Obra / infraestrutura</td><td><span class="pill ro">Fragmento</span></td><td class="note">Pips de nível; zero command de obra</td></tr>
+          <tr><td class="gp">GP-015</td><td class="what">Crise esportiva</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhuma tela</td></tr>
+          <tr><td class="gp">GP-016</td><td class="what">Crise financeira</td><td><span class="pill no">Ausente</span></td><td class="note">Nenhuma tela</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>As 114 telas, por arquétipo</h2>
+    <p class="sub">O arquétipo define o layout canônico e o nível de confirmação exigido. Note que o grupo <code>L-M06</code> inteiro é de risco irreversível — negociação, contrato, dívida, obra, promessa — e é justamente onde quase nada existe.</p>
+
+    <div class="legend">
+      <span class="legend-item"><span class="swatch built"></span> Tem tela — quase sempre parcial</span>
+      <span class="legend-item"><span class="swatch partial"></span> Só o command, sem tela</span>
+      <span class="legend-item"><span class="swatch read"></span> Fragmento de leitura na tela de outro</span>
+      <span class="legend-item"><span class="swatch missing"></span> Não existe</span>
+    </div>
+
+    <!-- L-M01 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M01</span>
+        <span class="arch-name">Wizard — autenticação, onboarding, entrada</span>
+        <span class="risk medium">Risco médio</span>
+        <span class="arch-count"><b>3</b> / 14</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-SPLASH</span><span class="chip-d">Splash / carregamento inicial</span></div>
+        <div class="chip missing"><span class="chip-id">M-LOGIN</span><span class="chip-d">Login — a sessão abre com credencial fixa de dev</span></div>
+        <div class="chip missing"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro — o command existe, a tela não</span></div>
+        <div class="chip missing"><span class="chip-id">M-RECOVER</span><span class="chip-d">Recuperação de senha</span></div>
+        <div class="chip missing"><span class="chip-id">M-WORLD-PICK</span><span class="chip-d">Seleção de mundo — o mundo é uma constante</span></div>
+        <div class="chip built"><span class="chip-id">M-CLUB-PICK</span><span class="chip-d">Escolher clube — lista real, sem filtro nem região</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-CLUB-CREATE</span><span class="chip-d">Criar clube de expansão</span></div>
+        <div class="chip missing"><span class="chip-id">M-REGION-PICK</span><span class="chip-d">Escolha de região / cidade</span></div>
+        <div class="chip missing"><span class="chip-id">M-CLUB-PREVIEW</span><span class="chip-d">Estado inicial: elenco, dívidas, riscos</span></div>
+        <div class="chip built"><span class="chip-id">M-SLOT-RESERVE</span><span class="chip-d">Reserva de vaga — é um Alert, não uma tela</span><span class="tag">fraca</span></div>
+        <div class="chip built"><span class="chip-id">M-CONTROL-ACTIVATE</span><span class="chip-d">Ativação de controle — é um Alert, não uma tela</span><span class="tag">fraca</span></div>
+        <div class="chip missing"><span class="chip-id">M-ONBOARD-REVIEW</span><span class="chip-d">Revisão de autoridade e pendências — a cópia promete, nada é renderizado</span></div>
+        <div class="chip read"><span class="chip-id">M-RETURN</span><span class="chip-d">Retorno após ausência — 3 números num cartão</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-TUTORIAL</span><span class="chip-d">Tutorial / tour guiado</span></div>
+      </div>
+    </div>
+
+    <!-- L-M02 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M02</span>
+        <span class="arch-name">Listas e centrais — KPIs, filtros, lista virtualizada</span>
+        <span class="risk low">Risco baixo</span>
+        <span class="arch-count"><b>2</b> / 14</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-DECISIONS</span><span class="chip-d">Central de decisões — o coração do ciclo semanal</span></div>
+        <div class="chip built"><span class="chip-id">M-SQUAD</span><span class="chip-d">Elenco — a única lista é o banco, dentro do modal de substituição</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-MEDICAL</span><span class="chip-d">Departamento médico / lesões</span></div>
+        <div class="chip missing"><span class="chip-id">M-ACADEMY</span><span class="chip-d">Categorias de base</span></div>
+        <div class="chip missing"><span class="chip-id">M-COMPETITIONS</span><span class="chip-d">Lista de competições — só um contador na Home</span></div>
+        <div class="chip missing"><span class="chip-id">M-CALENDAR</span><span class="chip-d">Calendário / agenda da temporada</span></div>
+        <div class="chip built"><span class="chip-id">M-MARKET</span><span class="chip-d">Mercado — listagens, busca e livres</span><span class="tag">aba MERCADO</span></div>
+        <div class="chip partial"><span class="chip-id">M-SCOUTING</span><span class="chip-d">Scouting — botão e badge; payload fixo, relatório nunca visível</span><span class="tag">só o command</span></div>
+        <div class="chip missing"><span class="chip-id">M-STAFF</span><span class="chip-d">Comissão técnica / staff</span></div>
+        <div class="chip missing"><span class="chip-id">M-NOTIFS</span><span class="chip-d">Central de notificações</span></div>
+        <div class="chip missing"><span class="chip-id">M-MY-WORLDS</span><span class="chip-d">Meus mundos e clubes</span></div>
+        <div class="chip missing"><span class="chip-id">M-SEARCH</span><span class="chip-d">Busca global</span></div>
+        <div class="chip missing"><span class="chip-id">M-MESSAGES</span><span class="chip-d">Mensagens entre gestores</span></div>
+        <div class="chip missing"><span class="chip-id">M-REPORTS</span><span class="chip-d">Central de relatórios</span></div>
+      </div>
+    </div>
+
+    <!-- L-M03 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M03</span>
+        <span class="arch-name">Perfil e detalhe — hero, tabs, seções</span>
+        <span class="risk low">Risco baixo</span>
+        <span class="arch-count"><b>2</b> / 36</span>
+      </div>
+      <div class="chips">
+        <div class="chip built"><span class="chip-id">M-HOME</span><span class="chip-d">Home — contadores read-only, sem drill-in nem decisão</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-DECISION-DETAIL</span><span class="chip-d">Detalhe de uma decisão</span></div>
+        <div class="chip missing"><span class="chip-id">M-PLAYER</span><span class="chip-d">Ficha do jogador</span></div>
+        <div class="chip missing"><span class="chip-id">M-PLAYER-ATTRS</span><span class="chip-d">Atributos detalhados</span></div>
+        <div class="chip missing"><span class="chip-id">M-PLAYER-DEV</span><span class="chip-d">Desenvolvimento / histórico de evolução</span></div>
+        <div class="chip missing"><span class="chip-id">M-ROLES</span><span class="chip-d">Papéis, hierarquia e liderança</span></div>
+        <div class="chip missing"><span class="chip-id">M-TRAINING</span><span class="chip-d">Treino do elenco</span></div>
+        <div class="chip missing"><span class="chip-id">M-MEDICAL-CASE</span><span class="chip-d">Caso de lesão / reabilitação</span></div>
+        <div class="chip missing"><span class="chip-id">M-YOUTH-PLAYER</span><span class="chip-d">Ficha do jovem</span></div>
+        <div class="chip missing"><span class="chip-id">M-NEXTMATCH</span><span class="chip-d">Próxima partida (central do jogo)</span></div>
+        <div class="chip missing"><span class="chip-id">M-SCOUT-OPP</span><span class="chip-d">Dossiê do adversário</span></div>
+        <div class="chip missing"><span class="chip-id">M-PREMATCH</span><span class="chip-d">Pré-jogo / contexto</span></div>
+        <div class="chip missing"><span class="chip-id">M-POSTMATCH</span><span class="chip-d">Relatório pós-jogo</span></div>
+        <div class="chip missing"><span class="chip-id">M-COMPETITION</span><span class="chip-d">Tabela, chaveamento, rodadas, artilharia</span></div>
+        <div class="chip missing"><span class="chip-id">M-CALENDAR-DAY</span><span class="chip-d">Detalhe do dia</span></div>
+        <div class="chip missing"><span class="chip-id">M-NATIONAL</span><span class="chip-d">Seleções / convocações</span></div>
+        <div class="chip missing"><span class="chip-id">M-AGENT</span><span class="chip-d">Empresário</span></div>
+        <div class="chip read"><span class="chip-id">M-FINANCE</span><span class="chip-d">Finanças — saldo e 2 contadores; sem extrato, orçamento ou resultado</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-COMMERCIAL</span><span class="chip-d">Comercial / patrocínios</span></div>
+        <div class="chip missing"><span class="chip-id">M-DEPARTMENT</span><span class="chip-d">Departamento (detalhe / upgrade)</span></div>
+        <div class="chip missing"><span class="chip-id">M-STAFF-HIRE</span><span class="chip-d">Contratar / demitir funcionário</span></div>
+        <div class="chip read"><span class="chip-id">M-STADIUM</span><span class="chip-d">Estádio — nome e capacidade, 2 campos</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-BOARD</span><span class="chip-d">Diretoria / objetivos / intervenção</span></div>
+        <div class="chip missing"><span class="chip-id">M-MORALE</span><span class="chip-d">Moral do elenco</span></div>
+        <div class="chip read"><span class="chip-id">M-FANS</span><span class="chip-d">Torcida — uma linha de texto</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-RIVALRIES</span><span class="chip-d">Rivalidades e clássicos</span></div>
+        <div class="chip read"><span class="chip-id">M-REPUTATION</span><span class="chip-d">Reputação — uma barra de progresso</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-SPONSORS-IMAGE</span><span class="chip-d">Imagem pública / patrocinadores</span></div>
+        <div class="chip built"><span class="chip-id">M-CLUB-PROFILE</span><span class="chip-d">Perfil do clube — hero, reputação, infra, estádio</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-CLUB-VIEW</span><span class="chip-d">Perfil público de outro clube</span></div>
+        <div class="chip missing"><span class="chip-id">M-MANAGER-PROFILE</span><span class="chip-d">Perfil público de outro gestor</span></div>
+        <div class="chip missing"><span class="chip-id">M-WORLD-STRUCTURE</span><span class="chip-d">Estrutura do mundo (divisões / pirâmide)</span></div>
+        <div class="chip missing"><span class="chip-id">M-TEAMBALANCE</span><span class="chip-d">Entrosamento e equilíbrio do elenco</span></div>
+        <div class="chip missing"><span class="chip-id">M-MEMBERSHIP</span><span class="chip-d">Sócio-torcedor</span></div>
+        <div class="chip missing"><span class="chip-id">M-PRODUCTS</span><span class="chip-d">Produtos / merchandising</span></div>
+        <div class="chip missing"><span class="chip-id">M-ROUND</span><span class="chip-d">Rodada e relógio do mundo</span></div>
+      </div>
+    </div>
+
+    <!-- L-M04 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M04</span>
+        <span class="arch-name">Editores — canvas, validação, salvar</span>
+        <span class="risk medium">Risco médio</span>
+        <span class="arch-count"><b>1</b> / 14</span>
+        <span class="arch-name" style="flex-basis:100%;font-size:0.8rem">M-STRUCTURE é arquétipo de <em>editor</em>, mas no app é só leitura — não há command de upgrade.</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-AUTOMATIONS</span><span class="chip-d">Automações / delegação à IA</span></div>
+        <div class="chip missing"><span class="chip-id">M-AUTOMATION-EDIT</span><span class="chip-d">Editor de automação / política offline</span></div>
+        <div class="chip built"><span class="chip-id">M-LINEUP</span><span class="chip-d">Escalação — campo, formações, substituição, rascunho e salvar</span><span class="tag">a mais completa</span></div>
+        <div class="chip missing"><span class="chip-id">M-TACTICS</span><span class="chip-d">Tática — formação não é tática; o command não existe</span></div>
+        <div class="chip missing"><span class="chip-id">M-GAMEPLAN</span><span class="chip-d">Plano de jogo / IA offline</span></div>
+        <div class="chip missing"><span class="chip-id">M-TRAINING-INDIV</span><span class="chip-d">Plano individual de treino</span></div>
+        <div class="chip missing"><span class="chip-id">M-CAREER-PLAN</span><span class="chip-d">Plano de carreira</span></div>
+        <div class="chip missing"><span class="chip-id">M-MENTORING</span><span class="chip-d">Mentoria</span></div>
+        <div class="chip missing"><span class="chip-id">M-REGISTRATION</span><span class="chip-d">Inscrição de elenco / listas</span></div>
+        <div class="chip missing"><span class="chip-id">M-TRANSFER-STRATEGY</span><span class="chip-d">Estratégia de janela</span></div>
+        <div class="chip missing"><span class="chip-id">M-BUDGET</span><span class="chip-d">Orçamento por áreas / cenários</span></div>
+        <div class="chip read"><span class="chip-id">M-STRUCTURE</span><span class="chip-d">Estrutura — pips de nível, zero command de upgrade</span><span class="tag">fragmento</span></div>
+        <div class="chip missing"><span class="chip-id">M-RETRAIN</span><span class="chip-d">Mudança de posição / arquétipo</span></div>
+        <div class="chip missing"><span class="chip-id">M-COMPARE</span><span class="chip-d">Comparar jogadores</span></div>
+      </div>
+    </div>
+
+    <!-- L-M05 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M05</span>
+        <span class="arch-name">Partida e tempo real — resync por sequência</span>
+        <span class="risk high">Risco alto</span>
+        <span class="arch-count"><b>1</b> / 5</span>
+      </div>
+      <div class="chips">
+        <div class="chip built"><span class="chip-id">M-LIVE</span><span class="chip-d">Ao vivo — placar, realtime com GAP, ticks, área técnica</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-DECISION-POINT</span><span class="chip-d">Ponto de decisão — as 4 ações são chips sempre ligados, sem janela</span></div>
+        <div class="chip missing"><span class="chip-id">M-HALFTIME</span><span class="chip-d">Intervalo — o motor só avança 15 ticks; o intervalo não existe</span></div>
+        <div class="chip missing"><span class="chip-id">M-PENALTIES</span><span class="chip-d">Disputa de pênaltis</span></div>
+        <div class="chip missing"><span class="chip-id">M-LIVE-WORLD</span><span class="chip-d">Rodada ao vivo — a tela colapsa numa única partida</span></div>
+      </div>
+    </div>
+
+    <!-- L-M06 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M06</span>
+        <span class="arch-name">Alto risco — antes/depois, custos, recibo</span>
+        <span class="risk irreversible">Irreversível</span>
+        <span class="arch-count"><b>2</b> / 18</span>
+      </div>
+      <div class="chips">
+        <div class="chip built"><span class="chip-id">M-CLUB-LEAVE</span><span class="chip-d">Saída — confirma cooldown e verifica; é um Alert, não tela de consequência</span><span class="tag">parcial</span></div>
+        <div class="chip missing"><span class="chip-id">M-PROMISES</span><span class="chip-d">Promessas ao jogador</span></div>
+        <div class="chip missing"><span class="chip-id">M-YOUTH-INTAKE</span><span class="chip-d">Captação / peneira</span></div>
+        <div class="chip missing"><span class="chip-id">M-PROMOTE</span><span class="chip-d">Promoção ao profissional</span></div>
+        <div class="chip missing"><span class="chip-id">M-SEASON-CLOSE</span><span class="chip-d">Fim de temporada (wizard)</span></div>
+        <div class="chip partial"><span class="chip-id">M-NEGOTIATION</span><span class="chip-d">Proposta — "PROPOR" dispara termos fixos; sem compositor, contra-proposta ou thread. O aceite age como vendedor</span><span class="tag">só o command</span></div>
+        <div class="chip missing"><span class="chip-id">M-CONTRACT</span><span class="chip-d">Contrato / renovação</span></div>
+        <div class="chip missing"><span class="chip-id">M-LOAN</span><span class="chip-d">Empréstimo</span></div>
+        <div class="chip missing"><span class="chip-id">M-DEBT</span><span class="chip-d">Dívidas / crédito</span></div>
+        <div class="chip missing"><span class="chip-id">M-MATCHDAY-REVENUE</span><span class="chip-d">Bilheteria / matchday</span></div>
+        <div class="chip missing"><span class="chip-id">M-STADIUM-WORKS</span><span class="chip-d">Obras do estádio</span></div>
+        <div class="chip missing"><span class="chip-id">M-LICENSING</span><span class="chip-d">Licenciamento / interdição</span></div>
+        <div class="chip missing"><span class="chip-id">M-PRESS</span><span class="chip-d">Imprensa / coletiva</span></div>
+        <div class="chip missing"><span class="chip-id">M-CONVO</span><span class="chip-d">Conversa com atleta</span></div>
+        <div class="chip missing"><span class="chip-id">M-PUBLIC-PROMISES</span><span class="chip-d">Promessas públicas</span></div>
+        <div class="chip built"><span class="chip-id">M-IDENTITY</span><span class="chip-d">Rebranding — escudo, camisas, paleta, unicidade e confirmação com a penalidade de torcida</span><span class="tag">a mais completa</span></div>
+        <div class="chip missing"><span class="chip-id">M-CLAUSES</span><span class="chip-d">Cláusulas e obrigações condicionais</span></div>
+        <div class="chip missing"><span class="chip-id">M-FRIENDLIES</span><span class="chip-d">Amistosos / pré-temporada</span></div>
+      </div>
+    </div>
+
+    <!-- L-M07 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M07</span>
+        <span class="arch-name">Relatórios — período, KPIs, gráfico, drill-down</span>
+        <span class="risk low">Risco baixo</span>
+        <span class="arch-count"><b>0</b> / 4</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-AWARDS</span><span class="chip-d">Premiações</span></div>
+        <div class="chip missing"><span class="chip-id">M-HISTORY</span><span class="chip-d">Histórico e legado do mundo</span></div>
+        <div class="chip missing"><span class="chip-id">M-RANKINGS</span><span class="chip-d">Rankings e reputação</span></div>
+        <div class="chip missing"><span class="chip-id">M-ACCOUNTING</span><span class="chip-d">Contabilidade e orçamento</span></div>
+      </div>
+    </div>
+
+    <!-- L-M08 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M08</span>
+        <span class="arch-name">Timeline — fato oficial vs. narrativa</span>
+        <span class="risk low">Risco baixo</span>
+        <span class="arch-count"><b>0</b> / 2</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-PLAYER-MEMORY</span><span class="chip-d">Memória / trajetória do jogador</span></div>
+        <div class="chip missing"><span class="chip-id">M-FEED</span><span class="chip-d">Feed de eventos / narrativa</span></div>
+      </div>
+    </div>
+
+    <!-- L-M09 -->
+    <div class="arch">
+      <div class="arch-head">
+        <span class="arch-id">L-M09</span>
+        <span class="arch-name">Configuração, suporte e loja</span>
+        <span class="risk medium">Risco médio</span>
+        <span class="arch-count"><b>0</b> / 7</span>
+      </div>
+      <div class="chips">
+        <div class="chip missing"><span class="chip-id">M-ACCOUNT</span><span class="chip-d">Conta e sessão</span></div>
+        <div class="chip missing"><span class="chip-id">M-SETTINGS</span><span class="chip-d">Configurações</span></div>
+        <div class="chip missing"><span class="chip-id">M-STORE</span><span class="chip-d">Loja / monetização</span></div>
+        <div class="chip missing"><span class="chip-id">M-SEASON-PASS</span><span class="chip-d">Passe de temporada</span></div>
+        <div class="chip missing"><span class="chip-id">M-INTEGRITY</span><span class="chip-d">Regras de integridade</span></div>
+        <div class="chip missing"><span class="chip-id">M-BUG-REPORT</span><span class="chip-d">Report de bug</span></div>
+        <div class="chip missing"><span class="chip-id">M-SUPPORT</span><span class="chip-d">Suporte e recursos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>O que trava a construção</h2>
+    <p class="sub">As telas ausentes não são só trabalho de UI. Três coisas precisam existir antes — ou em paralelo.</p>
+
+    <div class="blockers">
+      <div class="blocker">
+        <h3>O app não tem navegação de detalhe</h3>
+        <p>Toda chamada de rota no app é <code>router.replace</code> entre <code>/</code> e <code>/onboarding</code>. Não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. São <span class="num">6</span> rotas — 114 IDs não cabem em 6 rotas, e o que não está numa delas é cartão, não tela. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Abrir a árvore de navegação é pré-requisito de quase tudo aqui.</p>
+      </div>
+      <div class="blocker">
+        <h3>O registro das telas não vigia nada</h3>
+        <p>O <code>screen-registry.ts</code> não é importado por <em>nenhum</em> arquivo do app — só pelo próprio teste e pelo registro de golden paths. O cabeçalho dele afirma satisfazer FR-010 e SC-003 e que a falta de wireframes "não é lacuna", mas o dado é inerte: nada liga os 114 IDs às 6 telas reais, e o teste só mede o comprimento de um array.</p>
+      </div>
+      <div class="blocker">
+        <h3>O lado da leitura é grosso demais</h3>
+        <p>Os docs especificam <span class="num">78</span> queries finas por tela (<code>GetFinanceSnapshot</code>, <code>GetBudget</code>, <code>GetCreditCapacity</code>, <code>GetBoardMessage</code>…). A API expõe <span class="num">15</span> queries grossas, uma por contexto — <code>club</code>, <code>ledger</code>, <code>market</code>. Commands não são o gargalo: existem 148. Cada tela nova ou deriva no cliente, como o <code>club-projection.ts</code> já faz, ou ganha projeção própria no servidor.</p>
+      </div>
+      <div class="blocker">
+        <h3>Nada disso é verificável hoje</h3>
+        <p>Não há harness E2E — nem Detox, nem Maestro, nem Playwright — e <code>apps/mobile/package.json</code> não tem script de teste. O vitest inclui só <code>.test.ts</code>, então nenhum componente é renderizado em teste algum.</p>
+      </div>
+      <div class="blocker">
+        <h3>Os 16 golden paths não cobrem o produto</h3>
+        <p>Os fluxos de UX vão até <code>MF-25</code>. Fechar GP-001…016 ainda deixa de fora treino e condição, imprensa, convocação para seleção, automações, estádio e loja — que respondem por boa parte das telas <code>L-M03</code>, <code>L-M04</code> e <code>L-M09</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Registro de atualizações</h2>
+    <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
+
+    <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-16</span>
+        <span class="log-text"><b>Linha de base.</b> Leitura do código em <code>bc2a7ba</code>: 11 telas com alguma UI, 103 ausentes. Gate verde — typecheck limpo e 439/439 testes.</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Fontes: <code>packages/core/src/clients/screen-registry.ts</code> (114 IDs), <code>docs/04-ui-ux/24-layouts-canonicos-e-cobertura.md</code> (arquétipos e risco), <code>docs/04-ui-ux/23-rastreabilidade-ux-api.md</code> (39 telas já mapeadas para query · command · evento · errorCode), <code>apps/mobile/src/</code>. Contagem por leitura do código, não por teste automatizado — não existe harness E2E que prove cobertura de tela.
+  </footer>
+</div>
