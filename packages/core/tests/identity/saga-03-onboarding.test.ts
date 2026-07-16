@@ -9,6 +9,7 @@ import {
   GameWorld,
   WorldEventing,
   WorldIdentity,
+  UserAccount,
   type GameWorldSnapshot,
   type IdentityClubRef,
 } from "../../src/index.js";
@@ -49,16 +50,17 @@ describe("SAGA-03 onboarding (C1 + X-002)", () => {
     const identity = identityInit.value;
     const eventing = eventingInit.value;
 
-    const account = identity.registerAccount({
+    const account = UserAccount.register({
+      // R-172: a conta é de plataforma, não do mundo.
+      email: "acc-1@exemplo.com",
+      name: "Gestor",
       locale: "pt-BR",
-      rulesetVersion: gameWorld.rulesetVersion,
-      idempotencyKey: "acc:1",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-02",
+      occurredOn: "2026-01-02",
+      idempotencySeed: gameWorld.seed,
     });
     if (!account.ok) throw account.error;
     const joined = identity.joinWorld({
-      accountId: account.value.id,
+      accountId: account.value.snapshot().id,
       gameWorldId: gameWorld.id,
       rulesetVersion: gameWorld.rulesetVersion,
       idempotencyKey: "join:1",
@@ -68,7 +70,7 @@ describe("SAGA-03 onboarding (C1 + X-002)", () => {
     if (!joined.ok) throw joined.error;
     const reservation = identity.reserveClub({
       clubId: CLUB,
-      accountId: account.value.id,
+      accountId: account.value.snapshot().id,
       expiresOn: "2026-02-01",
       rulesetVersion: gameWorld.rulesetVersion,
       idempotencyKey: "res:1",
@@ -79,7 +81,7 @@ describe("SAGA-03 onboarding (C1 + X-002)", () => {
 
     const saga = eventing.startSaga({
       sagaType: "SAGA-03",
-      correlationKey: `onboarding:${account.value.id}`,
+      correlationKey: `onboarding:${account.value.snapshot().id}`,
       steps: ["risk-check", "confirm"],
       rulesetVersion: gameWorld.rulesetVersion,
       idempotencyKey: "saga:1",
@@ -144,7 +146,7 @@ describe("SAGA-03 onboarding (C1 + X-002)", () => {
 
     expect(control).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
     expect(confirmStep).toMatchObject({ ok: true, value: { status: "COMPLETED" } });
-    expect(ctx.identity.activeControlForClub(CLUB)!.accountId).toBe(ctx.account.id);
+    expect(ctx.identity.activeControlForClub(CLUB)!.accountId).toBe(ctx.account.snapshot().id);
     expect(ctx.identity.summary().activeParticipationCount).toBe(1);
   });
 

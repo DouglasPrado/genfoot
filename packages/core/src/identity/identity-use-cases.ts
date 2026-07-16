@@ -10,13 +10,11 @@ import {
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import type { IdentityRepository } from "./identity-repository.js";
 import type {
-  AccountSnapshot,
   ClubControlSnapshot,
   ClubReservationSnapshot,
   IdentityAccountRef,
   IdentityClubRef,
   IdentitySummary,
-  SessionFamilySnapshot,
   WorldIdentitySnapshot,
   WorldParticipationSnapshot,
 } from "./identity-types.js";
@@ -77,27 +75,6 @@ export class InitializeIdentity {
   }
 }
 
-export class RegisterAccount {
-  public constructor(private readonly repository: IdentityRepository) {}
-
-  public execute(
-    gameWorldId: GameWorldId,
-    input: Readonly<{
-      locale: string;
-      credentialKind?: string;
-      secretHash?: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Promise<Result<AccountSnapshot, DomainError>> {
-    return mutate(this.repository, gameWorldId, (identity) =>
-      identity.registerAccount(input),
-    );
-  }
-}
-
 export class JoinWorld {
   public constructor(private readonly repository: IdentityRepository) {}
 
@@ -114,26 +91,6 @@ export class JoinWorld {
   ): Promise<Result<WorldParticipationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.joinWorld(input),
-    );
-  }
-}
-
-export class RevokeSessionFamily {
-  public constructor(private readonly repository: IdentityRepository) {}
-
-  public execute(
-    gameWorldId: GameWorldId,
-    input: Readonly<{
-      familyId: string;
-      reason: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Promise<Result<SessionFamilySnapshot, DomainError>> {
-    return mutate(this.repository, gameWorldId, (identity) =>
-      identity.revokeSessionFamily(input),
     );
   }
 }
@@ -235,47 +192,6 @@ export class RequestClubSwitch {
   ): Promise<Result<ClubReservationSnapshot, DomainError>> {
     return mutate(this.repository, gameWorldId, (identity) =>
       identity.requestClubSwitch(input),
-    );
-  }
-}
-
-export class StartSession {
-  public constructor(private readonly repository: IdentityRepository) {}
-
-  public execute(
-    gameWorldId: GameWorldId,
-    input: Readonly<{
-      accountId: IdentityAccountRef;
-      tokenHash: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Promise<Result<SessionFamilySnapshot, DomainError>> {
-    return mutate(this.repository, gameWorldId, (identity) =>
-      identity.startSession(input),
-    );
-  }
-}
-
-export class RefreshSession {
-  public constructor(private readonly repository: IdentityRepository) {}
-
-  public execute(
-    gameWorldId: GameWorldId,
-    input: Readonly<{
-      familyId: string;
-      presentedTokenHash: string;
-      newTokenHash: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Promise<Result<SessionFamilySnapshot, DomainError>> {
-    return mutate(this.repository, gameWorldId, (identity) =>
-      identity.refreshSession(input),
     );
   }
 }

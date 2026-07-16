@@ -466,11 +466,12 @@ A definição completa e o racional de cada uma vivem em [`fechamentos-complemen
 
 A definição completa, as consequências aceitas e as pendências abertas vivem em [`provedor-de-identidade-2026-07-16.md`](provedor-de-identidade-2026-07-16.md).
 
-### R-172..R-173 — Conta global e Postgres · RATIFICADAS em 2026-07-16
+### R-172..R-174 — Conta global, Postgres e fim da auth duplicada · RATIFICADAS em 2026-07-16
 
 - **R-172 — A conta é global; o domínio se dobra ao modelo canônico.** `UserAccount` é entidade de plataforma, sem `gameWorldId`, com e-mail único; `WorldParticipant` faz o vínculo por mundo. O modelo físico (`02-modelo-de-dados.md §6.3.1` + `prisma/schema.prisma`) está certo; foi `packages/core` que divergiu. Materializa o que R-85 já dizia.
+- **R-174 — A máquina de sessão e credencial sai do domínio.** R-171 já entregou o ciclo de token ao Clerk "sem reimplementação própria"; o domínio mantinha uma auth paralela que ninguém chamava. Saem `UserSession`/`SessionFamily`/`UserCredential` do core e os commands `identity:start-session`/`refresh-session`/`revoke-session`/`register-account`.
 - **R-173 — Postgres é o único armazenamento; o adapter JSON é descontinuado.** A migração é porta por porta (16), mas o destino é único: dois armazenamentos convivendo, sem transação atravessando, é pior que qualquer um sozinho.
 
 A definição completa, as consequências e as pendências vivem em [`conta-global-e-postgres-2026-07-16.md`](conta-global-e-postgres-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-173 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.
+> **Estado consolidado:** R-01..R-174 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.

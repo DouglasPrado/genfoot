@@ -37,10 +37,24 @@ O `JsonWorldRepository` sai. Não haverá dois armazenamentos convivendo: dado p
 
 A migração é **porta por porta** (são 16), cada uma verificável, mas o destino é único: nenhuma porta permanece em JSON. Enquanto houver porta não migrada, o estado é **parcial e declarado como tal** — nunca "pronto".
 
+### R-174 — A máquina de sessão e credencial sai do domínio
+
+`UserSession`, `SessionFamily` e `UserCredential` do `packages/core` são removidos, junto com os commands `identity:start-session`, `identity:refresh-session`, `identity:revoke-session` e `identity:register-account`.
+
+Motivo: [R-171](provedor-de-identidade-2026-07-16.md) já entregou o ciclo de token ao Clerk — "access token curto + refresh rotativo com detecção de reúso, satisfazendo a intenção de R-95/R-131 **sem reimplementação própria**". O domínio mantinha uma máquina de autenticação paralela que a R-171 aposentou e ninguém desligou: **nenhum cliente chamava esses commands** (nem app, nem admin, nem seed), e `UserCredential.passwordHash` já estava registrado como sem uso.
+
+Também travava a migração: `sessions` e `sessionFamilies` viviam no agregado **por mundo**, e o `UserSession` do modelo físico é **global** (`userId`). Manter exigiria ou migrar código morto, ou inventar tabelas por mundo contrariando o canônico.
+
+`WorldIdentity` fica com o que é de fato do mundo: participações, reservas, controles e cooldowns — exatamente o que `WorldParticipant` e `ClubControl` esperam.
+
+Consequência aceita: **revogar sessão pelo admin** (a "revogação por lista de sessões" de R-95) passa a ser integração com a Backend API do Clerk, não estado do domínio. Não existe hoje e está registrado abaixo.
+
 ### Pendências abertas
 
 - **Gate DB-01..DB-16 continua devido.** A migration atual é de desenvolvimento. O próprio `schema.prisma` avisa: produção exige antes as constraints PostgreSQL não expressáveis no Prisma e a conversão das FKs world-scoped restantes em compostas.
 - **`UserCredential.passwordHash` segue sem uso** (R-171): quem detém credencial é o Clerk. A tabela existe no schema; decidir se some ou fica reservada.
+- **Revogação de sessão pelo admin** (R-95, "revogação por lista de sessões") não existe: com R-174 ela deixa de ser estado do domínio e vira integração com a Backend API do Clerk.
+- **`UserSession`, `UserCredential` e `AuthRefreshToken` continuam no `prisma/schema.prisma`** sem escritor, agora por decisão e não por descuido: o Clerk os detém. Decidir se saem do schema ou ficam reservados.
 - **Ciclo de vida entre provedor e jogo:** apagar um usuário no Clerk não desfaz nada no jogo. Com conta global e FK, isso passa a deixar `WorldParticipant` e `ClubControl` órfãos de forma visível.
 
 ## Efeito

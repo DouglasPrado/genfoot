@@ -10,27 +10,21 @@ import {
 import { deterministicUuidV7, timestampOf } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
-  AccountStatus,
   ControlStatus,
   ParticipationStatus,
   ClubReservationStatus,
-  SessionFamilyStatus,
   type AccountRegisteredEvent,
-  type AccountSnapshot,
   type ClubControlActivatedEvent,
   type ClubControlEndedEvent,
   type ClubControlSnapshot,
   type ClubReservationSnapshot,
   type ClubReservedEvent,
   type CooldownStartedEvent,
-  type CredentialSnapshot,
   type IdentityAccountRef,
   type IdentityClubRef,
   type IdentityDomainEvent,
   type IdentitySummary,
   type SessionFamilyRevokedEvent,
-  type SessionFamilySnapshot,
-  type SessionSnapshot,
   type WorldIdentitySnapshot,
   type WorldParticipationActivatedEvent,
   type WorldParticipationSnapshot,
@@ -49,14 +43,10 @@ export class WorldIdentity {
       gameWorldId: world.id,
       rulesetVersion: world.rulesetVersion,
       cooldownDays,
-      accounts: [],
-      credentials: [],
-      sessions: [],
       reservations: [],
       controls: [],
       participations: [],
       cooldowns: [],
-      sessionFamilies: [],
       events: [],
       revision: 1,
     });
@@ -106,92 +96,7 @@ export class WorldIdentity {
         return fail(invalidIdentity("Evento de identidade inválido."));
       }
     }
-    const accountIds = new Set<string>();
-    for (const account of snapshot.accounts ?? []) {
-      if (
-        account.gameWorldId !== snapshot.gameWorldId ||
-        accountIds.has(account.id) ||
-        account.locale.trim() === ""
-      ) {
-        return fail(invalidIdentity("Conta inválida."));
-      }
-      accountIds.add(account.id);
-    }
     return succeed(new WorldIdentity(snapshot));
-  }
-
-  public registerAccount(
-    input: Readonly<{
-      locale: string;
-      credentialKind?: string;
-      secretHash?: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Result<AccountSnapshot, DomainError> {
-    if (input.rulesetVersion !== this.state.rulesetVersion) {
-      return fail(rulesetMismatch());
-    }
-    const accounts = this.state.accounts ?? [];
-    const existing = accounts.find(
-      (account) => account.idempotencyKey === input.idempotencyKey,
-    );
-    if (existing !== undefined) return succeed(existing);
-    if (input.locale.trim() === "") {
-      return fail(new DomainError("INVALID_ACCOUNT", "locale é obrigatório."));
-    }
-    const date = WorldDate.parse(input.worldDate);
-    if (!date.ok) return date;
-    const accountId = deterministicUuidV7<"Account">({
-      worldSeed: input.worldSeed,
-      context: `account:${input.idempotencyKey}`,
-      timestampMilliseconds: timestampOf(date.value.toString()),
-    });
-    const account: AccountSnapshot = {
-      id: accountId,
-      gameWorldId: this.state.gameWorldId,
-      status: AccountStatus.ACTIVE,
-      locale: input.locale.trim(),
-      createdOn: date.value.toString(),
-      idempotencyKey: input.idempotencyKey,
-      version: 1,
-    };
-    const credentials = this.state.credentials ?? [];
-    const nextCredentials =
-      input.secretHash !== undefined && input.secretHash.trim() !== ""
-        ? [
-            ...credentials,
-            {
-              accountId,
-              kind: input.credentialKind ?? "PASSWORD",
-              secretHash: input.secretHash,
-              verifiedOn: date.value.toString(),
-            } satisfies CredentialSnapshot,
-          ]
-        : credentials;
-    const event: AccountRegisteredEvent = {
-      id: this.eventId(
-        input.worldSeed,
-        `account-registered:${input.idempotencyKey}`,
-        date.value.toString(),
-      ),
-      type: "AccountRegistered",
-      gameWorldId: this.state.gameWorldId,
-      accountId,
-      worldDate: date.value.toString(),
-      rulesetVersion: input.rulesetVersion,
-      idempotencyKey: input.idempotencyKey,
-    };
-    this.state = {
-      ...this.state,
-      accounts: [...accounts, account],
-      credentials: nextCredentials,
-      events: [...this.state.events, event],
-      revision: this.state.revision + 1,
-    };
-    return succeed(account);
   }
 
   public joinWorld(
@@ -228,15 +133,8 @@ export class WorldIdentity {
       );
       if (participation !== undefined) return succeed(participation);
     }
-    if (!(this.state.accounts ?? []).some(({ id }) => id === input.accountId)) {
-      return fail(
-        new DomainError(
-          "AUTHENTICATION_REQUIRED",
-          "Conta não registrada; registre antes de ingressar no mundo.",
-          { accountId: input.accountId },
-        ),
-      );
-    }
+    // A conta é global (R-172): quem prova que ela existe é o caso de uso, que
+    // enxerga a porta de plataforma. O agregado do mundo não tem como saber.
     const date = WorldDate.parse(input.worldDate);
     if (!date.ok) return date;
     const existingActive = this.state.participations.find(
@@ -277,46 +175,6 @@ export class WorldIdentity {
       revision: this.state.revision + 1,
     };
     return succeed(participation);
-  }
-
-  public revokeSessionFamily(
-    input: Readonly<{
-      familyId: string;
-      reason: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Result<SessionFamilySnapshot, DomainError> {
-    if (input.rulesetVersion !== this.state.rulesetVersion) {
-      return fail(rulesetMismatch());
-    }
-    const index = this.state.sessionFamilies.findIndex(
-      ({ id }) => id === input.familyId,
-    );
-    if (index < 0) {
-      return fail(
-        new DomainError(
-          "SESSION_NOT_FOUND",
-          "Família de sessão não encontrada.",
-          {
-            familyId: input.familyId,
-          },
-        ),
-      );
-    }
-    if (
-      this.state.sessionFamilies[index]!.status === SessionFamilyStatus.REVOKED
-    ) {
-      return succeed(this.state.sessionFamilies[index]!);
-    }
-    this.revokeFamilyAt(
-      index,
-      input.reason.trim() === "" ? "EXPLICIT" : input.reason.trim(),
-      input,
-    );
-    return succeed(this.state.sessionFamilies[index]!);
   }
 
   public reserveClub(
@@ -686,117 +544,6 @@ export class WorldIdentity {
     });
   }
 
-  public startSession(
-    input: Readonly<{
-      accountId: IdentityAccountRef;
-      tokenHash: string;
-      expiresOn?: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Result<SessionFamilySnapshot, DomainError> {
-    if (input.rulesetVersion !== this.state.rulesetVersion) {
-      return fail(rulesetMismatch());
-    }
-    const familyId = deterministicUuidV7<"SessionFamily">({
-      worldSeed: input.worldSeed,
-      context: `session-family:${input.idempotencyKey}`,
-      timestampMilliseconds: timestampOf(input.worldDate),
-    });
-    const existing = this.state.sessionFamilies.find(
-      ({ id }) => id === familyId,
-    );
-    if (existing !== undefined) return succeed(existing);
-    if (input.tokenHash.trim() === "") {
-      return fail(new DomainError("INVALID_SESSION", "tokenHash obrigatório."));
-    }
-    const date = WorldDate.parse(input.worldDate);
-    if (!date.ok) return date;
-    const expiresOn =
-      input.expiresOn === undefined
-        ? date.value.toString()
-        : WorldDate.parse(input.expiresOn);
-    if (typeof expiresOn !== "string" && !expiresOn.ok) return expiresOn;
-    const expiresOnValue =
-      typeof expiresOn === "string" ? expiresOn : expiresOn.value.toString();
-    const family: SessionFamilySnapshot = {
-      id: familyId,
-      accountId: input.accountId,
-      currentTokenHash: input.tokenHash,
-      status: SessionFamilyStatus.ACTIVE,
-    };
-    const session: SessionSnapshot = {
-      id: deterministicUuidV7<"Session">({
-        worldSeed: input.worldSeed,
-        context: `session:${input.idempotencyKey}`,
-        timestampMilliseconds: timestampOf(date.value.toString()),
-      }),
-      familyId,
-      accountId: input.accountId,
-      expiresOn: expiresOnValue,
-      revokedOn: null,
-    };
-    this.state = {
-      ...this.state,
-      sessionFamilies: [...this.state.sessionFamilies, family],
-      sessions: [...(this.state.sessions ?? []), session],
-      revision: this.state.revision + 1,
-    };
-    return succeed(family);
-  }
-
-  public refreshSession(
-    input: Readonly<{
-      familyId: string;
-      presentedTokenHash: string;
-      newTokenHash: string;
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): Result<SessionFamilySnapshot, DomainError> {
-    if (input.rulesetVersion !== this.state.rulesetVersion) {
-      return fail(rulesetMismatch());
-    }
-    const index = this.state.sessionFamilies.findIndex(
-      ({ id }) => id === input.familyId,
-    );
-    if (index < 0) {
-      return fail(
-        new DomainError(
-          "SESSION_NOT_FOUND",
-          "Família de sessão não encontrada.",
-          {
-            familyId: input.familyId,
-          },
-        ),
-      );
-    }
-    const family = this.state.sessionFamilies[index]!;
-    if (family.status === SessionFamilyStatus.REVOKED) {
-      return fail(sessionRevoked(family.id));
-    }
-    if (family.currentTokenHash !== input.presentedTokenHash) {
-      this.revokeFamilyAt(index, "TOKEN_REUSE", input);
-      return fail(sessionRevoked(family.id));
-    }
-    const rotated: SessionFamilySnapshot = {
-      ...family,
-      currentTokenHash: input.newTokenHash,
-    };
-    const sessionFamilies = [...this.state.sessionFamilies];
-    sessionFamilies[index] = rotated;
-    this.state = {
-      ...this.state,
-      sessionFamilies,
-      revision: this.state.revision + 1,
-    };
-    return succeed(rotated);
-  }
-
   public activeControlForClub(clubId: string): ClubControlSnapshot | null {
     return (
       this.state.controls.find(
@@ -808,7 +555,6 @@ export class WorldIdentity {
 
   public summary(): IdentitySummary {
     return {
-      accountCount: (this.state.accounts ?? []).length,
       activeReservationCount: this.state.reservations.filter(
         ({ status }) => status === ClubReservationStatus.HELD,
       ).length,
@@ -818,12 +564,6 @@ export class WorldIdentity {
       activeParticipationCount: this.state.participations.filter(
         ({ status }) => status === ParticipationStatus.ACTIVE,
       ).length,
-      activeSessionFamilyCount: this.state.sessionFamilies.filter(
-        ({ status }) => status === SessionFamilyStatus.ACTIVE,
-      ).length,
-      activeSessionCount: (this.state.sessions ?? []).filter(
-        ({ revokedOn }) => revokedOn === null,
-      ).length,
     };
   }
 
@@ -831,46 +571,6 @@ export class WorldIdentity {
     return this.state;
   }
 
-  private revokeFamilyAt(
-    index: number,
-    reason: string,
-    input: Readonly<{
-      rulesetVersion: RulesetVersion;
-      idempotencyKey: string;
-      worldSeed: string;
-      worldDate: string;
-    }>,
-  ): void {
-    const family = this.state.sessionFamilies[index]!;
-    const sessionFamilies = [...this.state.sessionFamilies];
-    sessionFamilies[index] = { ...family, status: SessionFamilyStatus.REVOKED };
-    const sessions = (this.state.sessions ?? []).map((session) =>
-      session.familyId === family.id && session.revokedOn === null
-        ? { ...session, revokedOn: input.worldDate }
-        : session,
-    );
-    const event: SessionFamilyRevokedEvent = {
-      id: this.eventId(
-        input.worldSeed,
-        `session-revoked:${input.idempotencyKey}`,
-        input.worldDate,
-      ),
-      type: "SessionFamilyRevoked",
-      gameWorldId: this.state.gameWorldId,
-      familyId: family.id,
-      reason,
-      worldDate: input.worldDate,
-      rulesetVersion: input.rulesetVersion,
-      idempotencyKey: input.idempotencyKey,
-    };
-    this.state = {
-      ...this.state,
-      sessionFamilies,
-      sessions,
-      events: [...this.state.events, event],
-      revision: this.state.revision + 1,
-    };
-  }
 
   private clubIsTaken(clubId: string): boolean {
     // A vaga está ocupada por uma reserva ainda retida (HELD) ou por um controle

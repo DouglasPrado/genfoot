@@ -50,31 +50,6 @@ export const SessionFamilyStatus = {
 export type SessionFamilyStatus =
   (typeof SessionFamilyStatus)[keyof typeof SessionFamilyStatus];
 
-export interface AccountSnapshot {
-  readonly id: IdentityAccountRef;
-  readonly gameWorldId: GameWorldId;
-  readonly status: AccountStatus;
-  readonly locale: string;
-  readonly createdOn: string;
-  readonly idempotencyKey: string;
-  readonly version: number;
-}
-
-export interface CredentialSnapshot {
-  readonly accountId: IdentityAccountRef;
-  readonly kind: string;
-  readonly secretHash: string;
-  readonly verifiedOn: string | null;
-}
-
-export interface SessionSnapshot {
-  readonly id: SessionId;
-  readonly familyId: SessionFamilyId;
-  readonly accountId: IdentityAccountRef;
-  readonly expiresOn: string;
-  readonly revokedOn: string | null;
-}
-
 export interface ClubReservationSnapshot {
   readonly id: ClubReservationId;
   readonly gameWorldId: GameWorldId;
@@ -110,13 +85,6 @@ export interface CooldownSnapshot {
   readonly accountId: IdentityAccountRef;
   readonly gameWorldId: GameWorldId;
   readonly untilOn: string;
-}
-
-export interface SessionFamilySnapshot {
-  readonly id: SessionFamilyId;
-  readonly accountId: IdentityAccountRef;
-  readonly currentTokenHash: string;
-  readonly status: SessionFamilyStatus;
 }
 
 export interface ClubReservedEvent {
@@ -205,27 +173,29 @@ export type IdentityDomainEvent =
   | CooldownStartedEvent
   | SessionFamilyRevokedEvent;
 
+/**
+ * Estado da identidade DENTRO de um mundo (R-172/R-174).
+ *
+ * Contas, credenciais e sessões saíram: são de plataforma. A conta global é
+ * `UserAccount`; o ciclo de token é do Clerk (R-171). Aqui fica só o que
+ * pertence ao mundo — e é exatamente o que `WorldParticipant` e `ClubControl`
+ * do modelo físico esperam.
+ */
 export interface WorldIdentitySnapshot {
   readonly gameWorldId: GameWorldId;
   readonly rulesetVersion: RulesetVersion;
   readonly cooldownDays: number;
-  readonly accounts?: readonly AccountSnapshot[];
-  readonly credentials?: readonly CredentialSnapshot[];
-  readonly sessions?: readonly SessionSnapshot[];
   readonly reservations: readonly ClubReservationSnapshot[];
   readonly controls: readonly ClubControlSnapshot[];
   readonly participations: readonly WorldParticipationSnapshot[];
   readonly cooldowns: readonly CooldownSnapshot[];
-  readonly sessionFamilies: readonly SessionFamilySnapshot[];
   readonly events: readonly IdentityDomainEvent[];
   readonly revision: number;
 }
 
+/** Resumo da identidade NO MUNDO. Conta e sessão são de plataforma (R-172/R-174). */
 export interface IdentitySummary {
-  readonly accountCount: number;
   readonly activeReservationCount: number;
   readonly activeControlCount: number;
   readonly activeParticipationCount: number;
-  readonly activeSessionFamilyCount: number;
-  readonly activeSessionCount: number;
 }

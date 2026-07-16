@@ -49,7 +49,6 @@ const input = {
   subject: "user_clerk1",
   email: "douglas@exemplo.com",
   name: "Douglas",
-  locale: "pt-BR",
   occurredOn: "2026-01-01",
   idempotencySeed: "grinta-demo",
 };

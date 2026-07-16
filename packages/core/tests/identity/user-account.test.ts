@@ -9,7 +9,6 @@ import {
 const base = {
   email: "Douglas@Exemplo.com ",
   name: " Douglas ",
-  locale: "pt-BR",
   occurredOn: "2026-01-01",
   idempotencySeed: "grinta-demo",
 };
@@ -44,10 +43,6 @@ describe("UserAccount.register", () => {
   it("exige e-mail e recusa formato sem @", () => {
     expect(UserAccount.register({ ...base, email: "  " }).ok).toBe(false);
     expect(UserAccount.register({ ...base, email: "douglas" }).ok).toBe(false);
-  });
-
-  it("exige locale", () => {
-    expect(UserAccount.register({ ...base, locale: " " }).ok).toBe(false);
   });
 
   // Determinismo: sem Date.now()/Math.random() no domínio, reprocessar o mesmo

@@ -108,8 +108,6 @@ import {
   ReconcileWorldLedger,
   RecordOfficialResult,
   RecordRiskSignal,
-  RefreshSession,
-  RegisterAccount,
   RegisterEventType,
   RegisterParticipant,
   ReleaseClubReservation,
@@ -128,13 +126,11 @@ import {
   RetryDeadLetter,
   RetryDelivery,
   RevokeAutomationRule,
-  RevokeSessionFamily,
   SetTrainingDirection,
   SettleReservation,
   StartLoan,
   StartMatch,
   StartSaga,
-  StartSession,
   StartTransfer,
   SubmitMatchCommand,
   SubmitOffer,
@@ -1012,9 +1008,7 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   "admin:resolve-support": wc((r) => new ResolveSupportCase(r), "admin"),
 
   // Identidade (C1)
-  "identity:register-account": wc((r) => new RegisterAccount(r), "identity"),
   "identity:join-world": wc((r) => new JoinWorld(r), "identity"),
-  "identity:revoke-session": wc((r) => new RevokeSessionFamily(r), "identity"),
   "identity:reserve-club": wc((r) => new ReserveClub(r), "identity"),
   "identity:confirm-onboarding": wc(
     (r) => new ConfirmOnboarding(r),
@@ -1026,8 +1020,6 @@ const gameplayHandlers: Record<string, CommandHandler> = {
   ),
   "identity:end-club-control": wc((r) => new EndClubControl(r), "identity"),
   "identity:request-switch": wc((r) => new RequestClubSwitch(r), "identity"),
-  "identity:start-session": wc((r) => new StartSession(r), "identity"),
-  "identity:refresh-session": wc((r) => new RefreshSession(r), "identity"),
 
   // Automação / IA (X-001)
   "automation:create-rule": wc(

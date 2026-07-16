@@ -11,6 +11,7 @@ import {
   WorldAdmin,
   WorldEventing,
   WorldIdentity,
+  UserAccount,
   type GameWorldSnapshot,
   type IdentityAccountRef,
   type IdentityClubRef,
@@ -145,16 +146,17 @@ describe("GP-001 Club entry (convergence)", () => {
     const journey: string[] = [];
 
     // C1: conta registrada ingressa no mundo e reserva a vaga.
-    const account = identity.registerAccount({
+    const account = UserAccount.register({
+      // R-172: a conta é de plataforma, não do mundo.
+      email: "acc-entry@exemplo.com",
+      name: "Gestor",
       locale: "pt-BR",
-      rulesetVersion: ruleset,
-      idempotencyKey: "acc:entry",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-02",
+      occurredOn: "2026-01-02",
+      idempotencySeed: gameWorld.seed,
     });
     if (!account.ok) throw account.error;
     const joined = identity.joinWorld({
-      accountId: account.value.id,
+      accountId: account.value.snapshot().id,
       gameWorldId: gameWorld.id,
       rulesetVersion: ruleset,
       idempotencyKey: "join:entry",
@@ -164,7 +166,7 @@ describe("GP-001 Club entry (convergence)", () => {
     if (!joined.ok) throw joined.error;
     const reservation = identity.reserveClub({
       clubId: CLUB,
-      accountId: account.value.id,
+      accountId: account.value.snapshot().id,
       expiresOn: "2026-02-01",
       rulesetVersion: ruleset,
       idempotencyKey: "reserve:entry",
@@ -177,7 +179,7 @@ describe("GP-001 Club entry (convergence)", () => {
     // X-002: a jornada roda como saga durável arrendada (lease/fencing).
     const saga = eventing.startSaga({
       sagaType: "SAGA-03",
-      correlationKey: `onboarding:${account.value.id}`,
+      correlationKey: `onboarding:${account.value.snapshot().id}`,
       steps: ["risk-check", "confirm"],
       rulesetVersion: ruleset,
       idempotencyKey: "saga:entry",
@@ -196,7 +198,7 @@ describe("GP-001 Club entry (convergence)", () => {
 
     // Passo risk-check: C12 abre e decide um caso (audit hash-chain verificável).
     const riskCase = admin.openCase({
-      subjects: [account.value.id],
+      subjects: [account.value.snapshot().id],
       severity: 10,
       evidenceRefs: ["signup:ok"],
       openedBy: "risk-officer",
@@ -239,7 +241,7 @@ describe("GP-001 Club entry (convergence)", () => {
     if (!confirmStep.ok) throw confirmStep.error;
     journey.push("CONTROL_ACTIVE");
 
-    expect(identity.activeControlForClub(CLUB)!.accountId).toBe(account.value.id);
+    expect(identity.activeControlForClub(CLUB)!.accountId).toBe(account.value.snapshot().id);
     expect(eventing.findSaga(saga.value.id)!.status).toBe("COMPLETED");
     expect(admin.verifyAuditChain()).toBe(true);
     // Screen contract (X-003): a sequência de estados da jornada é determinística.
@@ -247,17 +249,18 @@ describe("GP-001 Club entry (convergence)", () => {
 
     // Compensação: outra entrada com risco rejeitado libera a vaga e compensa a saga.
     const CLUB2 = "019f0000-0000-7000-8000-0000000000c9" as IdentityClubRef;
-    const account2 = identity.registerAccount({
+    const account2 = UserAccount.register({
+      // R-172: a conta é de plataforma, não do mundo.
+      email: "acc-reject@exemplo.com",
+      name: "Gestor",
       locale: "pt-BR",
-      rulesetVersion: ruleset,
-      idempotencyKey: "acc:reject",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-02",
+      occurredOn: "2026-01-02",
+      idempotencySeed: gameWorld.seed,
     });
     if (!account2.ok) throw account2.error;
     const reservation2 = identity.reserveClub({
       clubId: CLUB2,
-      accountId: account2.value.id,
+      accountId: account2.value.snapshot().id,
       expiresOn: "2026-02-01",
       rulesetVersion: ruleset,
       idempotencyKey: "reserve:reject",
@@ -267,7 +270,7 @@ describe("GP-001 Club entry (convergence)", () => {
     if (!reservation2.ok) throw reservation2.error;
     const saga2 = eventing.startSaga({
       sagaType: "SAGA-03",
-      correlationKey: `onboarding:${account2.value.id}`,
+      correlationKey: `onboarding:${account2.value.snapshot().id}`,
       steps: ["risk-check", "confirm"],
       rulesetVersion: ruleset,
       idempotencyKey: "saga:reject",
@@ -306,17 +309,18 @@ describe("GP-001 Club entry (convergence)", () => {
     // Programa de Clube Novo (T004): uma terceira conta assume um clube distinto
     // sem conflitar com os anteriores.
     const CLUB_NEW = "019f0000-0000-7000-8000-0000000000ca" as IdentityClubRef;
-    const account3 = identity.registerAccount({
+    const account3 = UserAccount.register({
+      // R-172: a conta é de plataforma, não do mundo.
+      email: "acc-newclub@exemplo.com",
+      name: "Gestor",
       locale: "pt-BR",
-      rulesetVersion: ruleset,
-      idempotencyKey: "acc:newclub",
-      worldSeed: gameWorld.seed,
-      worldDate: "2026-01-02",
+      occurredOn: "2026-01-02",
+      idempotencySeed: gameWorld.seed,
     });
     if (!account3.ok) throw account3.error;
     const reservation3 = identity.reserveClub({
       clubId: CLUB_NEW,
-      accountId: account3.value.id,
+      accountId: account3.value.snapshot().id,
       expiresOn: "2026-02-01",
       rulesetVersion: ruleset,
       idempotencyKey: "reserve:newclub",
@@ -332,6 +336,6 @@ describe("GP-001 Club entry (convergence)", () => {
       worldDate: "2026-01-07",
     });
     expect(controlNew).toMatchObject({ ok: true, value: { status: "ACTIVE" } });
-    expect(identity.activeControlForClub(CLUB_NEW)!.accountId).toBe(account3.value.id);
+    expect(identity.activeControlForClub(CLUB_NEW)!.accountId).toBe(account3.value.snapshot().id);
   });
 });

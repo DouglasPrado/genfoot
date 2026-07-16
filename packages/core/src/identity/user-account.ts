@@ -14,6 +14,10 @@ import { AccountStatus, type IdentityAccountRef } from "./identity-types.js";
  * O provedor externo (Clerk, R-171) autentica; a conta segue sendo a fonte de
  * verdade do jogo (R-85). A ligação é `externalSubject` = `sub` do token
  * verificado — chave estável, ao contrário do e-mail, que muda.
+ *
+ * `locale` NÃO mora aqui: pelo modelo canônico (`02-modelo-de-dados.md §6.3.1`)
+ * é preferência de usuário (`UserLocalePreference`), não atributo de conta.
+ * Guardá-lo na conta repetiria o erro que a R-172 acabou de corrigir.
  */
 export interface UserAccountSnapshot {
   readonly id: IdentityAccountRef;
@@ -22,7 +26,6 @@ export interface UserAccountSnapshot {
   /** Normalizado (minúsculas, sem espaços): é a chave única do modelo físico. */
   readonly email: string;
   readonly externalSubject: string | null;
-  readonly locale: string;
   readonly createdOn: string;
   readonly version: number;
 }
@@ -34,7 +37,6 @@ export function normalizeEmail(email: string): string {
 export interface RegisterUserAccountInput {
   readonly email: string;
   readonly name: string;
-  readonly locale: string;
   readonly externalSubject?: string;
   /** Data do mundo de origem; a conta é global, mas o id é determinístico. */
   readonly occurredOn: string;
@@ -59,9 +61,6 @@ export class UserAccount {
     if (!email.includes("@")) {
       return fail(new DomainError("INVALID_ACCOUNT", "e-mail inválido."));
     }
-    if (input.locale.trim() === "") {
-      return fail(new DomainError("INVALID_ACCOUNT", "locale é obrigatório."));
-    }
     const date = WorldDate.parse(input.occurredOn);
     if (!date.ok) return date;
 
@@ -79,7 +78,6 @@ export class UserAccount {
         name: input.name.trim(),
         email,
         externalSubject: subject === undefined || subject === "" ? null : subject,
-        locale: input.locale.trim(),
         createdOn: date.value.toString(),
         version: 1,
       }),

@@ -658,25 +658,19 @@ describe("JsonWorldRepository", () => {
     ).rejects.toMatchObject({ code: "MARKET_REVISION_CONFLICT" });
   });
 
-  it("persiste a identidade C1 com conta e sessão (round-trip + recovery)", async () => {
+  it("persiste a identidade C1 do mundo (round-trip + recovery)", async () => {
     const store = await repository();
     const world = snapshot();
     await store.value.save(world, null);
     const created = WorldIdentity.initialize(world);
     if (!created.ok) throw created.error;
     const identity = created.value;
-    const account = identity.registerAccount({
-      locale: "pt-BR",
-      credentialKind: "PASSWORD",
-      secretHash: "hash-1",
-      rulesetVersion: world.rulesetVersion,
-      idempotencyKey: "acc:1",
-      worldSeed: world.seed,
-      worldDate: "2026-01-02",
-    });
-    if (!account.ok) throw account.error;
+
+    // R-172: a conta é de plataforma e não passa pelo agregado do mundo. Aqui
+    // só entra o vínculo — participação, reserva, controle.
+    const accountId = "019b76da-a800-7787-9462-49c009be300a" as never;
     const joined = identity.joinWorld({
-      accountId: account.value.id,
+      accountId,
       gameWorldId: world.id,
       rulesetVersion: world.rulesetVersion,
       idempotencyKey: "join:1",
@@ -684,19 +678,9 @@ describe("JsonWorldRepository", () => {
       worldDate: "2026-01-03",
     });
     if (!joined.ok) throw joined.error;
-    const session = identity.startSession({
-      accountId: account.value.id,
-      tokenHash: "token-1",
-      expiresOn: "2026-02-01",
-      rulesetVersion: world.rulesetVersion,
-      idempotencyKey: "sess:1",
-      worldSeed: world.seed,
-      worldDate: "2026-01-03",
-    });
-    if (!session.ok) throw session.error;
 
     await store.value.saveIdentity(identity.snapshot(), null);
-    // round-trip: accounts, credentials, sessions e events preservados sem stripping
+    // round-trip: participações, reservas, controles e events sem stripping
     expect(await store.value.findIdentityByWorldId(world.id)).toEqual(
       identity.snapshot(),
     );
@@ -705,7 +689,7 @@ describe("JsonWorldRepository", () => {
     const restarted = new JsonWorldRepository(store.directory);
     const join = new JoinWorld(restarted);
     const retry = await join.execute(world.id, {
-      accountId: account.value.id,
+      accountId,
       gameWorldId: world.id,
       rulesetVersion: world.rulesetVersion,
       idempotencyKey: "join:1",
@@ -714,8 +698,7 @@ describe("JsonWorldRepository", () => {
     });
     expect(retry).toMatchObject({ ok: true });
     const reloaded = await restarted.findIdentityByWorldId(world.id);
-    expect(reloaded!.accounts).toHaveLength(1);
-    expect(reloaded!.sessions).toHaveLength(1);
+    expect(reloaded!.participations).toHaveLength(1);
     await expect(
       store.value.saveIdentity(identity.snapshot(), 99),
     ).rejects.toMatchObject({ code: "IDENTITY_REVISION_CONFLICT" });

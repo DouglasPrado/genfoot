@@ -12,7 +12,6 @@ export interface ResolveAccountInput {
   readonly subject: string;
   readonly email: string;
   readonly name: string;
-  readonly locale: string;
   readonly occurredOn: string;
   readonly idempotencySeed: string;
 }
@@ -61,7 +60,6 @@ export class ResolveAccountForSubject {
     const created = UserAccount.register({
       email: input.email,
       name: input.name,
-      locale: input.locale,
       externalSubject: subject,
       occurredOn: input.occurredOn,
       idempotencySeed: input.idempotencySeed,
