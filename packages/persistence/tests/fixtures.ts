@@ -92,19 +92,26 @@ export async function seedParticipant(
   return snapshot.id;
 }
 
+/**
+ * O clube e o seu período de identidade vigente.
+ *
+ * O nome NÃO mora no clube (R-175/BC-003): ele é um período com vigência, e o
+ * rebranding abre um novo em vez de sobrescrever. Um clube sem período vigente
+ * é um clube sem nome hoje — por isso a fixture cria os dois.
+ */
 export async function seedClub(client: PrismaClient, id = CLUB_ID): Promise<string> {
   await client.club.create({
+    data: { id, gameWorldId: WORLD_ID, regionId: "BR-SP" },
+  });
+  await client.clubIdentityPeriod.create({
     data: {
-      id,
+      id: `019b76da-a800-7aaa-9462-${id.slice(-12)}`,
       gameWorldId: WORLD_ID,
-      name: "Clube de teste",
-      shortName: "CTE",
-      slug: `clube-${id.slice(-4)}`,
-      country: "BR",
-      currencyId: "019b76da-a800-7787-9462-49c009becccc",
-      cashMinor: 0n,
-      wageBudgetMinor: 0n,
-      transferBudgetMinor: 0n,
+      clubId: id,
+      name: `Clube ${id.slice(-4)}`,
+      shortCode: id.slice(-3).toUpperCase(),
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      rulesetVersion: "1.0.0",
     },
   });
   return id;

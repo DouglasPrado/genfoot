@@ -112,11 +112,19 @@ enum ClubEntryReservationStatus {
   RELEASED
 }
 
+/// R-175: fica o ciclo de vida do CLUBE, e só ele.
+///
+/// Saíram: `BANKRUPT` (é do C9 — situação econômica, não estado do clube; e o
+/// saldo deriva do razão, Decisão 19.10), `BOT_RESERVED` (morreu com R-180: IA
+/// é a AUSÊNCIA de controle, não um estado do clube) e `INACTIVE` (vago — o
+/// domínio distingue suspenso de dissolvido, que é o que o jogo precisa).
+///
+/// A interseção entre os dois enums era `{ACTIVE}`: cada lado conhecia estados
+/// que o outro nunca ouviu falar.
 enum ClubStatus {
   ACTIVE
-  INACTIVE
-  BANKRUPT
-  BOT_RESERVED
+  SUSPENDED
+  DISSOLVED
 }
 
 enum SeasonStatus {
@@ -895,32 +903,175 @@ model Season {
 // CLUBE — §3.2 / §6.3.3
 // =============================================================================
 
+/// R-175. `name`, `shortName` e `slug` NÃO moram aqui: a identidade do clube é
+/// um PERÍODO com vigência (`ClubIdentityPeriod`), porque o rebranding (BC-003)
+/// abre período novo em vez de sobrescrever. Guardá-los aqui faria cada troca
+/// de nome apagar a anterior — e o histórico é justamente o que a feature
+/// existe para manter.
+///
+/// O nome corrente é o período sem `effectiveThrough`. A unicidade de nome por
+/// mundo vive lá, com índice parcial sobre o período vigente.
+/// A identidade do clube ao longo do tempo (BC-003). Root canônico que não
+/// tinha tabela — e sem ele o rebranding sobrescreveria o nome, apagando o
+/// histórico que a feature existe para guardar.
+///
+/// O período vigente é o de `effectiveThrough = null`. "Nome único por mundo"
+/// (context map:153) é índice único PARCIAL sobre os vigentes: dois clubes não
+/// podem se chamar igual HOJE, mas um nome abandonado pode ser reusado.
+model ClubIdentityPeriod {
+  id               String    @id @db.Uuid
+  gameWorldId      String    @db.Uuid
+  clubId           String    @db.Uuid
+  name             String
+  shortCode        String
+  effectiveFrom    DateTime  @db.Date
+  effectiveThrough DateTime? @db.Date
+  rulesetVersion   String
+  // Identidade visual: opcional porque clube gerado nasce sem ela e o jogador a
+  // define ao personalizar (BC-003). Cores em hex, kits/escudo por template.
+  primaryColor      String?
+  secondaryColor    String?
+  tertiaryColor     String?
+  homeKitTemplateId String?
+  awayKitTemplateId String?
+  crestTemplateId   String?
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+/// Root canônico (context map:77) que não tinha tabela — a única pista no
+/// schema era `DepartmentType.STADIUM`, que é outro modelo: estádio-como-
+/// departamento. O domínio o tem como ENTIDADE, obrigatória, 1 por clube.
+model Stadium {
+  id               String               @id @db.Uuid
+  gameWorldId      String               @db.Uuid
+  clubId           String               @db.Uuid
+  name             String
+  tenure           StadiumTenure
+  capacity         Int
+  pitchQuality     Int
+  condition        Int
+  licenseStatus    StadiumLicenseStatus @default(PENDING)
+  maintenanceDueOn DateTime?            @db.Date
+  version          Int                  @default(1)
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  // 1 estádio por clube: o domínio o tem como campo obrigatório, não lista.
+  @@unique([gameWorldId, clubId])
+}
+
+enum StadiumTenure {
+  OWNED
+  LEASED
+}
+
+enum StadiumLicenseStatus {
+  PENDING
+  LICENSED
+  SUSPENDED
+}
+
+/// Preço de ingresso vigente a partir de uma data (R-27).
+model TicketPricePolicy {
+  id             String   @id @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  // R-181: dinheiro é BigInt em unidade mínima. O domínio usava `number`
+  // (double IEEE-754) — muda com a reescrita de C9, que é dona do dinheiro.
+  priceMinor     BigInt
+  currencyId     String?  @db.Uuid // espera a model Currency (R-181)
+  effectiveOn    DateTime @db.Date
+  rulesetVersion String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId, effectiveOn])
+}
+
+/// Contrato comercial sobre um ativo do clube (naming rights, patrocínio).
+///
+/// PENDENTE E DECLARADO: ele não sabe quanto vale. O domínio não tem valor nem
+/// referência a valor — só `externalAgreementRef`. O dinheiro é do C9
+/// (context map:78), mas sem sequer uma referência o patrocínio é contrato sem
+/// preço. Volta com C9.
+model CommercialAgreement {
+  id                   String   @id @db.Uuid
+  gameWorldId          String   @db.Uuid
+  clubId               String   @db.Uuid
+  asset                String
+  exclusive            Boolean  @default(false)
+  startsOn             DateTime @db.Date
+  endsOn               DateTime @db.Date
+  externalAgreementRef String
+  rulesetVersion       String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+/// Decisão registrada da diretoria.
+///
+/// NÃO é o `BoardPromise` canônico, e a diferença importa: o doc pede promessa
+/// VERIFICÁVEL (command `MakePublicPromise`), e isto é auditoria — registra o
+/// que foi decidido, sem nada a verificar depois. São conceitos distintos, e o
+/// canônico segue sem materialização. Registrado como pendência.
+model BoardDecision {
+  id               String    @id @db.Uuid
+  gameWorldId      String    @db.Uuid
+  clubId           String    @db.Uuid
+  decisionType     String
+  authorId         String
+  justification    String
+  effectiveFrom    DateTime  @db.Date
+  effectiveThrough DateTime? @db.Date
+  recordedAt       DateTime  @db.Date
+  rulesetVersion   String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
 model Club {
-  id                  String          @id @default(uuid(7)) @db.Uuid
+  id                  String          @id @db.Uuid
   gameWorldId         String          @db.Uuid
-  name                String
-  shortName           String
-  slug                String
-  city                String?
-  country             String
+  regionId            String
   foundedYear         Int?
   // R-180: `controlType` saiu daqui também. Era projeção duplicada do
   // `ClubControl` — e duas fontes para "quem comanda" divergem em silêncio.
   // Clube sem controle ativo é tocado pela IA; a pergunta se responde no
   // ClubControl, não num flag do clube.
   status              ClubStatus      @default(ACTIVE)
-  reputation          Int             @default(1)
-  level               Int             @default(1)
+  // O domínio tem BANDA de reputação, não dois escalares soltos.
+  reputationBand      Int             @default(1)
   fanBaseSize         Int             @default(0)
   boardPatience       Int             @default(50)
   pressureLevel       Int             @default(0)
-  currencyId          String          @db.Uuid // moeda operacional do clube (FK Currency)
-  cashMinor           BigInt // C-06: PROJEÇÃO DERIVADA do razão (fonte de verdade = JournalLine POSTED, ownerScope=CLUB). NÃO é campo editável — reconstruído a partir do ledger.
-  wageBudgetMinor     BigInt
-  transferBudgetMinor BigInt
+  // Dinheiro do clube: pendente. `cashMinor` é PROJEÇÃO do razão (Decisão
+  // 19.10) e não pode ser escrito por C3 — o clube nunca escreve LedgerEntry
+  // (context map:78). Volta com C9, onde tem dono. `currencyId` espera a model
+  // Currency, que não existe (R-181).
+  currencyId          String?         @db.Uuid
+  cashMinor           BigInt?
+  wageBudgetMinor     BigInt?
+  transferBudgetMinor BigInt?
   version             Int             @default(1)
 
   gameWorld         GameWorld              @relation(fields: [gameWorldId], references: [id])
+  identityPeriods   ClubIdentityPeriod[]
+  stadium           Stadium?
+  ticketPolicies    TicketPricePolicy[]
+  commercialAgreements CommercialAgreement[]
+  boardDecisions    BoardDecision[]
   controls          ClubControl[]
   entryReservations ClubEntryReservation[]
   departments       ClubDepartment[]
@@ -942,7 +1093,9 @@ model Club {
   offersBuying      Offer[]                @relation("BuyingClubOffers")
   offersSelling     Offer[]                @relation("SellingClubOffers")
 
-  @@unique([gameWorldId, slug])
+  // A unicidade de nome mudou de casa: ela é do PERÍODO vigente
+  // (ClubIdentityPeriod), como índice único parcial em SQL cru. Aqui ela não
+  // cabia — o clube não tem mais nome, tem história de nomes.
   @@unique([gameWorldId, id]) // par de referência para FKs compostas por mundo
   @@index([gameWorldId])
 }
