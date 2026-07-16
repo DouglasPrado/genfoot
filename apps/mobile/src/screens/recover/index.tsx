@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useAuth, useSignIn } from "@clerk/expo";
+import { useSignIn } from "@clerk/expo";
 
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import {
@@ -35,7 +35,6 @@ function errorFor(
 export function Recover() {
   const router = useRouter();
   const { signIn, fetchStatus } = useSignIn();
-  const { isLoaded, isSignedIn, signOut } = useAuth();
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -46,11 +45,7 @@ export function Recover() {
   const busy = fetchStatus === "fetching";
   // `isLoaded` primeiro: enquanto o Clerk carrega, `isSignedIn` é indefinido e
   // tratá-lo como "fora" deixaria o formulário piscar antes do guard.
-  const step = deriveRecoverStep(
-    signIn?.status ?? null,
-    sent,
-    isLoaded && isSignedIn,
-  );
+  const step = deriveRecoverStep(signIn?.status ?? null, sent);
 
   const request = useCallback(async () => {
     const local = validateRecoverEmail(email);
@@ -127,26 +122,7 @@ export function Recover() {
     >
       <Text style={styles.logo}>GRINTA</Text>
 
-      {step === "signed-in" ? (
-        <>
-          <Text style={styles.heading}>VOCÊ JÁ ESTÁ CONECTADO</Text>
-          <Text style={styles.help}>
-            Recuperar acesso é para quem não consegue entrar. Para trocar a
-            senha estando conectado, saia primeiro.
-          </Text>
-          <Primary
-            label="SAIR E RECUPERAR"
-            onPress={() => void signOut()}
-            disabled={!isLoaded}
-          />
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.replace("/")}
-          >
-            <Text style={styles.link}>Voltar ao app</Text>
-          </Pressable>
-        </>
-      ) : step === "complete" ? (
+      {step === "complete" ? (
         <>
           <Text style={styles.heading}>SENHA REDEFINIDA</Text>
           <Text style={styles.help}>Entrando…</Text>

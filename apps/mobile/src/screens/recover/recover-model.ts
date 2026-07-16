@@ -14,7 +14,7 @@ export interface FieldError {
   readonly messageKey: string;
 }
 
-export type RecoverStep = "request" | "reset" | "complete" | "signed-in";
+export type RecoverStep = "request" | "reset" | "complete";
 
 const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,19 +49,36 @@ export function validateNewPassword(
   return errors;
 }
 
+/**
+ * Erro da API Signal do Clerk. É uma CLASSE que estende Error, com `code`,
+ * `message` e `longMessage` diretos — não `{ errors: [...] }`, que é o formato
+ * legado. `message` é texto para desenvolvedor e não deve ir para a tela; o
+ * campo humano é `longMessage` (doc do próprio tipo).
+ */
 interface ClerkErrorShape {
-  readonly errors?: readonly {
-    readonly code?: string;
-    readonly message?: string;
-  }[];
+  readonly code?: string;
+  readonly message?: string;
+  readonly longMessage?: string;
+}
+
+/** Aceita o erro solto ou uma lista, e nunca confia em `.errors`. */
+function asClerkErrors(error: unknown): readonly ClerkErrorShape[] {
+  if (error === null || error === undefined) return [];
+  if (Array.isArray(error)) return error as ClerkErrorShape[];
+  const shape = error as ClerkErrorShape & {
+    readonly errors?: readonly ClerkErrorShape[];
+  };
+  // Tolera o formato legado se algum caminho ainda o produzir.
+  if (Array.isArray(shape.errors)) return shape.errors;
+  if (shape.code !== undefined || shape.longMessage !== undefined) return [shape];
+  return [];
 }
 
 const IDENTIFIER_NOT_FOUND = "form_identifier_not_found";
 
 /** O e-mail não tem conta. Nunca vira mensagem visível (ver nota do módulo). */
 export function isIdentifierNotFound(error: unknown): boolean {
-  const shape = error as ClerkErrorShape | null;
-  return (shape?.errors ?? []).some(({ code }) => code === IDENTIFIER_NOT_FOUND);
+  return asClerkErrors(error).some(({ code }) => code === IDENTIFIER_NOT_FOUND);
 }
 
 /**
@@ -69,17 +86,14 @@ export function isIdentifierNotFound(error: unknown): boolean {
  * sign-in nenhum, e mesmo assim precisamos seguir para o passo do código para
  * não denunciar a ausência da conta.
  *
- * `signedIn` guarda a entrada: recuperar senha é fluxo de quem está fora, e o
- * Clerk recusa `signIn.create()` com sessão ativa ("Session already exists").
- * Vem depois de `complete` porque o próprio reset termina criando sessão.
+ * Quem tem sessão ativa nem chega aqui: o guard de `(auth)/_layout` redireciona
+ * — era o "Session already exists" que o Clerk devolvia ao tentar.
  */
 export function deriveRecoverStep(
   status: string | null,
   sent: boolean,
-  signedIn = false,
 ): RecoverStep {
   if (status === "complete") return "complete";
-  if (signedIn) return "signed-in";
   if (sent || status === "needs_new_password") return "reset";
   return "request";
 }
@@ -106,8 +120,7 @@ const BY_CODE: Record<string, FieldError> = {
 };
 
 export function mapRecoverError(error: unknown): readonly FieldError[] {
-  const shape = error as ClerkErrorShape | null;
-  const list = shape?.errors ?? [];
+  const list = asClerkErrors(error);
   if (list.length === 0) return [];
 
   return list
@@ -118,8 +131,7 @@ export function mapRecoverError(error: unknown): readonly FieldError[] {
       if (known !== undefined) return known;
       return {
         field: "form" as const,
-        messageKey:
-          item.message ?? "Não foi possível redefinir agora. Tente de novo.",
+        messageKey: item.longMessage ?? "Não foi possível redefinir agora. Tente de novo.",
       };
     });
 }

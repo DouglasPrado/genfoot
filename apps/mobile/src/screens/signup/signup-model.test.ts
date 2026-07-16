@@ -162,9 +162,7 @@ describe("deriveSignupStep", () => {
 describe("mapClerkError", () => {
   it("traduz e-mail já usado para o campo certo", () => {
     expect(
-      mapClerkError({
-        errors: [{ code: "form_identifier_exists", meta: { paramName: "email_address" } }],
-      }),
+      mapClerkError({ code: "form_identifier_exists" }),
     ).toEqual([
       { field: "email", messageKey: "Este e-mail já tem conta. Entre em vez de cadastrar." },
     ]);
@@ -172,9 +170,7 @@ describe("mapClerkError", () => {
 
   it("traduz senha vazada/fraca para o campo senha", () => {
     expect(
-      mapClerkError({
-        errors: [{ code: "form_password_pwned", meta: { paramName: "password" } }],
-      }),
+      mapClerkError({ code: "form_password_pwned" }),
     ).toEqual([
       {
         field: "password",
@@ -185,16 +181,12 @@ describe("mapClerkError", () => {
 
   it("traduz código de verificação incorreto", () => {
     expect(
-      mapClerkError({
-        errors: [{ code: "form_code_incorrect", meta: { paramName: "code" } }],
-      }),
+      mapClerkError({ code: "form_code_incorrect" }),
     ).toEqual([{ field: "code", messageKey: "Código incorreto." }]);
   });
 
   it("erro desconhecido vira mensagem de formulário, nunca silêncio", () => {
-    const mapped = mapClerkError({
-      errors: [{ code: "algo_que_nao_conhecemos" }],
-    });
+    const mapped = mapClerkError({ code: "algo_que_nao_conhecemos" });
     expect(mapped).toHaveLength(1);
     expect(mapped[0].field).toBe("form");
     expect(mapped[0].messageKey.length).toBeGreaterThan(0);
@@ -202,6 +194,6 @@ describe("mapClerkError", () => {
 
   it("sem erro devolve lista vazia", () => {
     expect(mapClerkError(null)).toEqual([]);
-    expect(mapClerkError({ errors: [] })).toEqual([]);
+    expect(mapClerkError({})).toEqual([]);
   });
 });

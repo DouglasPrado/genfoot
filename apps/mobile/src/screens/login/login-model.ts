@@ -13,7 +13,7 @@ export interface FieldError {
   readonly messageKey: string;
 }
 
-export type LoginStep = "form" | "complete" | "signed-in" | "needs-mfa";
+export type LoginStep = "form" | "complete" | "needs-mfa";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -47,25 +47,38 @@ export function canSubmitLogin(
 }
 
 /**
- * Passo da tela. `signedIn` vem depois de `complete` porque o próprio login
- * termina criando sessão — invertido, a tela nunca sairia do estado "já
- * conectado" ao entrar.
+ * Passo da tela. Quem já tem sessão nem chega aqui: o guard de
+ * `(auth)/_layout` redireciona antes de renderizar.
  */
-export function deriveLoginStep(
-  status: string | null,
-  signedIn: boolean,
-): LoginStep {
+export function deriveLoginStep(status: string | null): LoginStep {
   if (status === "complete") return "complete";
-  if (signedIn) return "signed-in";
   if (status === "needs_second_factor") return "needs-mfa";
   return "form";
 }
 
+/**
+ * Erro da API Signal do Clerk. É uma CLASSE que estende Error, com `code`,
+ * `message` e `longMessage` diretos — não `{ errors: [...] }`, que é o formato
+ * legado. `message` é texto para desenvolvedor e não deve ir para a tela; o
+ * campo humano é `longMessage` (doc do próprio tipo).
+ */
 interface ClerkErrorShape {
-  readonly errors?: readonly {
-    readonly code?: string;
-    readonly message?: string;
-  }[];
+  readonly code?: string;
+  readonly message?: string;
+  readonly longMessage?: string;
+}
+
+/** Aceita o erro solto ou uma lista, e nunca confia em `.errors`. */
+function asClerkErrors(error: unknown): readonly ClerkErrorShape[] {
+  if (error === null || error === undefined) return [];
+  if (Array.isArray(error)) return error as ClerkErrorShape[];
+  const shape = error as ClerkErrorShape & {
+    readonly errors?: readonly ClerkErrorShape[];
+  };
+  // Tolera o formato legado se algum caminho ainda o produzir.
+  if (Array.isArray(shape.errors)) return shape.errors;
+  if (shape.code !== undefined || shape.longMessage !== undefined) return [shape];
+  return [];
 }
 
 /**
@@ -88,8 +101,7 @@ const BY_CODE: Record<string, FieldError> = {
 };
 
 export function mapLoginError(error: unknown): readonly FieldError[] {
-  const shape = error as ClerkErrorShape | null;
-  const list = shape?.errors ?? [];
+  const list = asClerkErrors(error);
   if (list.length === 0) return [];
 
   return list.map((item) => {
@@ -97,7 +109,7 @@ export function mapLoginError(error: unknown): readonly FieldError[] {
     if (known !== undefined) return known;
     return {
       field: "form" as const,
-      messageKey: item.message ?? "Não foi possível entrar agora. Tente de novo.",
+      messageKey: item.longMessage ?? "Não foi possível entrar agora. Tente de novo.",
     };
   });
 }

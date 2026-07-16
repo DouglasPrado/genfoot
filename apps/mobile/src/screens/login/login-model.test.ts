@@ -63,28 +63,20 @@ describe("canSubmitLogin", () => {
 
 describe("deriveLoginStep", () => {
   it("começa no formulário", () => {
-    expect(deriveLoginStep(null, false)).toBe("form");
+    expect(deriveLoginStep(null)).toBe("form");
   });
 
   it("conclui quando o sign-in completa", () => {
-    expect(deriveLoginStep("complete", false)).toBe("complete");
-  });
-
-  it("com sessão ativa não oferece entrar de novo", () => {
-    expect(deriveLoginStep(null, true)).toBe("signed-in");
-  });
-
-  it("complete vence sessão ativa — é o próprio login que a criou", () => {
-    expect(deriveLoginStep("complete", true)).toBe("complete");
+    expect(deriveLoginStep("complete")).toBe("complete");
   });
 
   // needs_first_factor é o estado normal após create(); não é erro nem 2FA.
   it("primeiro fator pendente ainda é formulário", () => {
-    expect(deriveLoginStep("needs_first_factor", false)).toBe("form");
+    expect(deriveLoginStep("needs_first_factor")).toBe("form");
   });
 
   it("segundo fator pede MFA em vez de fingir sucesso", () => {
-    expect(deriveLoginStep("needs_second_factor", false)).toBe("needs-mfa");
+    expect(deriveLoginStep("needs_second_factor")).toBe("needs-mfa");
   });
 });
 
@@ -93,24 +85,24 @@ describe("mapLoginError", () => {
     // Não revelamos se o e-mail existe: senha errada e conta inexistente dão a
     // mesma mensagem, no formulário.
     expect(
-      mapLoginError({ errors: [{ code: "form_password_incorrect" }] }),
+      mapLoginError({ code: "form_password_incorrect" }),
     ).toEqual([{ field: "form", messageKey: "E-mail ou senha incorretos." }]);
   });
 
   it("identificador inexistente dá a MESMA mensagem que senha errada", () => {
     expect(
-      mapLoginError({ errors: [{ code: "form_identifier_not_found" }] }),
+      mapLoginError({ code: "form_identifier_not_found" }),
     ).toEqual([{ field: "form", messageKey: "E-mail ou senha incorretos." }]);
   });
 
   it("conta bloqueada é dita com clareza", () => {
-    const mapped = mapLoginError({ errors: [{ code: "user_locked" }] });
+    const mapped = mapLoginError({ code: "user_locked" });
     expect(mapped[0].field).toBe("form");
     expect(mapped[0].messageKey).toMatch(/bloquead/i);
   });
 
   it("erro desconhecido não some", () => {
-    const mapped = mapLoginError({ errors: [{ code: "novidade" }] });
+    const mapped = mapLoginError({ code: "novidade" });
     expect(mapped).toHaveLength(1);
     expect(mapped[0].messageKey.length).toBeGreaterThan(0);
   });

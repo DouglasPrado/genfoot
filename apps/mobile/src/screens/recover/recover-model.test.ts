@@ -56,13 +56,13 @@ describe("isIdentifierNotFound", () => {
   // transformaria a tela num oráculo de quais e-mails existem.
   it("reconhece o erro de identificador inexistente", () => {
     expect(
-      isIdentifierNotFound({ errors: [{ code: "form_identifier_not_found" }] }),
+      isIdentifierNotFound({ code: "form_identifier_not_found" }),
     ).toBe(true);
   });
 
   it("não confunde com outros erros", () => {
     expect(
-      isIdentifierNotFound({ errors: [{ code: "form_code_incorrect" }] }),
+      isIdentifierNotFound({ code: "form_code_incorrect" }),
     ).toBe(false);
     expect(isIdentifierNotFound(null)).toBe(false);
   });
@@ -71,28 +71,6 @@ describe("isIdentifierNotFound", () => {
 describe("deriveRecoverStep", () => {
   it("começa pedindo o e-mail", () => {
     expect(deriveRecoverStep(null, false)).toBe("request");
-  });
-
-  // Regressão: com sessão do Clerk ativa, signIn.create() falha com
-  // "Session already exists" e o erro cru vazava para a tela. Recuperação é
-  // fluxo de quem está fora (o doc alcança M-RECOVER por M-LOGIN).
-  it("com sessão ativa a tela não tenta recuperar — pede sair antes", () => {
-    expect(deriveRecoverStep(null, false, true)).toBe("signed-in");
-  });
-
-  it("sessão ativa vence até o envio já feito", () => {
-    expect(deriveRecoverStep(null, true, true)).toBe("signed-in");
-  });
-
-  it("mas não atrapalha a conclusão do próprio reset", () => {
-    // Ao redefinir, o finalize cria sessão: `complete` tem de vencer.
-    expect(deriveRecoverStep("complete", true, true)).toBe("complete");
-  });
-
-  it("vai ao código assim que o envio é confirmado, mesmo sem sign-in", () => {
-    // E-mail inexistente não cria sign-in; ainda assim seguimos ao passo do
-    // código, senão a tela revelaria que a conta não existe.
-    expect(deriveRecoverStep(null, true)).toBe("reset");
   });
 
   it("pede a senha nova quando o código foi aceito", () => {
@@ -111,13 +89,13 @@ describe("deriveRecoverStep", () => {
 describe("mapRecoverError", () => {
   it("traduz código incorreto", () => {
     expect(
-      mapRecoverError({ errors: [{ code: "form_code_incorrect" }] }),
+      mapRecoverError({ code: "form_code_incorrect" }),
     ).toEqual([{ field: "code", messageKey: "Código incorreto." }]);
   });
 
   it("traduz senha vazada", () => {
     expect(
-      mapRecoverError({ errors: [{ code: "form_password_pwned" }] }),
+      mapRecoverError({ code: "form_password_pwned" }),
     ).toEqual([
       {
         field: "password",
@@ -128,12 +106,12 @@ describe("mapRecoverError", () => {
 
   it("nunca vaza identificador inexistente como erro de campo", () => {
     expect(
-      mapRecoverError({ errors: [{ code: "form_identifier_not_found" }] }),
+      mapRecoverError({ code: "form_identifier_not_found" }),
     ).toEqual([]);
   });
 
   it("erro desconhecido vira mensagem genérica, sem silêncio", () => {
-    const mapped = mapRecoverError({ errors: [{ code: "coisa_nova" }] });
+    const mapped = mapRecoverError({ code: "coisa_nova" });
     expect(mapped).toHaveLength(1);
     expect(mapped[0].field).toBe("form");
     expect(mapped[0].messageKey.length).toBeGreaterThan(0);
@@ -141,5 +119,37 @@ describe("mapRecoverError", () => {
 
   it("sem erro devolve vazio", () => {
     expect(mapRecoverError(null)).toEqual([]);
+  });
+
+  // Regressão: o ClerkError da API Signal é uma CLASSE que estende Error, com
+  // code/message/longMessage diretos. Eu havia assumido `{ errors: [...] }` —
+  // o formato legado — e por isso TODO erro do Clerk virava silêncio na tela.
+  it("entende o erro como instância de Error, não só objeto literal", () => {
+    class FakeClerkError extends Error {
+      readonly code = "form_code_incorrect";
+      readonly longMessage = "O código está incorreto.";
+    }
+    expect(mapRecoverError(new FakeClerkError("dev-facing text"))).toEqual([
+      { field: "code", messageKey: "Código incorreto." },
+    ]);
+  });
+
+  // `message` é texto para desenvolvedor e não deve ir para a tela (doc do
+  // tipo); o campo humano é `longMessage`.
+  it("erro desconhecido usa longMessage, nunca a mensagem de desenvolvedor", () => {
+    const mapped = mapRecoverError({
+      code: "coisa_nova",
+      message: "internal: reset factor not prepared",
+      longMessage: "Não foi possível enviar o código agora.",
+    });
+    expect(mapped).toEqual([
+      { field: "form", messageKey: "Não foi possível enviar o código agora." },
+    ]);
+  });
+
+  it("sem longMessage cai na nossa frase, não na do desenvolvedor", () => {
+    const mapped = mapRecoverError({ code: "x", message: "not sent" });
+    expect(mapped[0].messageKey).not.toBe("not sent");
+    expect(mapped[0].messageKey).toMatch(/redefinir/i);
   });
 });

@@ -88,12 +88,29 @@ export function deriveSignupStep(progress: SignupProgress | null): SignupStep {
   return "form";
 }
 
+/**
+ * Erro da API Signal do Clerk. É uma CLASSE que estende Error, com `code`,
+ * `message` e `longMessage` diretos — não `{ errors: [...] }`, que é o formato
+ * legado. `message` é texto para desenvolvedor e não deve ir para a tela; o
+ * campo humano é `longMessage` (doc do próprio tipo).
+ */
 interface ClerkErrorShape {
-  readonly errors?: readonly {
-    readonly code?: string;
-    readonly message?: string;
-    readonly meta?: { readonly paramName?: string };
-  }[];
+  readonly code?: string;
+  readonly message?: string;
+  readonly longMessage?: string;
+}
+
+/** Aceita o erro solto ou uma lista, e nunca confia em `.errors`. */
+function asClerkErrors(error: unknown): readonly ClerkErrorShape[] {
+  if (error === null || error === undefined) return [];
+  if (Array.isArray(error)) return error as ClerkErrorShape[];
+  const shape = error as ClerkErrorShape & {
+    readonly errors?: readonly ClerkErrorShape[];
+  };
+  // Tolera o formato legado se algum caminho ainda o produzir.
+  if (Array.isArray(shape.errors)) return shape.errors;
+  if (shape.code !== undefined || shape.longMessage !== undefined) return [shape];
+  return [];
 }
 
 const BY_CODE: Record<string, FieldError> = {
@@ -129,8 +146,7 @@ const BY_CODE: Record<string, FieldError> = {
  * silêncio: vira erro de formulário com a mensagem do provedor.
  */
 export function mapClerkError(error: unknown): readonly FieldError[] {
-  const shape = error as ClerkErrorShape | null;
-  const list = shape?.errors ?? [];
+  const list = asClerkErrors(error);
   if (list.length === 0) return [];
 
   return list.map((item) => {
@@ -139,7 +155,7 @@ export function mapClerkError(error: unknown): readonly FieldError[] {
     return {
       field: "form" as const,
       messageKey:
-        item.message ?? "Não foi possível concluir o cadastro. Tente de novo.",
+        item.longMessage ?? "Não foi possível concluir o cadastro. Tente de novo.",
     };
   });
 }

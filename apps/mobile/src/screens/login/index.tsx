@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as AuthSession from "expo-auth-session";
-import { useAuth, useSSO, useSignIn } from "@clerk/expo";
+import { useSSO, useSignIn } from "@clerk/expo";
 
 import { useSession } from "@/lib/session";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
@@ -37,7 +37,6 @@ export function Login() {
   const router = useRouter();
   const { signIn, fetchStatus } = useSignIn();
   const { startSSOFlow } = useSSO();
-  const { isLoaded, isSignedIn } = useAuth();
   const { status: connection } = useSession();
 
   const [form, setForm] = useState<LoginForm>(EMPTY);
@@ -46,10 +45,7 @@ export function Login() {
 
   const online = connection !== "offline";
   const busy = fetchStatus === "fetching";
-  const step = deriveLoginStep(
-    signIn?.status ?? null,
-    isLoaded && isSignedIn,
-  );
+  const step = deriveLoginStep(signIn?.status ?? null);
 
   const visible = showValidation
     ? [...validateLoginForm(form), ...errors]
@@ -86,11 +82,6 @@ export function Login() {
       router.replace("/");
     })();
   }, [router, signIn, step]);
-
-  // Já conectado: não faz sentido oferecer entrar. Volta ao app.
-  useEffect(() => {
-    if (step === "signed-in") router.replace("/");
-  }, [router, step]);
 
   const withGoogle = useCallback(async () => {
     try {
