@@ -460,4 +460,10 @@ As decisões **R-149..R-170 estão RATIFICADAS** e fecham os resíduos descobert
 
 A definição completa e o racional de cada uma vivem em [`fechamentos-complementares-2026-07-13.md`](fechamentos-complementares-2026-07-13.md). Esta seção é o índice normativo; em conflito com texto anterior ainda não propagado, R-149..R-170 prevalecem.
 
-> **Estado consolidado:** R-01..R-170 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.
+### R-171 — Provedor de identidade · RATIFICADA em 2026-07-16
+
+- **R-171 — Clerk como provedor de identidade** (materializa R-85/R-95/R-131): o Clerk detém credencial, unicidade de e-mail, verificação, recuperação de acesso, Google/Apple e MFA. A conta do jogo segue sendo a fonte de verdade (R-85); a API verifica o token pela chave pública e deriva o `subject` do `sub` verificado, em vez de aceitar `subject` arbitrário.
+
+A definição completa, as consequências aceitas e as pendências abertas vivem em [`provedor-de-identidade-2026-07-16.md`](provedor-de-identidade-2026-07-16.md).
+
+> **Estado consolidado:** R-01..R-171 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.
