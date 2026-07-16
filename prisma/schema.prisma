@@ -623,6 +623,11 @@ model UserAccount {
   status      UserAccountStatus @default(ACTIVE)
   name        String
   email       String            @unique // e-mail normalizado: 1 conta por e-mail
+  // R-171: identidade externa (Clerk). `sub` do token verificado — chave
+  // estável de ligação com o provedor. O e-mail NÃO serve para isso: muda ao
+  // longo da vida da conta e só chega no token via claim customizada.
+  // Opcional porque contas podem nascer por outros caminhos (seed, admin).
+  externalSubject String?         @unique
   role        UserRole          @default(PLAYER)
   avatarUrl   String?
   lastLoginAt DateTime?

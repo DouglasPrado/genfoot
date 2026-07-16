@@ -7,7 +7,7 @@ import {
   type RulesetVersion,
 } from "@grinta/shared";
 
-import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import { deterministicUuidV7, timestampOf } from "../foundation/deterministic-uuid.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
   StaffAvailability,
@@ -688,6 +688,3 @@ function primaryScore(
   }
 }
 
-function timestampOf(worldDate: string): number {
-  return Date.parse(`${worldDate}T00:00:00.000Z`);
-}

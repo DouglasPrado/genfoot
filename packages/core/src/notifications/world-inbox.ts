@@ -7,7 +7,7 @@ import {
   type RulesetVersion,
 } from "@grinta/shared";
 
-import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import { deterministicUuidV7, timestampOf } from "../foundation/deterministic-uuid.js";
 import { stableHash } from "../matches/match-kernel.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import {
@@ -728,6 +728,3 @@ function rulesetMismatch(): DomainError {
   );
 }
 
-function timestampOf(worldDate: string): number {
-  return Date.parse(`${worldDate}T00:00:00.000Z`);
-}
