@@ -225,17 +225,24 @@ enum StaffQualityTier {
   ELITE
 }
 
+/// R-175: fica o do domínio (6). A interseção com os 10 anteriores era 3.
+///
+/// Saíram, e cada um por um motivo concreto:
+/// - `STADIUM`: o estádio é ENTIDADE (model Stadium). Não pode ser as duas
+///   coisas — seria o mesmo conceito em dois lugares, divergindo em silêncio.
+/// - `INFRASTRUCTURE`: colide com `InfrastructureProject`, que é root próprio.
+/// - `BOARD`: governança, não departamento que o gestor sobe de nível.
+/// - `FINANCE`: é do C9. O clube nunca escreve LedgerEntry (context map:78).
+/// - `COMMUNICATION`, `DATA_ANALYSIS`: sem comando e sem tipo no domínio.
+///
+/// `YOUTH_ACADEMY` → `YOUTH`: renomeio; fica o nome que o domínio usa.
 enum DepartmentType {
-  MEDICAL
+  FOOTBALL
   TRAINING
-  YOUTH_ACADEMY
+  MEDICAL
   SCOUTING
-  COMMUNICATION
-  BOARD
-  FINANCE
-  INFRASTRUCTURE
-  STADIUM
-  DATA_ANALYSIS
+  YOUTH
+  COMMERCIAL
 }
 
 enum ContractStatus {
@@ -1170,19 +1177,37 @@ model ClubControl {
   // migration — é um dos casos que o gate DB-01..DB-16 antecipa.
 }
 
+/// Departamento do clube. FILHO do `Club`, não root.
+///
+/// O context map (:77) o lista como aggregate root, mas o domínio o tem dentro
+/// do `Club` — `Club.setDepartmentPlan` o muta, ou seja, ele está na fronteira
+/// de consistência do clube. E R-175 quebrou o mega-agregado por CONTENÇÃO, que
+/// aqui não existe: ninguém disputa o departamento de um clube com outro clube.
+/// Um departamento sem clube não existe.
+///
+/// Por isso `version` some: quem versiona é o `Club`, e dois contadores para o
+/// mesmo commit é convite para divergirem.
+///
+/// `targetLevel`/`capacity`/`condition`/`maintenanceDueOn` vêm do domínio;
+/// `maxLevel` vem do schema e FICA — sem ele a invariante canônica
+/// `level ≤ maxLevel` (doc:154) é inexprimível, e era.
 model ClubDepartment {
-  id                            String         @id @default(uuid(7)) @db.Uuid
-  gameWorldId                   String         @db.Uuid
-  clubId                        String         @db.Uuid
-  currencyId                    String         @db.Uuid
-  type                          DepartmentType
-  level                         Int            @default(1)
-  maxLevel                      Int            @default(5)
-  qualityScore                  Int            @default(10)
-  maintenanceCostPerSeasonMinor BigInt
-  upgradeCostMinor              BigInt
+  id               String         @id @db.Uuid
+  gameWorldId      String         @db.Uuid
+  clubId           String         @db.Uuid
+  type             DepartmentType
+  level            Int            @default(1)
+  targetLevel      Int            @default(1)
+  maxLevel         Int            @default(5)
+  capacity         Int            @default(0)
+  condition        Int            @default(100)
+  maintenanceDueOn DateTime?      @db.Date
+  // Custos e moeda: pendente. Dinheiro é do C9 — o clube nunca escreve
+  // LedgerEntry (context map:78). Voltam com ele.
+  currencyId                    String? @db.Uuid
+  maintenanceCostPerSeasonMinor BigInt?
+  upgradeCostMinor              BigInt?
   effectJson                    Json?
-  version                       Int            @default(1) // concorrência otimista (agregado C3)
 
   club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
 
