@@ -334,7 +334,7 @@ describe("SignPlayer — a compra de verdade (R-192)", () => {
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("INSUFFICIENT_FUNDS");
+    if (!result.ok) expect(result.error.code).toBe("CASH_INSUFFICIENT");
     // Atomicidade: nem elenco movido, nem contrato, nem lançamento.
     expect(world.contracts).toHaveLength(0);
     expect(world.journal).toHaveLength(0);

@@ -8,6 +8,7 @@ import {
 } from "../finance/ledger-types.js";
 import type { LedgerRepository } from "../finance/ledger-repository.js";
 import { BASE_CURRENCY_ID } from "../finance/ledger-bootstrap.js";
+import { assertCashAvailable } from "../finance/spend-guard.js";
 import { deterministicUuidV7, timestampOf } from "../foundation/deterministic-uuid.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
 import { Squad } from "../clubs/squad.js";
@@ -140,20 +141,17 @@ export class SignPlayer {
         );
       }
 
-      // Caixa do comprador — projeção do razão (R-178). Não se compra fiado.
-      const buyerCash = await repos.ledger.sumClubCashMinor(
+      // Caixa do comprador — projeção do razão (R-178). Não se compra fiado. A
+      // trava é o helper canônico de gasto voluntário (`spend-guard`), que
+      // recusa com `CASH_INSUFFICIENT` e devolve o caixa para reuso.
+      const cashGuard = await assertCashAvailable(
+        repos.ledger,
         worldId,
         input.buyingClubId as never,
+        input.feeMinor,
       );
-      if (buyerCash < input.feeMinor) {
-        return fail(
-          new DomainError(
-            "INSUFFICIENT_FUNDS",
-            "Caixa insuficiente para a proposta.",
-            { cashMinor: buyerCash.toString(), feeMinor: input.feeMinor.toString() },
-          ),
-        );
-      }
+      if (!cashGuard.ok) return cashGuard;
+      const buyerCash = cashGuard.value;
 
       // As contas de caixa dos dois clubes (o razão as criou na gênese).
       const buyerCashAccount = await repos.ledger.findAccount(
