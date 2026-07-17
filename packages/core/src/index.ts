@@ -55,6 +55,8 @@ export * from "./clubs/infrastructure-project-types.js";
 export * from "./genesis/genesis-types.js";
 export * from "./genesis/player-generation.js";
 export * from "./genesis/world-genesis-generator.js";
+export * from "./genesis/genesis-unit-of-work.js";
+export * from "./genesis/player-bootstrap.js";
 export * from "./genesis/world-genesis-use-cases.js";
 export * from "./genesis/world-genesis-validator.js";
 

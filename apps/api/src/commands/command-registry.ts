@@ -17,6 +17,7 @@ import {
   SetWorldIdentity,
   type ClubControlRepository,
   type ClubUnitOfWork,
+  type GenesisUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldMutationResult,
@@ -67,6 +68,8 @@ export interface CommandContext {
   readonly controls: ClubControlRepository;
   /** Escopo transacional de C3: clube + evento no mesmo commit (Decisão 19.10). */
   readonly clubUnitOfWork: ClubUnitOfWork;
+  /** A gênese é atômica: 16 clubes + 368 jogadores + 16 elencos numa transação. */
+  readonly genesisUnitOfWork: GenesisUnitOfWork;
   /**
    * Quem agiu — a conta do JOGO, vinda da SESSÃO.
    *
@@ -335,14 +338,15 @@ const handlers: Record<string, CommandHandler> = {
    * A gênese não é guardada (R-185): é função pura do `seed`, que R-182 tornou
    * coluna. O que este command persiste é o EFEITO dela — as linhas de `Club`.
    */
-  "world:genesis": async ({ worlds, clubs, envelope }) => {
+  "world:genesis": async ({ worlds, genesisUnitOfWork, envelope }) => {
     const raw = requireWorldId(envelope.worldId);
     if (!raw.ok) return raw;
     const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new GenerateWorldGenesis(worlds, clubs).execute(
-      worldId.value,
-    );
+    const result = await new GenerateWorldGenesis(
+      worlds,
+      genesisUnitOfWork,
+    ).execute(worldId.value);
     if (!result.ok) return result;
     return succeed({ resource: `world:${worldId.value}` });
   },

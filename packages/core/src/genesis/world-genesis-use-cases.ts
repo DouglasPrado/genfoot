@@ -9,6 +9,8 @@ import {
 import { buildClubsFromGenesis } from "../clubs/club-bootstrap.js";
 import type { ClubRepository } from "../clubs/club-repository.js";
 import { Club } from "../clubs/club.js";
+import { Squad } from "../clubs/squad.js";
+import { Player } from "../players/player.js";
 import {
   ActivateWorld,
   type WorldMutationResult,
@@ -16,7 +18,12 @@ import {
 import type { WorldRepository } from "../world/world-repository.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
 import { WorldStatus } from "../world/world-types.js";
+import type { GenesisRepositories, GenesisUnitOfWork } from "./genesis-unit-of-work.js";
 import type { WorldGenesisSnapshot, WorldGenesisSummary } from "./genesis-types.js";
+import {
+  buildPlayersFromGenesis,
+  buildSquadsFromGenesis,
+} from "./player-bootstrap.js";
 import { WorldGenesisGenerator } from "./world-genesis-generator.js";
 import { validateWorldGenesis } from "./world-genesis-validator.js";
 
@@ -48,7 +55,7 @@ export interface GenerateWorldGenesisResult {
 export class GenerateWorldGenesis {
   public constructor(
     private readonly worldRepository: WorldRepository,
-    private readonly clubRepository: ClubRepository,
+    private readonly unitOfWork: GenesisUnitOfWork,
     private readonly generator = new WorldGenesisGenerator(),
   ) {}
 
@@ -77,37 +84,109 @@ export class GenerateWorldGenesis {
     const validated = validateWorldGenesis(world, genesis);
     if (!validated.ok) return validated;
 
-    const created = await this.materializeClubs(world, genesis);
-    if (!created.ok) return created;
-    return succeed({ created: created.value, summary: validated.value.summary });
+    // Tudo numa transação (o UoW): 16 clubes, 368 jogadores, 16 elencos. Um
+    // mundo com clubes e sem jogadores parece pronto e não é.
+    const materialized = await this.materialize(world, genesis);
+    if (!materialized.ok) return materialized;
+    return succeed({
+      created: materialized.value,
+      summary: validated.value.summary,
+    });
   }
 
   /**
-   * Idempotente por clube: reexecutar a gênese não duplica nem explode. Quem
-   * arbitra é o `findClubById` — o clube que já existe é PULADO, não
-   * sobrescrito, porque a esta altura ele pode já ter sido renomeado pelo dono
-   * (BC-003), e a gênese não tem o direito de desfazer isso.
+   * Idempotente por agregado: reexecutar a gênese não duplica nem explode. Quem
+   * arbitra é o `find*` — o que já existe é PULADO, não sobrescrito, porque a
+   * esta altura o clube pode já ter sido renomeado pelo dono (BC-003), e a
+   * gênese não tem o direito de desfazer isso.
+   *
+   * A ordem importa: clubes antes de elencos (a FK do elenco aponta para o
+   * clube), e jogadores antes de elencos (a FK do membro aponta para o jogador).
    */
-  private async materializeClubs(
+  private async materialize(
     world: GameWorldSnapshot,
     genesis: WorldGenesisSnapshot,
   ): Promise<Result<boolean, DomainError>> {
-    let created = false;
-    for (const snapshot of buildClubsFromGenesis(world, genesis)) {
-      const loaded = Club.fromSnapshot(snapshot);
+    const clubs = buildClubsFromGenesis(world, genesis);
+    const players = buildPlayersFromGenesis(world, genesis);
+    const squads = buildSquadsFromGenesis(world, genesis);
+
+    // Reidrata tudo ANTES de abrir a transação: um snapshot inválido é erro de
+    // gênese, não de banco, e não deve deixar uma transação meio aberta.
+    for (const club of clubs) {
+      const loaded = Club.fromSnapshot(club);
       if (!loaded.ok) return loaded;
-
-      const existing = await this.clubRepository.findClubById(
-        snapshot.gameWorldId,
-        snapshot.id,
-      );
-      if (existing !== null) continue;
-
-      await this.clubRepository.saveClub(snapshot, null);
-      created = true;
     }
+    for (const { player } of players) {
+      const loaded = Player.fromSnapshot(player);
+      if (!loaded.ok) return loaded;
+    }
+    for (const squad of squads) {
+      const loaded = Squad.fromSnapshot(squad);
+      if (!loaded.ok) return loaded;
+    }
+
+    const created = await this.unitOfWork.run(async (repositories) => {
+      let any = false;
+      any = (await materializeClubs(repositories, clubs)) || any;
+      any = (await materializePlayers(repositories, world, players)) || any;
+      any = (await materializeSquads(repositories, squads)) || any;
+      return any;
+    });
     return succeed(created);
   }
+}
+
+async function materializeClubs(
+  repositories: GenesisRepositories,
+  clubs: readonly Awaited<ReturnType<typeof buildClubsFromGenesis>>[number][],
+): Promise<boolean> {
+  let created = false;
+  for (const club of clubs) {
+    const existing = await repositories.clubs.findClubById(
+      club.gameWorldId,
+      club.id,
+    );
+    if (existing !== null) continue;
+    await repositories.clubs.saveClub(club, null);
+    created = true;
+  }
+  return created;
+}
+
+async function materializePlayers(
+  repositories: GenesisRepositories,
+  world: GameWorldSnapshot,
+  players: readonly Awaited<ReturnType<typeof buildPlayersFromGenesis>>[number][],
+): Promise<boolean> {
+  let created = false;
+  for (const aggregate of players) {
+    const existing = await repositories.players.findPlayerById(
+      world.id,
+      aggregate.player.id,
+    );
+    if (existing !== null) continue;
+    await repositories.players.savePlayer(aggregate, null);
+    created = true;
+  }
+  return created;
+}
+
+async function materializeSquads(
+  repositories: GenesisRepositories,
+  squads: readonly Awaited<ReturnType<typeof buildSquadsFromGenesis>>[number][],
+): Promise<boolean> {
+  let created = false;
+  for (const squad of squads) {
+    const existing = await repositories.squads.findFirstTeamSquad(
+      squad.gameWorldId,
+      squad.clubId,
+    );
+    if (existing !== null) continue;
+    await repositories.squads.saveSquad(squad, null);
+    created = true;
+  }
+  return created;
 }
 
 export class ActivateProvisionedWorld {

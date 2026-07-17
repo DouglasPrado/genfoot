@@ -12,3 +12,5 @@ export * from "./prisma-club-repository.js";
 export * from "./prisma-club-read-model.js";
 export * from "./prisma-world-read-model.js";
 export * from "./prisma-club-unit-of-work.js";
+export * from "./prisma-squad-repository.js";
+export * from "./prisma-genesis-unit-of-work.js";
