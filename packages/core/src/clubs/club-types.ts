@@ -133,18 +133,58 @@ export interface ClubSnapshot {
   readonly version: number;
 }
 
+/**
+ * Um membro do elenco — R-190.
+ *
+ * `slot: string` livre virou `shirtNumber`: a invariante "dois membros não
+ * ocupam o mesmo slot" era boa, e o físico já sabia qual é o slot de verdade num
+ * elenco de futebol. Agora ela diz o que quer dizer — dois jogadores não vestem
+ * o mesmo número.
+ *
+ * `category` saiu daqui: ela é do `Squad` (`SquadCategory`), não do membro. Um
+ * jogador não é "profissional" — o ELENCO é o profissional, e ele está nele.
+ *
+ * Sem `version` e sem `id` próprio no domínio: é filho do `Squad`, não root
+ * (R-183/R-187). Ninguém disputa um membro em separado do elenco dele.
+ */
 export interface SquadMembershipSnapshot {
   readonly playerId: PlayerId;
-  readonly slot: string;
-  readonly category: "SENIOR" | "RESERVE" | "YOUTH";
+  readonly shirtNumber: number;
+  /** Livre de propósito: "capitão", "reserva imediato". Não é regra. */
+  readonly role: string | null;
+  /** Data de MUNDO (R-190/R-177) — quando entrou no elenco. */
   readonly effectiveFrom: string;
 }
 
+export const SquadCategory = {
+  FIRST_TEAM: "FIRST_TEAM",
+  RESERVE: "RESERVE",
+  YOUTH_ACADEMY: "YOUTH_ACADEMY",
+  LOAN: "LOAN",
+  TRIAL: "TRIAL",
+} as const;
+
+export type SquadCategory = (typeof SquadCategory)[keyof typeof SquadCategory];
+
+/**
+ * O elenco de um clube numa temporada — R-190.
+ *
+ * `capacity` saiu: não tem coluna, e não deveria ter. O tamanho do elenco é
+ * REGRA (R-57: 23 jogadores), não dado por linha — gravá-lo permitiria dois
+ * clubes com tetos diferentes, o oposto do "teto comum" do GDD §1. A invariante
+ * ficou no agregado, contra a constante.
+ *
+ * `name`, `category` e `seasonNumber` entraram porque o físico os exige e o
+ * domínio os ignorava: elenco é por temporada, e um clube tem o profissional e a
+ * base ao mesmo tempo.
+ */
 export interface SquadSnapshot {
   readonly id: SquadId;
   readonly gameWorldId: GameWorldId;
   readonly clubId: ClubId;
-  readonly capacity: number;
+  readonly name: string;
+  readonly category: SquadCategory;
+  readonly seasonNumber: number;
   readonly memberships: readonly SquadMembershipSnapshot[];
   readonly version: number;
 }
@@ -226,8 +266,8 @@ export type ClubCommand =
         type: "AssignSquadSlot";
         squadId: SquadId;
         playerId: PlayerId;
-        slot: string;
-        category: SquadMembershipSnapshot["category"];
+        shirtNumber: number;
+        role: string | null;
       }>)
   | (ClubCommandBase &
       Readonly<{

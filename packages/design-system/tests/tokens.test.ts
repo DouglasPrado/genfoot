@@ -54,6 +54,32 @@ describe("design-system tokens", () => {
     expect(requiresConfirmation("world:advance-days")).toBe(false);
   });
 
+  /**
+   * `world:delete` era `low`, e portanto NÃO pedia confirmação no console.
+   *
+   * O command mais destrutivo do sistema — apaga o mundo e tudo que pende dele —
+   * não casava com nenhuma das listas: nem `:homologate`, nem `admin:`, nem
+   * `:advance-`. O botão da tela tem diálogo próprio e o servidor exige
+   * `confirmSeed`, então nada foi apagado por isto; mas quem digitasse
+   * `world:delete` no console disparava sem uma pergunta sequer, e o chip de
+   * risco dizia "low" para o operador.
+   */
+  it("classifica o ciclo de vida do mundo pelo que cada transição custa", () => {
+    // Apagar é irreversível de verdade: não há volta, nem histórico preservado.
+    expect(commandRisk("world:delete")).toBe("irreversible");
+    expect(requiresConfirmation("world:delete")).toBe(true);
+
+    // Arquivar NÃO é irreversível (R-56 manda ser reversível), mas põe o mundo
+    // inteiro em read-only: alto risco, confirmação obrigatória.
+    expect(commandRisk("world:archive")).toBe("high");
+    expect(requiresConfirmation("world:archive")).toBe(true);
+
+    // Congelar e descongelar são operação corriqueira e reversível na hora.
+    expect(commandRisk("world:pause")).toBe("medium");
+    expect(commandRisk("world:resume")).toBe("medium");
+    expect(requiresConfirmation("world:pause")).toBe(false);
+  });
+
   it("contraste WCAG dos tokens críticos passa os limiares (FR-011/SC-004)", () => {
     // texto normal ≥ 4.5:1; texto de apoio e acento (UI) ≥ 3:1
     expect(contrastRatio(color.text, color.background)).toBeGreaterThanOrEqual(4.5);

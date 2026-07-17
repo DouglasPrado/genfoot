@@ -14,6 +14,7 @@ import type { WorldRepository } from "./world-repository.js";
 import type {
   GameWorldSnapshot,
   WorldDomainEvent,
+  WorldIdentityInput,
   WorldProvisioningEvidence,
 } from "./world-types.js";
 
@@ -119,6 +120,101 @@ export class ActivateWorld {
       world: loaded.value.snapshot(),
       events: loaded.value.pullDomainEvents(),
     });
+  }
+}
+
+/**
+ * O ciclo de vida operacional do mundo: congelar, descongelar, inativar.
+ *
+ * As três transições têm a mesma forma — carrega, muta, salva com a revisão
+ * esperada —, então a forma vive aqui uma vez só. Cada caso de uso continua
+ * sendo uma classe própria porque cada um é um command distinto, com risco e
+ * autorização distintos.
+ *
+ * `save` recebe a revisão lida ANTES da mutação: quem gravou no meio do caminho
+ * ganha, e o command devolve conflito em vez de sobrescrever.
+ */
+async function transitionWorld(
+  repository: WorldRepository,
+  id: GameWorldId,
+  mutate: (world: GameWorld) => Result<void, DomainError>,
+): Promise<Result<WorldMutationResult, DomainError>> {
+  const snapshot = await repository.findById(id);
+  if (snapshot === null) {
+    return fail(new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", { id }));
+  }
+
+  const loaded = GameWorld.fromSnapshot(snapshot);
+  if (!loaded.ok) return loaded;
+
+  const mutated = mutate(loaded.value);
+  // Transição recusada não grava. Sem este retorno, um `pause()` inválido
+  // salvaria o mundo intacto e gastaria uma revisão à toa.
+  if (!mutated.ok) return mutated;
+
+  await repository.save(loaded.value.snapshot(), snapshot.version);
+  return succeed({
+    world: loaded.value.snapshot(),
+    events: loaded.value.pullDomainEvents(),
+  });
+}
+
+/**
+ * Nome e descrição do mundo. Update parcial — campo ausente não muda.
+ *
+ * Vale em qualquer status: identidade é rótulo administrativo, não simulação.
+ */
+export class SetWorldIdentity {
+  public constructor(private readonly repository: WorldRepository) {}
+
+  public async execute(
+    id: GameWorldId,
+    input: WorldIdentityInput,
+  ): Promise<Result<WorldMutationResult, DomainError>> {
+    return transitionWorld(this.repository, id, (world) =>
+      world.setIdentity(input),
+    );
+  }
+}
+
+/** Congela: o mundo segue legível e o relógio para. Reversível por `ResumeWorld`. */
+export class PauseWorld {
+  public constructor(private readonly repository: WorldRepository) {}
+
+  public async execute(
+    id: GameWorldId,
+    reason: string | null = null,
+  ): Promise<Result<WorldMutationResult, DomainError>> {
+    return transitionWorld(this.repository, id, (world) => world.pause(reason));
+  }
+}
+
+/** Volta a andar, de CONGELADO ou de INATIVO (R-56: arquivar é reversível). */
+export class ResumeWorld {
+  public constructor(private readonly repository: WorldRepository) {}
+
+  public async execute(
+    id: GameWorldId,
+  ): Promise<Result<WorldMutationResult, DomainError>> {
+    return transitionWorld(this.repository, id, (world) => world.resume());
+  }
+}
+
+/**
+ * Inativa (arquiva, R-56): read-only, preserva tudo, reversível.
+ *
+ * O gatilho de R-56 — ≥2 temporadas ociosas, aviso de 30 dias — não é verificado
+ * aqui e não tem como ser: não há temporada ligada nem medida de atividade. A
+ * lacuna está declarada no agregado.
+ */
+export class ArchiveWorld {
+  public constructor(private readonly repository: WorldRepository) {}
+
+  public async execute(
+    id: GameWorldId,
+    reason: string | null = null,
+  ): Promise<Result<WorldMutationResult, DomainError>> {
+    return transitionWorld(this.repository, id, (world) => world.archive(reason));
   }
 }
 

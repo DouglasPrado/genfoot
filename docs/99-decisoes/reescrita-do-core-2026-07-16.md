@@ -299,6 +299,50 @@ elenco nenhum — quem o materializa na gênese é o lado do clube.
 
 ---
 
+### R-190 — O elenco tem número de camisa, e a data de entrada é do mundo.
+
+Materializar o elenco (R-189) expôs em `Squad`/`SquadMembership` a mesma
+divergência que a [R-188](#r-188--o-grid-de-atributos-é-o-do-gdd-2-o-schema-copiou-o-football-manager) achou nos atributos: o domínio e o físico foram
+escritos por processos diferentes e nunca se falaram.
+
+| | Domínio (`club-types.ts:136`) | Físico (`schema.prisma`) |
+|---|---|---|
+| identificação na equipe | `slot: string` | `shirtNumber: Int?` + `role: String?` |
+| categoria | na **membership** | no **Squad** (`SquadCategory`) |
+| entrada | `effectiveFrom: string` | `startsAt DateTime @default(now())` |
+| capacidade | `capacity: number` | **não existe** |
+| nome, temporada | não existem | `name`, `seasonNumber` |
+
+**Vale o físico, com três correções.**
+
+**1. `slot: string` vira `shirtNumber: number`.** A invariante do agregado — "dois
+membros não ocupam o mesmo slot" — é boa, e o físico já sabe qual é o slot de
+verdade num elenco de futebol: a camisa. `slot` era um `string` livre que não
+significava nada; a camisa significa, e é o que a tela mostra. A unicidade
+continua, agora dizendo o que quer dizer: dois jogadores não vestem o mesmo
+número.
+
+**2. `startsAt` passa a ser data de MUNDO.** `DateTime @default(now())` é
+relógio de plataforma governando fato de jogo — e esta mesma reescrita já tinha
+escrito a régua (ver a tabela em "Pendências"): data de mundo é `DATE` e **não
+tem default**, porque um default de relógio inventa a data e mata o replay.
+Quando um jogador entrou no elenco é regra de jogo (janela de transferência,
+elegibilidade), não auditoria. Vira `DATE`, sem default. `endsAt` idem.
+
+**3. `capacity` sai do agregado.** Não tem coluna, e não deveria ter: o tamanho
+do elenco é regra (R-57: 23 jogadores), não dado por linha. Gravar capacidade
+permitiria dois clubes com tetos diferentes, que é o oposto do "teto comum" do
+GDD §1. A invariante fica no domínio, contra a constante.
+
+O `Squad` ganha `name`, `category` e `seasonNumber`, que o físico exige e o
+domínio ignorava — elenco é por temporada, e um clube tem o profissional e a
+base ao mesmo tempo.
+
+Nada disto muda a [Q5](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco-sem-contrato-e-assume-a-dívida): de C6 em diante o elenco segue sendo projeção de
+`ContractSigned`/`TransferSigned`.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

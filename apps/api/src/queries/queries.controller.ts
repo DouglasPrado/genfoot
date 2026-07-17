@@ -23,8 +23,10 @@ import {
   GAME_WORLD_REPOSITORY,
   IDENTITY_READ_MODEL,
   CLUB_READ_MODEL,
+  OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
+import { R2Storage } from "../uploads/r2-storage.js";
 import { registeredQueryNames, resolveQueryHandler } from "./query-registry.js";
 import {
   enforceWorldScope,
@@ -64,6 +66,9 @@ export class QueriesController {
     // O mundo é tabela, sempre (R-173/R-182).
     @Inject(GAME_WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     @Inject(WORLD_READ_MODEL) private readonly worldReadModel: WorldReadModel,
+    // Só para compor a URL pública das imagens do mundo a partir da chave. Não
+    // grava nada: quem grava é o UploadsController.
+    @Inject(OBJECT_STORAGE) private readonly storage: R2Storage,
   ) {}
 
   /**
@@ -138,7 +143,24 @@ export class QueriesController {
       );
     }
     const snapshot = result.value;
-    const paged = paginate(snapshot, query);
+    // O agregado guarda a CHAVE do objeto; a URL pública é composta aqui, que é
+    // onde o `R2_CDN_URL` é conhecido. Sem isto a tela receberia
+    // `grinta/worlds/…/banner-abc.png` e teria que montar a URL sozinha —
+    // colando o domínio do CDN dentro do cliente.
+    const paged = paginate(
+      {
+        ...snapshot,
+        bannerUrl:
+          snapshot.bannerKey === null
+            ? null
+            : this.storage.publicUrl(snapshot.bannerKey),
+        squarePhotoUrl:
+          snapshot.squarePhotoKey === null
+            ? null
+            : this.storage.publicUrl(snapshot.squarePhotoKey),
+      },
+      query,
+    );
     return {
       data: paged.data,
       asOf: snapshot.currentDate,

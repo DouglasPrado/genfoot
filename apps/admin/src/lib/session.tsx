@@ -21,6 +21,7 @@ import {
 // Vazio = same-origin: as chamadas vão para /api/v1/* na própria origem e o
 // Next.js as reescreve para a API (sem CORS). Override direto via env se preciso.
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+
 const STORAGE_KEY = "grinta.admin.session";
 
 export interface AdminSession {
@@ -36,6 +37,12 @@ interface SessionContextValue {
   readonly api: GrintaClient;
   /** Cache de query segregado por escopo (FR-009), limpo no logout. */
   readonly cache: QueryCache;
+  /**
+   * Chamada autenticada para o que não passa pelo SDK (multipart). Carrega o
+   * token e derruba a sessão em 401, como o `api` — a tela não trata nada disso.
+   * `path` é relativo à base da API (ex.: `/api/v1/worlds/x/images/banner`).
+   */
+  authorizedFetch(path: string, init: RequestInit): Promise<Response>;
   login(input: {
     subject: string;
     role: Role;
@@ -156,9 +163,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  /**
+   * O caminho autenticado para o que NÃO passa pelo SDK — hoje, o upload de
+   * imagem, que é multipart (o `GrintaClient` só fala JSON, e o boundary quem
+   * compõe é o browser).
+   *
+   * Existe para manter a invariante que o interceptor do `api` já garante: token
+   * em toda chamada, e 401 derruba a sessão. Sem isto, a tela de upload usava
+   * `fetch` cru e escapava do interceptor — token morto virava um erro vermelho
+   * no campo, enquanto o resto do app seguia como se a sessão estivesse viva. O
+   * comentário do interceptor já dizia por que: cada tela lembrar de tratar 401
+   * por conta própria é o que não deve acontecer.
+   */
+  const authorizedFetch = useCallback(
+    async (path: string, init: RequestInit): Promise<Response> => {
+      const response = await globalThis.fetch(`${BASE_URL}${path}`, {
+        ...init,
+        headers: {
+          ...init.headers,
+          ...(session === null
+            ? {}
+            : { authorization: `Bearer ${session.token}` }),
+        },
+      });
+      if (response.status === 401 && session !== null) logoutRef.current();
+      return response;
+    },
+    [session],
+  );
+
   const value = useMemo(
-    () => ({ session, hydrated, api, cache, login, logout, stepUp }),
-    [session, hydrated, api, cache, login, logout, stepUp],
+    () => ({
+      session,
+      hydrated,
+      api,
+      cache,
+      login,
+      logout,
+      stepUp,
+      authorizedFetch,
+    }),
+    [session, hydrated, api, cache, login, logout, stepUp, authorizedFetch],
   );
 
   return (

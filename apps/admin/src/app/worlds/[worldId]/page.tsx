@@ -1,5 +1,6 @@
 "use client";
 
+import { GrintaApiError } from "@grinta/api-client";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -15,7 +16,9 @@ import { SeasonHistory } from "@/components/season-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorldIdentityForm } from "@/components/world-identity-form";
 import { WorldParametersTable } from "@/components/world-parameters-table";
+import { WorldSettingsPanel } from "@/components/world-settings-panel";
 import {
   mockCompeticoes,
   mockDinheiroCirculante,
@@ -35,6 +38,13 @@ interface WorldSnapshot {
   readonly currentDate: string;
   readonly startDate: string;
   readonly seed: string;
+  readonly name: string | null;
+  readonly description: string | null;
+  /** A chave é o que o command grava; a URL a API compõe do R2_CDN_URL. */
+  readonly bannerKey: string | null;
+  readonly bannerUrl: string | null;
+  readonly squarePhotoKey: string | null;
+  readonly squarePhotoUrl: string | null;
   readonly rulesetVersion: string;
   readonly worldSequence: number;
   readonly version: number;
@@ -82,6 +92,7 @@ export default function WorldDetailPage() {
   const worldId = params.worldId;
   const { api, session } = useSession();
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [clubs, setClubs] = useState<readonly ClubRow[]>([]);
   const [commandTypes, setCommandTypes] = useState<readonly string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -92,12 +103,31 @@ export default function WorldDetailPage() {
     // da hora.
     if (session === null) return;
     let alive = true;
+    setSnapshotError(null);
     api
       .query<WorldSnapshot>(worldId)
       .then((e) => {
         if (alive) setSnapshot(e.data);
       })
-      .catch(() => undefined);
+      /**
+       * Falhar CALADO aqui fazia a tela mentir.
+       *
+       * Era `.catch(() => undefined)`: um 401 sumia, o `snapshot` ficava `null`, e
+       * a página renderizava título "Mundo", datas "—" e "sem imagem" — a cara de
+       * um mundo vazio, não a de uma sessão morta. O operador então via o upload
+       * recusar com `invalidToken` e concluía, com toda a razão, que trocar imagem
+       * não tinha nada a ver com login: o resto da tela parecia vivo.
+       *
+       * Mundo que não carregou e mundo sem dado são coisas diferentes, e agora a
+       * tela diz qual das duas.
+       */
+      .catch((err: unknown) => {
+        if (!alive) return;
+        setSnapshot(null);
+        setSnapshotError(
+          err instanceof GrintaApiError ? err.standard.code : "Falha na API",
+        );
+      });
     // Os clubes são o ÚNICO dado real desta tela. Se a query falhar, a tabela
     // fica vazia e diz isso — não cai em mock (CLAUDE.md §5).
     api
@@ -128,7 +158,9 @@ export default function WorldDetailPage() {
   return (
     <AppShell>
       <PageHeader
-        title={snapshot?.seed ?? "Mundo"}
+        // O nome manda quando existe; sem ele, o seed — que é o que esta tela
+        // sempre mostrou. "Mundo" só enquanto a query não voltou.
+        title={snapshot === null ? "Mundo" : (snapshot.name ?? snapshot.seed)}
         hint={worldId}
         actions={
           snapshot ? (
@@ -139,6 +171,20 @@ export default function WorldDetailPage() {
         }
       />
       <div className="space-y-6 p-6">
+        {/* Sessão morta é a causa mais comum, e o operador não tinha como saber:
+            o erro sumia e a tela parecia um mundo sem dado. */}
+        {snapshotError !== null ? (
+          <p className="rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+            Não consegui carregar o mundo (
+            <span className="mono">{snapshotError}</span>). O que a tela mostra
+            abaixo não é o estado dele.
+            {snapshotError.toLowerCase().includes("token") ||
+            snapshotError.includes("UNAUTHENTICATED")
+              ? " Sua sessão expirou — entre de novo."
+              : null}
+          </p>
+        ) : null}
+
         <MockNotice reais={1} total={6} />
 
         <Card>
@@ -249,6 +295,7 @@ export default function WorldDetailPage() {
             <TabsTrigger value="temporadas">Temporadas</TabsTrigger>
             <TabsTrigger value="console">Console</TabsTrigger>
             <TabsTrigger value="parametros">Parâmetros</TabsTrigger>
+            <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
 
           <TabsContent value="clubes">
@@ -327,6 +374,47 @@ export default function WorldDetailPage() {
                 />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="configuracoes">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Identidade</CardTitle>
+                  <Badge tone="ok">dado real · sem mock</Badge>
+                </CardHeader>
+                <CardContent>
+                  <WorldIdentityForm
+                    worldId={worldId}
+                    name={snapshot?.name ?? null}
+                    description={snapshot?.description ?? null}
+                    bannerKey={snapshot?.bannerKey ?? null}
+                    bannerUrl={snapshot?.bannerUrl ?? null}
+                    squarePhotoKey={snapshot?.squarePhotoKey ?? null}
+                    squarePhotoUrl={snapshot?.squarePhotoUrl ?? null}
+                    seed={snapshot?.seed ?? null}
+                    expectedVersion={snapshot?.version ?? null}
+                    onSaved={() => setRefreshKey((k) => k + 1)}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ciclo de vida do mundo</CardTitle>
+                  <Badge tone="ok">dado real · sem mock</Badge>
+                </CardHeader>
+                <CardContent>
+                  <WorldSettingsPanel
+                    worldId={worldId}
+                    status={snapshot?.status ?? null}
+                    currentDate={snapshot?.currentDate ?? null}
+                    expectedVersion={snapshot?.version ?? null}
+                    onChanged={() => setRefreshKey((k) => k + 1)}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

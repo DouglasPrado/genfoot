@@ -118,9 +118,10 @@ export function WorldParametersTable({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        O mundo não tem configuração: dos {rows.length} parâmetros abaixo,{" "}
+        Dos {rows.length} parâmetros abaixo,{" "}
         <span className="font-semibold text-[color:var(--ok)]">
-          {mutable.length} é alterável
+          {mutable.length}{" "}
+          {mutable.length === 1 ? "é alterável" : "são alteráveis"}
         </span>{" "}
         por command. O resto é imutável por construção ou está travado por uma
         lacuna já decidida e não implementada — cada linha diz qual.

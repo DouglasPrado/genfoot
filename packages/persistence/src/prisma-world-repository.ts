@@ -16,10 +16,16 @@ import type { Prisma } from "./generated/prisma/client.js";
  * reescrita, só o adapter. Quem é mega-agregado em C2 é o `WorldScheduler`, e
  * ele continua no JSON.
  *
- * `name`, `maxClubs`, `initialClubCashMinor` e `currencyId` NÃO são escritos: o
- * domínio não os tem, e por R-182 eles são configuração
- * (`GameRuleConfig`/`GameEconomyConfig`), não atributo do mundo. Ficam nulos até
- * a config existir — dívida declarada, não descuido.
+ * `name` e `description` SÃO escritos: são identidade do mundo, não
+ * configuração. O comentário anterior os agrupava com `maxClubs` e dizia que
+ * R-182 os manda para `GameRuleConfig` — extrapolação. R-182 lista
+ * `maxClubs`, `seasonDays` e `initialClubCashMinor`, que são dimensionamento, e
+ * `GameRuleConfig` é "atalho chave-valor para parâmetros simples de
+ * BALANCEAMENTO". Nome de exibição não balanceia nada.
+ *
+ * `maxClubs`, `seasonDays`, `initialClubCashMinor` e `currencyId` seguem sem
+ * escritor: esses o domínio realmente não tem, e por R-182 são configuração.
+ * Ficam nulos até a config existir — dívida declarada, não descuido.
  */
 export class PrismaWorldRepository implements WorldRepository {
   public constructor(private readonly client: Prisma.TransactionClient) {}
@@ -35,6 +41,10 @@ export class PrismaWorldRepository implements WorldRepository {
     const data = {
       status: snapshot.status,
       seed: snapshot.seed,
+      name: snapshot.name,
+      description: snapshot.description,
+      bannerKey: snapshot.bannerKey,
+      squarePhotoKey: snapshot.squarePhotoKey,
       rulesetVersion: snapshot.rulesetVersion,
       startDate: fromWorldDate(snapshot.startDate),
       currentDate: fromWorldDate(snapshot.currentDate),
@@ -91,6 +101,10 @@ export class WorldVersionConflict extends Error {
 interface GameWorldRow {
   readonly id: string;
   readonly seed: string;
+  readonly name: string | null;
+  readonly description: string | null;
+  readonly bannerKey: string | null;
+  readonly squarePhotoKey: string | null;
   readonly rulesetVersion: string;
   readonly startDate: Date;
   readonly currentDate: Date;
@@ -110,6 +124,10 @@ function toSnapshot(row: GameWorldRow | null): GameWorldSnapshot | null {
   return {
     id: row.id as GameWorldId,
     seed: row.seed,
+    name: row.name,
+    description: row.description,
+    bannerKey: row.bannerKey,
+    squarePhotoKey: row.squarePhotoKey,
     startDate: toWorldDate(row.startDate),
     currentDate: toWorldDate(row.currentDate),
     rulesetVersion: ruleset.value,

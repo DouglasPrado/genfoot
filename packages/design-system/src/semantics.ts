@@ -61,6 +61,9 @@ const IRREVERSIBLE = [
   ":exercise-loan-option",
   ":revoke-",
   ":abort",
+  // `world:delete` não casava com nada e caía em `low` — o command que apaga o
+  // mundo inteiro não pedia confirmação no console.
+  ":delete",
 ];
 const HIGH = [
   "admin:",
@@ -70,6 +73,9 @@ const HIGH = [
   ":propose-sanction",
   ":decide-appeal",
   ":publish-listing",
+  // Arquivar é reversível (R-56) — não é irreversível —, mas põe o mundo inteiro
+  // em read-only. Confirmação proporcional ao alcance, não à permanência.
+  ":archive",
 ];
 const MEDIUM = [
   ":advance-",
@@ -78,6 +84,9 @@ const MEDIUM = [
   ":open-",
   ":submit-",
   ":assign",
+  // Congelar/descongelar: reversível na hora, mas para o relógio de todo mundo.
+  ":pause",
+  ":resume",
 ];
 
 /**

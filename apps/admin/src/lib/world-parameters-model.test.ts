@@ -8,6 +8,8 @@ import {
 
 const SNAPSHOT = {
   seed: "grinta-demo",
+  name: "Série R — Beta",
+  description: "Mundo de calibração.",
   startDate: "2026-01-01",
   currentDate: "2026-03-14",
   rulesetVersion: "1.0.0",
@@ -78,13 +80,20 @@ describe("buildWorldParameters", () => {
       expect(row({}, "startDate").mutability.kind).toBe("immutable");
     });
 
-    it("status é o ÚNICO parâmetro com command real", () => {
+    it("status carrega o ciclo de vida inteiro", () => {
       const status = row({}, "status").mutability;
 
       expect(status.kind).toBe("command");
       if (status.kind !== "command") throw new Error("esperava command");
-      expect(status.commandTypes).toContain("world:activate");
-      expect(status.commandTypes).toContain("world:delete");
+      // O ciclo de vida inteiro passa por aqui: ativar, congelar, descongelar,
+      // inativar. Antes só existia `world:activate` — os outros três nasceram
+      // com a aba de Configurações.
+      expect(status.commandTypes).toEqual([
+        "world:activate",
+        "world:pause",
+        "world:resume",
+        "world:archive",
+      ]);
     });
 
     it("currentDate está travado: `world:advance-day` NÃO existe no registry", () => {
@@ -118,10 +127,17 @@ describe("buildWorldParameters", () => {
 
     it("nenhuma linha promete um command que o registry não tem", () => {
       // O registry real, verificado em apps/api/src/commands/command-registry.ts.
+      // A guarda de integridade dele vive em command-catalog.e2e.test.ts, que
+      // trava a lista exata — se um destes sumir de lá, aquele teste reprova
+      // primeiro.
       const REGISTRY = [
         "world:create",
         "world:genesis",
         "world:activate",
+        "world:pause",
+        "world:resume",
+        "world:archive",
+        "world:set-identity",
         "world:delete",
         "identity:join-world",
         "identity:reserve-club",
@@ -152,9 +168,12 @@ describe("buildWorldParameters", () => {
     });
   });
 
-  it("mutableParameters isola o que dá para mexer hoje: só o status", () => {
+  it("mutableParameters isola o que dá para mexer hoje", () => {
+    // Eram um (`status`). Nome e descrição entraram quando o command
+    // `world:set-identity` passou a existir — a tabela mede comportamento, e o
+    // comportamento mudou.
     expect(mutableParameters(buildWorldParameters(input())).map((r) => r.key)).toEqual(
-      ["status"],
+      ["name", "description", "status"],
     );
   });
 });

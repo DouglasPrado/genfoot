@@ -7,12 +7,43 @@ import {
 } from "@grinta/shared";
 
 import {
+  WORLD_DESCRIPTION_MAX_LENGTH,
+  WORLD_NAME_MAX_LENGTH,
+  WORLD_OBJECT_KEY_MAX_LENGTH,
   WorldStatus,
   type CreateGameWorldInput,
   type GameWorldSnapshot,
   type WorldDomainEvent,
+  type WorldIdentityInput,
   type WorldProvisioningEvidence,
 } from "./world-types.js";
+
+/**
+ * Apara e decide entre texto e ausência. Só-espaço vira `null`: sem isto, `"   "`
+ * seria um nome que a tela renderiza vazio, e ninguém entende por que o mundo
+ * perdeu o título.
+ *
+ * Recusa o que passa do limite em vez de truncar — truncar grava um nome que
+ * ninguém escolheu, e cala.
+ */
+function normalizeText(
+  value: string | null,
+  maxLength: number,
+  code: string,
+): Result<string | null, DomainError> {
+  if (value === null) return succeed(null);
+  const trimmed = value.trim();
+  if (trimmed === "") return succeed(null);
+  if (trimmed.length > maxLength) {
+    return fail(
+      new DomainError(code, `O texto passa de ${maxLength} caracteres.`, {
+        length: trimmed.length,
+        maxLength,
+      }),
+    );
+  }
+  return succeed(trimmed);
+}
 
 export class GameWorld {
   readonly #events: WorldDomainEvent[] = [];
@@ -20,6 +51,10 @@ export class GameWorld {
   readonly #seed: string;
   readonly #startDate: WorldDate;
   readonly #rulesetVersion: GameWorldSnapshot["rulesetVersion"];
+  #name: string | null;
+  #description: string | null;
+  #bannerKey: string | null;
+  #squarePhotoKey: string | null;
   #currentDate: WorldDate;
   #status: GameWorldSnapshot["status"];
   #worldSequence: number;
@@ -29,6 +64,10 @@ export class GameWorld {
     input: Readonly<{
       id: GameWorldSnapshot["id"];
       seed: string;
+      name: string | null;
+      description: string | null;
+      bannerKey: string | null;
+      squarePhotoKey: string | null;
       startDate: WorldDate;
       currentDate: WorldDate;
       rulesetVersion: GameWorldSnapshot["rulesetVersion"];
@@ -39,6 +78,10 @@ export class GameWorld {
   ) {
     this.#id = input.id;
     this.#seed = input.seed;
+    this.#name = input.name;
+    this.#description = input.description;
+    this.#bannerKey = input.bannerKey;
+    this.#squarePhotoKey = input.squarePhotoKey;
     this.#startDate = input.startDate;
     this.#currentDate = input.currentDate;
     this.#rulesetVersion = input.rulesetVersion;
@@ -61,6 +104,12 @@ export class GameWorld {
       new GameWorld({
         id: input.id,
         seed,
+        // Mundo nasce sem rótulo. `null` é ausência; um default tipo "Mundo 1"
+        // seria um nome que ninguém escolheu, indistinguível de um escolhido.
+        name: null,
+        description: null,
+        bannerKey: null,
+        squarePhotoKey: null,
         startDate: input.startDate,
         currentDate: input.startDate,
         rulesetVersion: input.rulesetVersion,
@@ -98,6 +147,10 @@ export class GameWorld {
       new GameWorld({
         id: snapshot.id,
         seed: snapshot.seed,
+        name: snapshot.name,
+        description: snapshot.description,
+        bannerKey: snapshot.bannerKey,
+        squarePhotoKey: snapshot.squarePhotoKey,
         startDate: startDate.value,
         currentDate: currentDate.value,
         rulesetVersion: snapshot.rulesetVersion,
@@ -161,6 +214,161 @@ export class GameWorld {
     return succeed(undefined);
   }
 
+  /**
+   * Nome e descrição do mundo. Update parcial: campo ausente fica como está,
+   * `null` limpa.
+   *
+   * Vale em QUALQUER estado, inclusive ARCHIVED. O read-only de R-56 é sobre
+   * simulação — "nenhuma partida nova roda" —, não sobre metadado: se reabrir um
+   * mundo arquivado é decisão administrativa, rotulá-lo também é.
+   *
+   * Não toca a seed. Identidade é rótulo; seed é entrada do determinismo
+   * (R-182), e por isso ela é `readonly` e isto aqui não é.
+   */
+  public setIdentity(input: WorldIdentityInput): Result<void, DomainError> {
+    const name =
+      input.name === undefined
+        ? succeed(this.#name)
+        : normalizeText(input.name, WORLD_NAME_MAX_LENGTH, "INVALID_WORLD_NAME");
+    if (!name.ok) return name;
+
+    const description =
+      input.description === undefined
+        ? succeed(this.#description)
+        : normalizeText(
+            input.description,
+            WORLD_DESCRIPTION_MAX_LENGTH,
+            "INVALID_WORLD_DESCRIPTION",
+          );
+    // Todos validam ANTES de qualquer atribuição: nome bom com descrição ruim
+    // não pode gravar o nome e falhar depois. Metade aplicada é o pior resultado.
+    if (!description.ok) return description;
+
+    const bannerKey =
+      input.bannerKey === undefined
+        ? succeed(this.#bannerKey)
+        : normalizeText(input.bannerKey, WORLD_OBJECT_KEY_MAX_LENGTH, "INVALID_WORLD_IMAGE_KEY");
+    if (!bannerKey.ok) return bannerKey;
+
+    const squarePhotoKey =
+      input.squarePhotoKey === undefined
+        ? succeed(this.#squarePhotoKey)
+        : normalizeText(
+            input.squarePhotoKey,
+            WORLD_OBJECT_KEY_MAX_LENGTH,
+            "INVALID_WORLD_IMAGE_KEY",
+          );
+    if (!squarePhotoKey.ok) return squarePhotoKey;
+
+    this.#name = name.value;
+    this.#description = description.value;
+    this.#bannerKey = bannerKey.value;
+    this.#squarePhotoKey = squarePhotoKey.value;
+    this.record("WorldIdentityChanged", {
+      gameWorldId: this.#id,
+      name: this.#name,
+      description: this.#description,
+      bannerKey: this.#bannerKey,
+      squarePhotoKey: this.#squarePhotoKey,
+    });
+
+    return succeed(undefined);
+  }
+
+  /**
+   * Congela o mundo: ele continua legível, e o relógio para.
+   *
+   * A parada do relógio não é imposta aqui — `advanceDays` já exige ACTIVE. Este
+   * método só muda o estado; o congelamento é consequência.
+   */
+  public pause(reason: string | null = null): Result<void, DomainError> {
+    if (this.#status !== WorldStatus.ACTIVE) {
+      return fail(
+        new DomainError(
+          "INVALID_WORLD_TRANSITION",
+          "Somente mundos ACTIVE podem ser congelados.",
+          { status: this.#status },
+        ),
+      );
+    }
+
+    this.#status = WorldStatus.PAUSED;
+    this.record("WorldPaused", { gameWorldId: this.#id, reason });
+
+    return succeed(undefined);
+  }
+
+  /**
+   * Volta a andar, de CONGELADO **ou de INATIVO**.
+   *
+   * R-56 exige que arquivar seja "reversível por decisão administrativa", então
+   * ARCHIVED devolve por aqui — não é estado terminal. Terminal é
+   * `world:delete`, que apaga.
+   *
+   * Não recebe `WorldProvisioningEvidence` de propósito: voltar de CONGELADO não
+   * gera clube nenhum, e exigir de novo a prova da gênese seria pedir ao operador
+   * que provasse o que já é fato no banco. Quem valida gênese é `activate()`, uma
+   * vez só, na saída de CREATING.
+   */
+  public resume(): Result<void, DomainError> {
+    if (
+      this.#status !== WorldStatus.PAUSED &&
+      this.#status !== WorldStatus.ARCHIVED
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_WORLD_TRANSITION",
+          "Somente mundos PAUSED ou ARCHIVED voltam a ficar ativos.",
+          { status: this.#status },
+        ),
+      );
+    }
+
+    this.#status = WorldStatus.ACTIVE;
+    this.record("WorldResumed", { gameWorldId: this.#id });
+
+    return succeed(undefined);
+  }
+
+  /**
+   * Inativa o mundo — o "arquivamento" de R-56.
+   *
+   * R-56 define o estado: "read-only — histórico, títulos e recordes
+   * preservados; nenhuma partida nova roda —, **reversível** por decisão
+   * administrativa". Read-only sai de graça (`advanceDays` exige ACTIVE) e a
+   * reversão é `resume()`.
+   *
+   * Não confundir com `world:delete`, que apaga: aqui o mundo permanece no banco
+   * e legível. Um mundo em CREATING não inativa — mundo que nunca abriu se
+   * apaga, não se aposenta.
+   *
+   * **O gatilho de R-56 NÃO é verificado aqui**, e a lacuna é declarada: a
+   * decisão condiciona o arquivamento a "≥ 2 temporadas sem usuário ativo" com
+   * "aviso prévio de 30 dias", e nada disso é verificável hoje — não há
+   * temporada ligada (`Season` é órfão, `currentSeasonId` nunca é escrito) nem
+   * medida de atividade. Quem decide se o mundo está ocioso é o operador; o
+   * domínio só recusa transição inválida.
+   */
+  public archive(reason: string | null = null): Result<void, DomainError> {
+    if (
+      this.#status !== WorldStatus.ACTIVE &&
+      this.#status !== WorldStatus.PAUSED
+    ) {
+      return fail(
+        new DomainError(
+          "INVALID_WORLD_TRANSITION",
+          "Somente mundos ACTIVE ou PAUSED podem ser inativados.",
+          { status: this.#status },
+        ),
+      );
+    }
+
+    this.#status = WorldStatus.ARCHIVED;
+    this.record("WorldArchived", { gameWorldId: this.#id, reason });
+
+    return succeed(undefined);
+  }
+
   public advanceDays(days: number): Result<void, DomainError> {
     if (this.#status !== WorldStatus.ACTIVE) {
       return fail(
@@ -200,6 +408,10 @@ export class GameWorld {
     return {
       id: this.#id,
       seed: this.#seed,
+      name: this.#name,
+      description: this.#description,
+      bannerKey: this.#bannerKey,
+      squarePhotoKey: this.#squarePhotoKey,
       startDate: this.#startDate.toString(),
       currentDate: this.#currentDate.toString(),
       rulesetVersion: this.#rulesetVersion,

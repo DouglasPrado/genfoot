@@ -35,6 +35,14 @@ export const IDENTITY_UNIT_OF_WORK = "IDENTITY_UNIT_OF_WORK";
 /** Leitura de C1: fora do UnitOfWork — query não abre transação. */
 export const IDENTITY_READ_MODEL = "IDENTITY_READ_MODEL";
 
+/**
+ * Armazenamento de objetos (R2). Token explícito como todos os outros: o `tsx`
+ * não emite `emitDecoratorMetadata`, então injeção por TIPO chega `undefined` no
+ * construtor — silenciosamente, e só estoura no primeiro uso. É por isso que
+ * todo provider deste app é resolvido por token, e não por classe.
+ */
+export const OBJECT_STORAGE = "OBJECT_STORAGE";
+
 export interface ApiInfo {
   readonly contractVersion: string;
 }

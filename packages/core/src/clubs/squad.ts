@@ -1,5 +1,7 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
+import { SQUAD_SIZE } from "../genesis/player-generation.js";
+
 import type { SquadMembershipSnapshot, SquadSnapshot } from "./club-types.js";
 
 export class Squad {
@@ -11,13 +13,16 @@ export class Squad {
     const players = new Set(
       snapshot.memberships.map(({ playerId }) => playerId),
     );
-    const slots = new Set(snapshot.memberships.map(({ slot }) => slot));
+    // A camisa é o slot (R-190): dois jogadores não vestem o mesmo número.
+    const shirts = new Set(snapshot.memberships.map(({ shirtNumber }) => shirtNumber));
     if (
       snapshot.version < 1 ||
-      snapshot.capacity < 1 ||
-      snapshot.memberships.length > snapshot.capacity ||
+      // O teto é REGRA (R-57), não coluna: gravá-lo por elenco permitiria dois
+      // clubes com tetos diferentes — o oposto do "teto comum" do GDD §1.
+      snapshot.memberships.length > SQUAD_SIZE ||
+      snapshot.seasonNumber < 1 ||
       players.size !== snapshot.memberships.length ||
-      slots.size !== snapshot.memberships.length
+      shirts.size !== snapshot.memberships.length
     ) {
       return fail(new DomainError("INVALID_SQUAD", "Elenco inválido."));
     }
@@ -27,7 +32,7 @@ export class Squad {
   public assign(
     membership: SquadMembershipSnapshot,
   ): Result<void, DomainError> {
-    if (this.state.memberships.length >= this.state.capacity) {
+    if (this.state.memberships.length >= SQUAD_SIZE) {
       return fail(
         new DomainError(
           "SQUAD_CAPACITY_EXCEEDED",
@@ -47,14 +52,21 @@ export class Squad {
         ),
       );
     }
-    if (this.state.memberships.some(({ slot }) => slot === membership.slot)) {
+    if (
+      this.state.memberships.some(
+        ({ shirtNumber }) => shirtNumber === membership.shirtNumber,
+      )
+    ) {
       return fail(
-        new DomainError("SQUAD_SLOT_OCCUPIED", "O slot já está ocupado."),
+        new DomainError(
+          "SQUAD_SLOT_OCCUPIED",
+          "Outro jogador já veste esse número.",
+        ),
       );
     }
-    if (membership.slot.trim() === "") {
+    if (!Number.isSafeInteger(membership.shirtNumber) || membership.shirtNumber < 1) {
       return fail(
-        new DomainError("INVALID_SQUAD_SLOT", "O slot é obrigatório."),
+        new DomainError("INVALID_SQUAD_SLOT", "O número da camisa é obrigatório."),
       );
     }
     this.state = {

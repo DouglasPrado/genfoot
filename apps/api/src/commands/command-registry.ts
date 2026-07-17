@@ -163,6 +163,10 @@ const worldLifecyclePayload = z.object({
 const worldIdentityPayload = z.object({
   name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
+  // As CHAVES do objeto no R2, produzidas por POST /worlds/{id}/images/{kind}.
+  // Não é URL: o agregado não conhece CDN.
+  bannerKey: z.string().nullable().optional(),
+  squarePhotoKey: z.string().nullable().optional(),
 });
 
 function requireWorldId(

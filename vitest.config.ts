@@ -14,9 +14,25 @@ const alias = {
   ),
 };
 
-/** Testes que falam com o Postgres de verdade (R-173). */
-const POSTGRES_TESTS =
-  "packages/persistence/tests/{prisma-*,identity-commands,club-commands}.test.ts";
+/**
+ * Testes que falam com o Postgres de verdade (R-173).
+ *
+ * **Os e2e da API entram aqui, e a ausência deles custava caro.** Eles sobem o
+ * Nest, e desde R-173 o Nest só fala com o Postgres — são testes de banco. Mas
+ * estavam no projeto `unit`, rodando em PARALELO com este: o TRUNCATE daqui
+ * apagava o mundo que o `world:create` de lá acabara de gravar, e a query
+ * seguinte voltava 404. Passavam ou não conforme o escalonador — exatamente o
+ * "gate que oscila" que o comentário do `singleFork` descreve, e do qual eles
+ * eram os únicos de fora.
+ *
+ * O disfarce era o `GRINTA_API_DATA_DIR` que eles ainda configuram: resquício da
+ * era do adapter JSON, quando de fato não tocavam banco. Viraram testes de
+ * Postgres quando o JSON morreu, e ninguém os mudou de projeto.
+ */
+const POSTGRES_TESTS = [
+  "packages/persistence/tests/{prisma-*,identity-commands,club-commands}.test.ts",
+  "apps/api/test/*.e2e.test.ts",
+];
 
 const UNIT_TESTS = [
   "packages/**/*.test.ts",
@@ -54,14 +70,14 @@ export default defineConfig({
         test: {
           name: "unit",
           include: UNIT_TESTS,
-          exclude: ["**/node_modules/**", "**/dist/**", POSTGRES_TESTS],
+          exclude: ["**/node_modules/**", "**/dist/**", ...POSTGRES_TESTS],
         },
       },
       {
         resolve: { alias },
         test: {
           name: "postgres",
-          include: [POSTGRES_TESTS],
+          include: POSTGRES_TESTS,
           /**
            * Um banco só, e cada arquivo dá TRUNCATE nas tabelas que usa. Em
            * paralelo, o TRUNCATE de um corre contra o INSERT do outro — e a

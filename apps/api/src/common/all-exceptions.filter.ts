@@ -2,6 +2,7 @@ import {
   Catch,
   HttpException,
   HttpStatus,
+  Logger,
   type ArgumentsHost,
   type ExceptionFilter,
 } from "@nestjs/common";
@@ -20,6 +21,8 @@ function correlationOf(request: Request): string {
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  readonly #logger = new Logger("AllExceptionsFilter");
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -44,6 +47,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       response.status(status).json(body);
       return;
     }
+    // Uma exceção que chega aqui é defeito nosso, e até agora ela sumia: o
+    // cliente recebia `INTERNAL_ERROR` — correto, não vaza stack — e o servidor
+    // não contava a ninguém o que houve. Não havia onde olhar. "Não vazar para o
+    // CLIENTE" e "não registrar em lugar nenhum" viraram a mesma coisa, e são
+    // coisas diferentes: a stack vai para o log do servidor, e só o envelope
+    // opaco vai pela rede.
+    this.#logger.error(
+      `${request.method} ${request.originalUrl} → INTERNAL_ERROR (correlationId=${correlationId})`,
+      exception instanceof Error ? exception.stack : String(exception),
+    );
+
     const body: StandardError = {
       code: "INTERNAL_ERROR",
       messageKey: "error.internal",

@@ -809,6 +809,11 @@ model GameWorld {
   // literais da gênese (dimensionamento), e `GameRuleConfig` é, por definição,
   // "atalho chave-valor para parâmetros simples de BALANCEAMENTO".
   name                    String?
+  description             String?
+  // A CHAVE do objeto no R2, não a URL: a URL pública é composta na borda a
+  // partir de `R2_CDN_URL`. Guardar a URL assaria o CDN de outro projeto aqui.
+  bannerKey               String?
+  squarePhotoKey          String?
   seed                    String // R-182: sem ele não há replay
   startDate               DateTime    @db.Date
   status                  WorldStatus @default(CREATING)
@@ -1684,8 +1689,14 @@ model SquadMembership {
   role        String?
   shirtNumber Int?
   isActive    Boolean   @default(true)
-  startsAt    DateTime  @default(now())
-  endsAt      DateTime?
+  /// Data de MUNDO, não instante de plataforma — R-190.
+  ///
+  /// Era `DateTime @default(now())`: relógio de plataforma governando fato de
+  /// jogo. Quando um jogador entrou no elenco é regra (janela, elegibilidade),
+  /// não auditoria. `DATE` e sem default, porque um default de relógio inventa a
+  /// data e mata o replay (R-177).
+  startsAt    DateTime  @db.Date
+  endsAt      DateTime? @db.Date
 
   squad  Squad  @relation(fields: [squadId], references: [id], onDelete: Cascade)
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)

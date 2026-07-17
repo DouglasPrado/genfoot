@@ -49,6 +49,8 @@ export interface ParameterRow {
 
 export interface WorldSnapshotLike {
   readonly seed: string;
+  readonly name: string | null;
+  readonly description: string | null;
   readonly startDate: string;
   readonly currentDate: string;
   readonly rulesetVersion: string;
@@ -120,6 +122,25 @@ export function buildWorldParameters(
 
   return [
     {
+      key: "name",
+      label: "Nome",
+      // Estas duas linhas eram a prova da tese desta tabela: `name` existia no
+      // banco, nullable, e NUNCA era escrito — travado por um comentário que
+      // atribuía a R-182 algo que R-182 não diz. Hoje gravam.
+      value: s?.name ?? null,
+      origin: "snapshot",
+      source: "GET /worlds/{id} · world:set-identity",
+      mutability: { kind: "command", commandTypes: ["world:set-identity"] },
+    },
+    {
+      key: "description",
+      label: "Descrição",
+      value: s?.description ?? null,
+      origin: "snapshot",
+      source: "GET /worlds/{id} · world:set-identity",
+      mutability: { kind: "command", commandTypes: ["world:set-identity"] },
+    },
+    {
       key: "seed",
       label: "Seed",
       value: s?.seed ?? null,
@@ -174,9 +195,17 @@ export function buildWorldParameters(
       value: s?.status ?? null,
       origin: "snapshot",
       source: "GET /worlds/{id}",
+      // O ciclo de vida operacional inteiro: em breve → ativo → congelado ⇄
+      // ativo | inativo ⇄ ativo. `world:delete` NÃO entra: ele não muda o
+      // status, apaga a linha — o parâmetro deixa de existir junto com o mundo.
       mutability: {
         kind: "command",
-        commandTypes: ["world:activate", "world:delete"],
+        commandTypes: [
+          "world:activate",
+          "world:pause",
+          "world:resume",
+          "world:archive",
+        ],
       },
     },
     {

@@ -57,6 +57,14 @@ export const SQUAD_POSITION_TEMPLATE: readonly PlayerPosition[] = [
 /** "1.380 pontos de overall para 23 jogadores" — GDD §1. */
 export const SQUAD_OVERALL_BUDGET = 1380;
 
+/**
+ * O tamanho do elenco — R-57: "elenco inicial com **23 jogadores**".
+ *
+ * É constante, não coluna (R-190): gravar capacidade por elenco permitiria dois
+ * clubes com tetos diferentes, que é o oposto do "teto comum" do GDD §1.
+ */
+export const SQUAD_SIZE = 23;
+
 /** Os setores entre os quais o GDD manda o teto variar. */
 const Sector = {
   GOALKEEPER: "GOALKEEPER",
