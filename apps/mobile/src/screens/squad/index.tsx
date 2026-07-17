@@ -19,9 +19,9 @@ import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
   selectManagedClub,
-  squadPlayersFromProjections,
+  squadPlayersFromRoster,
   type ClubPortfolioProjection,
-  type PlayerRosterProjection,
+  type MobileRosterProjection,
 } from "@/lib/club-projection";
 import {
   submitTrackedCommand,
@@ -58,7 +58,6 @@ export function Squad() {
   const worldId = useWorldId();
   const { client, session, status, contractVersion } = useSession();
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
-  const rosterQuery = useWorldQuery<PlayerRosterProjection>("player-roster");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const onboarding =
@@ -73,17 +72,15 @@ export function Squad() {
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
   );
+  // O elenco é da query `roster`, recortada pelo clube gerido (R-190). `null`
+  // enquanto o clube não é conhecido — a query só dispara com o clubId em mãos.
+  const rosterQuery = useWorldQuery<MobileRosterProjection>(
+    managedClub === null ? null : "roster",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const officialPlayers = useMemo(
-    () =>
-      managedClub === null
-        ? []
-        : squadPlayersFromProjections(
-            clubQuery.data,
-            rosterQuery.data,
-            managedClub.id,
-            clubQuery.asOf ?? "2026-01-01",
-          ),
-    [clubQuery.data, clubQuery.asOf, rosterQuery.data, managedClub],
+    () => squadPlayersFromRoster(rosterQuery.data),
+    [rosterQuery.data],
   );
   const players = officialPlayers;
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);

@@ -20,6 +20,10 @@ export interface RosterPlayerView {
   readonly overall: number;
   readonly potential: number;
   readonly availability: string;
+  /** Estado dinâmico do jogador (0–100). Muda por jogo/semana, não é atributo. */
+  readonly morale: number;
+  /** Prontidão física: 100 − fadiga. A tela mostra como "forma física". */
+  readonly fitness: number;
   /** Os 4 grupos, derivados dos 39 (R-179) — para exibição. */
   readonly groups: PlayerAttributeRollup;
 }

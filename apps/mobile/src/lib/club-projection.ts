@@ -66,27 +66,6 @@ export interface ClubPortfolioProjection {
   readonly squads?: readonly MobileSquadProjection[];
 }
 
-export interface PlayerRosterProjection {
-  readonly persons: readonly {
-    readonly id: string;
-    readonly firstName: string;
-    readonly lastName: string;
-    readonly birthDate: string;
-  }[];
-  readonly players: readonly {
-    readonly id: string;
-    readonly personId: string;
-    readonly primaryPosition: string;
-    readonly currentAbility: number;
-    readonly potentialAbility: number;
-    readonly dynamicState: {
-      readonly morale: number;
-      readonly confidence: number;
-      readonly fatigue: number;
-    };
-  }[];
-}
-
 const departmentPresentation: Readonly<
   Record<string, { name: string; icon: string }>
 > = {
@@ -171,68 +150,67 @@ const positionPresentation: Readonly<
   CF: { label: "ATA", group: "ATA" },
 };
 
-function ageOn(birthDate: string, on: string): number {
-  const birth = new Date(`${birthDate}T00:00:00Z`);
-  const date = new Date(`${on}T00:00:00Z`);
-  let age = date.getUTCFullYear() - birth.getUTCFullYear();
-  if (
-    date.getUTCMonth() < birth.getUTCMonth() ||
-    (date.getUTCMonth() === birth.getUTCMonth() &&
-      date.getUTCDate() < birth.getUTCDate())
-  ) {
-    age -= 1;
-  }
-  return age;
+/**
+ * O elenco tal como a query `roster` o devolve (RosterView do core, R-190).
+ *
+ * Substitui `PlayerRosterProjection` + `portfolio.squads`: a query nova já vem
+ * joinada — camisa, nome e overall num objeto só. Não é preciso cruzar pessoas,
+ * jogadores e memberships na tela.
+ */
+export interface MobileRosterProjection {
+  readonly clubId: string;
+  readonly squadName: string;
+  readonly seasonNumber: number;
+  readonly players: readonly {
+    readonly playerId: string;
+    readonly shirtNumber: number;
+    readonly name: string;
+    readonly primaryPosition: string;
+    readonly overall: number;
+    readonly potential: number;
+    readonly age: number;
+    readonly morale: number;
+    readonly fitness: number;
+  }[];
 }
 
-export function squadPlayersFromProjections(
-  portfolio: ClubPortfolioProjection | null,
-  roster: PlayerRosterProjection | null,
-  clubId: string,
-  worldDate: string,
+/**
+ * Mapeia o elenco oficial para a apresentação da tela.
+ *
+ * O que é REAL: camisa, nome, posição, idade, overall, potencial, moral, forma
+ * física. O que DEGRADA honestamente, e por quê:
+ *
+ * - `contractYears: 0` — não há contratos até C6 (R-189). Zero aqui é "sem
+ *   contrato materializado", não "contrato de zero ano".
+ * - `form: "steady"` — forma recente vem do histórico de partidas (C5), que não
+ *   existe. "steady" é o neutro honesto, não um número inventado.
+ * - `starter` pela camisa ≤ 11 — titularidade de verdade é escalação (tática),
+ *   que depende de comando ainda ausente.
+ */
+export function squadPlayersFromRoster(
+  roster: MobileRosterProjection | null,
 ): readonly SquadPlayer[] {
-  const squad = portfolio?.squads?.find(
-    (candidate) => candidate.clubId === clubId,
-  );
-  if (squad === undefined || roster === null) return [];
-  const players = new Map(roster.players.map((player) => [player.id, player]));
-  const persons = new Map(roster.persons.map((person) => [person.id, person]));
-
-  return squad.memberships.flatMap((membership, index) => {
-    const player = players.get(membership.playerId);
-    const person =
-      player === undefined ? undefined : persons.get(player.personId);
-    const position =
-      player === undefined
-        ? undefined
-        : positionPresentation[player.primaryPosition];
-    if (player === undefined || person === undefined || position === undefined)
-      return [];
-    const slotNumber =
-      Number.parseInt(membership.slot.replace(/\D/g, ""), 10) || index + 1;
+  if (roster === null) return [];
+  return roster.players.flatMap((player) => {
+    const position = positionPresentation[player.primaryPosition];
+    if (position === undefined) return [];
     return [
       {
-        id: player.id,
-        number: slotNumber,
-        name: `${person.firstName} ${person.lastName}`,
+        id: player.playerId,
+        number: player.shirtNumber,
+        name: player.name,
         position: position.label,
         group: position.group,
-        age: ageOn(person.birthDate, worldDate),
-        ovr: player.currentAbility,
-        pot: player.potentialAbility,
-        fitness: Math.max(0, 100 - player.dynamicState.fatigue),
-        form:
-          player.dynamicState.confidence >= 65
-            ? "up"
-            : player.dynamicState.confidence < 45
-              ? "down"
-              : "steady",
-        morale: player.dynamicState.morale,
+        age: player.age,
+        ovr: player.overall,
+        pot: player.potential,
+        fitness: player.fitness,
+        form: "steady",
+        morale: player.morale,
         contractYears: 0,
-        // Titularidade oficial pelo número do slot (S01–S11 = XI inicial),
-        // estável sob remove/assign — a ordem das memberships não importa.
-        starter: slotNumber <= 11,
+        starter: player.shirtNumber <= 11,
       } satisfies SquadPlayer,
     ];
   });
 }
+

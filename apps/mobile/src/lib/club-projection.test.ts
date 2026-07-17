@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildClubInfrastructure,
   selectManagedClub,
-  squadPlayersFromProjections,
+  squadPlayersFromRoster,
 } from "./club-projection";
 
 /**
@@ -76,49 +76,27 @@ describe("projeção do clube gerenciado no mobile", () => {
     ]);
   });
 
-  it("monta o elenco do clube juntando vínculos, jogadores e pessoas", () => {
-    const portfolio = {
-      clubs: [activeClub],
-      squads: [
-        {
-          id: "squad-active",
-          clubId: "club-active",
-          version: 1,
-          memberships: [
-            { playerId: "player-1", slot: "S09", category: "SENIOR" },
-          ],
-        },
-      ],
-    };
+  it("mapeia o elenco da query roster para a apresentação (R-190)", () => {
     const roster = {
-      persons: [
-        {
-          id: "person-1",
-          firstName: "Caio",
-          lastName: "Silva",
-          birthDate: "2000-08-01",
-        },
-      ],
+      clubId: "club-active",
+      squadName: "Elenco Jardim Atlético",
+      seasonNumber: 1,
       players: [
         {
-          id: "player-1",
-          personId: "person-1",
+          playerId: "player-1",
+          shirtNumber: 9,
+          name: "Caio Silva",
           primaryPosition: "ST",
-          currentAbility: 73,
-          potentialAbility: 81,
-          dynamicState: { morale: 72, confidence: 68, fatigue: 12 },
+          overall: 73,
+          potential: 81,
+          age: 25,
+          morale: 72,
+          fitness: 88,
         },
       ],
     };
 
-    expect(
-      squadPlayersFromProjections(
-        portfolio,
-        roster,
-        "club-active",
-        "2026-01-01",
-      ),
-    ).toEqual([
+    expect(squadPlayersFromRoster(roster)).toEqual([
       expect.objectContaining({
         id: "player-1",
         number: 9,
@@ -127,9 +105,36 @@ describe("projeção do clube gerenciado no mobile", () => {
         group: "ATA",
         age: 25,
         ovr: 73,
+        pot: 81,
         fitness: 88,
-        form: "up",
+        morale: 72,
+        starter: true,
       }),
     ]);
+  });
+
+  /** Sem contratos (C6) nem histórico de partidas (C5), estes campos degradam. */
+  it("degrada honestamente o que ainda não existe: contrato e forma", () => {
+    const [player] = squadPlayersFromRoster({
+      clubId: "c",
+      squadName: "e",
+      seasonNumber: 1,
+      players: [
+        {
+          playerId: "p",
+          shirtNumber: 20,
+          name: "Reserva",
+          primaryPosition: "CB",
+          overall: 58,
+          potential: 60,
+          age: 30,
+          morale: 50,
+          fitness: 100,
+        },
+      ],
+    });
+    expect(player?.contractYears).toBe(0);
+    expect(player?.form).toBe("steady");
+    expect(player?.starter).toBe(false); // camisa 20 não é titular por padrão
   });
 });
