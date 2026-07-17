@@ -18,7 +18,6 @@ import {
   buildClubInfrastructure,
   selectManagedClub,
   type ClubPortfolioProjection,
-  type NarrativeProjection,
 } from "@/lib/club-projection";
 import { ClubCrest } from "@/screens/club/customization/crest";
 import { CustomizeClubModal, normalizeClubName } from "@/screens/club/customization/customize-modal";
@@ -60,6 +59,19 @@ interface FanbaseProjection {
   readonly pressureLevel: number;
 }
 
+/** O feed de imprensa (C11): manchetes dos fatos reais do mundo. */
+interface NarrativeFeedProjection {
+  readonly items: readonly {
+    readonly id: string;
+    readonly clubId: string | null;
+    readonly type: string;
+    readonly title: string;
+    readonly description: string;
+    readonly intensity: number;
+    readonly occurredOn: string;
+  }[];
+}
+
 interface LedgerSummaryProjection {
   readonly accountCount: number;
   readonly transactionCount: number;
@@ -92,7 +104,7 @@ export function Club() {
    * leva selo e o operador sabe ler; aqui o jogador contrataria em cima de um
    * número inventado. Volta com C9 — e aí a tela liga sozinha.
    */
-  const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
+  const narrativeQuery = useWorldQuery<NarrativeFeedProjection>("narrative");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const identity = identityQuery.state === "empty" ? null : identityQuery.data;
@@ -495,6 +507,40 @@ export function Club() {
           )}
         </Card>
 
+        <Card>
+          <SectionHeader
+            title="IMPRENSA"
+            trailing={
+              <Icon
+                name="notifications-outline"
+                size={16}
+                color={color.textMuted}
+              />
+            }
+          />
+          {(narrativeQuery.data?.items.length ?? 0) === 0 ? (
+            <Text style={styles.pressEmpty}>
+              {narrativeQuery.state === "loading"
+                ? "Buscando as manchetes…"
+                : "Sem manchetes ainda. Contrate um reforço e a imprensa comenta."}
+            </Text>
+          ) : (
+            (narrativeQuery.data?.items ?? []).slice(0, 6).map((item) => (
+              <View key={item.id} style={styles.pressItem}>
+                <View style={styles.pressDot} />
+                <View style={styles.pressBody}>
+                  <Text style={styles.pressTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.pressDesc} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </Card>
+
         {controlStep.kind === "complete" ? (
           <Card>
             <SectionHeader
@@ -730,6 +776,32 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
   },
+  pressEmpty: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    paddingVertical: space.sm,
+  },
+  pressItem: {
+    flexDirection: "row",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  pressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 6,
+    backgroundColor: color.primary,
+  },
+  pressBody: { flex: 1, gap: 2 },
+  pressTitle: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  pressDesc: { color: color.textMuted, fontSize: fontSize.xs },
   finBalance: {
     backgroundColor: color.primaryDim,
     borderRadius: radius.sm,
