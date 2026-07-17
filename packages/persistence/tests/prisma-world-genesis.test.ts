@@ -1,5 +1,6 @@
 import {
   GenerateWorldGenesis,
+  INITIAL_ENDOWMENT_MINOR,
   SQUAD_SIZE,
   derivePlayerOverall,
 } from "@grinta/core";
@@ -25,6 +26,9 @@ const GENESIS_TABLES = [
   "PlayerAttributes",
   "Squad",
   "SquadMembership",
+  "FinancialAccount",
+  "JournalEntry",
+  "JournalLine",
 ];
 
 describe.skipIf(!hasDatabase)(
@@ -109,6 +113,61 @@ describe.skipIf(!hasDatabase)(
 
       expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(368);
       expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
+    });
+
+    /**
+     * ECO-001: cada clube nasce com R$ 5.000.000 no razão — e é PROJEÇÃO, não
+     * coluna: a soma dos lançamentos postados na conta de caixa dele (R-178).
+     */
+    it("cada clube nasce com a dotação de R$ 5.000.000 no razão", async () => {
+      await generate.execute(WORLD_ID as never);
+
+      // O caixa é ASSET/DEBIT: Σ débitos − Σ créditos das linhas postadas.
+      const clubs = await client.club.findMany({ where: { gameWorldId: WORLD_ID } });
+      for (const club of clubs) {
+        const lines = await client.journalLine.findMany({
+          where: {
+            gameWorldId: WORLD_ID,
+            account: { clubId: club.id, accountType: "ASSET" },
+            entry: { status: "POSTED" },
+          },
+        });
+        const balance = lines.reduce(
+          (sum, l) => sum + (l.direction === "DEBIT" ? l.amountMinor : -l.amountMinor),
+          0n,
+        );
+        expect(balance).toBe(INITIAL_ENDOWMENT_MINOR);
+      }
+    });
+
+    /**
+     * Economia fechada (ECO-003): a torneira criou exatamente o que os clubes
+     * têm. A oferta monetária do mundo é auditável.
+     */
+    it("a torneira criou exatamente o que os 16 clubes têm", async () => {
+      await generate.execute(WORLD_ID as never);
+
+      const faucetLines = await client.journalLine.findMany({
+        where: {
+          gameWorldId: WORLD_ID,
+          account: { systemAccount: "SYS_INITIAL_ENDOWMENT" },
+          entry: { status: "POSTED" },
+        },
+      });
+      const created = faucetLines.reduce(
+        (sum, l) => sum + (l.direction === "CREDIT" ? l.amountMinor : -l.amountMinor),
+        0n,
+      );
+      expect(created).toBe(INITIAL_ENDOWMENT_MINOR * 16n);
+    });
+
+    /** Idempotente: reexecutar a gênese não credita a dotação duas vezes. */
+    it("reexecutar não duplica a dotação", async () => {
+      await generate.execute(WORLD_ID as never);
+      await generate.execute(WORLD_ID as never);
+      expect(
+        await client.journalEntry.count({ where: { gameWorldId: WORLD_ID } }),
+      ).toBe(16);
     });
 
     /** A soma dos overalls de cada elenco é o teto comum de 1.380 (R-57). */

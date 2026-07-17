@@ -31,8 +31,11 @@ export interface LedgerRepository {
    * Grava um lançamento POSTADO com suas linhas. Idempotente por
    * `sourceEventId`: se já existe lançamento para aquele evento, não duplica
    * (um evento, um lançamento — R-191).
+   *
+   * Devolve `true` se gravou, `false` se pulou por já existir — a gênese precisa
+   * saber se de fato criou algo para não se declarar "criou" numa reexecução.
    */
-  appendJournalEntry(snapshot: JournalEntrySnapshot): Promise<void>;
+  appendJournalEntry(snapshot: JournalEntrySnapshot): Promise<boolean>;
 
   /** O caixa de um clube: Σ lançamentos postados na conta de caixa dele. */
   sumClubCashMinor(

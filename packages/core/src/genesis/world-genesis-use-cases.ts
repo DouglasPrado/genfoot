@@ -10,6 +10,7 @@ import { buildClubsFromGenesis } from "../clubs/club-bootstrap.js";
 import type { ClubRepository } from "../clubs/club-repository.js";
 import { Club } from "../clubs/club.js";
 import { Squad } from "../clubs/squad.js";
+import { buildLedgerGenesis } from "../finance/ledger-bootstrap.js";
 import { Player } from "../players/player.js";
 import {
   ActivateWorld,
@@ -110,6 +111,7 @@ export class GenerateWorldGenesis {
     const clubs = buildClubsFromGenesis(world, genesis);
     const players = buildPlayersFromGenesis(world, genesis);
     const squads = buildSquadsFromGenesis(world, genesis);
+    const ledger = buildLedgerGenesis(world, genesis);
 
     // Reidrata tudo ANTES de abrir a transação: um snapshot inválido é erro de
     // gênese, não de banco, e não deve deixar uma transação meio aberta.
@@ -131,10 +133,38 @@ export class GenerateWorldGenesis {
       any = (await materializeClubs(repositories, clubs)) || any;
       any = (await materializePlayers(repositories, world, players)) || any;
       any = (await materializeSquads(repositories, squads)) || any;
+      // O razão por último: a conta de caixa e a dotação de cada clube dependem
+      // de o clube já existir (a FK da conta aponta para o clube).
+      any = (await materializeLedger(repositories, ledger)) || any;
       return any;
     });
     return succeed(created);
   }
+}
+
+async function materializeLedger(
+  repositories: GenesisRepositories,
+  ledger: ReturnType<typeof buildLedgerGenesis>,
+): Promise<boolean> {
+  let created = false;
+  // As contas primeiro (o lançamento referencia a conta). Idempotente: a que já
+  // existe é pulada.
+  for (const account of ledger.accounts) {
+    const existing = await repositories.ledger.findAccount(
+      account.gameWorldId,
+      account.ownerScope,
+      account.accountCode,
+    );
+    if (existing !== null) continue;
+    await repositories.ledger.saveAccount(account, null);
+    created = true;
+  }
+  // Os lançamentos são idempotentes por `sourceEventId` no próprio adapter:
+  // reexecutar a gênese não credita a dotação duas vezes.
+  for (const entry of ledger.entries) {
+    if (await repositories.ledger.appendJournalEntry(entry)) created = true;
+  }
+  return created;
 }
 
 async function materializeClubs(
