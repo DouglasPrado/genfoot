@@ -99,6 +99,8 @@ export * from "./finance/budget-types.js";
 export * from "./finance/budget.js";
 export * from "./finance/set-budget.js";
 export * from "./finance/spend-guard.js";
+export * from "./finance/financial-health.js";
+export * from "./finance/club-finance-read-model.js";
 export * from "./competitions/competition-types.js";
 export * from "./competitions/competition-bootstrap.js";
 export * from "./competitions/competition-repository.js";
