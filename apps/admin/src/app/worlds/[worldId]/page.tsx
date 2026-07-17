@@ -160,10 +160,14 @@ export default function WorldDetailPage() {
             hint={tendencia.crescente ? "economia crescente" : "economia decrescente"}
             badge={<Mock contexto="C9 razão" />}
           />
+          {/* "Campeonatos rodando" de N: uma temporada tem VÁRIOS torneios —
+              liga, copa, estadual, continental (`06-temporada-e-competicoes.md`).
+              O cartão anterior dizia só quantos rodavam, como se o total fosse
+              1. */}
           <Stat
-            label="Campeonatos rodando"
-            value={String(competicoes.rodando)}
-            hint={`temporada ${competicoes.temporada} · rodada ${competicoes.rodada}/${competicoes.totalRodadas}`}
+            label="Torneios rodando"
+            value={`${competicoes.rodando} de ${competicoes.total}`}
+            hint={`temporada ${competicoes.temporada} · ${competicoes.torneios.map((t) => t.nome).join(" · ")}`}
             badge={<Mock contexto="C7 competições" />}
           />
           <Stat
@@ -224,7 +228,7 @@ export default function WorldDetailPage() {
                 <Badge tone="ok">dado real · Postgres</Badge>
               </CardHeader>
               <CardContent>
-                <ClubsTable clubs={clubs} />
+                <ClubsTable worldId={worldId} clubs={clubs} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -232,7 +236,7 @@ export default function WorldDetailPage() {
           <TabsContent value="temporadas">
             <Card>
               <CardHeader>
-                <CardTitle>Resultado por temporada</CardTitle>
+                <CardTitle>Campanhas por temporada</CardTitle>
                 <Mock contexto="C7 competições + C5 partidas" />
               </CardHeader>
               <CardContent>
