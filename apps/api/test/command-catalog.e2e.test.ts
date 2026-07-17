@@ -88,6 +88,8 @@ describe("API command catalog integrity (e2e)", () => {
       "identity:release-club-reservation",
       "identity:request-switch",
       "identity:reserve-club",
+      // C6: a compra de verdade — dinheiro, contrato e elenco num só commit (R-192).
+      "market:sign-player",
       "world:activate",
       // O ciclo de vida operacional: a aba de Configurações do admin os despacha.
       // Sobem aqui porque uma tela viva os exige — que é a regra desta lista.
@@ -108,7 +110,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(16);
+    expect(response.body.commandCount).toBe(17);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

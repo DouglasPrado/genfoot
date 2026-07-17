@@ -8,6 +8,7 @@ import {
   EndClubControl,
   GenerateWorldGenesis,
   PlayNextRound,
+  SignPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -20,6 +21,7 @@ import {
   type ClubUnitOfWork,
   type GenesisUnitOfWork,
   type MatchPlayRepository,
+  type TransferUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldMutationResult,
@@ -74,6 +76,8 @@ export interface CommandContext {
   readonly genesisUnitOfWork: GenesisUnitOfWork;
   /** C5 — joga a próxima rodada da liga (simulação determinística). */
   readonly matchPlay: MatchPlayRepository;
+  /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
+  readonly transferUnitOfWork: TransferUnitOfWork;
   /**
    * Quem agiu — a conta do JOGO, vinda da SESSÃO.
    *
@@ -137,6 +141,14 @@ const applyClubIdentityPayload = z.object({
       crestTemplateId: z.string(),
     })
     .optional(),
+});
+
+const signPlayerPayload = z.object({
+  buyingClubId: z.string().uuid(),
+  sellerClubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  feeMinor: z.union([z.string(), z.number()]).transform((v) => BigInt(v)),
+  currentSeason: z.number().int().positive().default(1),
 });
 
 const createWorldPayload = z.object({
@@ -369,6 +381,29 @@ const handlers: Record<string, CommandHandler> = {
     ).execute(world.value.worldId);
     if (!result.ok) return result;
     return succeed({ resource: `round:${result.value.roundNumber}` });
+  },
+
+  /**
+   * A compra de verdade (C6/R-192). Dinheiro, contrato e elenco num só commit —
+   * ou os três, ou nenhum. A taxa é validada na faixa da R-26 dentro do domínio.
+   */
+  "market:sign-player": async ({ worlds, transferUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = signPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SignPlayer(transferUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      buyingClubId: parsed.data.buyingClubId,
+      sellerClubId: parsed.data.sellerClubId,
+      playerId: parsed.data.playerId,
+      feeMinor: parsed.data.feeMinor,
+      currentSeason: parsed.data.currentSeason,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

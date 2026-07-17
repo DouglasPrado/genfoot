@@ -381,6 +381,72 @@ circulando": ele deriva do razão.
 
 ---
 
+### R-192 — A transferência é UM efeito atômico sobre três contextos. Ela paga a dívida da R-189.
+
+A compra de verdade — o técnico contrata um jogador de outro clube — é a primeira
+coisa que amarra C6, C9 e C3 num só ato, e ela fecha a dívida que a
+[R-189](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco-sem-contrato-e-assume-a-dívida)
+deixou aberta: "o primeiro command de transferência TEM que vir com o contrato, ou
+o elenco começa a mentir".
+
+**Uma transferência é UMA transação com três efeitos indivisíveis:**
+
+1. **O dinheiro anda (C9).** Um `JournalEntry` de classe `TRANSFER`: credita o
+   caixa do comprador (ativo cai) e debita o do vendedor (ativo sobe), pelo valor
+   da taxa. `Σ débitos = Σ créditos` — não há faucet nem sink, o dinheiro só troca
+   de mãos, e a oferta monetária do mundo não muda (ECO-003).
+2. **O vínculo nasce (C6).** Um `PlayerContract` ACTIVE para (jogador, comprador)
+   — a fonte AUTORITATIVA do vínculo (Q5). É isto que paga a R-189: o jogador da
+   gênese, que só tinha elenco, ganha contrato.
+3. **A projeção segue (C3).** A `SquadMembership` sai do elenco do vendedor e
+   entra no do comprador. O elenco é PROJEÇÃO do contrato (Q5); mover a membership
+   sem o contrato é o que a R-189 chamou de "elenco mentindo".
+
+Ou os três acontecem, ou nenhum. Meio efeito é um jogador pago e não entregue, ou
+entregue e não pago — corrupção. Um `TransferUnitOfWork` os grava no mesmo commit.
+
+**A taxa respeita a R-26:** entre 40% e 250% do valor de mercado estimado (R-41).
+Abaixo é roubo, acima é lavagem — os dois quebram a economia fechada. O domínio
+recusa fora da faixa antes de gravar.
+
+**Consequência aceita:** o salário do contrato é calibração de primeira passada
+(fração do valor), como o preço da R-41 — até a economia ter a fórmula fina. E a
+transferência ainda NÃO paga salário nem luvas; ela move a TAXA (comprador→vendedor)
+e cria a obrigação futura (o salário, que o ralo `SYS_WAGE_SINK` consome por
+temporada quando o ciclo econômico existir). Pagar a taxa e assinar o contrato é o
+átomo mínimo do mercado; o resto do ciclo (folha, luvas, cláusula) entra depois.
+
+---
+
+### R-193 — O elenco nasce com 23, mas o teto de registro é 30. Sem folga, o mercado nasce travado.
+
+Provar a R-192 por HTTP expôs uma sobre-restrição do código: `SQUAD_SIZE = 23`
+era, ao mesmo tempo, o **preenchimento inicial** da gênese e o **teto rígido** do
+`Squad.assign`. Como a gênese enche cada clube com exatamente 23, **todo elenco
+nascia cheio** — a primeira contratação batia em `SQUAD_CAPACITY_EXCEEDED` e o
+mercado da R-192 morria na largada.
+
+A [R-57](#) fala em "elenco **inicial** com 23 jogadores" — *inicial*, não
+*máximo*. O teto nunca foi ratificado; o código o inventou colando os dois números.
+
+**Separa-se o preenchimento do teto:**
+
+- `SQUAD_SIZE = 23` — quanto a gênese materializa por clube (R-57, o teto comum de
+  largada, GDD §1). Inalterado.
+- `MAX_SQUAD_SIZE = 30` — o teto de **registro**: o elenco recebe reforços até 30.
+  A folga de 7 vagas é o que permite contratar sem primeiro vender. É constante, não
+  coluna — comum a todos os clubes, pela mesma justiça de largada da R-190.
+
+`Squad` (criação e `assign`) passa a medir contra `MAX_SQUAD_SIZE`. A gênese não
+muda: nasce 23, cabe até 30.
+
+**Consequência aceita:** 30 é calibração de primeira passada — um teto de trabalho
+plausível para o elenco sênior; quando as categorias de base (#34) e a janela de
+registro existirem, o número se refina. O que a decisão fixa agora é a *separação*
+entre largada e teto, não o valor exato.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

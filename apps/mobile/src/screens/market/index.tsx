@@ -9,9 +9,15 @@ import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
+import { CommandTrackingStatus } from "@grinta/core";
+
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldQuery } from "@/lib/world";
+import { useWorldId, useWorldQuery } from "@/lib/world";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -65,8 +71,11 @@ const SECTOR: Readonly<Record<string, Filter>> = {
 
 /** Mercado: a vitrine de jogadores do mundo, com valor estimado (R-41). */
 export function Market() {
-  const { session, status } = useSession();
+  const { session, status, client, contractVersion } = useSession();
+  const worldId = useWorldId();
   const [filter, setFilter] = useState<Filter>("TODOS");
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -91,6 +100,55 @@ export function Market() {
     clubQuery.refetch();
     marketQuery.refetch();
   }, [clubQuery.refetch, marketQuery.refetch]);
+
+  /**
+   * A compra de verdade (R-192). Oferta a 100% do valor estimado — dentro da
+   * faixa da R-26 (40–250%) —, o servidor decide (não presume sucesso). Ao
+   * aplicar, o elenco e o caixa mudam: refaz clube e mercado.
+   */
+  const signPlayer = useCallback(
+    (p: MarketPlayer) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const idempotencyKey = `sign:${managedClub.id}:${p.playerId}`;
+      setSigningId(p.playerId);
+      setTracking({
+        status: CommandTrackingStatus.SUBMITTING,
+        commandId: null,
+        resource: null,
+        correlationId: `mobile:${idempotencyKey}`,
+        errorCode: null,
+      });
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "market:sign-player",
+        worldId,
+        payload: {
+          buyingClubId: managedClub.id,
+          sellerClubId: p.clubId,
+          playerId: p.playerId,
+          // Minor units, string — a taxa é o valor cheio (100%).
+          feeMinor: p.valueMinor,
+          currentSeason: 1,
+        },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setTracking(result);
+        setSigningId(null);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          clubQuery.refetch();
+          marketQuery.refetch();
+        }
+      });
+    },
+    [client, clubQuery, contractVersion, managedClub, marketQuery, worldId],
+  );
 
   const players = useMemo(() => {
     const all = marketQuery.data?.players ?? [];
@@ -167,6 +225,8 @@ export function Market() {
                 label: p.primaryPosition,
                 tint: color.textMuted,
               };
+              const own = p.clubId === managedClub.id;
+              const busy = signingId === p.playerId;
               return (
                 <View key={p.playerId} style={styles.row}>
                   <View style={[styles.posBadge, { backgroundColor: pos.tint }]}>
@@ -177,22 +237,51 @@ export function Market() {
                       {p.name}
                     </Text>
                     <Text style={styles.club} numberOfLines={1}>
-                      {p.clubName} · {p.age} anos
+                      {p.clubName} · {p.age} anos · R${" "}
+                      {formatAmount(Number(p.valueMinor) / 100)}
                     </Text>
                   </View>
                   <Text style={styles.ovr}>{p.overall}</Text>
-                  <Text style={styles.value}>
-                    R$ {formatAmount(Number(p.valueMinor) / 100)}
-                  </Text>
+                  {own ? (
+                    <Text style={styles.ownTag}>SEU</Text>
+                  ) : (
+                    <Pressable
+                      onPress={() => signPlayer(p)}
+                      disabled={busy || signingId !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Contratar ${p.name}`}
+                      accessibilityState={{ disabled: busy || signingId !== null }}
+                      style={[styles.signBtn, busy && styles.signBtnBusy]}
+                    >
+                      <Text style={styles.signText}>
+                        {busy ? "..." : "CONTRATAR"}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               );
             })
           )}
         </Card>
 
+        {tracking !== null &&
+          tracking.status === CommandTrackingStatus.REJECTED && (
+            <Text style={styles.error}>
+              Contratação recusada: {tracking.errorCode ?? "erro"}.
+            </Text>
+          )}
+        {tracking !== null &&
+          (tracking.status === CommandTrackingStatus.ACCEPTED ||
+            tracking.status === CommandTrackingStatus.APPLIED) && (
+            <Text style={styles.ok}>
+              Contratado. Caixa e elenco atualizados.
+            </Text>
+          )}
+
         <Text style={styles.note}>
-          Valor estimado (R-41). A negociação de verdade — contrato e dinheiro —
-          chega quando o mercado abrir.
+          Valor estimado (R-41). A oferta sai a 100% do valor — a taxa fica na
+          faixa da R-26 (40–250%). Dinheiro, contrato e elenco mudam num só ato
+          (R-192).
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -256,10 +345,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
   },
-  value: {
+  signBtn: {
     minWidth: 96,
-    textAlign: "right",
-    color: color.primary,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+    alignItems: "center",
+  },
+  signBtnBusy: { backgroundColor: color.surface },
+  signText: {
+    color: color.background,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  ownTag: {
+    minWidth: 96,
+    textAlign: "center",
+    color: color.textMuted,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
@@ -267,6 +370,18 @@ const styles = StyleSheet.create({
     color: color.textMuted,
     fontSize: fontSize.sm,
     paddingVertical: space.sm,
+  },
+  error: {
+    color: color.danger,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+    paddingHorizontal: space.xs,
+  },
+  ok: {
+    color: color.primary,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+    paddingHorizontal: space.xs,
   },
   note: { color: color.textMuted, fontSize: fontSize.xs, paddingHorizontal: space.xs },
 });

@@ -40,3 +40,22 @@ export function estimatePlayerValueMinor(overall: number, age: number): bigint {
   const value = Number(BASE_VALUE_MINOR) * skill * ageFactor(age);
   return BigInt(Math.round(value));
 }
+
+/**
+ * Salário por temporada estimado — calibração de primeira passada (R-192).
+ *
+ * Uma fração do valor de mercado: um jogador de R$2M ganha ~R$100k por temporada.
+ * É o número que o contrato grava até a economia ter a fórmula fina de folha. Não
+ * é pago na transferência — é a obrigação futura que o ralo de salários consome
+ * por temporada quando o ciclo econômico existir.
+ */
+export function estimateSalaryPerSeasonMinor(valueMinor: bigint): bigint {
+  return valueMinor / 20n;
+}
+
+/** A taxa de transferência é válida em [40%, 250%] do valor de mercado — R-26. */
+export function isTransferFeeInRange(feeMinor: bigint, valueMinor: bigint): boolean {
+  const floor = (valueMinor * 40n) / 100n;
+  const ceiling = (valueMinor * 250n) / 100n;
+  return feeMinor >= floor && feeMinor <= ceiling;
+}

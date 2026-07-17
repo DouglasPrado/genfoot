@@ -103,3 +103,5 @@ export * from "./matches/play-next-round.js";
 export * from "./matches/matches-read-model.js";
 export * from "./players/player-value.js";
 export * from "./players/market-read-model.js";
+export * from "./contracts/contract-types.js";
+export * from "./contracts/transfer-player.js";
