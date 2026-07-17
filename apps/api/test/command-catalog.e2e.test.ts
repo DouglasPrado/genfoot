@@ -119,6 +119,8 @@ describe("API command catalog integrity (e2e)", () => {
       "club-detail",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
+      // A torcida (C10, M-25): headcount, paciência da diretoria, pressão.
+      "fanbase",
       "identity",
       "identity-detail",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).

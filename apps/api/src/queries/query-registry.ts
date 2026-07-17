@@ -6,6 +6,7 @@ import type {
   CompetitionReadModel,
   MatchesReadModel,
   MarketReadModel,
+  FanbaseReadModel,
 } from "@grinta/core";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
@@ -31,6 +32,7 @@ export interface QueryContext {
   readonly competitionReadModel: CompetitionReadModel;
   readonly matchesReadModel: MatchesReadModel;
   readonly marketReadModel: MarketReadModel;
+  readonly fanbaseReadModel: FanbaseReadModel;
 }
 
 /**
@@ -78,6 +80,19 @@ const handlers: Record<string, QueryHandler> = {
       );
     }
     return succeed(await squadReadModel.roster(worldId, clubId));
+  },
+  fanbase: async ({ fanbaseReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "fanbase exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await fanbaseReadModel.fanbaseForClub(worldId, clubId));
   },
 };
 

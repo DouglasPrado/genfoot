@@ -53,6 +53,13 @@ import {
 
 type IoniconName = IconName;
 
+interface FanbaseProjection {
+  readonly clubId: string;
+  readonly headcount: number;
+  readonly boardPatience: number;
+  readonly pressureLevel: number;
+}
+
 interface LedgerSummaryProjection {
   readonly accountCount: number;
   readonly transactionCount: number;
@@ -98,6 +105,12 @@ export function Club() {
     clubQuery.data,
     controlStep.kind === "complete" ? controlStep.clubId : null,
   );
+  // A torcida (C10): headcount, paciência da diretoria e pressão, recortados pelo
+  // clube gerido. Só dispara com o clubId em mãos.
+  const fanbaseQuery = useWorldQuery<FanbaseProjection>(
+    managedClub === null ? null : "fanbase",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const vm =
     managedClub === null
       ? null
@@ -137,10 +150,11 @@ export function Club() {
             crestTemplateId: managedClub.crestTemplateId,
           }
         : defaultVisualIdentity(managedClub.name);
-  const fanbaseSize =
-    narrativeQuery.data?.clubs?.find(
-      (entry) => entry.clubId === managedClub?.id,
-    )?.fanbaseSize ?? null;
+  // A torcida vem de C10 agora (query `fanbase`), não mais do projeção de
+  // narrativa que devolvia 0. `headcount` é o tamanho; a paciência e a pressão
+  // ganham o card próprio abaixo.
+  const fanbase = fanbaseQuery.data;
+  const fanbaseSize = fanbase?.headcount ?? null;
   const takenNames = (clubQuery.data?.clubs ?? [])
     .filter((club) => club.id !== managedClub?.id)
     .map((club) => normalizeClubName(club.name));
@@ -298,12 +312,14 @@ export function Club() {
     // tudo menos no caixa — o saldo ficava colado no valor da última montagem.
     ledgerQuery.refetch();
     narrativeQuery.refetch();
+    fanbaseQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
     worldQuery.refetch,
     ledgerQuery.refetch,
     narrativeQuery.refetch,
+    fanbaseQuery.refetch,
   ]);
   const screenState = deriveScreenState({
     session: status,
@@ -430,6 +446,50 @@ export function Club() {
                 {ledgerQuery.state === "loading"
                   ? "Sincronizando o livro financeiro…"
                   : "O financeiro ainda não existe neste mundo. Nenhum saldo estimado será exibido."}
+              </Text>
+            </View>
+          )}
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="TORCIDA"
+            trailing={<Icon name="people" size={16} color={color.textMuted} />}
+          />
+          {fanbaseQuery.state === "ready" && fanbase !== null ? (
+            <View style={styles.financeContent}>
+              <View style={styles.finBalance}>
+                <Text style={styles.finBoxLabel}>TAMANHO DA TORCIDA</Text>
+                <Text style={styles.finBalanceValue}>
+                  {formatAmount(fanbase.headcount)}
+                </Text>
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PACIÊNCIA DA DIRETORIA</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.boardPatience}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.boardPatience / 100} height={6} />
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PRESSÃO</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.pressureLevel}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.pressureLevel / 100} height={6} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.financeUnavailable}>
+              <Icon name="people" size={18} color={color.textMuted} />
+              <Text style={styles.financeUnavailableText}>
+                {fanbaseQuery.state === "loading"
+                  ? "Sincronizando a torcida…"
+                  : "A torcida ainda não existe neste mundo."}
               </Text>
             </View>
           )}
@@ -654,6 +714,22 @@ const styles = StyleSheet.create({
   repBar: { flex: 1 },
   financeContent: { gap: space.sm },
   finGrid: { flexDirection: "row", gap: space.sm },
+  fanMeter: {
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.sm,
+    padding: space.md,
+    gap: space.xs,
+  },
+  fanMeterHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  fanMeterValue: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
   finBalance: {
     backgroundColor: color.primaryDim,
     borderRadius: radius.sm,

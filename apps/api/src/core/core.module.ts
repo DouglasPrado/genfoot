@@ -8,6 +8,7 @@ import {
   PrismaCompetitionReadModel,
   PrismaMatchesReadModel,
   PrismaMarketReadModel,
+  PrismaFanbaseReadModel,
   PrismaClubRepository,
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
@@ -30,6 +31,7 @@ import {
   COMPETITION_READ_MODEL,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
+  FANBASE_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
@@ -128,6 +130,12 @@ import {
         new PrismaMarketReadModel(client),
     },
     {
+      provide: FANBASE_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaFanbaseReadModel =>
+        new PrismaFanbaseReadModel(client),
+    },
+    {
       provide: CLUB_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubUnitOfWork =>
@@ -191,6 +199,7 @@ import {
     COMPETITION_READ_MODEL,
     MATCHES_READ_MODEL,
     MARKET_READ_MODEL,
+    FANBASE_READ_MODEL,
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,

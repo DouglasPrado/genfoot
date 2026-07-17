@@ -447,6 +447,39 @@ entre largada e teto, não o valor exato.
 
 ---
 
+### R-194 — A torcida nasce na gênese: um headcount determinístico. Os 8 segmentos vêm depois.
+
+A tela do Clube degradava a torcida ("omite a torcida", herança do extermínio
+R-175): os 16 clubes nasciam com `fanBaseSize = 0`. C10 abre com o mínimo que
+acende essa seção — o **tamanho** da torcida —, deixando a máquina de reação para
+o passo seguinte.
+
+**O que a gênese materializa (C10 vertical A):**
+
+- `fanBaseSize` — determinístico por `(seed, clubIndex)`, o mesmo índice do resto
+  da gênese (R-182). A curva é enviesada para baixo (f²): "todos nascem pequenos"
+  (GDD §1), muitos clubes pequenos e poucos grandes, na faixa [800, 45.000].
+- `boardPatience = 50` e `pressureLevel = 0` — **neutros**. Um mundo recém-nascido
+  não tem histórico; paciência e pressão só ganham valor quando o motor de reação
+  (§2 da spec, R-69) processar partidas e decisões. Materializá-los diferentes de
+  neutro na largada seria inventar um passado que não existe.
+
+**Fronteira aceita (R-183):** a torcida vive em colunas do `Club` (`fanBaseSize`,
+`boardPatience`, `pressureLevel`) que C3 não escreve de propósito — C10 é o dono
+delas. Na gênese, uma escrita única dentro da transação atômica, idempotente por
+clube (`WHERE fanBaseSize = 0`). Ainda **não é agregado versionado**: vira root com
+contenção quando o motor de reação existir (a partida altera a pressão em paralelo
+à edição do técnico).
+
+**O que isto NÃO é (o que falta para fechar C10):** os 8 segmentos da R-68
+(`FanSegment` com share/satisfação/vocalidade), a satisfação contínua e sua
+histerese (R-69), a expectativa (§3), a pressão ponderada por vocalidade, as
+rivalidades (R-70) e a `BoardPromise` (que a reescrita já apontou como três modelos
+incompatíveis — pendência aberta). Aqui a torcida é um número; a segmentação e a
+reação são o próximo passo.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

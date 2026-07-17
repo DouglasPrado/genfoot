@@ -11,6 +11,7 @@ import type { ClubRepository } from "../clubs/club-repository.js";
 import { Club } from "../clubs/club.js";
 import { Squad } from "../clubs/squad.js";
 import { buildCompetitionGenesis } from "../competitions/competition-bootstrap.js";
+import { buildFanbaseGenesis } from "../fanbase/fanbase-bootstrap.js";
 import { buildLedgerGenesis } from "../finance/ledger-bootstrap.js";
 import { Player } from "../players/player.js";
 import {
@@ -114,6 +115,7 @@ export class GenerateWorldGenesis {
     const squads = buildSquadsFromGenesis(world, genesis);
     const ledger = buildLedgerGenesis(world, genesis);
     const competition = buildCompetitionGenesis(world, genesis);
+    const fanbases = buildFanbaseGenesis(world, genesis);
 
     // Reidrata tudo ANTES de abrir a transação: um snapshot inválido é erro de
     // gênese, não de banco, e não deve deixar uma transação meio aberta.
@@ -135,6 +137,9 @@ export class GenerateWorldGenesis {
       any = (await materializeClubs(repositories, clubs)) || any;
       any = (await materializePlayers(repositories, world, players)) || any;
       any = (await materializeSquads(repositories, squads)) || any;
+      // A torcida depois dos clubes: ela mora em colunas do `Club` (a FK do
+      // seed é o próprio clube). Idempotente por clube (só semeia quem está zerado).
+      await repositories.fanbase.seedFanbases(world.id, fanbases);
       // O razão por último: a conta de caixa e a dotação de cada clube dependem
       // de o clube já existir (a FK da conta aponta para o clube).
       any = (await materializeLedger(repositories, ledger)) || any;
