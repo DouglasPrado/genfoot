@@ -92,3 +92,7 @@ export * from "./finance/journal-entry.js";
 export * from "./finance/ledger-read-model.js";
 export * from "./finance/ledger-repository.js";
 export * from "./finance/ledger-bootstrap.js";
+export * from "./competitions/competition-types.js";
+export * from "./competitions/competition-bootstrap.js";
+export * from "./competitions/competition-repository.js";
+export * from "./competitions/standings.js";
