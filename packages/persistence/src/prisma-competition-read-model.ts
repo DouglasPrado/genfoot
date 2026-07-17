@@ -57,21 +57,43 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
         m.resultStatus === "NORMAL",
     );
 
+    const clubIds = edition.clubs.map((c) => c.clubId);
+    const names = await this.clubNames(gameWorldId, clubIds);
+    const table = buildStandings(
+      clubIds,
+      finished.map((m) => ({
+        homeClubId: m.homeClubId,
+        awayClubId: m.awayClubId,
+        homeGoals: m.homeGoals,
+        awayGoals: m.awayGoals,
+      })),
+    );
+
     return {
       competitionId: competition.id,
       competitionName: competition.name,
       seasonNumber: 1,
       totalMatches: matches.length,
       playedMatches: finished.length,
-      table: buildStandings(
-        edition.clubs.map((c) => c.clubId),
-        finished.map((m) => ({
-          homeClubId: m.homeClubId,
-          awayClubId: m.awayClubId,
-          homeGoals: m.homeGoals,
-          awayGoals: m.awayGoals,
-        })),
-      ),
+      table: table.map((row) => ({
+        ...row,
+        clubName: names.get(row.clubId)?.name ?? "—",
+        shortCode: names.get(row.clubId)?.shortCode ?? "",
+      })),
     };
+  }
+
+  /** O nome vigente de cada clube (BC-003: o período com `effectiveThrough` nulo). */
+  private async clubNames(
+    gameWorldId: GameWorldId,
+    clubIds: readonly string[],
+  ): Promise<Map<string, { name: string; shortCode: string }>> {
+    const periods = await this.client.clubIdentityPeriod.findMany({
+      where: { gameWorldId, clubId: { in: [...clubIds] }, effectiveThrough: null },
+      select: { clubId: true, name: true, shortCode: true },
+    });
+    return new Map(
+      periods.map((p) => [p.clubId, { name: p.name, shortCode: p.shortCode }]),
+    );
   }
 }
