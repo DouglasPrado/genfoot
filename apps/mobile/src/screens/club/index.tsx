@@ -75,6 +75,16 @@ export function Club() {
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
+  /**
+   * `ledger` (C9) e `narrative` (C11) foram apagados no extermínio (R-175) e
+   * respondem 404. As duas queries FICAM, e a tela já fazia a coisa certa:
+   * degrada dizendo "Nenhum saldo estimado será exibido" e omite a torcida em
+   * vez de inventar número.
+   *
+   * Não mockei dinheiro aqui, e a diferença para o admin é deliberada: lá o mock
+   * leva selo e o operador sabe ler; aqui o jogador contrataria em cima de um
+   * número inventado. Volta com C9 — e aí a tela liga sozinha.
+   */
   const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -160,19 +170,18 @@ export function Club() {
       void submitTrackedCommand(client, {
         clientContractVersion: "v1",
         serverContractVersion: contractVersion,
-        commandType: "club:command",
+        // `club:command` morreu com o `WorldClubPortfolio` (R-175). O command
+        // agora é o do catálogo: `ApplyClubIdentity` (`:386`, MF-25).
+        commandType: "club:apply-identity",
         worldId,
-        expectedVersion: managedClub.version,
         payload: {
           clubId: managedClub.id,
-          actorId: session?.subject ?? "mobile",
-          occurredAt: worldDate,
-          command: {
-            type: "UpdateClubVisualIdentity",
-            name: input.name,
-            shortCode: input.shortCode,
-            visualIdentity: input.visualIdentity,
-          },
+          // Concorrência otimista por agregado (R-175): vai no PAYLOAD, que é
+          // onde o command a lê.
+          expectedVersion: managedClub.version,
+          name: input.name,
+          shortCode: input.shortCode,
+          visualIdentity: input.visualIdentity,
         },
         idempotencyKey,
         correlationId: `mobile:${idempotencyKey}`,
@@ -194,7 +203,6 @@ export function Club() {
       contractVersion,
       managedClub,
       narrativeQuery,
-      session?.subject,
       worldId,
       worldQuery.data?.currentDate,
     ],
@@ -285,12 +293,10 @@ export function Club() {
   const refresh = useCallback(() => {
     clubQuery.refetch();
     identityQuery.refetch();
-    ledgerQuery.refetch();
     worldQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
-    ledgerQuery.refetch,
     worldQuery.refetch,
   ]);
   const screenState = deriveScreenState({
@@ -417,7 +423,7 @@ export function Club() {
               <Text style={styles.financeUnavailableText}>
                 {ledgerQuery.state === "loading"
                   ? "Sincronizando o livro financeiro…"
-                  : "O financeiro do clube ainda não foi inicializado. Nenhum saldo estimado será exibido."}
+                  : "O financeiro ainda não existe neste mundo. Nenhum saldo estimado será exibido."}
               </Text>
             </View>
           )}
