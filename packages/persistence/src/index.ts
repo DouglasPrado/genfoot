@@ -29,3 +29,4 @@ export * from "./prisma-matches-read-model.js";
 export * from "./prisma-market-read-model.js";
 export * from "./prisma-contract-repository.js";
 export * from "./prisma-transfer-unit-of-work.js";
+export * from "./prisma-season-finance-unit-of-work.js";

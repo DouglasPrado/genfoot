@@ -1,7 +1,9 @@
 import {
   ActivateProvisionedWorld,
+  AdvanceWorldDays,
   ApplyClubIdentity,
   ArchiveWorld,
+  CloseSeasonFinances,
   ConfirmOnboarding,
   CreateWorld,
   DeleteWorld,
@@ -18,12 +20,15 @@ import {
   ResumeWorld,
   SetWorldIdentity,
   type ClubControlRepository,
+  type ClubReadModel,
   type ClubUnitOfWork,
   type GenesisUnitOfWork,
   type MatchPlayRepository,
+  type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
+  type WorldDomainEvent,
   type WorldMutationResult,
   type WorldRepository,
 } from "@grinta/core";
@@ -78,6 +83,10 @@ export interface CommandContext {
   readonly matchPlay: MatchPlayRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
+  /** C9 — o débito de custos de UM clube no encerramento de temporada. */
+  readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
+  /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
+  readonly clubReadModel: ClubReadModel;
   /**
    * Quem agiu — a conta do JOGO, vinda da SESSÃO.
    *
@@ -155,6 +164,10 @@ const createWorldPayload = z.object({
   seed: z.string().min(1),
   startDate: z.string(),
   rulesetVersion: z.string().default("1.0.0"),
+});
+
+const advanceDaysPayload = z.object({
+  days: z.number().int().positive(),
 });
 
 /**
@@ -372,6 +385,59 @@ const handlers: Record<string, CommandHandler> = {
    * determinístico a partir da força dos elencos — não é definido por ninguém.
    * A tabela (projeção, R-178) se preenche sozinha depois.
    */
+  /**
+   * Avança o relógio do mundo N dias (dev/admin). Ao cruzar a fronteira de
+   * temporada (`SeasonRolledOver`), roda o ENCERRAMENTO por clube: debita os
+   * custos da temporada que acabou no caixa de cada um (passo 14 do motor de
+   * virada). Cada débito é idempotente por (clube, temporada) — reavançar não
+   * cobra duas vezes. Sem receita materializada ainda, isso só drena o caixa: a
+   * insolvência progressiva é o comportamento assumido (R-45), não um bug.
+   */
+  "world:advance-days": async ({
+    worlds,
+    clubReadModel,
+    seasonFinanceUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = advanceDaysPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const advanced = await new AdvanceWorldDays(worlds).execute(
+      world.value.worldId,
+      parsed.data.days,
+    );
+    if (!advanced.ok) return advanced;
+
+    const rollovers = advanced.value.events.filter(
+      (event): event is Extract<WorldDomainEvent, { type: "SeasonRolledOver" }> =>
+        event.type === "SeasonRolledOver",
+    );
+    if (rollovers.length > 0) {
+      const worldView = await clubReadModel.worldView(world.value.worldId);
+      const closer = new CloseSeasonFinances(seasonFinanceUnitOfWork);
+      for (const rollover of rollovers) {
+        for (const club of worldView.clubs) {
+          // Uma falha num clube não derruba a virada dos outros — o débito é
+          // por clube e idempotente; o que faltar reprocessa no próximo avanço.
+          await closer.execute({
+            gameWorldId: world.value.worldId,
+            clubId: club.id,
+            seasonNumber: rollover.payload.seasonNumber,
+            worldSeed: advanced.value.world.seed,
+            occurredOn: advanced.value.world.currentDate,
+          });
+        }
+      }
+    }
+
+    return succeed({
+      resource: `world:${world.value.worldId}`,
+      mutation: advanced.value,
+    });
+  },
+
   "world:play-round": async ({ worlds, matchPlay, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

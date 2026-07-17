@@ -16,6 +16,7 @@ import {
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
   PrismaTransferUnitOfWork,
+  PrismaSeasonFinanceUnitOfWork,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
   PrismaIdentityUnitOfWork,
@@ -41,6 +42,7 @@ import {
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
+  SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_READ_MODEL,
@@ -176,6 +178,12 @@ import {
         new PrismaTransferUnitOfWork(client),
     },
     {
+      provide: SEASON_FINANCE_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaSeasonFinanceUnitOfWork =>
+        new PrismaSeasonFinanceUnitOfWork(client),
+    },
+    {
       provide: CLUB_CONTROL_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubControlRepository =>
@@ -222,6 +230,7 @@ import {
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
+    SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,
