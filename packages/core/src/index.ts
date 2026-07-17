@@ -100,3 +100,6 @@ export * from "./competitions/competition-read-model.js";
 export * from "./matches/match-simulation.js";
 export * from "./matches/match-play-repository.js";
 export * from "./matches/play-next-round.js";
+export * from "./matches/matches-read-model.js";
+export * from "./players/player-value.js";
+export * from "./players/market-read-model.js";

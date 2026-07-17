@@ -121,6 +121,10 @@ describe("API command catalog integrity (e2e)", () => {
       "identity-detail",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
+      // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.
+      "market",
+      // O calendário e os resultados (M-05, lista).
+      "matches",
       // O elenco (M-03): recorte fino por clubId. Faltava aqui — eu registrei o
       // handler e não atualizei esta lista, o mesmo descuido do club:apply-identity.
       "roster",
