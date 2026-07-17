@@ -17,6 +17,7 @@ export const CLUB_REPOSITORY = "CLUB_REPOSITORY";
  */
 export const CLUB_READ_MODEL = "CLUB_READ_MODEL";
 export const SQUAD_READ_MODEL = "SQUAD_READ_MODEL";
+export const LEDGER_READ_MODEL = "LEDGER_READ_MODEL";
 /** Escopo transacional de C3 (Decisão 19.10): clube + evento no mesmo commit. */
 export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
 export const GENESIS_UNIT_OF_WORK = "GENESIS_UNIT_OF_WORK";

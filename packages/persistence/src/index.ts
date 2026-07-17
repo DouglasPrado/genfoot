@@ -16,3 +16,4 @@ export * from "./prisma-squad-repository.js";
 export * from "./prisma-genesis-unit-of-work.js";
 export * from "./prisma-squad-read-model.js";
 export * from "./prisma-ledger-repository.js";
+export * from "./prisma-ledger-read-model.js";

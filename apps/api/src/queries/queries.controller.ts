@@ -1,4 +1,9 @@
-import type { ClubReadModel, SquadReadModel, WorldReadModel } from "@grinta/core";
+import type {
+  ClubReadModel,
+  LedgerReadModel,
+  SquadReadModel,
+  WorldReadModel,
+} from "@grinta/core";
 import {
   Controller,
   Get,
@@ -24,6 +29,7 @@ import {
   IDENTITY_READ_MODEL,
   CLUB_READ_MODEL,
   SQUAD_READ_MODEL,
+  LEDGER_READ_MODEL,
   OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
@@ -62,6 +68,7 @@ export class QueriesController {
   constructor(
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
     @Inject(SQUAD_READ_MODEL) private readonly squadReadModel: SquadReadModel,
+    @Inject(LEDGER_READ_MODEL) private readonly ledgerReadModel: LedgerReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -230,6 +237,7 @@ export class QueriesController {
         identityReadModel: this.identityReadModel,
         clubReadModel: this.clubReadModel,
         squadReadModel: this.squadReadModel,
+        ledgerReadModel: this.ledgerReadModel,
       },
       worldId.value,
       query,

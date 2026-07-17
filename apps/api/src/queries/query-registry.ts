@@ -2,6 +2,7 @@ import type {
   ClubReadModel,
   IdentityReadModel,
   SquadReadModel,
+  LedgerReadModel,
 } from "@grinta/core";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
@@ -23,6 +24,7 @@ export interface QueryContext {
   readonly identityReadModel: IdentityReadModel;
   readonly clubReadModel: ClubReadModel;
   readonly squadReadModel: SquadReadModel;
+  readonly ledgerReadModel: LedgerReadModel;
 }
 
 /**
@@ -46,6 +48,8 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await identityReadModel.summary(worldId)),
   "identity-detail": async ({ identityReadModel }, worldId) =>
     succeed(await identityReadModel.worldView(worldId)),
+  ledger: async ({ ledgerReadModel }, worldId) =>
+    succeed(await ledgerReadModel.summary(worldId)),
   roster: async ({ squadReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     if (clubId === null) {

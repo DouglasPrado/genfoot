@@ -4,6 +4,7 @@ import {
   PrismaClubControlRepository,
   PrismaClubReadModel,
   PrismaSquadReadModel,
+  PrismaLedgerReadModel,
   PrismaClubRepository,
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
@@ -20,6 +21,7 @@ import {
   CLUB_CONTROL_REPOSITORY,
   CLUB_READ_MODEL,
   SQUAD_READ_MODEL,
+  LEDGER_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
@@ -92,6 +94,12 @@ import {
         new PrismaSquadReadModel(client),
     },
     {
+      provide: LEDGER_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaLedgerReadModel =>
+        new PrismaLedgerReadModel(client),
+    },
+    {
       provide: CLUB_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubUnitOfWork =>
@@ -139,6 +147,7 @@ import {
     CLUB_REPOSITORY,
     CLUB_READ_MODEL,
     SQUAD_READ_MODEL,
+    LEDGER_READ_MODEL,
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
