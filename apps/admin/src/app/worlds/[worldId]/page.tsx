@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { ClubsTable, type ClubRow } from "@/components/clubs-table";
 import { CommandConsole } from "@/components/command-console";
+import { CompetitionsPanel } from "@/components/competitions-panel";
 import { Mock, MockNotice } from "@/components/mock";
 import { QuickActions } from "@/components/quick-actions";
 import { SeasonHistory } from "@/components/season-history";
@@ -217,6 +218,7 @@ export default function WorldDetailPage() {
         <Tabs defaultValue="clubes">
           <TabsList>
             <TabsTrigger value="clubes">Clubes</TabsTrigger>
+            <TabsTrigger value="competicoes">Competições</TabsTrigger>
             <TabsTrigger value="temporadas">Temporadas</TabsTrigger>
             <TabsTrigger value="console">Console</TabsTrigger>
           </TabsList>
@@ -229,6 +231,24 @@ export default function WorldDetailPage() {
               </CardHeader>
               <CardContent>
                 <ClubsTable worldId={worldId} clubs={clubs} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="competicoes">
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Competições · temporada {competicoes.temporada}
+                </CardTitle>
+                <Mock contexto="C7 + C5 + C4" />
+              </CardHeader>
+              <CardContent>
+                <CompetitionsPanel
+                  worldId={worldId}
+                  clubs={clubs}
+                  temporada={competicoes.temporada}
+                />
               </CardContent>
             </Card>
           </TabsContent>
