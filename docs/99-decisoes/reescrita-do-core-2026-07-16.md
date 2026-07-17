@@ -1,4 +1,4 @@
-# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-186
+# Reescrita do core: agregados, eventos, tempo, dinheiro — R-175 a R-187
 
 > **Status:** CANÔNICO / RATIFICADO · **Data:** 2026-07-16 · **Autoridade:** decisão do dono do produto · **Escopo:** `packages/core`, `prisma/schema.prisma`, todos os 16 contextos
 
@@ -193,6 +193,22 @@ Achado ao provar `identity:confirm-onboarding` por HTTP — 544 testes verdes n�
 O último não é cosmético. `CLUB_TAKEN` **fundia dois códigos canônicos em um**: o domínio já distinguia "reservado por outro" de "já tem gestor" em branches separados (`identity-commands.ts:447,454`) e emitia o mesmo código. Reserva é retenção **mole com prazo** (R-25) — o clube volta em minutos; controle ativo é dono. O cliente não tinha como saber se esperava ou desistia. Nenhum cliente dependia dos nomes antigos (grep em `apps/mobile`, `apps/admin`, `api-client`: zero), então alinhar não quebrou ninguém.
 
 **A lição, que já é a quinta vez:** teste verde concorda consigo mesmo. A borda só se prova atravessando-a.
+
+### R-187 — Um comando, um evento. `ClubIdentityPeriod` não é root.
+
+Achado ao devolver o BC-003 (task #22), e forçado por teste — não por leitura.
+
+O [catálogo](../02-tecnico/10-catalogo-de-commands.md) promete DOIS eventos para `ApplyClubIdentity` (`:390`): `ClubIdentityApplied` **+ `ClubIdentityPeriodOpened` quando muda identidade oficial**. O `DomainEventLog` recusa: `@@unique([gameWorldId, aggregateType, aggregateId, aggregateVersion])` (R-176) — **um evento por versão de agregado**, porque duas linhas na mesma versão são duas histórias.
+
+A saída óbvia seria dizer que o período é outro agregado — o [context map:77](../02-tecnico/12-context-map-e-blueprint.md) o lista como root. **É falso, e o físico prova:** `ClubIdentityPeriod` não tem coluna `version`. E pela régua que a R-183 estabeleceu — *root é o que precisa de fronteira própria por **contenção*** — ele não é: ninguém disputa o período de um clube com outro clube, e `Club.updateIdentity` o muta de dentro. É a mesma lista feita por **vocabulário** que já promovera departamento e estádio.
+
+O teste fechou o argumento: rebranding no mesmo dia lógico **substitui** o período aberto (regra de `5f1c654`) — mesmo id, mesma "versão 1". Dois `ClubIdentityPeriodOpened` para o mesmo período. **Um root de verdade não tem duas versões 1.**
+
+Portanto: **um comando, um fato, um evento.** `ClubIdentityApplied` carrega `periodOpened: boolean`, e a distinção que o catálogo queria sobrevive — trocar só o escudo é "sem efeito esportivo" (`:387`) e não abre período — sem inventar um root que o físico não tem.
+
+**A regra geral:** quando o catálogo pedir N eventos por comando, pergunte de quantos AGREGADOS eles falam. Se for um só, é um evento com o fato dentro — o unique do log não é obstáculo, é a definição de história.
+
+**Corolário para os 13 contextos restantes:** a lista de ~70 roots do context map precisa passar por dois testes, não um. Contenção (R-183) **e** `version` no físico. Root sem `version` não é root — é entidade dentro de alguém.
 
 ---
 
