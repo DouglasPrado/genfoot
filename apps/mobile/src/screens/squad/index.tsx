@@ -132,38 +132,53 @@ export function Squad() {
     [clubQuery.data, managedClub?.id],
   );
 
-  // Hidrata uma vez por clube: rascunho salvo (SET_LINEUP_DRAFT) se ainda for
-  // válido para o roster atual, senão a escalação oficial. Refetchs NÃO apagam
-  // mais a edição local — o rascunho sobrevive até salvar ou trocar de clube.
+  // Monta a escalação quando o elenco chega — de forma ROBUSTA.
+  //
+  // O bug anterior: `onPitchIds` inicializava vazio (o elenco ainda não tinha
+  // carregado) e a hidratação rodava UMA vez por clube, numa corrida com o
+  // carregamento assíncrono. Se ela perdia a corrida, o campo e o banco ficavam
+  // vazios — jogadores reais no elenco, "—" em todo slot.
+  //
+  // Agora é auto-curativo: sempre que a escalação atual for inválida (não tem 11
+  // no campo, ou tem um id que não é jogador do elenco), remonta na hora dos
+  // jogadores reais. Isso NÃO apaga edição válida — se os 11 já batem, sai cedo.
   const hydratedClubRef = useRef<string | null>(null);
   useEffect(() => {
     const clubId = managedClub?.id ?? null;
     if (clubId === null || players.length < 11) return;
+    const ids = new Set(players.map((p) => p.id));
+    const lineupValid =
+      onPitchIds.length === 11 && onPitchIds.every((id) => ids.has(id));
+    if (lineupValid) return;
+
+    // Monta a escalação padrão IMEDIATAMENTE (síncrono) — é o que garante que o
+    // campo nunca fique vazio quando o elenco chega.
+    setFormation("4-2-1-3");
+    setOnPitchIds(
+      assignToFormation(
+        players.filter((p) => p.starter),
+        "4-2-1-3",
+      ),
+    );
+    setBenchIds(players.filter((p) => !p.starter).map((p) => p.id));
+    setActiveSlot(null);
+
+    // Depois, tenta o rascunho salvo (assíncrono) e sobrepõe SE ainda for válido
+    // para este elenco. Uma vez por clube.
     if (hydratedClubRef.current === clubId) return;
     hydratedClubRef.current = clubId;
-    const ids = new Set(players.map((p) => p.id));
     void readLineupDraft(worldId, clubId).then((draft) => {
-      const valid =
+      const draftValid =
         draft !== null &&
         draft.onPitchIds.length === 11 &&
         [...draft.onPitchIds, ...draft.benchIds].every((id) => ids.has(id));
-      if (valid) {
+      if (draftValid) {
         setFormation(draft.formation);
         setOnPitchIds([...draft.onPitchIds]);
         setBenchIds([...draft.benchIds]);
-      } else {
-        setFormation("4-2-1-3");
-        setOnPitchIds(
-          assignToFormation(
-            players.filter((p) => p.starter),
-            "4-2-1-3",
-          ),
-        );
-        setBenchIds(players.filter((p) => !p.starter).map((p) => p.id));
       }
-      setActiveSlot(null);
     });
-  }, [managedClub?.id, players, worldId]);
+  }, [managedClub?.id, players, worldId, onPitchIds]);
 
   // Persiste o rascunho a cada edição (pós-hidratação).
   useEffect(() => {
