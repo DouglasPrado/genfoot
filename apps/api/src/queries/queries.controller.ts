@@ -2,6 +2,7 @@ import type {
   ClubReadModel,
   CompetitionReadModel,
   LedgerReadModel,
+  ClubFinanceReadModel,
   FanbaseReadModel,
   NarrativeReadModel,
   MarketReadModel,
@@ -35,6 +36,7 @@ import {
   CLUB_READ_MODEL,
   SQUAD_READ_MODEL,
   LEDGER_READ_MODEL,
+  CLUB_FINANCE_READ_MODEL,
   COMPETITION_READ_MODEL,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
@@ -79,6 +81,8 @@ export class QueriesController {
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
     @Inject(SQUAD_READ_MODEL) private readonly squadReadModel: SquadReadModel,
     @Inject(LEDGER_READ_MODEL) private readonly ledgerReadModel: LedgerReadModel,
+    @Inject(CLUB_FINANCE_READ_MODEL)
+    private readonly clubFinanceReadModel: ClubFinanceReadModel,
     @Inject(COMPETITION_READ_MODEL)
     private readonly competitionReadModel: CompetitionReadModel,
     @Inject(MATCHES_READ_MODEL)
@@ -258,6 +262,7 @@ export class QueriesController {
         clubReadModel: this.clubReadModel,
         squadReadModel: this.squadReadModel,
         ledgerReadModel: this.ledgerReadModel,
+        clubFinanceReadModel: this.clubFinanceReadModel,
         competitionReadModel: this.competitionReadModel,
         matchesReadModel: this.matchesReadModel,
         marketReadModel: this.marketReadModel,

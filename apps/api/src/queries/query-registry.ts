@@ -1,5 +1,6 @@
 import type {
   ClubReadModel,
+  ClubFinanceReadModel,
   IdentityReadModel,
   SquadReadModel,
   LedgerReadModel,
@@ -30,6 +31,7 @@ export interface QueryContext {
   readonly clubReadModel: ClubReadModel;
   readonly squadReadModel: SquadReadModel;
   readonly ledgerReadModel: LedgerReadModel;
+  readonly clubFinanceReadModel: ClubFinanceReadModel;
   readonly competitionReadModel: CompetitionReadModel;
   readonly matchesReadModel: MatchesReadModel;
   readonly marketReadModel: MarketReadModel;
@@ -82,6 +84,19 @@ const handlers: Record<string, QueryHandler> = {
       );
     }
     return succeed(await squadReadModel.roster(worldId, clubId));
+  },
+  "finance-snapshot": async ({ clubFinanceReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "finance-snapshot exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await clubFinanceReadModel.snapshot(worldId, clubId));
   },
   fanbase: async ({ fanbaseReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
