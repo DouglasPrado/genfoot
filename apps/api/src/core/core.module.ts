@@ -3,6 +3,7 @@ import {
   createPrismaClient,
   PrismaClubControlRepository,
   PrismaClubReadModel,
+  PrismaSquadReadModel,
   PrismaClubRepository,
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
@@ -18,6 +19,7 @@ import { IdempotencyStore } from "./idempotency-store.js";
 import {
   CLUB_CONTROL_REPOSITORY,
   CLUB_READ_MODEL,
+  SQUAD_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
@@ -84,6 +86,12 @@ import {
         new PrismaClubReadModel(client),
     },
     {
+      provide: SQUAD_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaSquadReadModel =>
+        new PrismaSquadReadModel(client),
+    },
+    {
       provide: CLUB_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubUnitOfWork =>
@@ -130,6 +138,7 @@ import {
     WORLD_READ_MODEL,
     CLUB_REPOSITORY,
     CLUB_READ_MODEL,
+    SQUAD_READ_MODEL,
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,

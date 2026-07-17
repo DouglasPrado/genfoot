@@ -1,4 +1,4 @@
-import type { ClubReadModel, WorldReadModel } from "@grinta/core";
+import type { ClubReadModel, SquadReadModel, WorldReadModel } from "@grinta/core";
 import {
   Controller,
   Get,
@@ -23,6 +23,7 @@ import {
   GAME_WORLD_REPOSITORY,
   IDENTITY_READ_MODEL,
   CLUB_READ_MODEL,
+  SQUAD_READ_MODEL,
   OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
@@ -60,6 +61,7 @@ function invalidWorldId(messageKey: string): ApiException {
 export class QueriesController {
   constructor(
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
+    @Inject(SQUAD_READ_MODEL) private readonly squadReadModel: SquadReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -224,8 +226,13 @@ export class QueriesController {
       );
     }
     const result = await handler(
-      { identityReadModel: this.identityReadModel, clubReadModel: this.clubReadModel },
+      {
+        identityReadModel: this.identityReadModel,
+        clubReadModel: this.clubReadModel,
+        squadReadModel: this.squadReadModel,
+      },
       worldId.value,
+      query,
     );
     if (!result.ok) {
       throw new ApiException(

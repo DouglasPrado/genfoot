@@ -1,5 +1,9 @@
-import type { ClubReadModel, IdentityReadModel } from "@grinta/core";
-import { DomainError, succeed, type GameWorldId, type Result } from "@grinta/shared";
+import type {
+  ClubReadModel,
+  IdentityReadModel,
+  SquadReadModel,
+} from "@grinta/core";
+import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
  * Registry de queries, depois do extermínio da arquitetura morta (R-175).
@@ -18,11 +22,19 @@ import { DomainError, succeed, type GameWorldId, type Result } from "@grinta/sha
 export interface QueryContext {
   readonly identityReadModel: IdentityReadModel;
   readonly clubReadModel: ClubReadModel;
+  readonly squadReadModel: SquadReadModel;
 }
 
+/**
+ * `params` são os query-string da requisição. A maioria das queries é
+ * world-scoped e os ignora; algumas — como `roster` — precisam de um recorte
+ * fino (o clube), e é por aqui que ele chega. É o primeiro passo da
+ * granularidade que o doc 23 pede (#37).
+ */
 export type QueryHandler = (
   context: QueryContext,
   worldId: GameWorldId,
+  params: Record<string, unknown>,
 ) => Promise<Result<unknown, DomainError>>;
 
 const handlers: Record<string, QueryHandler> = {
@@ -34,6 +46,19 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await identityReadModel.summary(worldId)),
   "identity-detail": async ({ identityReadModel }, worldId) =>
     succeed(await identityReadModel.worldView(worldId)),
+  roster: async ({ squadReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "roster exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await squadReadModel.roster(worldId, clubId));
+  },
 };
 
 export function resolveQueryHandler(name: string): QueryHandler | undefined {
