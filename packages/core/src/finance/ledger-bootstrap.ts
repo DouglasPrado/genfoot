@@ -70,7 +70,37 @@ export function buildLedgerGenesis(
     version: 1,
   };
 
-  const accounts: LedgerAccountSnapshot[] = [faucet];
+  // Os ralos por onde o dinheiro MORRE (ECO-003): folha e operacional. São
+  // contas de sistema (scope WORLD), lado DÉBITO — simétrico à torneira, que
+  // nasce no crédito. Nascem vazias; o débito de encerramento de temporada
+  // (`close-season-finances.ts`) é quem as movimenta. Aditivo: não muda id de
+  // conta existente, e sink sem lançamento contribui 0 ao resíduo.
+  const wageSink: LedgerAccountSnapshot = {
+    id: uuid(`${world.id}:ledger:sink:wage`),
+    gameWorldId: world.id,
+    ownerScope: AccountOwnerScope.WORLD,
+    clubId: null,
+    systemAccount: SystemAccount.SYS_WAGE_SINK,
+    accountCode: "SYS:WAGE_SINK",
+    accountType: FinancialAccountType.SYSTEM_SINK,
+    normalSide: AccountNormalSide.DEBIT,
+    currencyId: BASE_CURRENCY_ID,
+    version: 1,
+  };
+  const operatingSink: LedgerAccountSnapshot = {
+    id: uuid(`${world.id}:ledger:sink:operating`),
+    gameWorldId: world.id,
+    ownerScope: AccountOwnerScope.WORLD,
+    clubId: null,
+    systemAccount: SystemAccount.SYS_OPERATING_SINK,
+    accountCode: "SYS:OPERATING_SINK",
+    accountType: FinancialAccountType.SYSTEM_SINK,
+    normalSide: AccountNormalSide.DEBIT,
+    currencyId: BASE_CURRENCY_ID,
+    version: 1,
+  };
+
+  const accounts: LedgerAccountSnapshot[] = [faucet, wageSink, operatingSink];
   const entries: JournalEntrySnapshot[] = [];
 
   for (const club of genesis.clubs) {
