@@ -487,6 +487,13 @@ R-173 tornou o Postgres o único armazenamento, e a primeira porta migrada revel
 - **R-181 — Dinheiro é `bigint` + `currencyId`; a `model Currency` passa a existir.** O domínio usava `number` (double IEEE-754) para todo dinheiro; 17 colunas `currencyId` apontavam para uma tabela inexistente.
 - **R-182 — Seed, data inicial e sequência do mundo são colunas.** `GameWorld.seed` não tinha coluna — sem ele não há replay, que é invariante canônica. E o mundo inicial deixa de ser literal de tipo (`rounds: 30`, `generatedClubCount: 16`).
 
+- **R-183 — Nem todo root do context map é root.** Departamento e estádio são filhos do clube: root é o que precisa de fronteira por CONTENÇÃO, não por vocabulário.
+- **R-184 — A idempotência guarda o fingerprint do PEDIDO.** Mesma chave com corpo diferente é `IDEMPOTENCY_KEY_REUSED`, não sucesso silencioso.
+- **R-185 — A gênese não é armazenada.** É função pura do seed; o que persiste é o efeito dela.
+- **R-186 — O barramento valida o payload.** Os errorCodes passam a ser os do catálogo, não os que o domínio inventou.
+- **R-187 — Um comando, um evento.** `ClubIdentityPeriod` não é root. Corolário: root precisa passar por DOIS testes — contenção (R-183) e `version` no físico.
+- **R-188 — O grid de atributos é o do GDD §2 (39), não o do Football Manager (33).** O schema copiou `technique`/`flair`/`teamwork`/`workRate`/`aggression`; a §2 se declara fonte única, e a R-09 agrega "o grid canônico". Corrige a premissa da R-179, não a decisão.
+
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-182 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige.
+> **Estado consolidado:** R-01..R-188 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179.

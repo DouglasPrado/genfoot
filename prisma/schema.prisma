@@ -803,7 +803,12 @@ model RolePermission {
 ///   inventado seria pior: gravaria como fato o que é chute.
 model GameWorld {
   id                      String      @id @db.Uuid
-  name                    String? // pendente: vai para GameRuleConfig (R-182)
+  // Identidade do mundo, escrita pelo domínio. NÃO é configuração: o comentário
+  // anterior dizia "pendente: vai para GameRuleConfig (R-182)" e extrapolava —
+  // R-182 trata de `maxClubs`, `seasonDays`, `initialClubCashMinor` e dos
+  // literais da gênese (dimensionamento), e `GameRuleConfig` é, por definição,
+  // "atalho chave-valor para parâmetros simples de BALANCEAMENTO".
+  name                    String?
   seed                    String // R-182: sem ele não há replay
   startDate               DateTime    @db.Date
   status                  WorldStatus @default(CREATING)
@@ -1294,8 +1299,15 @@ model Player {
   fatigue                 Int                    @default(0)
   matchSharpness          Int                    @default(50)
   // traços persistentes
+  //
+  // `consistency` saiu deste bloco (R-188): é a "regularidade" da §2 do GDD —
+  // atributo MENTAL, que sobe com treino, e mora no grid. Traço tem intensidade
+  // e visibilidade; regularidade não tem nem uma nem outra.
+  //
+  // Os que sobraram aqui seguem divergentes em três lugares ao mesmo tempo —
+  // este bloco, `PlayerPersonality` (com outros nomes) e a lista canônica do
+  // GDD. R-188 registra a pendência e não a resolve.
   injuryProneness         Int                    @default(50)
-  consistency             Int                    @default(50)
   ambition                Int                    @default(50)
   loyalty                 Int                    @default(50)
   professionalism         Int                    @default(50)
@@ -1329,46 +1341,71 @@ model Player {
   @@index([gameWorldId, clubId])
 }
 
+/// O grid canônico do jogador — R-188.
+///
+/// **A lista é a do GDD §2, que se declara fonte única** (`02-sistema-de-jogadores.md:107`).
+/// O que estava aqui era o grid do Football Manager, com os nomes dele
+/// (`technique`, `flair`, `teamwork`, `workRate`, `aggression`) — e sem os do
+/// GDD: bola parada, visão de jogo, explosão, recuperação física, regularidade,
+/// resiliência, e 3 atributos de goleiro. A R-09 manda o `overall` ser "média
+/// ponderada do **grid canônico**"; com o grid errado, ela não tinha sobre o que
+/// operar, e o treino (§6) não tinha eixo.
+///
+/// Sem `id`: é filho de `Player` (1:1), não root — a régua de R-183/R-187. A
+/// chave é o jogador.
+///
+/// **`overall` não é coluna**, e não é esquecimento: o GDD é explícito (`:120`)
+/// — "derivado, não armazenado como atributo". Quem o deriva é
+/// `player-overall.ts`.
 model PlayerAttributes {
-  id                    String @id @default(uuid(7)) @db.Uuid
-  playerId              String @unique @db.Uuid
-  // técnicos
-  finishing             Int
-  longShots             Int
-  heading               Int
-  passing               Int
-  crossing              Int
-  dribbling             Int
-  firstTouch            Int
-  technique             Int
-  tackling              Int
-  marking               Int
-  positioning           Int
-  // físicos
-  acceleration          Int
-  pace                  Int
-  stamina               Int
-  strength              Int
-  agility               Int
-  balance               Int
-  jumping               Int
-  // mentais
-  bravery               Int
-  aggression            Int
-  composure             Int
-  decisions             Int
-  concentration         Int
-  leadership            Int
-  teamwork              Int
-  workRate              Int
-  determination         Int
-  flair                 Int
-  // goleiro (nullable — só GKs)
-  goalkeeperReflexes    Int?
-  goalkeeperHandling    Int?
-  goalkeeperPositioning Int?
-  goalkeeperKicking     Int?
-  goalkeeperOneOnOne    Int?
+  playerId              String @id @db.Uuid
+  // técnicos (12) — GDD §2
+  finishing             Int // finalização
+  longShots             Int // chute de longe
+  shortPassing          Int // passe curto
+  longPassing           Int // passe longo (lançamento)
+  crossing              Int // cruzamento
+  dribbling             Int // drible
+  firstTouch            Int // controle de bola (domínio / primeiro toque)
+  marking               Int // marcação
+  tackling              Int // desarme
+  heading               Int // cabeceio
+  setPieces             Int // bola parada (falta / escanteio / pênalti)
+  vision                Int // visão de jogo
+  // físicos (9) — GDD §2
+  pace                  Int // velocidade
+  acceleration          Int // aceleração
+  strength              Int // força
+  stamina               Int // resistência
+  jumping               Int // impulsão
+  agility               Int // agilidade
+  balance               Int // equilíbrio
+  explosiveness         Int // explosão
+  recovery              Int // recuperação física
+  // mentais (10) — GDD §2. `positioning` é "inteligência tática (leitura de
+  // jogo / posicionamento)": ler o jogo não é gesto técnico, e é onde o GDD o
+  // põe. `aggression` NÃO está aqui — o GDD o classifica como traço
+  // ("temperamento"), que tem visibilidade e não sobe com treino.
+  positioning           Int // inteligência tática (leitura de jogo)
+  decisions             Int // tomada de decisão
+  concentration         Int // concentração / foco
+  discipline            Int // disciplina
+  composure             Int // frieza
+  determination         Int // determinação / garra
+  leadership            Int // liderança
+  consistency           Int // regularidade
+  bravery               Int // coragem
+  resilience            Int // resiliência
+  // goleiro (8, nullable — só GKs) — GDD §2, "grid próprio, somado aos
+  // atributos físicos e mentais comuns"
+  goalkeeperReflexes    Int? // reflexos
+  goalkeeperPositioning Int? // posicionamento de gol
+  goalkeeperHandling    Int? // saída de gol (domínio de área / cruzamentos)
+  goalkeeperKicking     Int? // reposição com os pés
+  goalkeeperAerial      Int? // jogo aéreo
+  goalkeeperOneOnOne    Int? // um-contra-um
+  goalkeeperPenalty     Int? // defesa de pênalti
+  goalkeeperCommand     Int? // comando de área / comunicação
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }

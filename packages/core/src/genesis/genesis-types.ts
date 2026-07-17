@@ -7,14 +7,26 @@ export type SquadId = EntityId<"Squad">;
 export type CompetitionId = EntityId<"Competition">;
 export type FixtureId = EntityId<"Fixture">;
 
+/**
+ * As 15 posições — as mesmas do `enum PlayerPosition` do schema.
+ *
+ * Eram 11: faltavam `LWB`, `RWB`, `LM` e `RM`, que o banco aceita. Um domínio
+ * que não representa uma linha que o banco grava não consegue reidratar o
+ * próprio agregado — o `fromSnapshot` estouraria num ala-lateral perfeitamente
+ * válido.
+ */
 export const PlayerPosition = {
   GK: "GK",
   CB: "CB",
   LB: "LB",
   RB: "RB",
+  LWB: "LWB",
+  RWB: "RWB",
   CDM: "CDM",
   CM: "CM",
   CAM: "CAM",
+  LM: "LM",
+  RM: "RM",
   LW: "LW",
   RW: "RW",
   ST: "ST",

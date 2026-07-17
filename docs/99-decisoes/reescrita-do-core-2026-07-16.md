@@ -212,6 +212,34 @@ Portanto: **um comando, um fato, um evento.** `ClubIdentityApplied` carrega `per
 
 ---
 
+### R-188 — O grid de atributos é o do GDD §2. O schema copiou o Football Manager.
+
+**Corrige a premissa da [R-179](#r-179--jogador-tem-32-atributos-granulares-os-4-grupos-são-rollup-derivado), não a decisão.** A R-179 escolheu granular sobre agrupado e estava certa; ela só comparou o domínio (4 grupos) com o schema (33 colunas) e nunca conferiu o schema contra o game design. Ao materializar C4 a divergência apareceu.
+
+As colunas de `PlayerAttributes` (`schema.prisma:1039`) são o grid do **Football Manager**, com os nomes dele: `technique`, `flair`, `teamwork`, `workRate`, `aggression`. O GDD §2 define outro grid, e diz de si mesmo (`02-sistema-de-jogadores.md:107`):
+
+> Esta subseção é a **fonte única** da lista de atributos do jogador. O overview (§7) e a IA de comportamento (§3.4) apenas **referenciam** esta lista — não mantêm listas próprias.
+
+**Vale o GDD**, e não é preferência: a §2 se declara fonte única; a [R-09](registro-de-decisoes.md) manda o `overall` ser "média ponderada **do grid canônico** por posição" — o canônico, não o do schema; e o treino (§6) evolui pelos eixos da §2. Um schema que não os tem deixa a R-09 sem grid e o treino sem eixo, que é exatamente o vazio que a R-179 queria fechar.
+
+**São 39, não 33** — técnicos 12, físicos 9, mentais 10, goleiro 8.
+
+O que **morre** (FM, sem contraparte no GDD): `technique`, `flair`, `teamwork`, `workRate`. E `aggression`, que é caso à parte: o GDD o classifica explicitamente como **traço** ("temperamento"), não atributo — traço tem intensidade e **visibilidade**, não é nota que sobe com treino.
+
+O que **nasce**: `shortPassing`/`longPassing` (o GDD separa passe curto de lançamento; o schema tinha um `passing` só), `setPieces`, `vision`, `explosiveness`, `recovery`, `discipline`, `consistency`, `resilience`, `goalkeeperAerial`, `goalkeeperPenalty`, `goalkeeperCommand`.
+
+O que **muda de bloco**: `positioning` sai de técnico e vira mental — no GDD é "inteligência tática (leitura de jogo / posicionamento)", e ler o jogo não é um gesto técnico.
+
+O que **muda de tabela**: `Player.consistency` é a "regularidade" da §2 — atributo mental, e estava solto no root.
+
+**Os 4 grupos seguem sendo rollup** (R-179), agora sobre 39. E `overall` **nunca é coluna**: o GDD é explícito (`:120`) — "derivado, não armazenado como atributo".
+
+Consequência aceita: a migração é destrutiva. Não há o que preservar — por [R-173](conta-global-e-postgres-2026-07-16.md) não há dado a migrar, e um mundo se regenera do seed (R-182).
+
+**Não resolvido aqui, e listado como pendência:** os **traços** divergem em três lugares ao mesmo tempo — `Player.ambition/loyalty/professionalism`, `PlayerPersonality` (com outros nomes: `grit`, `ego`, `adaptability`…) e a lista canônica do GDD. `PlayerPersonality.discipline` ainda duplica o atributo mental homônimo. C4 materializa os atributos; os traços esperam decisão.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

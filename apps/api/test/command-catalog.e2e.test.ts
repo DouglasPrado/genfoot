@@ -77,6 +77,11 @@ describe("API command catalog integrity (e2e)", () => {
    */
   it("o catálogo é exatamente o que a vertical viva exige", () => {
     expect([...registeredCommandTypes()].sort()).toEqual([
+      // BC-003 pela tela do clube no mobile (MF-25). Faltava aqui: eu o
+      // registrei em 608fd99 e não atualizei esta lista — o gate ficou vermelho
+      // nesse commit, e eu não vi porque rodei a suíte sem `DATABASE_URL` e
+      // tomei o erro dos e2e por ambiental.
+      "club:apply-identity",
       "identity:confirm-onboarding",
       "identity:end-club-control",
       "identity:join-world",
@@ -84,9 +89,15 @@ describe("API command catalog integrity (e2e)", () => {
       "identity:request-switch",
       "identity:reserve-club",
       "world:activate",
+      // O ciclo de vida operacional: a aba de Configurações do admin os despacha.
+      // Sobem aqui porque uma tela viva os exige — que é a regra desta lista.
+      "world:archive",
       "world:create",
       "world:delete",
       "world:genesis",
+      "world:pause",
+      "world:resume",
+      "world:set-identity",
     ]);
   });
 
@@ -95,8 +106,9 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(10);
+    expect(response.body.commandCount).toBe(15);
     expect(response.body.commands).toContain("world:genesis");
+    expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([
       "club",
