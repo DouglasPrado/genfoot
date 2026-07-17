@@ -94,7 +94,10 @@ export function ClubsTable({
           {clubs.map((club) => {
             const n = mockNumerosDoClube(worldId, club.id);
             return (
-            <tr key={club.id} className="border-b border-border/60 last:border-0">
+            <tr
+              key={club.id}
+              className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
+            >
               <td className="px-3 py-2 font-medium">
                 <ClubName club={club} size="md" />
               </td>

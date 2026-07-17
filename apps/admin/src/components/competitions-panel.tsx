@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ClubCrest, ClubName } from "@/components/club-crest";
 import type { ClubRow } from "@/components/clubs-table";
 import { Mock } from "@/components/mock";
+import { PositionBadge } from "@/components/position-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -87,17 +88,21 @@ function Standings({
             {linhas.map((linha) => (
               <tr
                 key={linha.clube.id}
-                className={`border-b border-border/60 last:border-0 ${ZONA_COR[linha.zona]}`}
+                className={`border-b border-border/60 even:bg-surface-2/40 last:border-0 ${ZONA_COR[linha.zona]}`}
               >
                 <td className="mono px-3 py-2 tabular-nums text-muted-foreground">
                   {linha.posicao}
                 </td>
                 <td className="px-3 py-2 font-medium">
+                  {/* A taça vai DEPOIS do nome: o olho lê o clube e só então o
+                      troféu qualifica quem leu. À esquerda ela empurrava os
+                      nomes e desalinhava a coluna inteira por causa de uma
+                      linha. */}
                   <span className="flex items-center gap-2">
+                    <ClubName club={linha.clube} />
                     {linha.zona === "TITULO" ? (
                       <Trophy className="size-3.5 shrink-0 text-[color:var(--ok)]" />
                     ) : null}
-                    <ClubName club={linha.clube} />
                   </span>
                 </td>
                 <td className="mono px-3 py-2 text-right font-semibold tabular-nums">
@@ -537,14 +542,14 @@ export function CompetitionsPanel({
                   {mockPremiacaoDinheiro(torneio, refs).map((premio) => (
                     <tr
                       key={premio.colocacao}
-                      className="border-b border-border/60 last:border-0"
+                      className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
                     >
                       <td className="px-3 py-2 font-medium">
                         <span className="flex items-center gap-2">
-                          {premio.colocacao === "Campeão" ? (
-                            <Trophy className="size-3.5 text-[color:var(--ok)]" />
-                          ) : null}
                           {premio.colocacao}
+                          {premio.colocacao === "Campeão" ? (
+                            <Trophy className="size-3.5 shrink-0 text-[color:var(--ok)]" />
+                          ) : null}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
@@ -592,7 +597,7 @@ export function CompetitionsPanel({
                 {mockPremiacao(torneio.id, refs).map((premio) => (
                   <tr
                     key={premio.categoria}
-                    className="border-b border-border/60 last:border-0"
+                    className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
                   >
                     <td className="px-3 py-2 font-medium">{premio.categoria}</td>
                     <td className="px-3 py-2">{premio.jogador}</td>
@@ -647,7 +652,7 @@ function Ranking({
           {linhas.map((linha) => (
             <tr
               key={linha.jogador}
-              className="border-b border-border/60 last:border-0"
+              className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
             >
               <td className="mono px-3 py-2 tabular-nums text-muted-foreground">
                 {linha.colocacao}
@@ -660,9 +665,7 @@ function Ranking({
                   <span className="mono w-6 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                     {linha.numero}
                   </span>
-                  <span className="mono w-9 shrink-0 rounded-[3px] border border-border bg-surface-2 px-1 py-0.5 text-center text-[10px] text-muted-foreground">
-                    {linha.posicao}
-                  </span>
+                  <PositionBadge posicao={linha.posicao} />
                   {linha.jogador}
                 </span>
               </td>

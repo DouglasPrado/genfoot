@@ -8,14 +8,24 @@
  * correspondente pelo mesmo id". Não inventei modelo: um id fora do catálogo
  * não teria como ser validado pelo domínio.
  *
- * **Clube gerado NÃO tem escudo.** Ele nasce sem identidade visual, e o jogador
- * a define ao personalizar (BC-003). Aqui isso não vira um escudo bonito
- * inventado — vira um marcador neutro com o código do clube: legível, óbvio, e
- * que não afirma uma identidade que o clube não escolheu. Quando o dono
- * personalizar, o escudo aparece sozinho, e a diferença entre os dois estados é
- * a prova de que o dado é real.
+ * **Clube gerado não tem escudo GRAVADO** — nasce sem identidade visual, e o
+ * jogador a define ao personalizar (BC-003). Hoje TODOS os 32 clubes estão
+ * assim: `SELECT count(crestTemplateId) → 0`. E não é descuido de seed — o
+ * command `UpdateClubVisualIdentity` morreu junto com o `WorldClubPortfolio`
+ * (R-175); não existe porta HTTP capaz de dar escudo a um clube.
+ *
+ * Então usamos o MESMO mecanismo do app (`visual-identity.ts:154`), com os
+ * mesmos 8 presets e o mesmo hash FNV-1a: identidade default DETERMINÍSTICA,
+ * derivada do nome, "para que cada clube pareça distinto". Não é invenção nem
+ * fallback silencioso — é o comportamento que o app já tem, e ele deriva do
+ * mesmo dado real (o nome do clube), não de um random.
+ *
+ * O que continua honesto: `derivada` diz qual é qual. Um escudo derivado não se
+ * passa por escolhido — o `title` avisa, e no dia em que o command voltar, o
+ * escudo do dono entra e a marca sai.
  */
 export interface CrestIdentity {
+  readonly name?: string;
   readonly shortCode: string;
   readonly primaryColor: string | null;
   readonly secondaryColor: string | null;
@@ -23,6 +33,31 @@ export interface CrestIdentity {
 }
 
 const SIZE = { sm: 16, md: 22, lg: 32 } as const;
+
+/** Os 8 presets do app (`visual-identity.ts`), na mesma ordem. */
+const PRESETS: readonly { primary: string; secondary: string; crest: string }[] =
+  [
+    { primary: "#E11D2E", secondary: "#0A0B0D", crest: "crest-shield" },
+    { primary: "#1D4ED8", secondary: "#F8FAFC", crest: "crest-round" },
+    { primary: "#16A34A", secondary: "#F8FAFC", crest: "crest-shield" },
+    { primary: "#0A0B0D", secondary: "#C2F74A", crest: "crest-banner" },
+    { primary: "#7C3AED", secondary: "#FACC15", crest: "crest-classic" },
+    { primary: "#0EA5A4", secondary: "#0A0B0D", crest: "crest-round" },
+  ];
+
+/** O MESMO hash do app (FNV-1a): mesmo clube, mesmo escudo, nos dois clientes. */
+function hashString(value: string): number {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return hash >>> 0;
+}
+
+function derivada(seed: string) {
+  return PRESETS[hashString(seed) % PRESETS.length]!;
+}
 
 export function ClubCrest({
   club,
@@ -32,16 +67,16 @@ export function ClubCrest({
   size?: keyof typeof SIZE;
 }) {
   const px = SIZE[size];
-  const temIdentidade =
+  const escolhida =
     club.crestTemplateId !== null && club.primaryColor !== null;
 
-  if (!temIdentidade) {
-    return <CrestPlaceholder shortCode={club.shortCode} px={px} />;
-  }
-
-  const primary = club.primaryColor!;
-  const secondary = club.secondaryColor ?? "#ffffff";
-  const label = `Escudo do ${club.shortCode}`;
+  const preset = escolhida
+    ? {
+        primary: club.primaryColor!,
+        secondary: club.secondaryColor ?? "#F8FAFC",
+        crest: club.crestTemplateId!,
+      }
+    : derivada(club.name ?? club.shortCode);
 
   return (
     <svg
@@ -49,10 +84,21 @@ export function ClubCrest({
       height={px}
       viewBox="0 0 32 32"
       role="img"
-      aria-label={label}
+      aria-label={`Escudo do ${club.shortCode}`}
       className="shrink-0"
     >
-      {shapeFor(club.crestTemplateId!, primary, secondary)}
+      <title>
+        {escolhida
+          ? `${club.shortCode} — identidade escolhida pelo dono`
+          : `${club.shortCode} — escudo derivado do nome; o clube ainda não foi personalizado (BC-003)`}
+      </title>
+      {shapeFor(preset.crest, preset.primary, preset.secondary)}
+      {/* Escudo derivado leva uma marca discreta: ele NÃO se passa por
+          escolhido. No dia em que `UpdateClubVisualIdentity` voltar, o escudo do
+          dono entra e este ponto some — a diferença é a prova. */}
+      {escolhida ? null : (
+        <circle cx="28.5" cy="3.5" r="2.5" className="fill-[color:var(--warn)]" />
+      )}
     </svg>
   );
 }
@@ -99,36 +145,6 @@ function shapeFor(templateId: string, primary: string, secondary: string) {
         </>
       );
   }
-}
-
-/**
- * Sem identidade visual: um marcador, não um escudo.
- *
- * Tracejado e sem cor de propósito — ele diz "este clube ainda não escolheu",
- * que é a verdade (BC-003), em vez de fingir uma identidade.
- */
-function CrestPlaceholder({
-  shortCode,
-  px,
-}: {
-  shortCode: string;
-  px: number;
-}) {
-  return (
-    <span
-      aria-label={`${shortCode} — sem escudo definido`}
-      title="Sem identidade visual: o clube ainda não foi personalizado (BC-003)"
-      className="inline-flex shrink-0 items-center justify-center rounded-[3px] border border-dashed border-border text-muted-foreground"
-      style={{
-        width: px,
-        height: px,
-        fontSize: Math.max(7, Math.round(px * 0.34)),
-        lineHeight: 1,
-      }}
-    >
-      {shortCode.slice(0, 3)}
-    </span>
-  );
 }
 
 /** Escudo + nome, que é como o clube aparece em quase toda tela. */

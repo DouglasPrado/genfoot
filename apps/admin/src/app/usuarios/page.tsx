@@ -124,7 +124,7 @@ export default function UsersPage() {
                 {rows.map((row) => (
                   <tr
                     key={`${row.worldId}:${row.accountId}`}
-                    className="border-b border-border/50 last:border-0"
+                    className="border-b border-border/50 even:bg-surface-2/40 last:border-0"
                   >
                     <td className="px-4 py-3 font-mono text-xs">
                       {row.accountId.slice(0, 8)}…

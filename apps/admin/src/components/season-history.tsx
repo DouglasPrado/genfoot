@@ -117,14 +117,14 @@ export function SeasonHistory({
                   {lista.map((campanha) => (
                     <tr
                       key={campanha.torneio.id}
-                      className="border-b border-border/60 last:border-0"
+                      className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
                     >
                       <td className="px-3 py-2 font-medium">
                         <span className="flex items-center gap-2">
-                          {campanha.campeao ? (
-                            <Trophy className="size-3.5 text-[color:var(--ok)]" />
-                          ) : null}
                           {campanha.torneio.nome}
+                          {campanha.campeao ? (
+                            <Trophy className="size-3.5 shrink-0 text-[color:var(--ok)]" />
+                          ) : null}
                           {campanha.torneio.emAndamento ? (
                             <Badge tone="live">em andamento</Badge>
                           ) : null}
