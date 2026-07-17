@@ -1,0 +1,174 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  GOALKEEPING_ATTRIBUTES,
+  MENTAL_ATTRIBUTES,
+  PHYSICAL_ATTRIBUTES,
+  TECHNICAL_ATTRIBUTES,
+  derivePlayerOverall,
+} from "../players/player-attributes.js";
+
+import { PlayerPosition } from "./genesis-types.js";
+import {
+  SQUAD_OVERALL_BUDGET,
+  SQUAD_POSITION_TEMPLATE,
+  generateSquadAttributes,
+} from "./player-generation.js";
+
+describe("geração do elenco inicial (GDD §1 · teto comum de pontos)", () => {
+  const elenco = (seed: string, clubIndex = 0) =>
+    generateSquadAttributes({ worldSeed: seed, clubIndex });
+
+  it("o template é de 23 jogadores — o número do GDD", () => {
+    expect(SQUAD_POSITION_TEMPLATE).toHaveLength(23);
+    expect(SQUAD_OVERALL_BUDGET).toBe(1380);
+  });
+
+  /**
+   * "todos os clubes partem de **1.380 pontos de overall para 23 jogadores**"
+   * (`01-mundo-persistente-e-clubes.md:158`). É o teto COMUM: nenhum clube
+   * começa mais forte que outro, só diferente.
+   *
+   * **Exatamente 1.380, não por volta de.** Eu tinha escrito este teste com
+   * tolerância de ±23 achando que o arredondamento da nota vazaria; ele não
+   * vaza, e a razão é a mesma que faz `shiftToTarget` funcionar: os pesos da
+   * R-09 somam 1, então somar δ inteiro a todo atributo move a nota em
+   * exatamente δ — `round(x + δ) = round(x) + δ`. Tolerância que não é
+   * necessária é regressão que passa despercebida.
+   */
+  it("todo clube parte dos mesmos 1.380 pontos — exatos", () => {
+    for (let clubIndex = 0; clubIndex < 16; clubIndex += 1) {
+      const squad = elenco("grinta-demo", clubIndex);
+      const total = squad.reduce(
+        (sum, p) => sum + derivePlayerOverall(p.position, p.attributes),
+        0,
+      );
+      expect(`clube ${clubIndex}: ${total}`).toBe(
+        `clube ${clubIndex}: ${SQUAD_OVERALL_BUDGET}`,
+      );
+    }
+  });
+
+  /** "média-alvo 60; **média nunca superior a 62**" — o limite é do GDD. */
+  it("a média nunca passa de 62", () => {
+    for (let clubIndex = 0; clubIndex < 16; clubIndex += 1) {
+      const squad = elenco("grinta-demo", clubIndex);
+      const media =
+        squad.reduce(
+          (sum, p) => sum + derivePlayerOverall(p.position, p.attributes),
+          0,
+        ) / squad.length;
+      expect(media).toBeLessThanOrEqual(62);
+    }
+  });
+
+  /**
+   * "variando apenas como esses pontos se dividem entre **defesa, meio, ataque
+   * e goleiros**". Mesmo teto, perfis diferentes — senão os 16 clubes são o
+   * mesmo clube com outro nome, e escolher clube não é escolha.
+   */
+  it("clubes diferentes distribuem os mesmos pontos de formas diferentes", () => {
+    const perfil = (clubIndex: number) =>
+      elenco("grinta-demo", clubIndex)
+        .filter((p) => p.position === PlayerPosition.ST)
+        .map((p) => derivePlayerOverall(p.position, p.attributes))
+        .reduce((a, b) => a + b, 0);
+
+    const perfis = new Set(
+      Array.from({ length: 16 }, (_, index) => perfil(index)),
+    );
+    expect(perfis.size).toBeGreaterThan(1);
+  });
+
+  /**
+   * O defeito que os testes do teto e da média NÃO pegavam: os dois fechavam
+   * com 8 defensores de nota 60 idêntica. Elenco chapado não tem titular nem
+   * reserva, e escalar o time deixa de ser decisão.
+   */
+  it("dentro do mesmo setor os jogadores têm notas diferentes", () => {
+    const squad = elenco("grinta-demo", 0);
+    const defesa: readonly PlayerPosition[] = [
+      PlayerPosition.CB,
+      PlayerPosition.LB,
+      PlayerPosition.RB,
+    ];
+    const defensores = squad
+      .filter((p) => defesa.includes(p.position))
+      .map((p) => derivePlayerOverall(p.position, p.attributes));
+
+    expect(defensores.length).toBeGreaterThan(4);
+    expect(new Set(defensores).size).toBeGreaterThan(1);
+  });
+
+  /** "O elenco inicial típico é veterano e **equilibrado**" — não uma escada. */
+  it("mas a diferença dentro do setor é de elenco, não de abismo", () => {
+    const squad = elenco("grinta-demo", 0);
+    const notas = squad.map((p) => derivePlayerOverall(p.position, p.attributes));
+    expect(Math.max(...notas) - Math.min(...notas)).toBeLessThanOrEqual(25);
+  });
+
+  it("é determinístico: a mesma seed dá o mesmo elenco", () => {
+    expect(elenco("grinta-demo", 3)).toEqual(elenco("grinta-demo", 3));
+  });
+
+  it("seeds diferentes dão elencos diferentes", () => {
+    expect(elenco("grinta-demo", 0)).not.toEqual(elenco("outra-seed", 0));
+  });
+
+  describe("o grid de cada jogador", () => {
+    const squad = generateSquadAttributes({
+      worldSeed: "grinta-demo",
+      clubIndex: 0,
+    });
+
+    it("tem os 31 atributos de linha em todo jogador, na escala 0–100", () => {
+      for (const player of squad) {
+        for (const code of [
+          ...TECHNICAL_ATTRIBUTES,
+          ...PHYSICAL_ATTRIBUTES,
+          ...MENTAL_ATTRIBUTES,
+        ]) {
+          const value = player.attributes[code];
+          expect(Number.isSafeInteger(value)).toBe(true);
+          expect(value).toBeGreaterThanOrEqual(0);
+          expect(value).toBeLessThanOrEqual(100);
+        }
+      }
+    });
+
+    /** `null` não é `0`: zero diria "péssimo goleiro"; null diz "não se aplica". */
+    it("só o goleiro tem grid de goleiro; nos outros é null", () => {
+      for (const player of squad) {
+        const isGK = player.position === PlayerPosition.GK;
+        for (const code of GOALKEEPING_ATTRIBUTES) {
+          if (isGK) expect(player.attributes[code]).not.toBeNull();
+          else expect(player.attributes[code]).toBeNull();
+        }
+      }
+    });
+
+    it("tem os 2 goleiros do template", () => {
+      expect(squad.filter((p) => p.position === PlayerPosition.GK)).toHaveLength(
+        2,
+      );
+    });
+
+    /**
+     * O arquétipo tem de aparecer: um zagueiro marca melhor do que finaliza.
+     * Sem isso o grid é ruído com 39 colunas — e a R-179 queria o oposto.
+     */
+    it("o zagueiro marca melhor do que finaliza", () => {
+      const zagueiros = squad.filter((p) => p.position === PlayerPosition.CB);
+      expect(zagueiros.length).toBeGreaterThan(0);
+      for (const cb of zagueiros) {
+        expect(cb.attributes.marking).toBeGreaterThan(cb.attributes.finishing);
+      }
+    });
+
+    it("o atacante finaliza melhor do que marca", () => {
+      for (const st of squad.filter((p) => p.position === PlayerPosition.ST)) {
+        expect(st.attributes.finishing).toBeGreaterThan(st.attributes.marking);
+      }
+    });
+  });
+});
