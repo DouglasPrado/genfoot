@@ -72,10 +72,10 @@ export function LiveMatch() {
   const { client, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ readonly currentDate: string }>("world");
   const matchQuery = useWorldQuery<MatchesProjection>("matches-detail");
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const realtime = useMobileRealtime(worldId);
   const clubs = new Map(
-    (clubQuery.data?.clubs ?? []).map((club) => [club.id, club.identity.name]),
+    (clubQuery.data?.clubs ?? []).map((club) => [club.id, club.name]),
   );
   const matches = matchQuery.data?.matches ?? [];
   const focus =

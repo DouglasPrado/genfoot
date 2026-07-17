@@ -27,6 +27,7 @@ import {
   type VisualIdentity,
 } from "@/screens/club/customization/visual-identity";
 import { deriveScreenState } from "@/lib/screen-state";
+import { useAuth, useUser } from "@clerk/expo";
 import { useWorldQuery } from "@/lib/world";
 import { useWorldId } from "@/lib/world";
 import { useSession } from "@/lib/session";
@@ -67,18 +68,30 @@ interface LedgerSummaryProjection {
 
 /** Tela de Clube: identidade, finanças e infraestrutura. */
 export function Club() {
+  const { isLoaded, isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
   const worldId = useWorldId();
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
+  /**
+   * `ledger` (C9) e `narrative` (C11) foram apagados no extermínio (R-175) e
+   * respondem 404. As duas queries FICAM, e a tela já fazia a coisa certa:
+   * degrada dizendo "Nenhum saldo estimado será exibido" e omite a torcida em
+   * vez de inventar número.
+   *
+   * Não mockei dinheiro aqui, e a diferença para o admin é deliberada: lá o mock
+   * leva selo e o operador sabe ler; aqui o jogador contrataria em cima de um
+   * número inventado. Volta com C9 — e aí a tela liga sozinha.
+   */
   const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const identity = identityQuery.state === "empty" ? null : identityQuery.data;
   const controlStep = deriveOnboardingStep(
     identity,
-    session?.subject ?? "",
+    session?.accountId ?? null,
     worldQuery.data?.currentDate ?? "",
   );
   const managedClub = selectManagedClub(
@@ -89,12 +102,13 @@ export function Club() {
     managedClub === null
       ? null
       : {
-          name: managedClub.identity.name.toUpperCase(),
+          name: managedClub.name.toUpperCase(),
           reputation: Math.min(
             100,
             Math.max(0, managedClub.reputationBand * 20),
           ),
-          stadium: managedClub.stadium,
+          stadiumName: managedClub.stadiumName,
+          stadiumCapacity: managedClub.stadiumCapacity,
           infrastructure: buildClubInfrastructure(managedClub),
         };
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
@@ -102,16 +116,34 @@ export function Club() {
   const [customizeTracking, setCustomizeTracking] =
     useState<TrackedCommandResult | null>(null);
 
-  const visualIdentity =
-    managedClub?.identity.visualIdentity ??
-    (managedClub === null ? null : defaultVisualIdentity(managedClub.id));
+  /**
+   * A identidade visual do clube, ou a derivada do nome.
+   *
+   * O read model entrega as cores planas (`primaryColor`…) porque elas moram no
+   * PERÍODO de identidade, e quem resolve qual período vale hoje é ele (BC-003).
+   * `crestTemplateId` nulo = clube nunca personalizado — e aí vale a mesma
+   * identidade default determinística que o admin usa, derivada do nome.
+   */
+  const visualIdentity: VisualIdentity | null =
+    managedClub === null
+      ? null
+      : managedClub.crestTemplateId !== null && managedClub.primaryColor !== null
+        ? {
+            primaryColor: managedClub.primaryColor,
+            secondaryColor: managedClub.secondaryColor ?? "#F8FAFC",
+            tertiaryColor: null,
+            homeKitTemplateId: "kit-solid",
+            awayKitTemplateId: "kit-solid",
+            crestTemplateId: managedClub.crestTemplateId,
+          }
+        : defaultVisualIdentity(managedClub.name);
   const fanbaseSize =
     narrativeQuery.data?.clubs?.find(
       (entry) => entry.clubId === managedClub?.id,
     )?.fanbaseSize ?? null;
   const takenNames = (clubQuery.data?.clubs ?? [])
     .filter((club) => club.id !== managedClub?.id)
-    .map((club) => normalizeClubName(club.identity.name));
+    .map((club) => normalizeClubName(club.name));
 
   const submitCustomize = useCallback(
     (input: {
@@ -138,19 +170,18 @@ export function Club() {
       void submitTrackedCommand(client, {
         clientContractVersion: "v1",
         serverContractVersion: contractVersion,
-        commandType: "club:command",
+        // `club:command` morreu com o `WorldClubPortfolio` (R-175). O command
+        // agora é o do catálogo: `ApplyClubIdentity` (`:386`, MF-25).
+        commandType: "club:apply-identity",
         worldId,
-        expectedVersion: managedClub.version,
         payload: {
           clubId: managedClub.id,
-          actorId: session?.subject ?? "mobile",
-          occurredAt: worldDate,
-          command: {
-            type: "UpdateClubVisualIdentity",
-            name: input.name,
-            shortCode: input.shortCode,
-            visualIdentity: input.visualIdentity,
-          },
+          // Concorrência otimista por agregado (R-175): vai no PAYLOAD, que é
+          // onde o command a lê.
+          expectedVersion: managedClub.version,
+          name: input.name,
+          shortCode: input.shortCode,
+          visualIdentity: input.visualIdentity,
         },
         idempotencyKey,
         correlationId: `mobile:${idempotencyKey}`,
@@ -172,7 +203,6 @@ export function Club() {
       contractVersion,
       managedClub,
       narrativeQuery,
-      session?.subject,
       worldId,
       worldQuery.data?.currentDate,
     ],
@@ -188,10 +218,10 @@ export function Club() {
         return;
       }
       const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
-      const cooldownUntil = addWorldDays(
-        worldDate,
-        identity?.cooldownDays ?? 30,
-      );
+      // R-26. `cooldownDays` saiu da projeção de identidade: era config de mundo
+      // lida do mega-agregado, e config de mundo é `GameRuleConfig` (R-182) —
+      // que ainda não existe. Constante declarada, não número mágico escondido.
+      const cooldownUntil = addWorldDays(worldDate, COOLDOWN_DAYS);
       Alert.alert(
         reason === "EXIT" ? "Deixar o clube?" : "Iniciar troca de clube?",
         `O controle será encerrado agora. Você só poderá assumir outro clube a partir de ${cooldownUntil}. O histórico do clube será preservado.`,
@@ -254,7 +284,6 @@ export function Club() {
       client,
       contractVersion,
       controlStep,
-      identity?.cooldownDays,
       identityQuery.refetch,
       worldId,
       worldQuery.data?.currentDate,
@@ -264,12 +293,10 @@ export function Club() {
   const refresh = useCallback(() => {
     clubQuery.refetch();
     identityQuery.refetch();
-    ledgerQuery.refetch();
     worldQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
-    ledgerQuery.refetch,
     worldQuery.refetch,
   ]);
   const screenState = deriveScreenState({
@@ -340,7 +367,7 @@ export function Club() {
               <Text style={styles.title}>{vm.name}</Text>
               <Icon name="shirt" size={16} color={color.primary} />
             </View>
-            <Text style={styles.subtitle}>{vm.stadium.name}</Text>
+            <Text style={styles.subtitle}>{vm.stadiumName}</Text>
             <View style={styles.repRow}>
               <Text style={styles.repLabel}>REPUTAÇÃO</Text>
               <View style={styles.repBar}>
@@ -396,7 +423,7 @@ export function Club() {
               <Text style={styles.financeUnavailableText}>
                 {ledgerQuery.state === "loading"
                   ? "Sincronizando o livro financeiro…"
-                  : "O financeiro do clube ainda não foi inicializado. Nenhum saldo estimado será exibido."}
+                  : "O financeiro ainda não existe neste mundo. Nenhum saldo estimado será exibido."}
               </Text>
             </View>
           )}
@@ -440,6 +467,52 @@ export function Club() {
                   <Text style={styles.exitText}>DEIXAR CLUBE</Text>
                 </Pressable>
               </View>
+            )}
+          </Card>
+        ) : null}
+
+        {/* Conta vive aqui provisoriamente; a casa canônica é o M-ACCOUNT
+            ("Conta e sessão", L-M09), que ainda não existe. O card mostra o
+            estado real em vez de sumir: hoje a sessão do jogo é independente
+            do Clerk, então dá para estar "no clube" e fora da conta. */}
+        {isLoaded ? (
+          <Card>
+            <SectionHeader
+              title="CONTA"
+              trailing={<Icon name="person" size={16} color={color.textMuted} />}
+            />
+            {isSignedIn ? (
+              <>
+                <Text style={styles.controlNote}>
+                  {user?.primaryEmailAddress?.emailAddress ?? "Conta conectada"}
+                  {"\n"}Sair encerra a sessão neste aparelho. Seu clube e seu
+                  progresso continuam intactos.
+                </Text>
+                <Pressable
+                  style={styles.signOutButton}
+                  onPress={() => void signOut()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Sair da conta"
+                >
+                  <Text style={styles.signOutText}>SAIR DA CONTA</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.controlNote}>
+                  Nenhuma conta conectada neste aparelho. O jogo ainda usa a
+                  sessão de desenvolvimento — por isso o clube aparece mesmo
+                  sem conta.
+                </Text>
+                <Pressable
+                  style={styles.signOutButton}
+                  onPress={() => router.push("/cadastro")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar conta"
+                >
+                  <Text style={styles.signOutText}>CRIAR CONTA</Text>
+                </Pressable>
+              </>
             )}
           </Card>
         ) : null}
@@ -494,9 +567,9 @@ export function Club() {
             }
           />
           <View style={styles.stadiumRow}>
-            <Text style={styles.stadiumName}>{vm.stadium.name}</Text>
+            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
             <Text style={styles.stadiumCap}>
-              {formatAmount(vm.stadium.capacity)} lugares
+              {formatAmount(vm.stadiumCapacity)} lugares
             </Text>
           </View>
         </Card>
@@ -507,8 +580,8 @@ export function Club() {
           visible={customizeOpen}
           onClose={() => setCustomizeOpen(false)}
           clubId={managedClub.id}
-          clubName={managedClub.identity.name}
-          clubShortCode={managedClub.identity.shortCode}
+          clubName={managedClub.name}
+          clubShortCode={managedClub.shortCode}
           initial={visualIdentity}
           takenNames={takenNames}
           submitting={
@@ -525,6 +598,9 @@ export function Club() {
     </SafeAreaView>
   );
 }
+
+/** R-26: o cooldown de saída. Volta para `GameRuleConfig` com C2 (R-182). */
+const COOLDOWN_DAYS = 30;
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
@@ -725,5 +801,20 @@ const styles = StyleSheet.create({
     color: color.danger,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black as "800",
+  },
+  signOutButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    marginTop: space.sm,
+  },
+  signOutText: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
   },
 });

@@ -107,6 +107,9 @@ A documentação está organizada em áreas, do "porquê" ao "como":
 - [Hierarquia normativa e ratificação](99-decisoes/hierarquia-normativa-e-ratificacao.md)
 - [Baseline ratificada em 2026-07-13](99-decisoes/baseline-ratificada-2026-07-13.md)
 - [Fechamentos complementares R-149..R-170](99-decisoes/fechamentos-complementares-2026-07-13.md)
+- [Provedor de identidade R-171](99-decisoes/provedor-de-identidade-2026-07-16.md)
+- [Conta global e Postgres R-172/R-173](99-decisoes/conta-global-e-postgres-2026-07-16.md)
+- [Reescrita do core R-175..R-182](99-decisoes/reescrita-do-core-2026-07-16.md)
 
 ---
 

@@ -2,30 +2,96 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+const alias = {
+  "@grinta/core": fileURLToPath(
+    new URL("./packages/core/src/index.ts", import.meta.url),
+  ),
+  "@grinta/persistence": fileURLToPath(
+    new URL("./packages/persistence/src/index.ts", import.meta.url),
+  ),
+  "@grinta/shared": fileURLToPath(
+    new URL("./packages/shared/src/index.ts", import.meta.url),
+  ),
+};
+
+/**
+ * Testes que falam com o Postgres de verdade (R-173).
+ *
+ * **Os e2e da API entram aqui, e a ausência deles custava caro.** Eles sobem o
+ * Nest, e desde R-173 o Nest só fala com o Postgres — são testes de banco. Mas
+ * estavam no projeto `unit`, rodando em PARALELO com este: o TRUNCATE daqui
+ * apagava o mundo que o `world:create` de lá acabara de gravar, e a query
+ * seguinte voltava 404. Passavam ou não conforme o escalonador — exatamente o
+ * "gate que oscila" que o comentário do `singleFork` descreve, e do qual eles
+ * eram os únicos de fora.
+ *
+ * O disfarce era o `GRINTA_API_DATA_DIR` que eles ainda configuram: resquício da
+ * era do adapter JSON, quando de fato não tocavam banco. Viraram testes de
+ * Postgres quando o JSON morreu, e ninguém os mudou de projeto.
+ */
+const POSTGRES_TESTS = [
+  "packages/persistence/tests/{prisma-*,identity-commands,club-commands}.test.ts",
+  "apps/api/test/*.e2e.test.ts",
+];
+
+const UNIT_TESTS = [
+  "packages/**/*.test.ts",
+  "apps/api/**/*.test.ts",
+  "apps/mobile/**/*.test.ts",
+  "apps/admin/**/*.test.ts",
+];
+
+/**
+ * A suíte inteira aponta para o banco DE TESTE — inclusive a e2e da API, que
+ * sobe o Nest e o Nest lê `DATABASE_URL` (o boot exige o banco desde que o JSON
+ * morreu).
+ *
+ * Sem este override, rodar `pnpm test` com a API de dev configurada escrevia (e,
+ * pelo TRUNCATE do harness, APAGAVA) o banco de desenvolvimento. Foi o que
+ * aconteceu: o gate verde levou junto os 16 clubes do mundo que eu acabara de
+ * provar por HTTP, e o admin abriu vazio.
+ *
+ * `TEST_DATABASE_URL` vazia deixa `DATABASE_URL` vazia de propósito: os testes
+ * de Postgres se PULAM dizendo por quê, em vez de cair no banco que estiver por
+ * perto.
+ */
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
+
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@grinta/core": fileURLToPath(
-        new URL("./packages/core/src/index.ts", import.meta.url),
-      ),
-      "@grinta/persistence": fileURLToPath(
-        new URL("./packages/persistence/src/index.ts", import.meta.url),
-      ),
-      "@grinta/shared": fileURLToPath(
-        new URL("./packages/shared/src/index.ts", import.meta.url),
-      ),
-    },
-  },
+  resolve: { alias },
   test: {
-    include: [
-      "packages/**/*.test.ts",
-      "apps/simulator/**/*.test.ts",
-      "apps/api/**/*.test.ts",
-      "apps/mobile/**/*.test.ts",
-      "scripts/roadmap/**/*.test.ts",
-    ],
+    env: { DATABASE_URL: TEST_DATABASE_URL },
     coverage: {
       reporter: ["text", "json", "html"],
     },
+    projects: [
+      {
+        resolve: { alias },
+        test: {
+          name: "unit",
+          include: UNIT_TESTS,
+          exclude: ["**/node_modules/**", "**/dist/**", ...POSTGRES_TESTS],
+        },
+      },
+      {
+        resolve: { alias },
+        test: {
+          name: "postgres",
+          include: POSTGRES_TESTS,
+          /**
+           * Um banco só, e cada arquivo dá TRUNCATE nas tabelas que usa. Em
+           * paralelo, o TRUNCATE de um corre contra o INSERT do outro — e a
+           * suíte reprova um número diferente de testes a cada rodada. Gate que
+           * oscila não é gate.
+           *
+           * `singleFork` (e não `fileParallelism`, que só vale na raiz) põe
+           * estes arquivos num processo só, em série. Custa segundos e não
+           * afeta o projeto `unit`, que segue em paralelo.
+           */
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true } },
+        },
+      },
+    ],
   },
 });

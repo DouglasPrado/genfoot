@@ -10,18 +10,28 @@ import {
   Req,
 } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
-import type { JsonWorldRepository } from "@grinta/persistence";
+import type {
+  ClubControlRepository,
+  ClubRepository,
+  ClubUnitOfWork,
+  IdentityUnitOfWork,
+  WorldRepository,
+} from "@grinta/core";
 import type { Request } from "express";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
-import { registeredQueryTypes } from "../queries/query-registry.js";
+import { registeredQueryNames } from "../queries/query-registry.js";
 
 import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
+  CLUB_CONTROL_REPOSITORY,
+  CLUB_REPOSITORY,
+  CLUB_UNIT_OF_WORK,
+  GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
+  IDENTITY_UNIT_OF_WORK,
   REALTIME_PUBLISHER,
-  WORLD_REPOSITORY,
 } from "../core/tokens.js";
 import type { RealtimePublisher } from "../realtime/realtime-publisher.js";
 import {
@@ -40,9 +50,17 @@ const SUPPORTED_CONTRACT_VERSIONS = new Set(["v1"]);
 @Controller("commands")
 export class CommandsController {
   constructor(
-    @Inject(WORLD_REPOSITORY) private readonly repository: JsonWorldRepository,
+    @Inject(CLUB_REPOSITORY) private readonly clubs: ClubRepository,
+    @Inject(CLUB_CONTROL_REPOSITORY)
+    private readonly controls: ClubControlRepository,
+    @Inject(CLUB_UNIT_OF_WORK)
+    private readonly clubUnitOfWork: ClubUnitOfWork,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
+    @Inject(IDENTITY_UNIT_OF_WORK)
+    private readonly identityUnitOfWork: IdentityUnitOfWork,
+    // O mundo é tabela, sempre (R-173/R-182) — raiz de tudo.
+    @Inject(GAME_WORLD_REPOSITORY) private readonly worlds: WorldRepository,
   ) {}
 
   @ApiOperation({
@@ -59,7 +77,7 @@ export class CommandsController {
     const commands = registeredCommandTypes();
     return {
       commands,
-      queries: registeredQueryTypes(),
+      queries: registeredQueryNames(),
       commandCount: commands.length,
     };
   }
@@ -68,10 +86,7 @@ export class CommandsController {
     summary: "Envia um command (envelope idempotente)",
     description:
       "commandType roteia para o caso de uso. Resposta: ACCEPTED | " +
-      "ALREADY_APPLIED | REJECTED. 127 tipos em 17 contextos (world, club, " +
-      "market, ledger, infrastructure, scheduler, season, automation, staff, " +
-      "competition, player, narrative, inbox, admin, identity, eventing, match). " +
-      "Veja GET /commands/catalog.",
+      "ALREADY_APPLIED | REJECTED. Veja GET /commands/catalog.",
   })
   @ApiBody({
     schema: {
@@ -172,7 +187,16 @@ export class CommandsController {
     const commandId = randomUUID();
     let result;
     try {
-      result = await handler({ repository: this.repository, envelope });
+      result = await handler({
+        clubs: this.clubs,
+        controls: this.controls,
+        clubUnitOfWork: this.clubUnitOfWork,
+        // Quem agiu vem do TOKEN, não do corpo. O evento grava isso.
+        actorId: request.session?.accountId ?? null,
+        identityUnitOfWork: this.identityUnitOfWork,
+        worlds: this.worlds,
+        envelope,
+      });
     } catch (error) {
       // Rede de segurança: nenhum command derruba a API com 500. Qualquer
       // exceção do domínio/adapter vira REJECTED com correlationId preservado.

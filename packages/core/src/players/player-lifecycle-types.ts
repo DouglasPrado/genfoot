@@ -1,6 +1,12 @@
 import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 
 import type {
+  PlayerAttributeCode,
+  PlayerAttributeRollup,
+  PlayerAttributes,
+} from "./player-attributes.js";
+
+import type {
   DominantFoot,
   PlayerId,
   PlayerPosition,
@@ -52,12 +58,13 @@ export interface PersonLifecycleSnapshot {
   readonly version: number;
 }
 
-export interface PlayerAttributeGroups {
-  readonly technical: number;
-  readonly physical: number;
-  readonly mental: number;
-  readonly goalkeeping: number;
-}
+/**
+ * Os 4 grupos — **rollup derivado para exibição** (R-179), nunca fonte.
+ *
+ * Reexportado de `player-attributes.ts`, que é onde o grid de 39 vive. Quem
+ * decide qualquer coisa lê os 39; isto é o que a tela mostra no card.
+ */
+export type PlayerAttributeGroups = PlayerAttributeRollup;
 
 export interface PlayerDynamicState {
   readonly morale: number;
@@ -78,7 +85,7 @@ export interface PlayerLifecycleSnapshot {
   readonly availability: PlayerAvailability;
   readonly generationSource: PlayerGenerationSource;
   readonly generatedAtSeasonNumber: number;
-  readonly attributes: PlayerAttributeGroups;
+  readonly attributes: PlayerAttributes;
   readonly currentAbility: number;
   readonly potentialAbility: number;
   readonly dynamicState: PlayerDynamicState;
@@ -101,7 +108,12 @@ export interface PlayerGeneratedEvent {
   readonly idempotencyKey: string;
 }
 
-export type PlayerAttributeCode = keyof PlayerAttributeGroups;
+/**
+ * O código de um atributo — agora um dos 39 do GDD §2 (R-188), não uma das 4
+ * chaves do rollup. É o que `applyAttributeChange` e o histórico de evolução
+ * endereçam: treinar "mental" não é treinar nada, treinar `composure` é.
+ */
+export type { PlayerAttributeCode };
 
 export interface PlayerDevelopmentHistoryEntry {
   readonly id: PlayerDevelopmentHistoryId;

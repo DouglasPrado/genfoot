@@ -1,183 +1,45 @@
-import {
-  InspectAdmin,
-  InspectAutomation,
-  InspectClubPortfolio,
-  InspectCompetitions,
-  InspectEventing,
-  InspectIdentity,
-  InspectInbox,
-  InspectLedger,
-  InspectMarket,
-  InspectMatches,
-  InspectPlayerLifecycle,
-  InspectStaff,
-  InspectWorldScheduler,
-} from "@grinta/core";
-import type { JsonWorldRepository } from "@grinta/persistence";
-import {
-  succeed,
-  type DomainError,
-  type GameWorldId,
-  type Result,
-} from "@grinta/shared";
-
-import { composeNarrativeProjection } from "./narrative-projection.js";
+import type { ClubReadModel, IdentityReadModel } from "@grinta/core";
+import { DomainError, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
- * Registry de queries do X-003. Cada tipo mapeia para um caso de uso de inspeção
- * de `@grinta/core` sobre o `worldId` — o adapter JSON implementa todas as portas.
+ * Registry de queries, depois do extermínio da arquitetura morta (R-175).
  * Somente leitura: nunca muta estado.
+ *
+ * Eram 15 queries, 13 delas lendo o adapter JSON — competições, partidas,
+ * mercado, razão, jogadores, staff, narrativa, inbox, admin, automação,
+ * eventing, scheduler. Todas morreram com os contextos que as serviam, e voltam
+ * quando uma tela precisar delas.
+ *
+ * **Há UM caminho de leitura: o Postgres.** Os read models são separados das
+ * portas de escrita de propósito (R-175): a escrita carrega UM agregado por id;
+ * a tela quer a lista do mundo. Ler pela porta de escrita traria de volta o
+ * "carregue o mundo inteiro" que a R-175 matou.
  */
+export interface QueryContext {
+  readonly identityReadModel: IdentityReadModel;
+  readonly clubReadModel: ClubReadModel;
+}
+
 export type QueryHandler = (
-  repository: JsonWorldRepository,
+  context: QueryContext,
   worldId: GameWorldId,
 ) => Promise<Result<unknown, DomainError>>;
 
 const handlers: Record<string, QueryHandler> = {
-  club: (repository, worldId) =>
-    new InspectClubPortfolio(repository).world(worldId),
-  competitions: async (repository, worldId) => {
-    const inspector = new InspectCompetitions(repository);
-    const summary = await inspector.summary(worldId);
-    if (!summary.ok) return summary;
-    const competitions = await inspector.world(worldId);
-    if (!competitions.ok) return competitions;
-    const nextFixture = competitions.value.fixtures
-      .filter(({ status }) => status === "SCHEDULED")
-      .slice()
-      .sort((left, right) => left.kickoffOn.localeCompare(right.kickoffOn))[0];
-    return succeed({
-      ...summary.value,
-      competitions: competitions.value.editions.map((edition) => ({
-        id: edition.id,
-        name: edition.name,
-        status: edition.status,
-        startOn: edition.startOn,
-      })),
-      nextKickoffOn: nextFixture?.kickoffOn ?? null,
-      fixtures: competitions.value.fixtures.map((fixture) => ({
-        id: fixture.id,
-        editionId: fixture.editionId,
-        round: fixture.round,
-        homeClubId: fixture.homeClubId,
-        awayClubId: fixture.awayClubId,
-        kickoffOn: fixture.kickoffOn,
-        status: fixture.status,
-        homeGoals: fixture.homeGoals,
-        awayGoals: fixture.awayGoals,
-      })),
-    });
-  },
-  matches: (repository, worldId) =>
-    new InspectMatches(repository).summary(worldId),
-  "matches-detail": (repository, worldId) =>
-    new InspectMatches(repository).world(worldId),
-  market: async (repository, worldId) => {
-    const inspector = new InspectMarket(repository);
-    const market = await inspector.summary(worldId);
-    if (!market.ok) return market;
-    const marketWorld = await inspector.world(worldId);
-    if (!marketWorld.ok) return marketWorld;
-    const lifecycle = await new InspectPlayerLifecycle(repository).world(
-      worldId,
-    );
-    if (!lifecycle.ok) return lifecycle;
-    const persons = new Map(
-      lifecycle.value.persons.map((person) => [person.id, person] as const),
-    );
-    const availablePlayers = lifecycle.value.players
-      .filter(({ careerStatus }) => careerStatus === "FREE_AGENT")
-      .map((player) => {
-        const person = persons.get(player.personId);
-        return {
-          id: player.id,
-          name:
-            person === undefined
-              ? "Jogador livre"
-              : `${person.firstName} ${person.lastName}`,
-          primaryPosition: player.primaryPosition,
-          currentAbility: player.currentAbility,
-          potentialAbility: player.potentialAbility,
-          nationality: person?.nationality ?? "--",
-        };
-      });
-    const playerName = (playerId: string): string => {
-      const player = lifecycle.value.players.find(({ id }) => id === playerId);
-      const person =
-        player === undefined ? undefined : persons.get(player.personId);
-      return person === undefined
-        ? "Jogador"
-        : `${person.firstName} ${person.lastName}`;
-    };
-    const playerCard = (playerId: string) => {
-      const player = lifecycle.value.players.find(({ id }) => id === playerId);
-      return {
-        playerName: playerName(playerId),
-        primaryPosition: player?.primaryPosition ?? "--",
-        currentAbility: player?.currentAbility ?? 0,
-        personId: player?.personId ?? null,
-      };
-    };
-    return succeed({
-      ...market.value,
-      availablePlayerCount: availablePlayers.length,
-      availablePlayers,
-      scoutingReports: marketWorld.value.scoutingReports,
-      negotiations: marketWorld.value.negotiations.map((negotiation) => ({
-        ...negotiation,
-        ...playerCard(negotiation.playerId),
-      })),
-      listings: (marketWorld.value.listings ?? []).map((listing) => ({
-        ...listing,
-        ...playerCard(listing.playerId),
-      })),
-      transfers: marketWorld.value.transfers ?? [],
-      loans: marketWorld.value.loans ?? [],
-    });
-  },
-  ledger: async (repository, worldId) => {
-    const inspector = new InspectLedger(repository);
-    const summary = await inspector.summary(worldId);
-    if (!summary.ok) return summary;
-    const ledger = await inspector.world(worldId);
-    if (!ledger.ok) return ledger;
-    const clubBalances = ledger.value.accounts
-      .filter(({ idempotencyKey }) =>
-        idempotencyKey.startsWith("genesis:club-cash:"),
-      )
-      .map((account) => ({
-        clubId: account.idempotencyKey.slice("genesis:club-cash:".length),
-        balanceMinor: account.balanceMinor,
-      }));
-    return succeed({ ...summary.value, clubBalances });
-  },
-  players: (repository, worldId) =>
-    new InspectPlayerLifecycle(repository).summary(worldId),
-  "player-roster": (repository, worldId) =>
-    new InspectPlayerLifecycle(repository).world(worldId),
-  staff: (repository, worldId) => new InspectStaff(repository).summary(worldId),
-  narrative: (repository, worldId) =>
-    composeNarrativeProjection(repository, worldId),
-  inbox: (repository, worldId) => new InspectInbox(repository).summary(worldId),
-  admin: (repository, worldId) => new InspectAdmin(repository).summary(worldId),
-  automation: (repository, worldId) =>
-    new InspectAutomation(repository).summary(worldId),
-  eventing: (repository, worldId) =>
-    new InspectEventing(repository).summary(worldId),
-  identity: (repository, worldId) =>
-    new InspectIdentity(repository).summary(worldId),
-  "identity-detail": (repository, worldId) =>
-    new InspectIdentity(repository).world(worldId),
-  scheduler: (repository, worldId) =>
-    new InspectWorldScheduler(repository).execute(worldId),
+  club: async ({ clubReadModel }, worldId) =>
+    succeed(await clubReadModel.summary(worldId)),
+  "club-detail": async ({ clubReadModel }, worldId) =>
+    succeed(await clubReadModel.worldView(worldId)),
+  identity: async ({ identityReadModel }, worldId) =>
+    succeed(await identityReadModel.summary(worldId)),
+  "identity-detail": async ({ identityReadModel }, worldId) =>
+    succeed(await identityReadModel.worldView(worldId)),
 };
 
-export function resolveQueryHandler(
-  queryType: string,
-): QueryHandler | undefined {
-  return handlers[queryType];
+export function resolveQueryHandler(name: string): QueryHandler | undefined {
+  return handlers[name];
 }
 
-export function registeredQueryTypes(): readonly string[] {
+export function registeredQueryNames(): readonly string[] {
   return Object.keys(handlers);
 }

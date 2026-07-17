@@ -55,3 +55,14 @@ export function deterministicUuidV7<TKind extends string>(
     hexadecimal.slice(10).join(""),
   ].join("-") as EntityId<TKind>;
 }
+
+/**
+ * Milissegundos de uma data do mundo (YYYY-MM-DD), à meia-noite UTC.
+ *
+ * Alimenta o `timestampMilliseconds` do `deterministicUuidV7`: o id sai da data
+ * DO MUNDO, nunca do relógio da máquina — é isso que mantém o domínio
+ * determinístico e o replay reproduzível.
+ */
+export function timestampOf(worldDate: string): number {
+  return Date.parse(`${worldDate}T00:00:00.000Z`);
+}

@@ -7,8 +7,9 @@ import {
   type RulesetVersion,
 } from "@grinta/shared";
 
-import { calculatePlayerOverall } from "../genesis/world-genesis-generator.js";
 import type { GeneratedPlayer } from "../genesis/genesis-types.js";
+
+import { derivePlayerOverall } from "./player-attributes.js";
 import {
   PlayerAvailability,
   PlayerCareerStatus,
@@ -43,7 +44,7 @@ export class Player {
         generationSource: player.generationSource,
         generatedAtSeasonNumber: 1,
         attributes: player.attributes,
-        currentAbility: calculatePlayerOverall(player),
+        currentAbility: derivePlayerOverall(player.primaryPosition, player.attributes),
         potentialAbility: player.potentialAbility,
         dynamicState: {
           morale: 50,
@@ -67,7 +68,11 @@ export class Player {
       !validScore(snapshot.currentAbility) ||
       !validScore(snapshot.potentialAbility) ||
       snapshot.currentAbility > snapshot.potentialAbility ||
-      !Object.values(snapshot.attributes).every(validScore) ||
+      // `null` é legítimo aqui, e só aqui: é o grid de goleiro em quem não é
+      // goleiro. Não é "atributo zero" — é "não se aplica" (R-188).
+      !Object.values(snapshot.attributes)
+        .filter((value) => value !== null)
+        .every(validScore) ||
       !Object.values(snapshot.dynamicState).every(validScore) ||
       !Number.isSafeInteger(snapshot.version) ||
       snapshot.version < 1
@@ -140,7 +145,21 @@ export class Player {
     }
     const date = WorldDate.parse(input.worldDate);
     if (!date.ok) return date;
+
     const previousValue = this.state.attributes[input.attributeCode];
+    // Uma regra que os 4 grupos não conseguiam nem enunciar: treinar reflexo de
+    // goleiro num atacante. O atributo é `null` nele — "não se aplica" —, e
+    // isso é recusa, não um treino que rende zero.
+    if (previousValue === null) {
+      return fail(
+        new DomainError(
+          "ATTRIBUTE_NOT_APPLICABLE",
+          "Esse atributo não se aplica à posição do jogador.",
+          { playerId: this.state.id, attributeCode: input.attributeCode },
+        ),
+      );
+    }
+
     let nextValue = Math.max(
       previousValue - 6,
       Math.min(previousValue + 6, input.requestedValue),
@@ -187,20 +206,18 @@ export class Player {
     return this.state;
   }
 
+  /**
+   * A nota do jogador com UM atributo trocado — sem materializar a troca.
+   *
+   * Isto montava um `GeneratedPlayer` inteiro e falso só para chamar o cálculo
+   * do gerador, com um `clubId` de UUID zerado no meio. A nota nunca dependeu
+   * de clube: ela é `(posição, atributos)`, e é essa a assinatura de
+   * `derivePlayerOverall`.
+   */
   private overallWith(code: PlayerAttributeCode, value: number): number {
-    return calculatePlayerOverall({
-      id: this.state.id,
-      personId: this.state.personId,
-      clubId:
-        "00000000-0000-7000-8000-000000000000" as GeneratedPlayer["clubId"],
-      primaryPosition: this.state.primaryPosition,
-      ...(this.state.secondaryPosition === undefined
-        ? {}
-        : { secondaryPosition: this.state.secondaryPosition }),
-      dominantFoot: this.state.dominantFoot,
-      attributes: { ...this.state.attributes, [code]: value },
-      potentialAbility: this.state.potentialAbility,
-      generationSource: "INITIAL_WORLD",
+    return derivePlayerOverall(this.state.primaryPosition, {
+      ...this.state.attributes,
+      [code]: value,
     });
   }
 }

@@ -64,7 +64,7 @@ function combinedQueryState(states: readonly QueryState[]): QueryState {
 /** Painel de comando do clube: somente projeções oficiais, sem seeds de demo. */
 export function Home() {
   const { session, status } = useSession();
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const competitionQuery =
@@ -78,7 +78,7 @@ export function Home() {
   const onboarding =
     session === null
       ? null
-      : deriveOnboardingStep(identity, session.subject, clubQuery.asOf ?? "");
+      : deriveOnboardingStep(identity, session.accountId, clubQuery.asOf ?? "");
   const club = selectManagedClub(
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
@@ -91,7 +91,7 @@ export function Home() {
     ) {
       return;
     }
-    if (deriveOnboardingStep(identity, session.subject).kind !== "complete") {
+    if (deriveOnboardingStep(identity, session.accountId).kind !== "complete") {
       router.replace("/onboarding");
     }
   }, [identity, identityQuery.state, session]);
@@ -142,15 +142,15 @@ export function Home() {
             <View style={styles.hero}>
               <View style={styles.crest}>
                 <Text style={styles.crestText}>
-                  {club.identity.shortCode.slice(0, 3)}
+                  {club.shortCode.slice(0, 3)}
                 </Text>
               </View>
               <View style={styles.heroText}>
                 <Text style={styles.eyebrow}>SEU CLUBE</Text>
-                <Text style={styles.title}>{club.identity.name}</Text>
+                <Text style={styles.title}>{club.name}</Text>
                 <Text style={styles.subtitle}>
-                  {club.stadium.name} ·{" "}
-                  {club.stadium.capacity.toLocaleString("pt-BR")} lugares
+                  {club.stadiumName} ·{" "}
+                  {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                 </Text>
               </View>
             </View>

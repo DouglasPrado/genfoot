@@ -8,6 +8,9 @@ import { AllExceptionsFilter } from "./common/all-exceptions.filter.js";
 import { CoreModule } from "./core/core.module.js";
 import { API_INFO, type ApiInfo } from "./core/tokens.js";
 import { HealthController } from "./health/health.controller.js";
+import { UploadsController } from "./uploads/uploads.controller.js";
+import { R2Storage } from "./uploads/r2-storage.js";
+import { OBJECT_STORAGE } from "./core/tokens.js";
 import { QueriesController } from "./queries/queries.controller.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { ValidationController } from "./validation/validation.controller.js";
@@ -18,9 +21,11 @@ import { ValidationController } from "./validation/validation.controller.js";
     HealthController,
     CommandsController,
     QueriesController,
+    UploadsController,
     ValidationController,
   ],
   providers: [
+    { provide: OBJECT_STORAGE, useClass: R2Storage },
     {
       provide: API_INFO,
       useValue: { contractVersion: "v1" } satisfies ApiInfo,

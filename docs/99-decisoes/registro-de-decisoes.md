@@ -460,4 +460,42 @@ As decisões **R-149..R-170 estão RATIFICADAS** e fecham os resíduos descobert
 
 A definição completa e o racional de cada uma vivem em [`fechamentos-complementares-2026-07-13.md`](fechamentos-complementares-2026-07-13.md). Esta seção é o índice normativo; em conflito com texto anterior ainda não propagado, R-149..R-170 prevalecem.
 
-> **Estado consolidado:** R-01..R-170 RATIFICADAS, exceto R-35..R-40 e R-108 reservados.
+### R-171 — Provedor de identidade · RATIFICADA em 2026-07-16
+
+- **R-171 — Clerk como provedor de identidade** (materializa R-85/R-95/R-131): o Clerk detém credencial, unicidade de e-mail, verificação, recuperação de acesso, Google/Apple e MFA. A conta do jogo segue sendo a fonte de verdade (R-85); a API verifica o token pela chave pública e deriva o `subject` do `sub` verificado, em vez de aceitar `subject` arbitrário.
+
+A definição completa, as consequências aceitas e as pendências abertas vivem em [`provedor-de-identidade-2026-07-16.md`](provedor-de-identidade-2026-07-16.md).
+
+### R-172..R-174 — Conta global, Postgres e fim da auth duplicada · RATIFICADAS em 2026-07-16
+
+- **R-172 — A conta é global; o domínio se dobra ao modelo canônico.** `UserAccount` é entidade de plataforma, sem `gameWorldId`, com e-mail único; `WorldParticipant` faz o vínculo por mundo. O modelo físico (`02-modelo-de-dados.md §6.3.1` + `prisma/schema.prisma`) está certo; foi `packages/core` que divergiu. Materializa o que R-85 já dizia.
+- **R-174 — A máquina de sessão e credencial sai do domínio.** R-171 já entregou o ciclo de token ao Clerk "sem reimplementação própria"; o domínio mantinha uma auth paralela que ninguém chamava. Saem `UserSession`/`SessionFamily`/`UserCredential` do core e os commands `identity:start-session`/`refresh-session`/`revoke-session`/`register-account`.
+- **R-173 — Postgres é o único armazenamento; o adapter JSON é descontinuado.** A migração é porta por porta (16), mas o destino é único: dois armazenamentos convivendo, sem transação atravessando, é pior que qualquer um sozinho.
+
+A definição completa, as consequências e as pendências vivem em [`conta-global-e-postgres-2026-07-16.md`](conta-global-e-postgres-2026-07-16.md).
+
+### R-175..R-182 — Reescrita do core: agregados, eventos, tempo, dinheiro · RATIFICADAS em 2026-07-16
+
+R-173 tornou o Postgres o único armazenamento, e a primeira porta migrada revelou que a divergência era estrutural: o domínio construiu **16 mega-agregados** (`World<X>`, um por mundo) onde o context map define **~70 roots por entidade**. Um levantamento dos 16 contextos (snapshot × context map × schema) mostrou que **nenhuma das três fontes é confiável sozinha** — o schema viola o próprio canon em `Player.clubId` e `StaffContract.club`, e o doc nomeia roots que não existem em lado nenhum.
+
+- **R-175 — O agregado é a entidade, não o mundo. `revision` morre.** Cada root vira carregável/salvável isoladamente com `version` por linha. Hoje qualquer escrita em qualquer jogador de um mundo contende no mesmo inteiro.
+- **R-176 — Eventos vivem em `DomainEventLog`, tipados, com hash sobre o payload. Corrige R-133.** O `events[]` dentro do estado (12 snapshots) nunca é drenado e cresce sem limite. `OutboxEvent` passa a carregar `payloadJson`, não só o hash — hoje o outbox é estruturalmente incapaz de publicar. Evento é união discriminada tipada, não `type: string` + payload opaco.
+- **R-177 — O tempo do mundo é data (`YYYY-MM-DD`); tick existe só dentro da partida.** E tick não é minuto: o domínio o chama de *chance*. Converter seria lossy.
+- **R-178 — Só partidas dobradas; `FinancialTransaction` morre.** Havia duas contabilidades concorrentes no schema, e nada impedia lançar dinheiro fora do razão balanceado. `balanceMinor` sai do agregado: saldo deriva do ledger (Decisão 19.10).
+- **R-179 — Jogador tem 32 atributos granulares.** Os 4 grupos viram rollup derivado. Com 4, scouting/treino/tática não têm sobre o que operar.
+- **R-180 — IA é a ausência de controle, não um tipo de controle.** `ClubControl.controlType` exigia um `WorldParticipant` fantasma numa FK NOT NULL.
+- **R-181 — Dinheiro é `bigint` + `currencyId`; a `model Currency` passa a existir.** O domínio usava `number` (double IEEE-754) para todo dinheiro; 17 colunas `currencyId` apontavam para uma tabela inexistente.
+- **R-182 — Seed, data inicial e sequência do mundo são colunas.** `GameWorld.seed` não tinha coluna — sem ele não há replay, que é invariante canônica. E o mundo inicial deixa de ser literal de tipo (`rounds: 30`, `generatedClubCount: 16`).
+
+- **R-183 — Nem todo root do context map é root.** Departamento e estádio são filhos do clube: root é o que precisa de fronteira por CONTENÇÃO, não por vocabulário.
+- **R-184 — A idempotência guarda o fingerprint do PEDIDO.** Mesma chave com corpo diferente é `IDEMPOTENCY_KEY_REUSED`, não sucesso silencioso.
+- **R-185 — A gênese não é armazenada.** É função pura do seed; o que persiste é o efeito dela.
+- **R-186 — O barramento valida o payload.** Os errorCodes passam a ser os do catálogo, não os que o domínio inventou.
+- **R-187 — Um comando, um evento.** `ClubIdentityPeriod` não é root. Corolário: root precisa passar por DOIS testes — contenção (R-183) e `version` no físico.
+- **R-188 — O grid de atributos é o do GDD §2 (39), não o do Football Manager (33).** O schema copiou `technique`/`flair`/`teamwork`/`workRate`/`aggression`; a §2 se declara fonte única, e a R-09 agrega "o grid canônico". Corrige a premissa da R-179, não a decisão.
+- **R-190 — O elenco tem número de camisa, e a data de entrada é do mundo.** `slot: string` livre vira `shirtNumber`; `startsAt DateTime @default(now())` era relógio de plataforma governando regra de jogo — vira `DATE` sem default (R-177). `capacity` sai do agregado: teto de elenco é regra (R-57), não dado por linha.
+- **R-189 — A gênese não assina contrato; o vínculo dela é o elenco.** `Player.clubId` morre (o canon já dizia que `PlayerContract` é autoritativo). Contrato exige salário, e salário é dinheiro: o GDD §1 proíbe gerar dinheiro "de forma isolada", fora da economia fechada. Consequência aceita: "jogador livre" não é respondível até C6/C9.
+
+A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
+
+> **Estado consolidado:** R-01..R-188 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179.

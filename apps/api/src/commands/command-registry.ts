@@ -1,153 +1,27 @@
-import { randomUUID } from "node:crypto";
-
 import {
-  AcceptOffer,
-  AcceptStaffContract,
-  AccrueDebt,
-  ActivateAutomationRule,
-  ActivateContract,
   ActivateProvisionedWorld,
-  AdvanceSagaStep,
-  AdvanceTransferStep,
-  AdvanceWorldDays,
-  ApplyDailyDevelopment,
-  ApplyDiscipline,
-  ApplyNarrativeFact,
-  ApproveCorrection,
-  ApproveSanction,
-  AssignStaff,
-  BuildDigest,
-  CancelNegotiation,
-  CancelPromise,
-  ChooseConversationOption,
-  ClaimSaga,
-  CloseAccountingPeriod,
-  CompensateSaga,
-  CompensateTransfer,
-  AbortInfrastructureProject,
-  AdvanceMatchTicks,
-  AdvanceScheduledWorldDays,
-  AdvanceWorldDayCommand,
-  BootstrapWorldScheduler,
-  CancelScheduledTask,
-  CheckpointMatch,
-  ConsumeEvent,
-  CreateAutomationRule,
-  CreateCompetitionEdition,
-  CreateMatchManifest,
-  CreateStaffMember,
+  ApplyClubIdentity,
+  ArchiveWorld,
+  ConfirmOnboarding,
   CreateWorld,
-  FinalizeMatch,
-  DecideAppeal,
-  DismissNotification,
+  DeleteWorld,
   EndClubControl,
-  EndStaffContract,
-  EvaluateDecision,
-  EvaluatePromise,
-  ExecuteClubCommand,
-  ExecuteDecisionProposal,
-  ExerciseLoanOption,
-  ExpireReservations,
-  FileAppeal,
-  GenerateFixtures,
-  GeneratePlayer,
-  GenerateReport,
   GenerateWorldGenesis,
-  GenerateYouthCohort,
-  GetDecisionExplanation,
-  HomologateCompetition,
-  InitializeAdmin,
-  InitializeAutomation,
-  InitializeCompetitions,
-  InitializeEventing,
-  InitializeIdentity,
-  InitializeInbox,
-  InitializeLedger,
-  InitializeMarket,
-  InitializeMarketPopulation,
-  InitializeMatches,
-  InitializeNarrative,
-  InitializeStaff,
   InspectWorld,
   JoinWorld,
-  ProcessDueWorldTasks,
-  RegisterTemporalWindow,
-  ResumeInfrastructureProject,
-  ResumeSeasonRollover,
-  ResumeWorldScheduler,
-  ScheduleWorldTask,
-  ScheduleWorldTasks,
-  RetryScheduledTask,
-  SEASON_ROLLOVER_STEPS,
-  StartInfrastructureProject,
-  StartSeasonRollover,
-  createClubMaintenanceTaskHandler,
-  createPlayerDayTaskHandler,
-  type InfrastructureFinancingPort,
-  type InfrastructureLicensingPort,
-  MakePublicPromise,
-  MarkNotificationRead,
-  OfferStaffContract,
-  OpenCase,
-  OpenLedgerAccount,
-  OpenMedicalCase,
-  OpenNarrativeCrisis,
-  OpenNegotiation,
-  OpenSupportCase,
-  PlaceQuarantine,
-  PostTransaction,
-  ProcessPlayerDay,
-  ProjectNotification,
-  PromoteYouth,
-  ProposeSanction,
-  PublishListing,
-  PublishOutboxBatch,
-  ReassessMedicalCase,
-  RebuildInboxProjection,
-  RebuildProjection,
-  ReconcileWorldLedger,
-  RecordOfficialResult,
-  RecordRiskSignal,
-  RefreshSession,
-  RegisterAccount,
-  RegisterEventType,
-  RegisterParticipant,
+  PauseWorld,
   ReleaseClubReservation,
-  ReleaseReservation,
   RequestClubSwitch,
-  RequestCorrection,
-  RequestReprocessing,
-  RequestScouting,
   ReserveClub,
-  ReserveFunds,
-  ResolveNarrativeCrisis,
-  ResolveSupportCase,
-  ResumeMatch,
-  ResumeRealtimeStream,
-  RetirePlayer,
-  RetryDeadLetter,
-  RetryDelivery,
-  RevokeAutomationRule,
-  RevokeSessionFamily,
-  SetTrainingDirection,
-  SettleReservation,
-  StartLoan,
-  StartMatch,
-  StartSaga,
-  StartSession,
-  StartTransfer,
-  SubmitMatchCommand,
-  SubmitOffer,
-  SubmitRecoveryPlan,
-  SuspendAutomationRule,
-  TerminateContract,
-  ConfirmOnboarding,
-  DisableAutomationOnControlChange,
-  ReturnLoanedPlayer,
-  type ClubCommand,
+  ResumeWorld,
+  SetWorldIdentity,
+  type ClubControlRepository,
+  type ClubUnitOfWork,
+  type ClubRepository,
+  type IdentityUnitOfWork,
   type WorldMutationResult,
+  type WorldRepository,
 } from "@grinta/core";
-import type { JsonWorldRepository } from "@grinta/persistence";
 import {
   DomainError,
   WorldDate,
@@ -160,7 +34,22 @@ import {
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
-import { applyRebrandReaction } from "./rebrand-reaction.js";
+
+/**
+ * O barramento de commands depois do extermínio da arquitetura morta (R-175).
+ *
+ * Eram ~148 commands sobre 16 mega-agregados e o adapter JSON. **Sobraram 10** —
+ * os que uma vertical viva exige hoje: o admin criando um mundo, gerando os
+ * clubes, ativando e apagando; e o jogador entrando e escolhendo clube.
+ *
+ * Os outros não foram adiados: foram APAGADOS, com os contextos que os serviam.
+ * Voltam um a um, já em agregado por entidade sobre Postgres, quando uma tela
+ * precisar deles — e aí nascem certos na primeira vez. Construir 148 commands
+ * antes de qualquer cliente provar que eram os certos foi o que produziu 16
+ * contextos completos convivendo com 11 de 114 telas.
+ *
+ * Não há mais `repository: JsonWorldRepository` no contexto. Só Postgres.
+ */
 
 export interface CommandOutcome {
   readonly resource: string | null;
@@ -168,7 +57,27 @@ export interface CommandOutcome {
 }
 
 export interface CommandContext {
-  readonly repository: JsonWorldRepository;
+  /** Escopo transacional de C1 (R-175/R-176): agregado e evento no mesmo commit. */
+  readonly identityUnitOfWork: IdentityUnitOfWork;
+  /** O mundo é tabela, sempre (R-173/R-182). Raiz de tudo: todo command o lê. */
+  readonly worlds: WorldRepository;
+  /** C3 — o clube é tabela. É o que destrava `identity:reserve-club`. */
+  readonly clubs: ClubRepository;
+  /** C1 — só para perguntar se alguém está jogando antes de apagar o mundo. */
+  readonly controls: ClubControlRepository;
+  /** Escopo transacional de C3: clube + evento no mesmo commit (Decisão 19.10). */
+  readonly clubUnitOfWork: ClubUnitOfWork;
+  /**
+   * Quem agiu — a conta do JOGO, vinda da SESSÃO.
+   *
+   * Nunca do payload: o evento grava `actorId`, e quem é o ator é o token que
+   * chegou, não o que o cliente escreveu. Um `actorId` de payload deixaria
+   * qualquer um assinar o rebranding em nome de outro.
+   *
+   * `null` = comando de sistema (admin, scheduler) — o `actorType` do evento
+   * vira SYSTEM.
+   */
+  readonly actorId: string | null;
   readonly envelope: CommandEnvelope;
 }
 
@@ -180,261 +89,237 @@ function invalidPayload(error: z.ZodError): DomainError {
   return new DomainError("COMMAND_PAYLOAD_INVALID", error.message);
 }
 
+/**
+ * A confirmação vai no PAYLOAD, e é checada no domínio.
+ *
+ * Uma confirmação que mora só no modal não protege nada: quem chama a API direto
+ * — script, curl, um bug de outra tela — apaga o mundo sem digitar coisa alguma.
+ * O modal pede nome e uuid porque é bom para o operador; o comando exige o seed
+ * porque é o que impede o acidente.
+ */
+const deleteWorldPayload = z.object({
+  confirmSeed: z.string().min(1),
+});
+
+/**
+ * `ApplyClubIdentity` (catálogo `:386`, risco baixo, MF-25).
+ *
+ * O payload do catálogo é `{crestAssetId?, colors?, kitAssetId?, tributes?}` —
+ * puramente cosmético. O nome/código NÃO estão lá, e é a extensão que o BC-003
+ * fez conscientemente (892e0e9): a identidade do clube é um PERÍODO, e nome e
+ * visual mudam juntos ao abrir um. Segui o modelo do BC-003 e os NOMES DE EVENTO
+ * do catálogo — eles não conflitam.
+ *
+ * `expectedVersion` é obrigatório: concorrência otimista por agregado (R-175).
+ * Sem ele, dois rebrandings simultâneos escreveriam um por cima do outro.
+ */
+const applyClubIdentityPayload = z.object({
+  clubId: z.string().uuid(),
+  expectedVersion: z.number().int().positive(),
+  name: z.string().min(1),
+  // O catálogo canônico do domínio valida o resto (visual-identity-catalog):
+  // aqui só a forma. Duplicar a regra de paleta seria dois donos para ela.
+  shortCode: z.string().regex(/^[A-Z0-9]{2,5}$/u),
+  visualIdentity: z
+    .object({
+      primaryColor: z.string(),
+      secondaryColor: z.string(),
+      tertiaryColor: z.string().nullable(),
+      homeKitTemplateId: z.string(),
+      awayKitTemplateId: z.string(),
+      crestTemplateId: z.string(),
+    })
+    .optional(),
+});
+
 const createWorldPayload = z.object({
   seed: z.string().min(1),
   startDate: z.string(),
   rulesetVersion: z.string().default("1.0.0"),
 });
 
-const advanceDaysPayload = z.object({
-  days: z.number().int().positive(),
+/**
+ * Congelar e inativar aceitam um motivo, que viaja até o evento.
+ *
+ * Opcional de propósito: exigir motivo obrigatório em operação de incidente é
+ * atrito na hora errada, e produz "asdf" como motivo. Ausente vira `null` — que
+ * é "não disseram", e não uma string vazia fingindo texto.
+ */
+const worldLifecyclePayload = z.object({
+  reason: z.string().trim().min(1).max(280).optional(),
 });
 
-const clubCommandPayload = z.object({
-  clubId: z.string().uuid(),
-  actorId: z.string().min(1),
-  occurredAt: z.string(),
-  rulesetVersion: z.string().default("1.0.0"),
-  command: z.record(z.unknown()),
+/**
+ * Identidade do mundo. Update parcial, e os três casos são distintos:
+ * campo ausente = não mexe · `null` = limpa · texto = grava.
+ *
+ * `nullable().optional()` carrega essa diferença até o domínio. Um
+ * `.optional()` sozinho tornaria "limpar o nome" inexprimível pela API.
+ *
+ * Os limites (60/500) NÃO são repetidos aqui: quem valida tamanho é o agregado,
+ * e um número duplicado na borda vira dois números que divergem. O zod só
+ * garante o tipo.
+ */
+const worldIdentityPayload = z.object({
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  // As CHAVES do objeto no R2, produzidas por POST /worlds/{id}/images/{kind}.
+  // Não é URL: o agregado não conhece CDN.
+  bannerKey: z.string().nullable().optional(),
+  squarePhotoKey: z.string().nullable().optional(),
 });
 
-const publishListingPayload = z.object({
-  playerId: z.string().min(1),
-  sellerClubId: z.string().min(1),
-  askingFeeMinor: z.number().int().nonnegative(),
-  rulesetVersion: z.string().default("1.0.0"),
-});
+function requireWorldId(
+  rawWorldId: string | undefined,
+): Result<string, DomainError> {
+  return rawWorldId === undefined
+    ? fail(new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."))
+    : succeed(rawWorldId);
+}
 
 async function loadWorld(
-  repository: CommandContext["repository"],
+  worlds: CommandContext["worlds"],
   rawWorldId: string | undefined,
 ) {
-  if (rawWorldId === undefined) {
-    return fail(
-      new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-    );
-  }
-  const worldId = parseGameWorldId(rawWorldId);
+  const raw = requireWorldId(rawWorldId);
+  if (!raw.ok) return raw;
+  const worldId = parseGameWorldId(raw.value);
   if (!worldId.ok) return worldId;
-  const world = await new InspectWorld(repository).execute(worldId.value);
+  const world = await new InspectWorld(worlds).execute(worldId.value);
   if (!world.ok) return world;
   return succeed({ worldId: worldId.value, snapshot: world.value });
 }
 
-/** Caso de uso com o shape uniforme `execute(worldId, input)`. */
-interface WorldInputUseCase {
-  execute(
-    worldId: import("@grinta/shared").GameWorldId,
-    input: never,
-  ): Promise<Result<unknown, DomainError>>;
-}
-
-/**
- * Factory genérico para os commands com shape `execute(worldId, input)`: carrega o
- * snapshot do mundo, injeta o contexto determinístico (idempotencyKey, rulesetVersion,
- * worldSeed, worldDate) e mescla o payload específico. Erros de domínio viram REJECTED;
- * exceções inesperadas viram COMMAND_EXECUTION_FAILED (nunca 500).
- */
-function wc(
-  build: (repository: CommandContext["repository"]) => WorldInputUseCase,
-  resourceKind = "world",
-): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const payload =
-      typeof envelope.payload === "object" && envelope.payload !== null
-        ? (envelope.payload as Record<string, unknown>)
-        : {};
-    const input = {
-      ...payload,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    };
-    try {
-      const result = await build(repository).execute(
-        world.value.worldId,
-        input as never,
-      );
-      if (!result.ok) return result;
-      return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
-    } catch (error) {
-      return fail(
-        new DomainError(
-          "COMMAND_EXECUTION_FAILED",
-          error instanceof Error ? error.message : "Falha ao executar command.",
-        ),
-      );
-    }
-  };
-}
-
-// --- Portas/handlers sintéticos (adapter) para os use cases com dependências ---
-const API_WORKER = "api-worker";
-const nowMs = (): number => Date.now();
-
-function financingPort(): InfrastructureFinancingPort {
-  return {
-    reserve: (context) =>
-      Promise.resolve({
-        reservationRef: `api:${context.idempotencyKey}:reservation`,
-      }),
-    disburseMilestone: (context) =>
-      Promise.resolve({
-        disbursementRef: `api:${context.idempotencyKey}:disbursement`,
-      }),
-    releaseRemainder: (context) =>
-      Promise.resolve({
-        releaseFactRef: `api:${context.idempotencyKey}:release`,
-      }),
-  };
-}
-
-function licensingPort(): InfrastructureLicensingPort {
-  return {
-    inspect: (context) =>
-      Promise.resolve({
-        approved: true,
-        inspectionRef: `api:${context.idempotencyKey}:license`,
-      }),
-  };
-}
-
-function taskHandlers(repository: CommandContext["repository"]) {
-  return {
-    "players:process-day": createPlayerDayTaskHandler(repository),
-    "clubs:process-day": createClubMaintenanceTaskHandler(repository),
-  };
-}
-
-function rolloverHandlers() {
-  return Object.fromEntries(
-    SEASON_ROLLOVER_STEPS.map((stepId) => [
-      stepId,
-      () =>
-        Promise.resolve({
-          status: "COMPLETED" as const,
-          evidence: { source: "api" },
-        }),
-    ]),
-  );
-}
-
-function rolloverVerifier() {
-  return () =>
-    Promise.resolve({
-      standingsConsistent: true,
-      ledgerBalanced: true,
-      populationInBand: true,
-      evidence: { source: "api" },
-    });
-}
-
-/** Use case com shape `execute(input)` (input carrega o gameWorldId). */
-interface SingleInputUseCase {
+interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
 
-/** Inicializador de contexto com shape `execute(worldSnapshot)`. */
-interface WorldSnapshotUseCase {
-  execute(world: never): Promise<Result<unknown, DomainError>>;
-}
+/**
+ * Os payloads de C1.
+ *
+ * Isto NÃO existia, e o buraco era real: o `ic()` repassava `...payload` como
+ * `never` direto ao caso de uso. Um campo obrigatório ausente não virava
+ * `COMMAND_PAYLOAD_INVALID` — descia até o Prisma e voltava como crash, com o
+ * caminho do arquivo e o CÓDIGO-FONTE do adapter dentro da resposta HTTP.
+ *
+ * **Cada schema espelha o `Input` do caso de uso — não o que eu achava que ele
+ * pedia.** A primeira versão destes schemas foi escrita de memória, e dois dos
+ * seis estavam errados: `end-club-control` e `request-switch` pediam
+ * `{accountId, clubId}` quando o domínio quer `controlId`. Uma validação
+ * inventada é pior que nenhuma — ela RECUSA o payload certo e diz que a culpa é
+ * do cliente. Só apareceu ao chamar por HTTP.
+ *
+ * `acceptInheritedState` é `literal(true)` e NÃO vai ao domínio: o catálogo o
+ * define como a confirmação de assumir o clube COM o estado herdado — dívidas,
+ * contratos, promessas — e marca o command como risco alto. `false` não é "outro
+ * caminho", é ausência de consentimento; recusá-lo na borda deixa o domínio
+ * livre de um flag que só pode valer `true`.
+ */
+const identityPayloads: Record<string, z.ZodType> = {
+  // JoinWorldInput
+  "identity:join-world": z.object({ accountId: z.string().uuid() }),
+  // ReserveClubInput (o `attemptKey` vem do envelope, não do payload)
+  "identity:reserve-club": z.object({
+    accountId: z.string().uuid(),
+    clubId: z.string().uuid(),
+    expiresOn: z.string(),
+  }),
+  // ConfirmOnboardingInput + a confirmação de risco alto do catálogo (:81)
+  "identity:confirm-onboarding": z.object({
+    reservationId: z.string().uuid(),
+    acceptInheritedState: z.literal(true),
+  }),
+  // ReleaseClubReservationInput
+  "identity:release-club-reservation": z.object({
+    reservationId: z.string().uuid(),
+  }),
+  /**
+   * EndClubControlInput — `controlId`, não `clubId`: quem termina é o CONTROLE,
+   * e o clube continua existindo (a IA assume, R-180).
+   *
+   * `cooldownDays` tem default aqui e isso é dívida declarada: ele é config de
+   * mundo (`GameRuleConfig`) e volta para lá com C2 (R-182). O próprio input do
+   * domínio já diz isso. 30 é o valor de R-26.
+   */
+  "identity:end-club-control": z.object({
+    controlId: z.string().uuid(),
+    reason: z.string().min(1),
+    cooldownDays: z.number().int().nonnegative().default(30),
+  }),
+  // RequestClubSwitch É um ReserveClub por dentro — mesmo input.
+  "identity:request-switch": z.object({
+    accountId: z.string().uuid(),
+    clubId: z.string().uuid(),
+    expiresOn: z.string(),
+  }),
+};
 
-/** Factory para inicializadores de contexto `<ctx>:initialize`. */
-function wInit(
-  build: (repository: CommandContext["repository"]) => WorldSnapshotUseCase,
-  resourceKind: string,
+/**
+ * Adapter dos commands de C1.
+ *
+ * Sem `idempotencyKey` no input: cada comando é naturalmente idempotente pela
+ * chave natural do banco. O `idempotencyKey` do envelope entra como
+ * `attemptKey` — semente do id determinístico dos roots que são 1-por-VEZ
+ * (reserva, controle), e é o que faz o retry devolver o mesmo id em vez de
+ * criar uma segunda reserva.
+ *
+ * A tabela `IdempotencyKey` (R-176/R-184) é do barramento, não do caso de uso, e
+ * ainda não está ligada aqui — pendência declarada.
+ */
+function ic(
+  build: (unitOfWork: IdentityUnitOfWork) => IdentityUseCase,
 ): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    return guardRun(
-      () => build(repository).execute(world.value.snapshot as never),
-      `${resourceKind}:${world.value.worldId}`,
-    );
-  };
-}
-
-/** Factory para use cases `execute(input)` — injeta gameWorldId + contexto. */
-function wc1(
-  build: (repository: CommandContext["repository"]) => SingleInputUseCase,
-  resourceKind = "world",
-): CommandHandler {
-  return async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const payload =
-      typeof envelope.payload === "object" && envelope.payload !== null
-        ? (envelope.payload as Record<string, unknown>)
-        : {};
-    const input = {
-      ...payload,
-      gameWorldId: world.value.worldId,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    };
-    try {
-      const result = await build(repository).execute(input as never);
-      if (!result.ok) return result;
-      return succeed({ resource: `${resourceKind}:${world.value.worldId}` });
-    } catch (error) {
+  return async ({ worlds, identityUnitOfWork, envelope }) => {
+    const schema = identityPayloads[envelope.commandType];
+    if (schema === undefined) {
       return fail(
         new DomainError(
-          "COMMAND_EXECUTION_FAILED",
-          error instanceof Error ? error.message : "Falha ao executar command.",
+          "COMMAND_PAYLOAD_INVALID",
+          `Sem contrato de payload para ${envelope.commandType}.`,
         ),
+      );
+    }
+    const parsed = schema.safeParse(envelope.payload ?? {});
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    // O mundo é tabela (R-182): `seed` e `currentDate` vêm do Postgres, e o
+    // mundo enfim é reproduzível a partir do banco.
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const input = {
+      ...(parsed.data as Record<string, unknown>),
+      gameWorldId: world.value.worldId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      attemptKey: envelope.idempotencyKey,
+      correlationId: envelope.correlationId,
+    };
+    try {
+      const result = await build(identityUnitOfWork).execute(input as never);
+      if (!result.ok) return result;
+      return succeed({ resource: `identity:${world.value.worldId}` });
+    } catch (error) {
+      // A mensagem do erro NÃO vai para o cliente. Um erro do Prisma carrega o
+      // caminho do arquivo e um trecho do código-fonte do adapter — vazar isso
+      // numa resposta HTTP entrega o interior do servidor a quem chamou. O
+      // detalhe vai para o log, onde tem dono.
+      console.error(`[${envelope.commandType}] falhou:`, error);
+      return fail(
+        new DomainError("COMMAND_EXECUTION_FAILED", "Falha ao executar command."),
       );
     }
   };
 }
 
-/** Executa um caso de uso e converte exceções em REJECTED (nunca 500). */
-async function guardRun(
-  run: () => Promise<Result<unknown, DomainError>>,
-  resource: string,
-): Promise<Result<CommandOutcome, DomainError>> {
-  try {
-    const result = await run();
-    if (!result.ok) return result;
-    return succeed({ resource });
-  } catch (error) {
-    return fail(
-      new DomainError(
-        "COMMAND_EXECUTION_FAILED",
-        error instanceof Error ? error.message : "Falha ao executar command.",
-      ),
-    );
-  }
-}
-
-function requireString(
-  payload: unknown,
-  field: string,
-): Result<string, DomainError> {
-  const value =
-    typeof payload === "object" && payload !== null
-      ? (payload as Record<string, unknown>)[field]
-      : undefined;
-  return typeof value === "string"
-    ? succeed(value)
-    : fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", `${field} é obrigatório.`),
-      );
-}
-
 const handlers: Record<string, CommandHandler> = {
-  "world:create": async ({ repository, envelope }) => {
+  "world:create": async ({ worlds, envelope }) => {
     const parsed = createWorldPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
     const startDate = WorldDate.parse(parsed.data.startDate);
     if (!startDate.ok) return startDate;
     const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
     if (!ruleset.ok) return ruleset;
-    const result = await new CreateWorld(repository).execute({
+    const result = await new CreateWorld(worlds).execute({
       seed: parsed.data.seed,
       startDate: startDate.value,
       rulesetVersion: ruleset.value,
@@ -446,74 +331,30 @@ const handlers: Record<string, CommandHandler> = {
     });
   },
 
-  "world:genesis": async ({ repository, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
+  /**
+   * A gênese não é guardada (R-185): é função pura do `seed`, que R-182 tornou
+   * coluna. O que este command persiste é o EFEITO dela — as linhas de `Club`.
+   */
+  "world:genesis": async ({ worlds, clubs, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new GenerateWorldGenesis(
-      repository,
-      repository,
-      undefined,
-      repository,
-      repository,
-    ).execute(worldId.value);
+    const result = await new GenerateWorldGenesis(worlds, clubs).execute(
+      worldId.value,
+    );
     if (!result.ok) return result;
-
-    const world = await repository.findById(worldId.value);
-    const genesis = await repository.findByWorldId(worldId.value);
-    if (world === null || genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "A gênese não pôde ser recarregada para concluir o bootstrap.",
-        ),
-      );
-    }
-    const ledger = await new InitializeLedger(repository).execute(
-      world,
-      undefined,
-      genesis,
-    );
-    if (!ledger.ok) return ledger;
-    const market = await new InitializeMarket(repository).execute(world);
-    if (!market.ok) return market;
-    const population = await new InitializeMarketPopulation(repository).execute(
-      world,
-      genesis.clubs.length,
-    );
-    if (!population.ok) return population;
-    const competitions = await new InitializeCompetitions(repository).execute(
-      world,
-      genesis,
-    );
-    if (!competitions.ok) return competitions;
-    const matches = await new InitializeMatches(repository).execute(
-      world,
-      competitions.value,
-    );
-    if (!matches.ok) return matches;
     return succeed({ resource: `world:${worldId.value}` });
   },
 
-  "world:activate": async ({ repository, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
+  "world:activate": async ({ worlds, clubs, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new ActivateProvisionedWorld(
-      repository,
-      repository,
-      repository,
-      repository,
-      repository,
-    ).execute(worldId.value);
+    const result = await new ActivateProvisionedWorld(worlds, clubs).execute(
+      worldId.value,
+    );
     if (!result.ok) return result;
     return succeed({
       resource: `world:${worldId.value}`,
@@ -521,607 +362,167 @@ const handlers: Record<string, CommandHandler> = {
     });
   },
 
-  "club:command": async ({ repository, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    if (envelope.expectedVersion === undefined) {
+  /**
+   * Nome e descrição. Vale em qualquer status — identidade é rótulo
+   * administrativo, não simulação.
+   */
+  "world:set-identity": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldIdentityPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new SetWorldIdentity(worlds).execute(
+      loaded.value.worldId,
+      parsed.data,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
+   * Congela o mundo: segue legível, o relógio para. Reversível por `world:resume`.
+   */
+  "world:pause": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldLifecyclePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new PauseWorld(worlds).execute(
+      loaded.value.worldId,
+      parsed.data.reason ?? null,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /** Descongela — de CONGELADO ou de INATIVO (R-56: arquivar é reversível). */
+  "world:resume": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+
+    const result = await new ResumeWorld(worlds).execute(loaded.value.worldId);
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
+   * Inativa (arquiva, R-56): read-only, preserva histórico/títulos/recordes,
+   * REVERSÍVEL por `world:resume`. Não é `world:delete`.
+   *
+   * O gatilho de R-56 (≥2 temporadas ociosas, aviso de 30 dias) não é conferido:
+   * não há temporada ligada nem medida de atividade para conferir. Quem julga o
+   * ócio é o operador — a lacuna está declarada no agregado, não escondida aqui.
+   */
+  "world:archive": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldLifecyclePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new ArchiveWorld(worlds).execute(
+      loaded.value.worldId,
+      parsed.data.reason ?? null,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
+   * Apaga o mundo e TUDO que pende dele. Irreversível.
+   *
+   * Não confunda com arquivar (R-56): arquivar põe em read-only, preserva
+   * "histórico, títulos e recordes" e é reversível — e agora existe, em
+   * `world:archive`. Deletar não é nada disso, e por isso recusa mundo com
+   * gestor ativo.
+   */
+  "world:delete": async ({ worlds, controls, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
+    if (!worldId.ok) return worldId;
+    const parsed = deleteWorldPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new DeleteWorld(worlds, controls).execute({
+      gameWorldId: worldId.value,
+      confirmSeed: parsed.data.confirmSeed,
+    });
+    if (!result.ok) return result;
+    // `resource` null: o recurso deixou de existir — apontar para ele seria
+    // mandar o cliente buscar um 404.
+    return succeed({ resource: null });
+  },
+
+  /**
+   * Personalizar o clube (BC-003 / MF-25). Voltou: o command vivia dentro do
+   * `WorldClubPortfolio` e foi apagado com ele (R-175).
+   */
+  "club:apply-identity": async ({ worlds, clubUnitOfWork, envelope, actorId }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = applyClubIdentityPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    if (actorId === null) {
+      // Personalizar clube é ato de JOGADOR. Sem conta de jogo não há quem
+      // assine — e o `actorId` do evento não pode ser inventado.
       return fail(
         new DomainError(
-          "COMMAND_PAYLOAD_INVALID",
-          "expectedVersion é obrigatório para club:command.",
+          "FORBIDDEN_NOT_CONTROLLER",
+          "É preciso uma conta de jogo para personalizar um clube.",
         ),
       );
     }
-    const worldId = parseGameWorldId(envelope.worldId);
-    if (!worldId.ok) return worldId;
-    const parsed = clubCommandPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
-    if (!ruleset.ok) return ruleset;
-    const command = {
-      commandId: randomUUID(),
-      idempotencyKey: envelope.idempotencyKey,
-      gameWorldId: worldId.value,
-      clubId: parsed.data.clubId as ClubCommand["clubId"],
-      expectedVersion: envelope.expectedVersion,
-      occurredAt: parsed.data.occurredAt,
-      rulesetVersion: ruleset.value,
-      actorId: parsed.data.actorId,
-      ...parsed.data.command,
-    } as ClubCommand;
-    const result = await new ExecuteClubCommand(repository).execute(command);
+
+    const { visualIdentity, ...identity } = parsed.data;
+    const result = await new ApplyClubIdentity(clubUnitOfWork).execute({
+      ...identity,
+      // `exactOptionalPropertyTypes`: `visualIdentity: undefined` NÃO é o mesmo
+      // que ausente. Ausente = "não mexe no visual"; presente-e-undefined seria
+      // um valor. O spread condicional preserva a diferença.
+      ...(visualIdentity === undefined ? {} : { visualIdentity }),
+      gameWorldId: world.value.worldId,
+      worldSeed: world.value.snapshot.seed,
+      // A data do MUNDO, não a do relógio: o período de identidade vige em data
+      // de mundo (R-177), e é ela que decide se o rebranding abre período novo
+      // ou substitui o de hoje.
+      occurredOn: world.value.snapshot.currentDate,
+      actorId,
+      ...(envelope.correlationId === undefined
+        ? {}
+        : { correlationId: envelope.correlationId }),
+    });
     if (!result.ok) return result;
-    // Rebranding (C3) → reação da torcida (C10): queda de 10–15% no headcount.
-    if (parsed.data.command.type === "UpdateClubVisualIdentity") {
-      await applyRebrandReaction(
-        repository,
-        worldId.value,
-        parsed.data.clubId,
-        envelope.idempotencyKey,
-      );
-    }
     return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
-  "market:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar o mercado.",
-        ),
-      );
-    }
-    const result = await new InitializeMarket(repository).execute(
-      world.value.snapshot,
-    );
-    if (!result.ok) return result;
-    const population = await new InitializeMarketPopulation(repository).execute(
-      world.value.snapshot,
-      genesis.clubs.length,
-    );
-    if (!population.ok) return population;
-    return succeed({ resource: `market:${world.value.worldId}` });
-  },
-
-  "ledger:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar o ledger.",
-        ),
-      );
-    }
-    const result = await new InitializeLedger(repository).execute(
-      world.value.snapshot,
-      undefined,
-      genesis,
-    );
-    if (!result.ok) return result;
-    return succeed({ resource: `ledger:${world.value.worldId}` });
-  },
-
-  // Inicializadores de contexto (execute(worldSnapshot))
-  "competition:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const genesis = await repository.findByWorldId(world.value.worldId);
-    if (genesis === null) {
-      return fail(
-        new DomainError(
-          "WORLD_GENESIS_NOT_FOUND",
-          "Execute world:genesis antes de inicializar as competições.",
-        ),
-      );
-    }
-    const result = await new InitializeCompetitions(repository).execute(
-      world.value.snapshot,
-      genesis,
-    );
-    if (!result.ok) return result;
-    const matches = await new InitializeMatches(repository).execute(
-      world.value.snapshot,
-      result.value,
-    );
-    if (!matches.ok) return matches;
-    return succeed({ resource: `competitions:${world.value.worldId}` });
-  },
-  "match:initialize": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const competitions = await repository.findCompetitionsByWorldId(
-      world.value.worldId,
-    );
-    const result = await new InitializeMatches(repository).execute(
-      world.value.snapshot,
-      competitions ?? undefined,
-    );
-    return result.ok
-      ? succeed({ resource: `matches:${world.value.worldId}` })
-      : result;
-  },
-  "staff:initialize": wInit((r) => new InitializeStaff(r), "staff"),
-  "narrative:initialize": wInit((r) => new InitializeNarrative(r), "narrative"),
-  "inbox:initialize": wInit((r) => new InitializeInbox(r), "inbox"),
-  "admin:initialize": wInit((r) => new InitializeAdmin(r), "admin"),
-  "automation:initialize": wInit(
-    (r) => new InitializeAutomation(r),
-    "automation",
-  ),
-  "identity:initialize": wInit((r) => new InitializeIdentity(r), "identity"),
-  "eventing:initialize": wInit((r) => new InitializeEventing(r), "eventing"),
-
-  // Infraestrutura de estádio (SAGA-04) — portas sintéticas de financiamento/licença
-  "infrastructure:start": wc1(
-    (r) => new StartInfrastructureProject(r),
-    "infrastructure",
-  ),
-  "infrastructure:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const projectId = requireString(envelope.payload, "projectId");
-    if (!projectId.ok) return projectId;
-    return guardRun(
-      () =>
-        new ResumeInfrastructureProject(
-          repository,
-          financingPort(),
-          licensingPort(),
-          API_WORKER,
-          nowMs,
-        ).execute(
-          world.value.worldId,
-          projectId.value,
-          world.value.snapshot.currentDate,
-        ),
-      `infrastructure:${projectId.value}`,
-    );
-  },
-  "infrastructure:abort": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const projectId = requireString(envelope.payload, "projectId");
-    if (!projectId.ok) return projectId;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const reason =
-      typeof payload.reason === "string" ? payload.reason : "aborted-via-api";
-    return guardRun(
-      () =>
-        new AbortInfrastructureProject(
-          repository,
-          financingPort(),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, projectId.value, reason),
-      `infrastructure:${projectId.value}`,
-    );
-  },
-
-  // Scheduler do mundo (C2)
-  "scheduler:bootstrap": wc1(
-    (r) => new BootstrapWorldScheduler(r),
-    "scheduler",
-  ),
-  "scheduler:cancel-task": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const taskId = requireString(envelope.payload, "taskId");
-    if (!taskId.ok) return taskId;
-    return guardRun(
-      () =>
-        new CancelScheduledTask(repository).execute(
-          world.value.worldId,
-          taskId.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:retry-task": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const taskId = requireString(envelope.payload, "taskId");
-    if (!taskId.ok) return taskId;
-    return guardRun(
-      () =>
-        new RetryScheduledTask(repository).execute(
-          world.value.worldId,
-          taskId.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:schedule-tasks": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const inputs = (envelope.payload as Record<string, unknown> | undefined)
-      ?.inputs;
-    if (!Array.isArray(inputs)) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "inputs[] é obrigatório."),
-      );
-    }
-    return guardRun(
-      () =>
-        new ScheduleWorldTasks(repository).execute(
-          world.value.worldId,
-          inputs as never,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    return guardRun(
-      () =>
-        new ResumeWorldScheduler(
-          repository,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:process-due": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const on = WorldDate.parse(world.value.snapshot.currentDate);
-    if (!on.ok) return on;
-    return guardRun(
-      () =>
-        new ProcessDueWorldTasks(repository, taskHandlers(repository)).execute(
-          world.value.worldId,
-          on.value,
-        ),
-      `scheduler:${world.value.worldId}`,
-    );
-  },
-  "scheduler:advance-days": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const days = typeof payload.days === "number" ? payload.days : 1;
-    return guardRun(
-      () =>
-        new AdvanceScheduledWorldDays(
-          repository,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, days),
-      `world:${world.value.worldId}`,
-    );
-  },
-  "world:advance-day": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
-    const input = {
-      ...payload,
-      idempotencyKey: envelope.idempotencyKey,
-      rulesetVersion: world.value.snapshot.rulesetVersion,
-    };
-    return guardRun(
-      () =>
-        new AdvanceWorldDayCommand(
-          repository,
-          repository,
-          taskHandlers(repository),
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, input as never),
-      `world:${world.value.worldId}`,
-    );
-  },
-
-  // Virada de temporada (SAGA-02) — resume com handlers/verifier sintéticos
-  "season:rollover:resume": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const rolloverId = requireString(envelope.payload, "rolloverId");
-    if (!rolloverId.ok) return rolloverId;
-    return guardRun(
-      () =>
-        new ResumeSeasonRollover(
-          repository,
-          rolloverHandlers() as never,
-          rolloverVerifier() as never,
-          API_WORKER,
-          nowMs,
-        ).execute(world.value.worldId, rolloverId.value),
-      `rollover:${rolloverId.value}`,
-    );
-  },
-
-  // Explicação de decisão de automação (X-001)
-  "automation:get-explanation": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const decisionId = requireString(envelope.payload, "decisionId");
-    if (!decisionId.ok) return decisionId;
-    return guardRun(
-      () =>
-        new GetDecisionExplanation(repository).execute(
-          world.value.worldId,
-          decisionId.value,
-        ),
-      `decision:${decisionId.value}`,
-    );
-  },
-
-  "market:publish-listing": async ({ repository, envelope }) => {
-    const world = await loadWorld(repository, envelope.worldId);
-    if (!world.ok) return world;
-    const parsed = publishListingPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const ruleset = parseRulesetVersion(parsed.data.rulesetVersion);
-    if (!ruleset.ok) return ruleset;
-    const input = {
-      playerId: parsed.data.playerId,
-      sellerClubId: parsed.data.sellerClubId,
-      askingFeeMinor: parsed.data.askingFeeMinor,
-      rulesetVersion: ruleset.value,
-      idempotencyKey: envelope.idempotencyKey,
-      worldSeed: world.value.snapshot.seed,
-      worldDate: world.value.snapshot.currentDate,
-    } as Parameters<PublishListing["execute"]>[1];
-    const result = await new PublishListing(repository).execute(
-      world.value.worldId,
-      input,
-    );
-    if (!result.ok) return result;
-    return succeed({ resource: `listing:${parsed.data.playerId}` });
-  },
-
-  "world:advance-days": async ({ repository, envelope }) => {
-    if (envelope.worldId === undefined) {
-      return fail(
-        new DomainError("COMMAND_PAYLOAD_INVALID", "worldId é obrigatório."),
-      );
-    }
-    const worldId = parseGameWorldId(envelope.worldId);
-    if (!worldId.ok) return worldId;
-    const parsed = advanceDaysPayload.safeParse(envelope.payload);
-    if (!parsed.success) return fail(invalidPayload(parsed.error));
-    const result = await new AdvanceWorldDays(repository).execute(
-      worldId.value,
-      parsed.data.days,
-    );
-    if (!result.ok) return result;
-    return succeed({
-      resource: `world:${worldId.value}`,
-      mutation: result.value,
-    });
-  },
-};
-
-/**
- * Catálogo de gameplay com shape uniforme `execute(worldId, input)`, wirado pelo
- * factory `wc`. Cobre staff, competições, ledger, jogador/médico, narrativa,
- * notificações, admin, identidade, automação, eventing e o restante do mercado.
- */
-const gameplayHandlers: Record<string, CommandHandler> = {
-  // Staff (C5)
-  "staff:create": wc((r) => new CreateStaffMember(r), "staff"),
-  "staff:offer-contract": wc((r) => new OfferStaffContract(r), "staff"),
-  "staff:accept-contract": wc((r) => new AcceptStaffContract(r), "staff"),
-  "staff:assign": wc((r) => new AssignStaff(r), "staff"),
-  "staff:end-contract": wc((r) => new EndStaffContract(r), "staff"),
-
-  // Competições (C7)
-  "competition:create-edition": wc(
-    (r) => new CreateCompetitionEdition(r),
-    "competition",
-  ),
-  "competition:register-participant": wc(
-    (r) => new RegisterParticipant(r),
-    "competition",
-  ),
-  "competition:generate-fixtures": wc(
-    (r) => new GenerateFixtures(r),
-    "competition",
-  ),
-  "competition:record-result": wc(
-    (r) => new RecordOfficialResult(r),
-    "competition",
-  ),
-  "competition:apply-discipline": wc(
-    (r) => new ApplyDiscipline(r),
-    "competition",
-  ),
-  "competition:homologate": wc(
-    (r) => new HomologateCompetition(r),
-    "competition",
-  ),
-
-  // Ledger (C9)
-  "ledger:open-account": wc((r) => new OpenLedgerAccount(r), "ledger"),
-  "ledger:post-transaction": wc((r) => new PostTransaction(r), "ledger"),
-  "ledger:reserve": wc((r) => new ReserveFunds(r), "ledger"),
-  "ledger:settle-reservation": wc((r) => new SettleReservation(r), "ledger"),
-  "ledger:release-reservation": wc((r) => new ReleaseReservation(r), "ledger"),
-  "ledger:reconcile": wc((r) => new ReconcileWorldLedger(r), "ledger"),
-  "ledger:accrue-debt": wc((r) => new AccrueDebt(r), "ledger"),
-  "ledger:close-period": wc((r) => new CloseAccountingPeriod(r), "ledger"),
-  "ledger:expire-reservations": wc((r) => new ExpireReservations(r), "ledger"),
-
-  // Jogador + médico (C4)
-  "player:process-day": wc((r) => new ProcessPlayerDay(r), "player"),
-  "player:generate": wc((r) => new GeneratePlayer(r), "player"),
-  "player:set-training": wc((r) => new SetTrainingDirection(r), "player"),
-  "player:apply-development": wc((r) => new ApplyDailyDevelopment(r), "player"),
-  "player:generate-youth": wc((r) => new GenerateYouthCohort(r), "player"),
-  "player:promote-youth": wc((r) => new PromoteYouth(r), "player"),
-  "player:open-medical-case": wc((r) => new OpenMedicalCase(r), "player"),
-  "player:reassess-medical": wc((r) => new ReassessMedicalCase(r), "player"),
-  "player:retire": wc((r) => new RetirePlayer(r), "player"),
-
-  // Narrativa (C10)
-  "narrative:apply-fact": wc((r) => new ApplyNarrativeFact(r), "narrative"),
-  "narrative:make-promise": wc((r) => new MakePublicPromise(r), "narrative"),
-  "narrative:evaluate-promise": wc((r) => new EvaluatePromise(r), "narrative"),
-  "narrative:open-crisis": wc((r) => new OpenNarrativeCrisis(r), "narrative"),
-  "narrative:submit-recovery": wc(
-    (r) => new SubmitRecoveryPlan(r),
-    "narrative",
-  ),
-  "narrative:resolve-crisis": wc(
-    (r) => new ResolveNarrativeCrisis(r),
-    "narrative",
-  ),
-  "narrative:choose-conversation": wc(
-    (r) => new ChooseConversationOption(r),
-    "narrative",
-  ),
-  "narrative:cancel-promise": wc((r) => new CancelPromise(r), "narrative"),
-
-  // Notificações (C11)
-  "inbox:project": wc((r) => new ProjectNotification(r), "inbox"),
-  "inbox:mark-read": wc((r) => new MarkNotificationRead(r), "inbox"),
-  "inbox:dismiss": wc((r) => new DismissNotification(r), "inbox"),
-  "inbox:build-digest": wc((r) => new BuildDigest(r), "inbox"),
-  "inbox:generate-report": wc((r) => new GenerateReport(r), "inbox"),
-  "inbox:rebuild-projection": wc((r) => new RebuildInboxProjection(r), "inbox"),
-  "inbox:retry-delivery": wc((r) => new RetryDelivery(r), "inbox"),
-
-  // Admin / anti-abuso (C12)
-  "admin:record-risk": wc((r) => new RecordRiskSignal(r), "admin"),
-  "admin:propose-sanction": wc((r) => new ProposeSanction(r), "admin"),
-  "admin:approve-sanction": wc((r) => new ApproveSanction(r), "admin"),
-  "admin:file-appeal": wc((r) => new FileAppeal(r), "admin"),
-  "admin:decide-appeal": wc((r) => new DecideAppeal(r), "admin"),
-  "admin:open-case": wc((r) => new OpenCase(r), "admin"),
-  "admin:place-quarantine": wc((r) => new PlaceQuarantine(r), "admin"),
-  "admin:request-correction": wc((r) => new RequestCorrection(r), "admin"),
-  "admin:approve-correction": wc((r) => new ApproveCorrection(r), "admin"),
-  "admin:request-reprocessing": wc((r) => new RequestReprocessing(r), "admin"),
-  "admin:open-support": wc((r) => new OpenSupportCase(r), "admin"),
-  "admin:resolve-support": wc((r) => new ResolveSupportCase(r), "admin"),
-
-  // Identidade (C1)
-  "identity:register-account": wc((r) => new RegisterAccount(r), "identity"),
-  "identity:join-world": wc((r) => new JoinWorld(r), "identity"),
-  "identity:revoke-session": wc((r) => new RevokeSessionFamily(r), "identity"),
-  "identity:reserve-club": wc((r) => new ReserveClub(r), "identity"),
-  "identity:confirm-onboarding": wc(
-    (r) => new ConfirmOnboarding(r),
-    "identity",
-  ),
-  "identity:release-club-reservation": wc(
-    (r) => new ReleaseClubReservation(r),
-    "identity",
-  ),
-  "identity:end-club-control": wc((r) => new EndClubControl(r), "identity"),
-  "identity:request-switch": wc((r) => new RequestClubSwitch(r), "identity"),
-  "identity:start-session": wc((r) => new StartSession(r), "identity"),
-  "identity:refresh-session": wc((r) => new RefreshSession(r), "identity"),
-
-  // Automação / IA (X-001)
-  "automation:create-rule": wc(
-    (r) => new CreateAutomationRule(r),
-    "automation",
-  ),
-  "automation:activate-rule": wc(
-    (r) => new ActivateAutomationRule(r),
-    "automation",
-  ),
-  "automation:suspend-rule": wc(
-    (r) => new SuspendAutomationRule(r),
-    "automation",
-  ),
-  "automation:revoke-rule": wc(
-    (r) => new RevokeAutomationRule(r),
-    "automation",
-  ),
-  "automation:evaluate-decision": wc(
-    (r) => new EvaluateDecision(r),
-    "automation",
-  ),
-  "automation:execute-proposal": wc(
-    (r) => new ExecuteDecisionProposal(r),
-    "automation",
-  ),
-  "automation:disable-on-control-change": wc(
-    (r) => new DisableAutomationOnControlChange(r),
-    "automation",
-  ),
-
-  // Eventing / sagas (X-002)
-  "eventing:publish-outbox": wc((r) => new PublishOutboxBatch(r), "eventing"),
-  "eventing:consume-event": wc((r) => new ConsumeEvent(r), "eventing"),
-  "eventing:retry-dead-letter": wc((r) => new RetryDeadLetter(r), "eventing"),
-  "eventing:register-event-type": wc(
-    (r) => new RegisterEventType(r),
-    "eventing",
-  ),
-  "eventing:start-saga": wc((r) => new StartSaga(r), "eventing"),
-  "eventing:claim-saga": wc((r) => new ClaimSaga(r), "eventing"),
-  "eventing:advance-saga-step": wc((r) => new AdvanceSagaStep(r), "eventing"),
-  "eventing:compensate-saga": wc((r) => new CompensateSaga(r), "eventing"),
-  "eventing:rebuild-projection": wc(
-    (r) => new RebuildProjection(r),
-    "eventing",
-  ),
-  "eventing:resume-realtime": wc(
-    (r) => new ResumeRealtimeStream(r),
-    "eventing",
-  ),
-
-  // Scheduler + temporada — shape uniforme (C2 / SAGA-02)
-  "scheduler:schedule-task": wc((r) => new ScheduleWorldTask(r), "scheduler"),
-  "scheduler:register-window": wc(
-    (r) => new RegisterTemporalWindow(r),
-    "scheduler",
-  ),
-  "season:rollover:start": wc((r) => new StartSeasonRollover(r), "rollover"),
-
-  // Partida ao vivo (C8)
-  "match:create-manifest": wc((r) => new CreateMatchManifest(r), "match"),
-  "match:start": wc((r) => new StartMatch(r), "match"),
-  "match:submit-command": wc((r) => new SubmitMatchCommand(r), "match"),
-  "match:advance-ticks": wc((r) => new AdvanceMatchTicks(r), "match"),
-  "match:checkpoint": wc((r) => new CheckpointMatch(r), "match"),
-  "match:resume": wc((r) => new ResumeMatch(r), "match"),
-  "match:finalize": wc((r) => new FinalizeMatch(r), "match"),
-
-  // Mercado — restante (C6)
-  "market:request-scouting": wc((r) => new RequestScouting(r), "market"),
-  "market:open-negotiation": wc((r) => new OpenNegotiation(r), "market"),
-  "market:submit-offer": wc((r) => new SubmitOffer(r), "market"),
-  "market:accept-offer": wc((r) => new AcceptOffer(r), "market"),
-  "market:activate-contract": wc((r) => new ActivateContract(r), "market"),
-  "market:terminate-contract": wc((r) => new TerminateContract(r), "market"),
-  "market:cancel-negotiation": wc((r) => new CancelNegotiation(r), "market"),
-  "market:start-transfer": wc((r) => new StartTransfer(r), "market"),
-  "market:advance-transfer-step": wc(
-    (r) => new AdvanceTransferStep(r),
-    "market",
-  ),
-  "market:compensate-transfer": wc((r) => new CompensateTransfer(r), "market"),
-  "market:start-loan": wc((r) => new StartLoan(r), "market"),
-  "market:exercise-loan-option": wc((r) => new ExerciseLoanOption(r), "market"),
-  "market:return-loaned-player": wc((r) => new ReturnLoanedPlayer(r), "market"),
+  "identity:join-world": ic((u) => new JoinWorld(u)),
+  "identity:reserve-club": ic((u) => new ReserveClub(u)),
+  "identity:confirm-onboarding": ic((u) => new ConfirmOnboarding(u)),
+  "identity:release-club-reservation": ic((u) => new ReleaseClubReservation(u)),
+  "identity:end-club-control": ic((u) => new EndClubControl(u)),
+  "identity:request-switch": ic((u) => new RequestClubSwitch(u)),
 };
 
 export function resolveCommandHandler(
   commandType: string,
 ): CommandHandler | undefined {
-  return handlers[commandType] ?? gameplayHandlers[commandType];
+  return handlers[commandType];
 }
 
 export function registeredCommandTypes(): readonly string[] {
-  return [...Object.keys(handlers), ...Object.keys(gameplayHandlers)];
+  return Object.keys(handlers);
 }

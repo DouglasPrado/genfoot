@@ -1,4 +1,5 @@
-import { Tabs } from "expo-router";
+import { useAuth } from "@clerk/expo";
+import { Redirect, Tabs } from "expo-router";
 import { Icon, type IconName } from "@/components/icon";
 import { color, fontSize, fontWeight } from "@/theme";
 
@@ -11,6 +12,15 @@ function tabIcon(name: IoniconName) {
 }
 
 export default function TabsLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  // Guard do app: sair da conta em qualquer aba cai aqui e leva ao login, sem
+  // cada tela precisar navegar por conta própria. `isLoaded` antes de
+  // `isSignedIn` — decidir enquanto o Clerk restaura a sessão do cache
+  // expulsaria quem já está logado a cada abertura.
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <Redirect href="/entrar" />;
+
   return (
     <Tabs
       screenOptions={{
@@ -32,7 +42,7 @@ export default function TabsLayout() {
         },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }} />
+      <Tabs.Screen name="inicio" options={{ title: "INÍCIO", tabBarIcon: tabIcon("home") }} />
       <Tabs.Screen name="elenco" options={{ title: "ELENCO", tabBarIcon: tabIcon("people") }} />
       <Tabs.Screen name="partidas" options={{ title: "PARTIDAS", tabBarIcon: tabIcon("trophy") }} />
       <Tabs.Screen name="mercado" options={{ title: "MERCADO", tabBarIcon: tabIcon("transfer") }} />

@@ -3,6 +3,11 @@ import { WorldDate } from "@grinta/shared";
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import { SeededRandom } from "../foundation/seeded-random.js";
 import type { GameWorldSnapshot } from "../world/world-types.js";
+
+import {
+  SQUAD_POSITION_TEMPLATE,
+  generateSquadAttributes,
+} from "./player-generation.js";
 import {
   DominantFoot,
   PlayerPosition,
@@ -12,7 +17,6 @@ import {
   type GeneratedFixture,
   type GeneratedPerson,
   type GeneratedPlayer,
-  type GeneratedPlayerAttributes,
   type GeneratedSquad,
   type PersonId,
   type PlayerId,
@@ -85,32 +89,6 @@ const LAST_NAMES = [
   "Vieira",
 ] as const;
 
-const SQUAD_POSITION_TEMPLATE: readonly PlayerPositionType[] = [
-  PlayerPosition.GK,
-  PlayerPosition.GK,
-  PlayerPosition.CB,
-  PlayerPosition.CB,
-  PlayerPosition.CB,
-  PlayerPosition.CB,
-  PlayerPosition.LB,
-  PlayerPosition.LB,
-  PlayerPosition.RB,
-  PlayerPosition.RB,
-  PlayerPosition.CDM,
-  PlayerPosition.CDM,
-  PlayerPosition.CDM,
-  PlayerPosition.CM,
-  PlayerPosition.CM,
-  PlayerPosition.CAM,
-  PlayerPosition.CAM,
-  PlayerPosition.LW,
-  PlayerPosition.LW,
-  PlayerPosition.RW,
-  PlayerPosition.ST,
-  PlayerPosition.ST,
-  PlayerPosition.CF,
-];
-
 export class WorldGenesisGenerator {
   public generate(world: GameWorldSnapshot): WorldGenesisSnapshot {
     const startDate = requiredWorldDate(world.startDate);
@@ -131,12 +109,20 @@ export class WorldGenesisGenerator {
 
     clubs.forEach((club, clubIndex) => {
       const squadPlayerIds: PlayerId[] = [];
-      SQUAD_POSITION_TEMPLATE.forEach((position, squadIndex) => {
+      // O elenco em si é de `player-generation.ts`: é lá que moram o teto comum
+      // de 1.380, a curva etária e o arquétipo por posição (R-57/R-188). Aqui
+      // ficam só os ids e as pessoas.
+      const squad = generateSquadAttributes({
+        worldSeed: world.seed,
+        clubIndex,
+      });
+
+      squad.forEach((generated, squadIndex) => {
         const globalIndex =
           clubIndex * SQUAD_POSITION_TEMPLATE.length + squadIndex;
         const random = new SeededRandom({
           worldSeed: world.seed,
-          context: `player:${globalIndex}`,
+          context: `person:${globalIndex}`,
         });
         const personId = deterministicUuidV7<"Person">({
           worldSeed: world.seed,
@@ -148,27 +134,29 @@ export class WorldGenesisGenerator {
           context: `${world.id}:player:${globalIndex}`,
           timestampMilliseconds: baseTimestamp,
         }) as PlayerId;
-        const age = random.nextInt(26, 34);
-        const attributes = generateAttributes(position, random);
 
         persons.push({
           id: personId,
           firstName: FIRST_NAMES[random.nextInt(0, FIRST_NAMES.length)]!,
           lastName: LAST_NAMES[random.nextInt(0, LAST_NAMES.length)]!,
-          birthDate: birthDateForAge(startDate.toString(), age, random),
+          birthDate: birthDateForAge(
+            startDate.toString(),
+            generated.age,
+            random,
+          ),
           primaryNationality: "BR",
         });
         players.push({
           id: playerId,
           personId,
           clubId: club.id,
-          primaryPosition: position,
+          primaryPosition: generated.position,
           ...(squadIndex < 2
-            ? { secondaryPosition: secondaryPositionFor(position) }
+            ? { secondaryPosition: secondaryPositionFor(generated.position) }
             : {}),
-          dominantFoot: dominantFootFor(position, random),
-          attributes,
-          potentialAbility: random.nextInt(60, 86),
+          dominantFoot: dominantFootFor(generated.position, random),
+          attributes: generated.attributes,
+          potentialAbility: generated.potentialAbility,
           generationSource: "INITIAL_WORLD",
         });
         squadPlayerIds.push(playerId);
@@ -218,77 +206,9 @@ export class WorldGenesisGenerator {
   }
 }
 
-export function calculatePlayerOverall(player: GeneratedPlayer): number {
-  const { technical, physical, mental, goalkeeping } = player.attributes;
 
-  if (player.primaryPosition === PlayerPosition.GK) {
-    return Math.round(goalkeeping * 0.6 + mental * 0.25 + physical * 0.15);
-  }
 
-  const [technicalWeight, physicalWeight, mentalWeight] = weightsFor(
-    player.primaryPosition,
-  );
-  return Math.round(
-    technical * technicalWeight +
-      physical * physicalWeight +
-      mental * mentalWeight,
-  );
-}
 
-function generateAttributes(
-  position: PlayerPositionType,
-  random: SeededRandom,
-): GeneratedPlayerAttributes {
-  const physical = random.nextInt(54, 67);
-
-  if (position === PlayerPosition.GK) {
-    const goalkeeping = random.nextInt(54, 67);
-    const mental = solveAttribute(
-      60,
-      goalkeeping * 0.6 + physical * 0.15,
-      0.25,
-    );
-    return { technical: random.nextInt(45, 61), physical, mental, goalkeeping };
-  }
-
-  const technical = random.nextInt(54, 67);
-  const [, physicalWeight, mentalWeight] = weightsFor(position);
-  const [technicalWeight] = weightsFor(position);
-  const mental = solveAttribute(
-    60,
-    technical * technicalWeight + physical * physicalWeight,
-    mentalWeight,
-  );
-  return { technical, physical, mental, goalkeeping: 0 };
-}
-
-function solveAttribute(
-  target: number,
-  knownScore: number,
-  weight: number,
-): number {
-  return Math.max(0, Math.min(100, Math.round((target - knownScore) / weight)));
-}
-
-function weightsFor(
-  position: PlayerPositionType,
-): readonly [number, number, number] {
-  if (
-    position === PlayerPosition.CB ||
-    position === PlayerPosition.LB ||
-    position === PlayerPosition.RB
-  ) {
-    return [0.35, 0.3, 0.35];
-  }
-  if (
-    position === PlayerPosition.CDM ||
-    position === PlayerPosition.CM ||
-    position === PlayerPosition.CAM
-  ) {
-    return [0.45, 0.2, 0.35];
-  }
-  return [0.5, 0.25, 0.25];
-}
 
 function dominantFootFor(position: PlayerPositionType, random: SeededRandom) {
   if (position === PlayerPosition.LB || position === PlayerPosition.LW) {

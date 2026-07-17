@@ -17,6 +17,7 @@ export class SessionStore {
   issue(
     input: Readonly<{
       subject: string;
+      accountId?: string | null;
       role?: Role;
       worldScope?: readonly string[];
       ttlMs?: number;
@@ -26,6 +27,7 @@ export class SessionStore {
     const session: Session = {
       token: randomUUID(),
       subject: input.subject,
+      accountId: input.accountId ?? null,
       role: input.role ?? Role.USER,
       worldScope: input.worldScope ?? [],
       expiresAtMs: input.nowMs + (input.ttlMs ?? DEFAULT_TTL_MS),

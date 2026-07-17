@@ -9,6 +9,7 @@ import {
   type SessionResponse,
   type StandardError,
   type ValidationReport,
+  type WorldListItem,
 } from "./types.js";
 
 type FetchLike = (
@@ -31,6 +32,13 @@ export interface ClientOptions {
   /** Sink de telemetria segura (FR-013): recebe só IDs, nunca payload/PII. */
   readonly onTelemetry?: (event: CommandTelemetryEvent) => void;
 }
+
+/**
+ * Versão do contrato que este SDK fala. Vai em todo command e é comparada com a
+ * `contractVersion` do `/health` no bootstrap do cliente: major diferente é
+ * `BREAKING` e exige atualizar o app (doc 08 §versionamento).
+ */
+export const CONTRACT_VERSION = "v1";
 
 let correlationCounter = 0;
 
@@ -103,10 +111,16 @@ export class GrintaClient {
     ).body;
   }
 
+  /**
+   * Abre sessão na API. Sessão de usuário exige `clerkToken` (R-171): o
+   * servidor verifica e deriva o subject do `sub`, ignorando o daqui. `subject`
+   * só vale para bootstrap admin ou com a porta de desenvolvimento aberta.
+   */
   async session(input: {
     subject: string;
     role?: Role;
     adminKey?: string;
+    clerkToken?: string;
     worldScope?: readonly string[];
   }): Promise<SessionResponse> {
     return (
@@ -120,6 +134,20 @@ export class GrintaClient {
 
   async catalog(): Promise<Catalog> {
     return (await this.request<Catalog>("GET", "/api/v1/commands/catalog")).body;
+  }
+
+  /**
+   * Os mundos que existem. É a única query sem `worldId` — ela é a que os
+   * descobre. Sem ela, o admin listava mundos do `localStorage` do navegador e
+   * seguia mostrando os que já tinham sido apagados.
+   */
+  async worlds(): Promise<readonly WorldListItem[]> {
+    return (
+      await this.request<QueryEnvelope<readonly WorldListItem[]>>(
+        "GET",
+        "/api/v1/worlds",
+      )
+    ).body.data;
   }
 
   /** Roda a calibração (VAL-001) e devolve o relatório com bandas e gate. */
@@ -136,7 +164,7 @@ export class GrintaClient {
   async command(envelope: CommandEnvelope): Promise<CommandResponse> {
     correlationCounter += 1;
     const full = {
-      contractVersion: "v1",
+      contractVersion: CONTRACT_VERSION,
       payload: {},
       correlationId: `sdk-${correlationCounter}`,
       ...envelope,

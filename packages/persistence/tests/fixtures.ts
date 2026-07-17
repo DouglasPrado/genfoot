@@ -1,0 +1,151 @@
+import { UserAccount, WorldParticipant } from "@grinta/core";
+
+import type { PrismaClient } from "../src/prisma-connection.js";
+
+/**
+ * Fixtures dos testes de Postgres. As FKs são reais: a partir de R-175 quase
+ * todo agregado de C1 pendura em mundo + conta + participação, e o banco recusa
+ * o que o JSON aceitava calado.
+ *
+ * Os ids são fixos e distintos por conceito — nada de derivar do relógio.
+ */
+export const WORLD_ID = "019b76da-a800-7787-9462-49c009be1111";
+export const CLUB_ID = "019b76da-a800-7787-9462-49c009be3333";
+export const OTHER_WORLD_ID = "019b76da-a800-7787-9462-49c009be5555";
+export const WORLD_SEED = "grinta-demo";
+
+/** Ordem de limpeza não importa: TRUNCATE ... CASCADE resolve as FKs. */
+export const IDENTITY_TABLES = [
+  "GameWorld",
+  "UserAccount",
+  "WorldParticipant",
+  "Club",
+  "ClubControl",
+];
+
+/**
+ * C3. `Club` com CASCADE já derruba os filhos, mas listá-los é a documentação
+ * de quais tabelas o agregado ocupa — e o TRUNCATE não fica dependendo de a FK
+ * estar declarada com o cascade certo.
+ */
+export const CLUB_TABLES = [
+  "GameWorld",
+  "Club",
+  "ClubIdentityPeriod",
+  "Stadium",
+  "ClubDepartment",
+  "TicketPricePolicy",
+  "CommercialAgreement",
+  "BoardDecision",
+];
+
+export function accountSnapshot(email = "douglas@exemplo.com") {
+  const result = UserAccount.register({
+    email,
+    name: "Douglas",
+    occurredOn: "2026-01-02",
+    idempotencySeed: WORLD_SEED,
+  });
+  if (!result.ok) throw result.error;
+  return result.value.snapshot();
+}
+
+export function participantSnapshot(accountId: string, occurredOn = "2026-01-02") {
+  const result = WorldParticipant.join({
+    gameWorldId: WORLD_ID,
+    accountId,
+    worldSeed: WORLD_SEED,
+    occurredOn,
+  });
+  if (!result.ok) throw result.error;
+  return result.value.snapshot();
+}
+
+export async function seedWorld(client: PrismaClient): Promise<void> {
+  await client.gameWorld.create({
+    data: {
+      id: WORLD_ID,
+      name: "Mundo de teste",
+      // R-182: sem seed gravado, o mundo não é reproduzível a partir do banco.
+      seed: WORLD_SEED,
+      rulesetVersion: "1.0.0",
+      startDate: new Date("2026-01-01T00:00:00.000Z"),
+      currentDate: new Date("2026-01-02T00:00:00.000Z"),
+      maxClubs: 16,
+      initialClubCashMinor: 100_000_00n,
+      currencyId: "019b76da-a800-7787-9462-49c009becccc",
+    },
+  });
+}
+
+export async function seedAccount(
+  client: PrismaClient,
+  email?: string,
+): Promise<string> {
+  const snapshot = accountSnapshot(email);
+  // Sem `createdAt`: é instante de plataforma, e quem o grava é o
+  // `@default(now())`. A conta é global (R-172) e não tem data de mundo.
+  await client.userAccount.create({
+    data: { id: snapshot.id, name: snapshot.name, email: snapshot.email },
+  });
+  return snapshot.id;
+}
+
+export async function seedParticipant(
+  client: PrismaClient,
+  accountId: string,
+): Promise<string> {
+  const snapshot = participantSnapshot(accountId);
+  await client.worldParticipant.create({
+    data: {
+      id: snapshot.id,
+      gameWorldId: snapshot.gameWorldId,
+      userId: snapshot.accountId,
+      status: snapshot.status,
+      joinedOn: new Date(`${snapshot.joinedOn}T00:00:00.000Z`),
+    },
+  });
+  return snapshot.id;
+}
+
+/**
+ * O clube e o seu período de identidade vigente.
+ *
+ * O nome NÃO mora no clube (R-175/BC-003): ele é um período com vigência, e o
+ * rebranding abre um novo em vez de sobrescrever. Um clube sem período vigente
+ * é um clube sem nome hoje — por isso a fixture cria os dois.
+ */
+export async function seedClub(client: PrismaClient, id = CLUB_ID): Promise<string> {
+  await client.club.create({
+    data: { id, gameWorldId: WORLD_ID, regionId: "BR-SP" },
+  });
+  await client.clubIdentityPeriod.create({
+    data: {
+      id: `019b76da-a800-7aaa-9462-${id.slice(-12)}`,
+      gameWorldId: WORLD_ID,
+      clubId: id,
+      name: `Clube ${id.slice(-4)}`,
+      shortCode: id.slice(-3).toUpperCase(),
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      rulesetVersion: "1.0.0",
+    },
+  });
+  // O estádio é OBRIGATÓRIO no domínio (`ClubSnapshot.stadium`, não opcional):
+  // clube sem estádio não existe, e uma fixture que o omitia produzia um clube
+  // que o `Club.fromSnapshot` recusaria. Ela mentia — o read model, ao exigi-lo,
+  // só tornou a mentira visível.
+  await client.stadium.create({
+    data: {
+      id: `019b76da-a800-7bbb-9462-${id.slice(-12)}`,
+      gameWorldId: WORLD_ID,
+      clubId: id,
+      name: `Estádio ${id.slice(-4)}`,
+      tenure: "OWNED",
+      capacity: 10_000,
+      pitchQuality: 60,
+      condition: 100,
+      licenseStatus: "LICENSED",
+    },
+  });
+  return id;
+}

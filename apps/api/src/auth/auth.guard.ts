@@ -62,6 +62,9 @@ export class AuthGuard implements CanActivate {
         request.session = {
           token: "anonymous",
           subject: "anonymous",
+          // Sessão anônima é ADMIN e não tem conta de jogo — igual à admin de
+          // verdade. Dar-lhe uma poria um jogador fantasma no mundo.
+          accountId: null,
           role: "admin",
           worldScope: [],
           expiresAtMs: Number.MAX_SAFE_INTEGER,

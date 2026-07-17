@@ -30,6 +30,8 @@ describe("API query catalog (e2e)", () => {
   beforeAll(async () => {
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiq-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
+    // Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.
+    process.env.GRINTA_API_ALLOW_DEV_SESSIONS = "1";
     process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -81,9 +83,10 @@ describe("API query catalog (e2e)", () => {
     expect(response.body.data.status).toBe("ACTIVE");
   });
 
-  // Genesis + activate inicializam clube e elenco; os demais contextos só
-  // existem após o setup próprio (temporada, transações, mercado).
-  it.each(["club", "players"])(
+  // A gênese materializa os clubes como LINHAS (R-185): o que este teste prova é
+  // que `world:genesis` teve efeito no Postgres. A query `players` saiu junto
+  // com o contexto que a servia e volta quando uma tela precisar dela.
+  it.each(["club", "club-detail"])(
     "query %s (inicializado na gênese) → 200 com envelope",
     async (queryType) => {
       const response = await request(app.getHttpServer()).get(
@@ -96,103 +99,35 @@ describe("API query catalog (e2e)", () => {
     },
   );
 
-  it("query player-roster entrega elenco e reserva oficial de mercado", async () => {
-    const response = await request(app.getHttpServer()).get(
-      `/api/v1/worlds/${worldId}/player-roster`,
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.players).toHaveLength(528);
-    expect(response.body.data.persons).toHaveLength(528);
-    expect(response.body.data.players[0]).toMatchObject({
-      careerStatus: "ACTIVE",
-      availability: "AVAILABLE",
-    });
-    expect(response.body.data.persons[0]).toEqual(
-      expect.objectContaining({
-        firstName: expect.any(String),
-        lastName: expect.any(String),
-      }),
-    );
-    expect(
-      response.body.data.players.filter(
-        (player: { careerStatus: string }) =>
-          player.careerStatus === "FREE_AGENT",
-      ),
-    ).toHaveLength(160);
-  });
-
-  it("gênese materializa as 240 partidas oficiais da Liga Inicial", async () => {
-    const response = await request(app.getHttpServer()).get(
-      `/api/v1/worlds/${worldId}/matches-detail`,
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.matches).toHaveLength(240);
-    expect(response.body.data.matches[0]).toMatchObject({
-      status: "CREATED",
-      kickoffOn: "2026-01-08",
-    });
-  });
-
-  it("query identity-detail entrega contas, reservas e controles oficiais", async () => {
-    await request(app.getHttpServer())
-      .post("/api/v1/commands")
-      .send(
-        command({
-          commandType: "identity:initialize",
-          worldId,
-          idempotencyKey: "q-identity-init",
-        }),
+  /**
+   * C1 já migrou para o Postgres (R-173/R-175), então esta query exige banco —
+   * é read model sobre quatro tabelas, não mais o snapshot de um mega-agregado.
+   * Sem `DATABASE_URL` ela é PULADA e diz por quê, em vez de passar em silêncio
+   * dando a impressão de que foi verificada.
+   *
+   * Sem `revision`: não existe mais revisão de mundo (R-175), é `version` por
+   * linha. Sem `accounts`: a conta é de plataforma (R-172) e não vive no mundo.
+   * Sem `identity:initialize`: não há agregado de identidade para inicializar —
+   * os roots nascem quando o jogador age.
+   */
+  it.skipIf(process.env.DATABASE_URL === undefined)(
+    "query identity-detail entrega reservas, controles e participações do mundo",
+    async () => {
+      const response = await request(app.getHttpServer()).get(
+        `/api/v1/worlds/${worldId}/identity-detail`,
       );
 
-    const response = await request(app.getHttpServer()).get(
-      `/api/v1/worlds/${worldId}/identity-detail`,
-    );
-
-    expect(response.status).toBe(200);
-    expect(response.body.data).toMatchObject({
-      accounts: [],
-      reservations: [],
-      controls: [],
-      participations: [],
-      revision: 1,
-    });
-  });
-
-  it("query matches resume o calendário materializado", async () => {
-    const response = await request(app.getHttpServer()).get(
-      `/api/v1/worlds/${worldId}/matches`,
-    );
-    expect(response.status).toBe(200);
-    expect(response.body.data).toMatchObject({
-      matchCount: 240,
-      finalCount: 0,
-    });
-  });
-
-  it("a gênese entrega economia, mercado e competição jogáveis", async () => {
-    const [ledger, market, competitions] = await Promise.all([
-      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/ledger`),
-      request(app.getHttpServer()).get(`/api/v1/worlds/${worldId}/market`),
-      request(app.getHttpServer()).get(
-        `/api/v1/worlds/${worldId}/competitions`,
-      ),
-    ]);
-
-    expect(ledger.body.data).toMatchObject({
-      accountCount: 17,
-      transactionCount: 16,
-      residualMinor: 0,
-    });
-    expect(market.body.data.availablePlayerCount).toBe(160);
-    expect(competitions.body.data).toMatchObject({
-      editionCount: 1,
-      participantCount: 16,
-      fixtureCount: 240,
-      nextKickoffOn: "2026-01-08",
-    });
-  });
+      expect(response.status).toBe(200);
+      expect(response.body.data).toMatchObject({
+        participations: [],
+        reservations: [],
+        controls: [],
+        cooldowns: [],
+      });
+      expect(response.body.data).not.toHaveProperty("accounts");
+      expect(response.body.data).not.toHaveProperty("revision");
+    },
+  );
 
   it("envelope de query carrega paginação (limit/offset)", async () => {
     const response = await request(app.getHttpServer()).get(

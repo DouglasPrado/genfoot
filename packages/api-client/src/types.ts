@@ -6,6 +6,14 @@ export interface SessionResponse {
   readonly role: Role;
   readonly expiresAtMs: number;
   readonly worldScope: readonly string[];
+  /**
+   * A conta do JOGO (R-172), resolvida a partir do subject verificado do
+   * provedor. É o que vai em `identity:join-world` e `reserve-club`.
+   *
+   * `null` em sessão admin de dev — ela não tem conta de jogo, e inventar uma
+   * poria um jogador fantasma no mundo.
+   */
+  readonly accountId: string | null;
 }
 
 export interface CommandEnvelope {
@@ -42,6 +50,17 @@ export interface QueryEnvelope<T = unknown> {
   readonly projectionVersion: number;
   readonly pagination: Pagination;
   readonly scope: Record<string, string>;
+}
+
+/** Uma linha da lista de mundos (`GET /api/v1/worlds`). */
+export interface WorldListItem {
+  readonly id: string;
+  readonly seed: string;
+  readonly status: string;
+  readonly currentDate: string;
+  readonly startDate: string;
+  readonly rulesetVersion: string;
+  readonly clubCount: number;
 }
 
 export interface Catalog {

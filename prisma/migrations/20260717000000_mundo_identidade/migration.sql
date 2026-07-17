@@ -1,0 +1,14 @@
+-- Nome e descrição do mundo: identidade, não configuração.
+--
+-- `name` já existia como coluna nullable e NUNCA foi escrita — o comentário do
+-- schema dizia "pendente: vai para GameRuleConfig (R-182)". R-182 não diz isso:
+-- o texto dela trata de `maxClubs`, `seasonDays` e `initialClubCashMinor`
+-- (dimensionamento) e dos literais da gênese. `GameRuleConfig`, por definição
+-- própria, é "atalho chave-valor para parâmetros simples de BALANCEAMENTO".
+-- Nome de exibição não balanceia nada.
+--
+-- Então `name` fica onde está, passa a ser escrito pelo domínio, e ganha a
+-- `description` que faltava. Ambas nullable: mundo sem rótulo é estado legítimo
+-- — os mundos que já existem nascem sem nome, e um default inventado gravaria
+-- como fato o que é chute.
+ALTER TABLE "GameWorld" ADD COLUMN "description" TEXT;

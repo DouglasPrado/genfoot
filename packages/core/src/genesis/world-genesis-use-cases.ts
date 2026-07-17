@@ -1,36 +1,44 @@
 import {
   DomainError,
-  WorldDate,
   fail,
   succeed,
   type GameWorldId,
   type Result,
 } from "@grinta/shared";
 
+import { buildClubsFromGenesis } from "../clubs/club-bootstrap.js";
+import type { ClubRepository } from "../clubs/club-repository.js";
+import { Club } from "../clubs/club.js";
 import {
   ActivateWorld,
   type WorldMutationResult,
 } from "../world/world-use-cases.js";
-import type { ClubPortfolioRepository } from "../clubs/club-repository.js";
-import { buildClubDailyTasks } from "../clubs/club-maintenance.js";
-import { InitializeClubPortfolio } from "../clubs/club-use-cases.js";
-import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
-import type { PlayerLifecycleRepository } from "../players/player-lifecycle-repository.js";
-import {
-  InitializePlayerLifecycle,
-  buildPlayerDailyTasks,
-} from "../players/player-lifecycle-use-cases.js";
-import type { SchedulingRepository } from "../scheduling/scheduling-repository.js";
-import {
-  BootstrapWorldScheduler,
-  ScheduleWorldTasks,
-} from "../scheduling/scheduling-use-cases.js";
 import type { WorldRepository } from "../world/world-repository.js";
+import type { GameWorldSnapshot } from "../world/world-types.js";
 import { WorldStatus } from "../world/world-types.js";
-import type { WorldGenesisSummary } from "./genesis-types.js";
+import type { WorldGenesisSnapshot, WorldGenesisSummary } from "./genesis-types.js";
 import { WorldGenesisGenerator } from "./world-genesis-generator.js";
-import type { WorldGenesisRepository } from "./world-genesis-repository.js";
 import { validateWorldGenesis } from "./world-genesis-validator.js";
+
+/**
+ * Gênese do mundo, depois do extermínio da arquitetura morta (R-175).
+ *
+ * **A gênese deixou de ser guardada (R-185).** Ela é uma função pura do `seed`,
+ * que R-182 tornou coluna: `generate(world)` devolve sempre o mesmo mundo. O
+ * `WorldGenesisRepository` — que a serializava inteira num blob — era hábito do
+ * JSON, não necessidade. O que persiste é o EFEITO dela: as linhas de `Club`.
+ *
+ * O que saiu junto: `InitializePlayerLifecycle`, `BootstrapWorldScheduler` e
+ * `ScheduleWorldTasks` eram mega-agregados sobre o adapter JSON. Não foram
+ * adiados por conveniência — foram apagados, e voltam já em agregado por
+ * entidade quando uma vertical viva os exigir. Hoje a vertical é o admin:
+ * criar mundo → gerar clubes → ativar.
+ *
+ * Os clubes agora nascem como LINHAS. Era isto que faltava para
+ * `identity:reserve-club` parar de falhar com
+ * `ClubEntryReservation_gameWorldId_clubId_fkey`: a reserva já vivia no
+ * Postgres e pendurava em `Club` por FK, enquanto o clube só existia no blob.
+ */
 
 export interface GenerateWorldGenesisResult {
   readonly created: boolean;
@@ -40,10 +48,8 @@ export interface GenerateWorldGenesisResult {
 export class GenerateWorldGenesis {
   public constructor(
     private readonly worldRepository: WorldRepository,
-    private readonly genesisRepository: WorldGenesisRepository,
+    private readonly clubRepository: ClubRepository,
     private readonly generator = new WorldGenesisGenerator(),
-    private readonly playerLifecycleRepository?: PlayerLifecycleRepository,
-    private readonly clubPortfolioRepository?: ClubPortfolioRepository,
   ) {}
 
   public async execute(
@@ -67,59 +73,48 @@ export class GenerateWorldGenesis {
       );
     }
 
-    const existing = await this.genesisRepository.findByWorldId(gameWorldId);
-    if (existing !== null) {
-      const validated = validateWorldGenesis(world, existing);
-      if (!validated.ok) return validated;
-      const initialized = await this.initializePlayers(world, existing);
-      if (!initialized.ok) return initialized;
-      const clubs = await this.initializeClubs(world, existing);
-      if (!clubs.ok) return clubs;
-      return succeed({ created: false, summary: validated.value.summary });
-    }
-
     const genesis = this.generator.generate(world);
     const validated = validateWorldGenesis(world, genesis);
     if (!validated.ok) return validated;
 
-    await this.genesisRepository.saveGenesis(genesis, world.version);
-    const initialized = await this.initializePlayers(world, genesis);
-    if (!initialized.ok) return initialized;
-    const clubs = await this.initializeClubs(world, genesis);
-    if (!clubs.ok) return clubs;
-    return succeed({ created: true, summary: validated.value.summary });
+    const created = await this.materializeClubs(world, genesis);
+    if (!created.ok) return created;
+    return succeed({ created: created.value, summary: validated.value.summary });
   }
 
-  private async initializePlayers(
-    world: Parameters<InitializePlayerLifecycle["execute"]>[0],
-    genesis: Parameters<InitializePlayerLifecycle["execute"]>[1],
-  ): Promise<Result<void, DomainError>> {
-    if (this.playerLifecycleRepository === undefined) return succeed(undefined);
-    const initialized = await new InitializePlayerLifecycle(
-      this.playerLifecycleRepository,
-    ).execute(world, genesis);
-    return initialized.ok ? succeed(undefined) : initialized;
-  }
+  /**
+   * Idempotente por clube: reexecutar a gênese não duplica nem explode. Quem
+   * arbitra é o `findClubById` — o clube que já existe é PULADO, não
+   * sobrescrito, porque a esta altura ele pode já ter sido renomeado pelo dono
+   * (BC-003), e a gênese não tem o direito de desfazer isso.
+   */
+  private async materializeClubs(
+    world: GameWorldSnapshot,
+    genesis: WorldGenesisSnapshot,
+  ): Promise<Result<boolean, DomainError>> {
+    let created = false;
+    for (const snapshot of buildClubsFromGenesis(world, genesis)) {
+      const loaded = Club.fromSnapshot(snapshot);
+      if (!loaded.ok) return loaded;
 
-  private async initializeClubs(
-    world: Parameters<InitializeClubPortfolio["execute"]>[0],
-    genesis: Parameters<InitializeClubPortfolio["execute"]>[1],
-  ): Promise<Result<void, DomainError>> {
-    if (this.clubPortfolioRepository === undefined) return succeed(undefined);
-    const initialized = await new InitializeClubPortfolio(
-      this.clubPortfolioRepository,
-    ).execute(world, genesis);
-    return initialized.ok ? succeed(undefined) : initialized;
+      const existing = await this.clubRepository.findClubById(
+        snapshot.gameWorldId,
+        snapshot.id,
+      );
+      if (existing !== null) continue;
+
+      await this.clubRepository.saveClub(snapshot, null);
+      created = true;
+    }
+    return succeed(created);
   }
 }
 
 export class ActivateProvisionedWorld {
   public constructor(
     private readonly worldRepository: WorldRepository,
-    private readonly genesisRepository: WorldGenesisRepository,
-    private readonly schedulingRepository?: SchedulingRepository,
-    private readonly playerLifecycleRepository?: PlayerLifecycleRepository,
-    private readonly clubPortfolioRepository?: ClubPortfolioRepository,
+    private readonly clubRepository: ClubRepository,
+    private readonly generator = new WorldGenesisGenerator(),
   ) {}
 
   public async execute(
@@ -133,8 +128,26 @@ export class ActivateProvisionedWorld {
         }),
       );
     }
-    const genesis = await this.genesisRepository.findByWorldId(gameWorldId);
-    if (genesis === null) {
+
+    const genesis = this.generator.generate(world);
+    const validated = validateWorldGenesis(world, genesis);
+    if (!validated.ok) return validated;
+
+    // "A gênese rodou?" não se pergunta mais a um blob: pergunta-se ao EFEITO
+    // dela. Se o primeiro clube do mundo não tem linha, a gênese não foi
+    // materializada — e ativar um mundo sem clubes entregaria ao jogador um
+    // mundo vazio.
+    const first = genesis.clubs[0];
+    if (first === undefined) {
+      return fail(
+        new DomainError("WORLD_GENESIS_EMPTY", "A gênese não produziu clubes."),
+      );
+    }
+    const materialized = await this.clubRepository.findClubById(
+      world.id,
+      first.id,
+    );
+    if (materialized === null) {
       return fail(
         new DomainError(
           "WORLD_GENESIS_NOT_FOUND",
@@ -142,117 +155,6 @@ export class ActivateProvisionedWorld {
           { gameWorldId },
         ),
       );
-    }
-
-    const validated = validateWorldGenesis(world, genesis);
-    if (!validated.ok) return validated;
-
-    if (this.playerLifecycleRepository !== undefined) {
-      const initialized = await new InitializePlayerLifecycle(
-        this.playerLifecycleRepository,
-      ).execute(world, genesis);
-      if (!initialized.ok) return initialized;
-    }
-
-    if (this.clubPortfolioRepository !== undefined) {
-      const initialized = await new InitializeClubPortfolio(
-        this.clubPortfolioRepository,
-      ).execute(world, genesis);
-      if (!initialized.ok) return initialized;
-    }
-
-    if (this.schedulingRepository !== undefined) {
-      const fixtureDates = genesis.fixtures.map(
-        ({ scheduledWorldDate }) => scheduledWorldDate,
-      );
-      const startsOn = fixtureDates.reduce((left, right) =>
-        left < right ? left : right,
-      );
-      const endsOn = fixtureDates.reduce((left, right) =>
-        left > right ? left : right,
-      );
-      const timestampMilliseconds = Date.parse(`${world.startDate}T00:00:00Z`);
-      const parsedEnd = WorldDate.parse(endsOn);
-      if (!parsedEnd.ok) return parsedEnd;
-      const nextStartsOn = parsedEnd.value.addDays(14);
-      const seasonDurationDays = Math.round(
-        (Date.parse(`${endsOn}T00:00:00Z`) -
-          Date.parse(`${startsOn}T00:00:00Z`)) /
-          86_400_000,
-      );
-      const nextEndsOn = nextStartsOn.addDays(seasonDurationDays);
-      const scheduler = await new BootstrapWorldScheduler(
-        this.schedulingRepository,
-      ).execute({
-        gameWorldId,
-        rulesetVersion: world.rulesetVersion,
-        season: {
-          id: deterministicUuidV7<"Season">({
-            worldSeed: world.seed,
-            context: "season:1",
-            timestampMilliseconds,
-          }),
-          number: 1,
-          name: "Temporada 1",
-          startsOn,
-          endsOn,
-        },
-        startTaskId: deterministicUuidV7<"ScheduledTask">({
-          worldSeed: world.seed,
-          context: "season:1:start",
-          timestampMilliseconds,
-        }),
-        dueTaskId: deterministicUuidV7<"ScheduledTask">({
-          worldSeed: world.seed,
-          context: "season:1:due",
-          timestampMilliseconds,
-        }),
-        rollover: {
-          id: deterministicUuidV7<"SeasonRollover">({
-            worldSeed: world.seed,
-            context: "season:1:rollover",
-            timestampMilliseconds,
-          }),
-          nextSeason: {
-            id: deterministicUuidV7<"Season">({
-              worldSeed: world.seed,
-              context: "season:2",
-              timestampMilliseconds: Date.parse(
-                `${nextStartsOn.toString()}T00:00:00Z`,
-              ),
-            }),
-            number: 2,
-            name: "Temporada 2",
-            startsOn: nextStartsOn.toString(),
-            endsOn: nextEndsOn.toString(),
-          },
-        },
-      });
-      if (!scheduler.ok) return scheduler;
-      const playerTasks = await new ScheduleWorldTasks(
-        this.schedulingRepository,
-      ).execute(
-        gameWorldId,
-        buildPlayerDailyTasks({
-          gameWorldId,
-          worldSeed: world.seed,
-          fromExclusive: world.startDate,
-          throughInclusive: endsOn,
-        }),
-      );
-      if (!playerTasks.ok) return playerTasks;
-      const clubTasks = await new ScheduleWorldTasks(
-        this.schedulingRepository,
-      ).execute(
-        gameWorldId,
-        buildClubDailyTasks({
-          gameWorldId,
-          worldSeed: world.seed,
-          fromExclusive: world.startDate,
-          throughInclusive: endsOn,
-        }),
-      );
-      if (!clubTasks.ok) return clubTasks;
     }
 
     return new ActivateWorld(this.worldRepository).execute(

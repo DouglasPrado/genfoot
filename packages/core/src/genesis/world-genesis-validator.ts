@@ -4,7 +4,7 @@ import type {
   GameWorldSnapshot,
   WorldProvisioningEvidence,
 } from "../world/world-types.js";
-import { calculatePlayerOverall } from "./world-genesis-generator.js";
+import { derivePlayerOverall } from "../players/player-attributes.js";
 import type {
   ClubId,
   PlayerId,
@@ -58,11 +58,11 @@ export function validateWorldGenesis(
         "Todo jogador deve apontar para clube e pessoa da mesma gênese.",
       );
     }
-    if (calculatePlayerOverall(player) !== 60) {
-      return invalid(
-        "Todo jogador inicial deve ter overall derivado igual a 60.",
-      );
-    }
+    // NÃO se exige `overall === 60` por jogador, e a exigência anterior era um
+    // erro que contradizia a própria R-57: "os pontos podem ser distribuídos de
+    // formas diferentes entre goleiros, defesa, meio e ataque". Com todo mundo
+    // em 60 não há distribuição diferente possível — o validador proibia o que
+    // a decisão exige. O que vale é o TETO do elenco, checado abaixo.
     playersById.set(player.id, player);
   }
 
@@ -99,7 +99,7 @@ export function validateWorldGenesis(
         );
       }
       assignedPlayers.add(playerId);
-      totalOverall += calculatePlayerOverall(player);
+      totalOverall += derivePlayerOverall(player.primaryPosition, player.attributes);
     }
     if (totalOverall !== 1_380) {
       return invalid("A força total de cada elenco deve ser exatamente 1.380.");

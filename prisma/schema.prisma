@@ -39,7 +39,12 @@
 // =============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  // Prisma 7 + pnpm: o gerador legado `prisma-client-js` escreve dentro de
+  // node_modules/@prisma/client e não resolve num workspace isolado (o client
+  // vive em packages/persistence, não na raiz). O gerador novo escreve num
+  // caminho explícito, que o adapter importa direto.
+  provider = "prisma-client"
+  output   = "../packages/persistence/src/generated/prisma"
 }
 
 datasource db {
@@ -78,6 +83,13 @@ enum UserAccountStatus {
   ANONYMIZED
 }
 
+/// R-175: era `String @default("ACTIVE")` — texto livre aceita "ACITVE" e o
+/// banco não reclama. O estado da participação tem dois valores; o tipo diz.
+enum WorldParticipantStatus {
+  ACTIVE
+  ENDED
+}
+
 enum WorldStatus {
   CREATING
   ACTIVE
@@ -86,16 +98,33 @@ enum WorldStatus {
   ARCHIVED
 }
 
-enum ClubControlType {
-  USER
-  AI
+/// R-175: era `Boolean isActive` + `endsAtWorldTick` — dois campos contando o
+/// mesmo fato, livres para se contradizer.
+enum ClubControlStatus {
+  ACTIVE
+  ENDED
 }
 
+enum ClubEntryReservationStatus {
+  HELD
+  CONFIRMED
+  EXPIRED
+  RELEASED
+}
+
+/// R-175: fica o ciclo de vida do CLUBE, e só ele.
+///
+/// Saíram: `BANKRUPT` (é do C9 — situação econômica, não estado do clube; e o
+/// saldo deriva do razão, Decisão 19.10), `BOT_RESERVED` (morreu com R-180: IA
+/// é a AUSÊNCIA de controle, não um estado do clube) e `INACTIVE` (vago — o
+/// domínio distingue suspenso de dissolvido, que é o que o jogo precisa).
+///
+/// A interseção entre os dois enums era `{ACTIVE}`: cada lado conhecia estados
+/// que o outro nunca ouviu falar.
 enum ClubStatus {
   ACTIVE
-  INACTIVE
-  BANKRUPT
-  BOT_RESERVED
+  SUSPENDED
+  DISSOLVED
 }
 
 enum SeasonStatus {
@@ -196,17 +225,24 @@ enum StaffQualityTier {
   ELITE
 }
 
+/// R-175: fica o do domínio (6). A interseção com os 10 anteriores era 3.
+///
+/// Saíram, e cada um por um motivo concreto:
+/// - `STADIUM`: o estádio é ENTIDADE (model Stadium). Não pode ser as duas
+///   coisas — seria o mesmo conceito em dois lugares, divergindo em silêncio.
+/// - `INFRASTRUCTURE`: colide com `InfrastructureProject`, que é root próprio.
+/// - `BOARD`: governança, não departamento que o gestor sobe de nível.
+/// - `FINANCE`: é do C9. O clube nunca escreve LedgerEntry (context map:78).
+/// - `COMMUNICATION`, `DATA_ANALYSIS`: sem comando e sem tipo no domínio.
+///
+/// `YOUTH_ACADEMY` → `YOUTH`: renomeio; fica o nome que o domínio usa.
 enum DepartmentType {
-  MEDICAL
+  FOOTBALL
   TRAINING
-  YOUTH_ACADEMY
+  MEDICAL
   SCOUTING
-  COMMUNICATION
-  BOARD
-  FINANCE
-  INFRASTRUCTURE
-  STADIUM
-  DATA_ANALYSIS
+  YOUTH
+  COMMERCIAL
 }
 
 enum ContractStatus {
@@ -618,6 +654,11 @@ model UserAccount {
   status      UserAccountStatus @default(ACTIVE)
   name        String
   email       String            @unique // e-mail normalizado: 1 conta por e-mail
+  // R-171: identidade externa (Clerk). `sub` do token verificado — chave
+  // estável de ligação com o provedor. O e-mail NÃO serve para isso: muda ao
+  // longo da vida da conta e só chega no token via claim customizada.
+  // Opcional porque contas podem nascer por outros caminhos (seed, admin).
+  externalSubject String?         @unique
   role        UserRole          @default(PLAYER)
   avatarUrl   String?
   lastLoginAt DateTime?
@@ -642,25 +683,36 @@ model UserSession {
   ipAddress   String?
 
   user  UserAccount @relation(fields: [userId], references: [id])
-  world GameWorld?  @relation(fields: [gameWorldId], references: [id])
+  world GameWorld?  @relation(fields: [gameWorldId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([gameWorldId])
 }
 
 /// Vínculo usuário <-> mundo (§6.3.1). Substitui a antiga visão `ClubUser`.
+///
+/// R-177: o tempo do mundo é DATA, não instante — `@db.Date`, e sem
+/// `@default(now())`: a data vem do domínio. Um default de relógio de máquina
+/// inventaria a data quando o domínio esquecesse de mandá-la, e o mundo
+/// deixaria de ser reproduzível (R-182).
 model WorldParticipant {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  gameWorldId String    @db.Uuid
-  userId      String    @db.Uuid
-  status      String    @default("ACTIVE")
-  joinedAt    DateTime  @default(now())
-  leftAt      DateTime?
-  version     Int       @default(1)
+  id          String                 @id @db.Uuid
+  gameWorldId String                 @db.Uuid
+  userId      String                 @db.Uuid
+  status      WorldParticipantStatus @default(ACTIVE)
+  joinedOn    DateTime               @db.Date
+  leftOn      DateTime?              @db.Date
+  // Cooldown de conta é responsabilidade de C1 (context map:66) mas NÃO é
+  // aggregate root (:67 lista seis, e ele não está lá). É 1 por (conta, mundo)
+  // = 1 por participação: cabe como atributo. Tabela própria inventaria um root
+  // que o canônico não tem. O histórico fica no DomainEventLog (R-176).
+  cooldownUntilOn DateTime?          @db.Date
+  version     Int                    @default(1)
 
-  gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id])
+  gameWorld    GameWorld     @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
   user         UserAccount   @relation(fields: [userId], references: [id])
   clubControls ClubControl[]
+  clubEntryReservations ClubEntryReservation[]
 
   @@unique([gameWorldId, userId]) // 1 participação por usuário/mundo
   @@unique([gameWorldId, id])
@@ -732,19 +784,59 @@ model RolePermission {
 // =============================================================================
 
 /// Raiz de partição do mundo: seu `id` é o valor de `gameWorldId` dos filhos.
+/// R-182. O que muda, e por quê:
+///
+/// - **`seed` e `startDate` passam a existir.** Não tinham coluna, e o
+///   determinismo e o replay são invariante canônica (context map:149): sem
+///   seed gravado, o mundo NÃO é reproduzível a partir do banco. O
+///   `GameWorldSnapshot` sempre os teve; era o físico que não.
+/// - **`currentDate` e `startDate` viram DATE** (R-177): o tempo do mundo é
+///   data, não instante.
+/// - **`rulesetVersion` é semver, não FK.** O domínio usa `RulesetVersion`
+///   ("1.0.0"); `currentRuleSetVersionId` apontava para uma tabela que não
+///   existe. A coluna FK fica, sem escritor, até haver catálogo de ruleset.
+/// - **`name`, `maxClubs`, `seasonDays`, `initialClubCashMinor` e `currencyId`
+///   viram NULLABLE.** Eram NOT NULL e o domínio não os produz — ou seja,
+///   nada conseguia inserir um mundo. R-182 já decidiu que eles são
+///   configuração (`GameRuleConfig`/`GameEconomyConfig`), não atributo do
+///   mundo; nullable é a dívida declarada até a config existir. Um default
+///   inventado seria pior: gravaria como fato o que é chute.
 model GameWorld {
-  id                      String      @id @default(uuid(7)) @db.Uuid
-  name                    String
+  id                      String      @id @db.Uuid
+  // Identidade do mundo, escrita pelo domínio. NÃO é configuração: o comentário
+  // anterior dizia "pendente: vai para GameRuleConfig (R-182)" e extrapolava —
+  // R-182 trata de `maxClubs`, `seasonDays`, `initialClubCashMinor` e dos
+  // literais da gênese (dimensionamento), e `GameRuleConfig` é, por definição,
+  // "atalho chave-valor para parâmetros simples de BALANCEAMENTO".
+  name                    String?
+  description             String?
+  // A CHAVE do objeto no R2, não a URL: a URL pública é composta na borda a
+  // partir de `R2_CDN_URL`. Guardar a URL assaria o CDN de outro projeto aqui.
+  bannerKey               String?
+  squarePhotoKey          String?
+  seed                    String // R-182: sem ele não há replay
+  startDate               DateTime    @db.Date
   status                  WorldStatus @default(CREATING)
+  rulesetVersion          String // semver ("1.0.0"), como o domínio usa
   currentSeasonId         String?     @db.Uuid
-  currentRuleSetVersionId String?     @db.Uuid // versão de ruleset vigente
-  currentDate             DateTime // data virtual do mundo
+  currentRuleSetVersionId String?     @db.Uuid // sem escritor: não há catálogo de ruleset
+  currentDate             DateTime    @db.Date // data virtual do mundo (R-177)
   timezone                String      @default("America/Sao_Paulo")
-  maxClubs                Int
-  seasonDays              Int? // R-107: duração real da temporada por tamanho de mundo (16 clubes→~63d)
-  initialClubCashMinor    BigInt // caixa inicial em unidade mínima
-  currencyId              String      @db.Uuid // moeda-base do mundo (FK Currency)
+  maxClubs                Int? // pendente: GameRuleConfig (R-182)
+  seasonDays              Int? // R-107 · pendente: GameRuleConfig
+  initialClubCashMinor    BigInt? // pendente: GameEconomyConfig (R-182)
+  currencyId              String?     @db.Uuid // pendente: a model Currency não existe (R-181)
   createdAt               DateTime    @default(now())
+  // R-182: o contador do mundo morava DENTRO da tabela de eventos
+  // (`DomainEventLog.sequence`/`OutboxEvent.sequence`) e não tinha dono. É
+  // daqui que sai o `worldSequence` de cada evento: o append incrementa esta
+  // linha, e o lock dela é o que garante ordem total sem gap nem duplicata
+  // (CA-REG-01).
+  //
+  // `seed` e `startDate` — o resto de R-182 — entram com a reescrita de C2, que
+  // é quem cria mundo. Hoje o seed viaja como parâmetro e o mundo NÃO é
+  // reproduzível a partir do banco.
+  worldSequence           BigInt      @default(0)
   version                 Int         @default(1)
 
   seasons           Season[]
@@ -779,7 +871,7 @@ model GameEconomyConfig {
   targetFreeAgentRatio      Decimal @db.Decimal(5, 4)
   inflationRatePerSeason    Decimal @default(0) @db.Decimal(6, 4)
 
-  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 }
 
 model EconomySnapshot {
@@ -802,7 +894,7 @@ model EconomySnapshot {
   balanceScore            Decimal  @db.Decimal(10, 4)
   capturedAt              DateTime @default(now())
 
-  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 
   @@index([gameWorldId])
 }
@@ -817,7 +909,7 @@ model Season {
   endsAt      DateTime?
   version     Int          @default(1)
 
-  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 
   @@unique([gameWorldId, number])
   @@unique([gameWorldId, id])
@@ -828,33 +920,181 @@ model Season {
 // CLUBE — §3.2 / §6.3.3
 // =============================================================================
 
+/// R-175. `name`, `shortName` e `slug` NÃO moram aqui: a identidade do clube é
+/// um PERÍODO com vigência (`ClubIdentityPeriod`), porque o rebranding (BC-003)
+/// abre período novo em vez de sobrescrever. Guardá-los aqui faria cada troca
+/// de nome apagar a anterior — e o histórico é justamente o que a feature
+/// existe para manter.
+///
+/// O nome corrente é o período sem `effectiveThrough`. A unicidade de nome por
+/// mundo vive lá, com índice parcial sobre o período vigente.
+/// A identidade do clube ao longo do tempo (BC-003). Root canônico que não
+/// tinha tabela — e sem ele o rebranding sobrescreveria o nome, apagando o
+/// histórico que a feature existe para guardar.
+///
+/// O período vigente é o de `effectiveThrough = null`. "Nome único por mundo"
+/// (context map:153) é índice único PARCIAL sobre os vigentes: dois clubes não
+/// podem se chamar igual HOJE, mas um nome abandonado pode ser reusado.
+model ClubIdentityPeriod {
+  id               String    @id @db.Uuid
+  gameWorldId      String    @db.Uuid
+  clubId           String    @db.Uuid
+  name             String
+  shortCode        String
+  effectiveFrom    DateTime  @db.Date
+  effectiveThrough DateTime? @db.Date
+  rulesetVersion   String
+  // Identidade visual: opcional porque clube gerado nasce sem ela e o jogador a
+  // define ao personalizar (BC-003). Cores em hex, kits/escudo por template.
+  primaryColor      String?
+  secondaryColor    String?
+  tertiaryColor     String?
+  homeKitTemplateId String?
+  awayKitTemplateId String?
+  crestTemplateId   String?
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+/// Root canônico (context map:77) que não tinha tabela — a única pista no
+/// schema era `DepartmentType.STADIUM`, que é outro modelo: estádio-como-
+/// departamento. O domínio o tem como ENTIDADE, obrigatória, 1 por clube.
+model Stadium {
+  id               String               @id @db.Uuid
+  gameWorldId      String               @db.Uuid
+  clubId           String               @db.Uuid
+  name             String
+  tenure           StadiumTenure
+  capacity         Int
+  pitchQuality     Int
+  condition        Int
+  licenseStatus    StadiumLicenseStatus @default(PENDING)
+  maintenanceDueOn DateTime?            @db.Date
+  version          Int                  @default(1)
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  @@unique([gameWorldId, id])
+  // 1 estádio por clube: o domínio o tem como campo obrigatório, não lista.
+  @@unique([gameWorldId, clubId])
+}
+
+enum StadiumTenure {
+  OWNED
+  LEASED
+}
+
+enum StadiumLicenseStatus {
+  PENDING
+  LICENSED
+  SUSPENDED
+}
+
+/// Preço de ingresso vigente a partir de uma data (R-27).
+model TicketPricePolicy {
+  id             String   @id @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  // R-181: dinheiro é BigInt em unidade mínima. O domínio usava `number`
+  // (double IEEE-754) — muda com a reescrita de C9, que é dona do dinheiro.
+  priceMinor     BigInt
+  currencyId     String?  @db.Uuid // espera a model Currency (R-181)
+  effectiveOn    DateTime @db.Date
+  rulesetVersion String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId, effectiveOn])
+}
+
+/// Contrato comercial sobre um ativo do clube (naming rights, patrocínio).
+///
+/// PENDENTE E DECLARADO: ele não sabe quanto vale. O domínio não tem valor nem
+/// referência a valor — só `externalAgreementRef`. O dinheiro é do C9
+/// (context map:78), mas sem sequer uma referência o patrocínio é contrato sem
+/// preço. Volta com C9.
+model CommercialAgreement {
+  id                   String   @id @db.Uuid
+  gameWorldId          String   @db.Uuid
+  clubId               String   @db.Uuid
+  asset                String
+  exclusive            Boolean  @default(false)
+  startsOn             DateTime @db.Date
+  endsOn               DateTime @db.Date
+  externalAgreementRef String
+  rulesetVersion       String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+/// Decisão registrada da diretoria.
+///
+/// NÃO é o `BoardPromise` canônico, e a diferença importa: o doc pede promessa
+/// VERIFICÁVEL (command `MakePublicPromise`), e isto é auditoria — registra o
+/// que foi decidido, sem nada a verificar depois. São conceitos distintos, e o
+/// canônico segue sem materialização. Registrado como pendência.
+model BoardDecision {
+  id               String    @id @db.Uuid
+  gameWorldId      String    @db.Uuid
+  clubId           String    @db.Uuid
+  decisionType     String
+  authorId         String
+  justification    String
+  effectiveFrom    DateTime  @db.Date
+  effectiveThrough DateTime? @db.Date
+  recordedAt       DateTime  @db.Date
+  rulesetVersion   String
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
 model Club {
-  id                  String          @id @default(uuid(7)) @db.Uuid
+  id                  String          @id @db.Uuid
   gameWorldId         String          @db.Uuid
-  name                String
-  shortName           String
-  slug                String
-  city                String?
-  country             String
+  regionId            String
   foundedYear         Int?
-  controlType         ClubControlType @default(AI)
+  // R-180: `controlType` saiu daqui também. Era projeção duplicada do
+  // `ClubControl` — e duas fontes para "quem comanda" divergem em silêncio.
+  // Clube sem controle ativo é tocado pela IA; a pergunta se responde no
+  // ClubControl, não num flag do clube.
   status              ClubStatus      @default(ACTIVE)
-  reputation          Int             @default(1)
-  level               Int             @default(1)
+  // O domínio tem BANDA de reputação, não dois escalares soltos.
+  reputationBand      Int             @default(1)
   fanBaseSize         Int             @default(0)
   boardPatience       Int             @default(50)
   pressureLevel       Int             @default(0)
-  currencyId          String          @db.Uuid // moeda operacional do clube (FK Currency)
-  cashMinor           BigInt // C-06: PROJEÇÃO DERIVADA do razão (fonte de verdade = JournalLine POSTED, ownerScope=CLUB). NÃO é campo editável — reconstruído a partir do ledger.
-  wageBudgetMinor     BigInt
-  transferBudgetMinor BigInt
+  // Dinheiro do clube: pendente. `cashMinor` é PROJEÇÃO do razão (Decisão
+  // 19.10) e não pode ser escrito por C3 — o clube nunca escreve LedgerEntry
+  // (context map:78). Volta com C9, onde tem dono. `currencyId` espera a model
+  // Currency, que não existe (R-181).
+  currencyId          String?         @db.Uuid
+  cashMinor           BigInt?
+  wageBudgetMinor     BigInt?
+  transferBudgetMinor BigInt?
   version             Int             @default(1)
 
-  gameWorld         GameWorld              @relation(fields: [gameWorldId], references: [id])
+  gameWorld         GameWorld              @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
+  identityPeriods   ClubIdentityPeriod[]
+  stadium           Stadium?
+  ticketPolicies    TicketPricePolicy[]
+  commercialAgreements CommercialAgreement[]
+  boardDecisions    BoardDecision[]
   controls          ClubControl[]
+  entryReservations ClubEntryReservation[]
   departments       ClubDepartment[]
   aiProfile         ClubAIProfile?
-  players           Player[]
+  // `players` saiu daqui junto com `Player.clubId` (R-189): a relação existia
+  // só para a FK duplicada. Quem diz o elenco do clube é `squads`.
   playerContracts   PlayerContract[]
   staffContracts    StaffContract[]
   trainingPlans     TrainingPlan[]
@@ -871,49 +1111,123 @@ model Club {
   offersBuying      Offer[]                @relation("BuyingClubOffers")
   offersSelling     Offer[]                @relation("SellingClubOffers")
 
-  @@unique([gameWorldId, slug])
+  // A unicidade de nome mudou de casa: ela é do PERÍODO vigente
+  // (ClubIdentityPeriod), como índice único parcial em SQL cru. Aqui ela não
+  // cabia — o clube não tem mais nome, tem história de nomes.
   @@unique([gameWorldId, id]) // par de referência para FKs compostas por mundo
   @@index([gameWorldId])
 }
 
 /// Controle atual ou histórico do clube por um participante do mundo.
 /// Invariante (índice único parcial em migration SQL): 1 controle ACTIVE por clube.
-model ClubControl {
-  id                 String          @id @default(uuid(7)) @db.Uuid
-  gameWorldId        String          @db.Uuid
-  clubId             String          @db.Uuid
-  worldParticipantId String          @db.Uuid
-  controlType        ClubControlType
-  isActive           Boolean         @default(true)
-  startsAtWorldTick  BigInt
-  endsAtWorldTick    BigInt?
-  version            Int             @default(1)
+/// Quem comanda o clube, e desde quando.
+///
+/// R-177: `startsAtWorldTick`/`endsAtWorldTick` viraram DATA. Eram o único par
+/// de colunas `*WorldTick` do schema inteiro, e não existia conversor data↔tick
+/// em lado nenhum — o domínio sempre foi `YYYY-MM-DD`.
+///
+/// R-180: `controlType` saiu. Clube sem `ClubControl` ativo é tocado pela IA.
+/// O enum era incoerente com a própria tabela: `controlType = AI` exigiria um
+/// `WorldParticipant` fantasma, porque `worldParticipantId` é NOT NULL.
+///
+/// `endedReason` passa a existir: `ClubControlEndedEvent.reason` é obrigatório
+/// no domínio e não tinha coluna — o motivo evaporava na gravação.
+/// Retenção temporária da vaga num clube, com TTL (R-25).
+///
+/// Root canônico que não tinha tabela: 9 campos sem destino, e a reserva vivia
+/// dentro do blob de identidade do mundo. Não era detalhe de gravação —
+/// expirar reserva varrendo um blob JSON não é o mesmo produto que expirar por
+/// índice em `expiresOn`, que é o que `@@index([status, expiresOn])` dá.
+///
+/// "1 reserva HELD por clube" é índice único PARCIAL, em SQL cru na migration.
+/// Já "não reservar clube com controle ativo" cruza agregados e não vira
+/// constraint: fica no caso de uso, com o índice parcial do `ClubControl` como
+/// árbitro final na hora de confirmar. A reserva é retenção mole com prazo; a
+/// vaga só é de fato tomada quando o controle nasce.
+model ClubEntryReservation {
+  id                 String                     @id @db.Uuid
+  gameWorldId        String                     @db.Uuid
+  clubId             String                     @db.Uuid
+  worldParticipantId String                     @db.Uuid
+  status             ClubEntryReservationStatus @default(HELD)
+  heldOn             DateTime                   @db.Date
+  expiresOn          DateTime                   @db.Date
+  version            Int                        @default(1)
 
-  club             Club             @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  worldParticipant WorldParticipant @relation(fields: [worldParticipantId], references: [id])
+  club             Club             @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  worldParticipant WorldParticipant @relation(fields: [gameWorldId, worldParticipantId], references: [gameWorldId, id], onDelete: Cascade)
 
+  @@unique([gameWorldId, id])
   @@index([gameWorldId, clubId])
-  @@index([worldParticipantId])
+  @@index([gameWorldId, worldParticipantId])
+  // O varredor de vencidas acha as suas por índice, não lendo o mundo inteiro.
+  @@index([status, expiresOn])
 }
 
-model ClubDepartment {
-  id                            String         @id @default(uuid(7)) @db.Uuid
-  gameWorldId                   String         @db.Uuid
-  clubId                        String         @db.Uuid
-  currencyId                    String         @db.Uuid
-  type                          DepartmentType
-  level                         Int            @default(1)
-  maxLevel                      Int            @default(5)
-  qualityScore                  Int            @default(10)
-  maintenanceCostPerSeasonMinor BigInt
-  upgradeCostMinor              BigInt
-  effectJson                    Json?
-  version                       Int            @default(1) // concorrência otimista (agregado C3)
+model ClubControl {
+  id                 String            @id @db.Uuid
+  gameWorldId        String            @db.Uuid
+  clubId             String            @db.Uuid
+  worldParticipantId String            @db.Uuid
+  status             ClubControlStatus @default(ACTIVE)
+  startsOn           DateTime          @db.Date
+  endedOn            DateTime?         @db.Date
+  endedReason        String?
+  version            Int               @default(1)
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  // FK composta world-scoped (Decisão 19.8). Era simples (`references: [id]`) —
+  // o mesmo defeito que `StaffContract.club` ainda tem.
+  worldParticipant WorldParticipant @relation(fields: [gameWorldId, worldParticipantId], references: [gameWorldId, id], onDelete: Cascade)
 
-  @@unique([clubId, type])
+  @@unique([gameWorldId, id])
   @@index([gameWorldId, clubId])
+  @@index([gameWorldId, worldParticipantId])
+  // "1 controle ativo por clube" precisa de índice único PARCIAL
+  // (`WHERE status = 'ACTIVE'`), que o Prisma não expressa. Vai como SQL cru na
+  // migration — é um dos casos que o gate DB-01..DB-16 antecipa.
+}
+
+/// Departamento do clube. FILHO do `Club`, não root.
+///
+/// O context map (:77) o lista como aggregate root, mas o domínio o tem dentro
+/// do `Club` — `Club.setDepartmentPlan` o muta, ou seja, ele está na fronteira
+/// de consistência do clube. E R-175 quebrou o mega-agregado por CONTENÇÃO, que
+/// aqui não existe: ninguém disputa o departamento de um clube com outro clube.
+/// Um departamento sem clube não existe.
+///
+/// Por isso `version` some: quem versiona é o `Club`, e dois contadores para o
+/// mesmo commit é convite para divergirem.
+///
+/// `targetLevel`/`capacity`/`condition`/`maintenanceDueOn` vêm do domínio;
+/// `maxLevel` vem do schema e FICA — sem ele a invariante canônica
+/// `level ≤ maxLevel` (doc:154) é inexprimível, e era.
+model ClubDepartment {
+  // Sem `id`: o departamento não tem identidade própria no domínio — ele É o
+  // par (clube, tipo), e ninguém o referencia por id (o InfrastructureProject
+  // aponta o alvo pelo `kind`). Um uuid sintético aqui seria cerimônia: uma
+  // chave que nada usa e que o agregado teria de inventar a cada save.
+  gameWorldId      String         @db.Uuid
+  clubId           String         @db.Uuid
+  type             DepartmentType
+  level            Int            @default(1)
+  targetLevel      Int            @default(1)
+  maxLevel         Int            @default(5)
+  capacity         Int            @default(0)
+  condition        Int            @default(100)
+  maintenanceDueOn DateTime?      @db.Date
+  // Custos e moeda: pendente. Dinheiro é do C9 — o clube nunca escreve
+  // LedgerEntry (context map:78). Voltam com ele.
+  currencyId                    String? @db.Uuid
+  maintenanceCostPerSeasonMinor BigInt?
+  upgradeCostMinor              BigInt?
+  effectJson                    Json?
+
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+
+  // A chave natural É a chave primária: um clube tem no máximo um departamento
+  // de cada tipo, e isso deixa de ser convenção para virar constraint.
+  @@id([gameWorldId, clubId, type])
 }
 
 model ClubAIProfile {
@@ -930,7 +1244,7 @@ model ClubAIProfile {
   offlineDecisionLevel Int    @default(1)
   strategyJson         Json?
 
-  club Club @relation(fields: [clubId], references: [id])
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
 }
 
 // =============================================================================
@@ -955,7 +1269,7 @@ model Person {
   createdAt   DateTime     @default(now())
   version     Int          @default(1)
 
-  gameWorld   GameWorld    @relation(fields: [gameWorldId], references: [id])
+  gameWorld   GameWorld    @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
   player      Player?
   staffMember StaffMember?
 
@@ -969,7 +1283,11 @@ model Player {
   id                      String                 @id @default(uuid(7)) @db.Uuid
   gameWorldId             String                 @db.Uuid
   personId                String                 @unique @db.Uuid
-  clubId                  String?                @db.Uuid
+  // `clubId` morreu aqui — R-189. O canon já dizia que `PlayerContract` é a
+  // fonte autoritativa do vínculo jogador↔clube (`02-modelo-de-dados.md:57`), e
+  // isto dizia o mesmo fato por outro caminho: a duplicata que a R-180 matou em
+  // `Club.controlType`. O elenco (`Squad`/`SquadMembership`) diz por quem o
+  // jogador joga; o contrato dirá de quem ele é, quando C9 materializar dinheiro.
   primaryPosition         PlayerPosition
   secondaryPosition       PlayerPosition?
   dominantFoot            DominantFoot
@@ -981,26 +1299,51 @@ model Player {
   availability            PlayerAvailability     @default(AVAILABLE) // M-02: disponibilidade esportiva (separada da carreira em `status`)
   currentAbility          Int
   potentialAbility        Int
-  currencyId              String                 @db.Uuid
-  marketValueMinor        BigInt // dinheiro em unidade mínima
-  wageExpectationMinor    BigInt
+  /// Dinheiro do jogador — NULO até C9 existir (R-189).
+  ///
+  /// Eram NOT NULL, e isso tornava impossível materializar um jogador sem
+  /// inventar valor. `0` não é "barato", é MENTIRA: diria que o jogador não vale
+  /// nada. Nulo diz a verdade — ainda não se sabe.
+  ///
+  /// E não é preguiça: o GDD §1 proíbe gerar dinheiro "de forma isolada", fora da
+  /// economia fechada. Preço e salário se calculam "considerando o equilíbrio de
+  /// todo o universo", que é C9. Mesmo motivo do grid de goleiro em quem não é
+  /// goleiro (R-188): nulo é "não se aplica ainda", zero é uma afirmação falsa.
+  currencyId              String?                @db.Uuid
+  marketValueMinor        BigInt?
+  wageExpectationMinor    BigInt?
   // estado dinâmico
   morale                  Int                    @default(50)
   confidence              Int                    @default(50)
   happiness               Int                    @default(50)
   fatigue                 Int                    @default(0)
   matchSharpness          Int                    @default(50)
+  /// Até que dia do mundo o jogador já foi processado (`Player.processUntil`).
+  ///
+  /// Faltava: o agregado tinha o estado e o físico não tinha onde guardá-lo, e
+  /// o adapter só descobriu ao tentar reidratar. Sem ele o decaimento diário
+  /// reprocessa desde sempre a cada carga.
+  ///
+  /// `DATE` sem default — é data de MUNDO (R-177), e um `now()` aqui inventaria
+  /// a data e mataria o replay.
+  lastProcessedOn         DateTime               @db.Date
   // traços persistentes
+  //
+  // `consistency` saiu deste bloco (R-188): é a "regularidade" da §2 do GDD —
+  // atributo MENTAL, que sobe com treino, e mora no grid. Traço tem intensidade
+  // e visibilidade; regularidade não tem nem uma nem outra.
+  //
+  // Os que sobraram aqui seguem divergentes em três lugares ao mesmo tempo —
+  // este bloco, `PlayerPersonality` (com outros nomes) e a lista canônica do
+  // GDD. R-188 registra a pendência e não a resolve.
   injuryProneness         Int                    @default(50)
-  consistency             Int                    @default(50)
   ambition                Int                    @default(50)
   loyalty                 Int                    @default(50)
   professionalism         Int                    @default(50)
   version                 Int                    @default(1)
 
-  gameWorld             GameWorld                     @relation(fields: [gameWorldId], references: [id])
-  person                Person                        @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
-  club                  Club?                         @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  gameWorld             GameWorld                     @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
+  person                Person                        @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
   attributes            PlayerAttributes?
   background            PlayerBackground?
   personality           PlayerPersonality?
@@ -1023,51 +1366,75 @@ model Player {
 
   @@unique([gameWorldId, personId])
   @@unique([gameWorldId, id])
-  @@index([gameWorldId, clubId])
 }
 
+/// O grid canônico do jogador — R-188.
+///
+/// **A lista é a do GDD §2, que se declara fonte única** (`02-sistema-de-jogadores.md:107`).
+/// O que estava aqui era o grid do Football Manager, com os nomes dele
+/// (`technique`, `flair`, `teamwork`, `workRate`, `aggression`) — e sem os do
+/// GDD: bola parada, visão de jogo, explosão, recuperação física, regularidade,
+/// resiliência, e 3 atributos de goleiro. A R-09 manda o `overall` ser "média
+/// ponderada do **grid canônico**"; com o grid errado, ela não tinha sobre o que
+/// operar, e o treino (§6) não tinha eixo.
+///
+/// Sem `id`: é filho de `Player` (1:1), não root — a régua de R-183/R-187. A
+/// chave é o jogador.
+///
+/// **`overall` não é coluna**, e não é esquecimento: o GDD é explícito (`:120`)
+/// — "derivado, não armazenado como atributo". Quem o deriva é
+/// `player-overall.ts`.
 model PlayerAttributes {
-  id                    String @id @default(uuid(7)) @db.Uuid
-  playerId              String @unique @db.Uuid
-  // técnicos
-  finishing             Int
-  longShots             Int
-  heading               Int
-  passing               Int
-  crossing              Int
-  dribbling             Int
-  firstTouch            Int
-  technique             Int
-  tackling              Int
-  marking               Int
-  positioning           Int
-  // físicos
-  acceleration          Int
-  pace                  Int
-  stamina               Int
-  strength              Int
-  agility               Int
-  balance               Int
-  jumping               Int
-  // mentais
-  bravery               Int
-  aggression            Int
-  composure             Int
-  decisions             Int
-  concentration         Int
-  leadership            Int
-  teamwork              Int
-  workRate              Int
-  determination         Int
-  flair                 Int
-  // goleiro (nullable — só GKs)
-  goalkeeperReflexes    Int?
-  goalkeeperHandling    Int?
-  goalkeeperPositioning Int?
-  goalkeeperKicking     Int?
-  goalkeeperOneOnOne    Int?
+  playerId              String @id @db.Uuid
+  // técnicos (12) — GDD §2
+  finishing             Int // finalização
+  longShots             Int // chute de longe
+  shortPassing          Int // passe curto
+  longPassing           Int // passe longo (lançamento)
+  crossing              Int // cruzamento
+  dribbling             Int // drible
+  firstTouch            Int // controle de bola (domínio / primeiro toque)
+  marking               Int // marcação
+  tackling              Int // desarme
+  heading               Int // cabeceio
+  setPieces             Int // bola parada (falta / escanteio / pênalti)
+  vision                Int // visão de jogo
+  // físicos (9) — GDD §2
+  pace                  Int // velocidade
+  acceleration          Int // aceleração
+  strength              Int // força
+  stamina               Int // resistência
+  jumping               Int // impulsão
+  agility               Int // agilidade
+  balance               Int // equilíbrio
+  explosiveness         Int // explosão
+  recovery              Int // recuperação física
+  // mentais (10) — GDD §2. `positioning` é "inteligência tática (leitura de
+  // jogo / posicionamento)": ler o jogo não é gesto técnico, e é onde o GDD o
+  // põe. `aggression` NÃO está aqui — o GDD o classifica como traço
+  // ("temperamento"), que tem visibilidade e não sobe com treino.
+  positioning           Int // inteligência tática (leitura de jogo)
+  decisions             Int // tomada de decisão
+  concentration         Int // concentração / foco
+  discipline            Int // disciplina
+  composure             Int // frieza
+  determination         Int // determinação / garra
+  leadership            Int // liderança
+  consistency           Int // regularidade
+  bravery               Int // coragem
+  resilience            Int // resiliência
+  // goleiro (8, nullable — só GKs) — GDD §2, "grid próprio, somado aos
+  // atributos físicos e mentais comuns"
+  goalkeeperReflexes    Int? // reflexos
+  goalkeeperPositioning Int? // posicionamento de gol
+  goalkeeperHandling    Int? // saída de gol (domínio de área / cruzamentos)
+  goalkeeperKicking     Int? // reposição com os pés
+  goalkeeperAerial      Int? // jogo aéreo
+  goalkeeperOneOnOne    Int? // um-contra-um
+  goalkeeperPenalty     Int? // defesa de pênalti
+  goalkeeperCommand     Int? // comando de área / comunicação
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model PlayerBackground {
@@ -1084,7 +1451,7 @@ model PlayerBackground {
   lifeStorySummary      String?
   generatedTraitJson    Json? // traços derivados da história de vida
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model PlayerPersonality {
@@ -1102,7 +1469,7 @@ model PlayerPersonality {
   lifestyleBalance   Int
   hiddenTraits       Json? // traços ocultos, revelados por scouting
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model PlayerDevelopment {
@@ -1118,7 +1485,7 @@ model PlayerDevelopment {
   injuryImpactAccumulated Int       @default(0)
   lastDevelopmentAt       DateTime?
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
 model PlayerContract {
@@ -1137,8 +1504,8 @@ model PlayerContract {
   roleInSquad          String?
   version              Int            @default(1)
 
-  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
-  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id], onDelete: Cascade)
+  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
 
   @@index([gameWorldId, playerId])
   @@index([clubId])
@@ -1159,7 +1526,7 @@ model PlayerInjury {
   medicalDepartmentLevelAtTime Int?
   version                      Int            @default(1) // concorrência otimista (agregado C4 · medicina)
 
-  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
 
   @@index([gameWorldId, playerId])
 }
@@ -1184,7 +1551,7 @@ model PlayerSuspension {
   updatedAt           DateTime         @updatedAt
   version             Int              @default(1)
 
-  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id], onDelete: Cascade)
 
   @@index([gameWorldId, playerId])
   @@index([gameWorldId, competitionSeasonId])
@@ -1202,7 +1569,7 @@ model PlayerCompetitionDiscipline {
   redCount            Int    @default(0)
   version             Int    @default(1)
 
-  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id], onDelete: Cascade)
 
   @@unique([gameWorldId, playerId, competitionSeasonId]) // 1 contador por jogador/edição
   @@index([gameWorldId, competitionSeasonId])
@@ -1230,8 +1597,8 @@ model StaffMember {
   dataAnalysis      Int              @default(50)
   version           Int              @default(1)
 
-  gameWorld GameWorld       @relation(fields: [gameWorldId], references: [id])
-  person    Person          @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  gameWorld GameWorld       @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
+  person    Person          @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
   contracts StaffContract[]
 
   @@unique([gameWorldId, personId])
@@ -1251,8 +1618,8 @@ model StaffContract {
   salaryPerSeasonMinor BigInt // dinheiro em unidade mínima
   version              Int            @default(1)
 
-  staff StaffMember @relation(fields: [gameWorldId, staffId], references: [gameWorldId, id])
-  club  Club        @relation(fields: [clubId], references: [id])
+  staff StaffMember @relation(fields: [gameWorldId, staffId], references: [gameWorldId, id], onDelete: Cascade)
+  club  Club        @relation(fields: [clubId], references: [id], onDelete: Cascade)
 
   @@index([gameWorldId, clubId])
   @@index([gameWorldId, staffId])
@@ -1271,7 +1638,7 @@ model TrainingPlan {
   startsAt          DateTime
   endsAt            DateTime?
 
-  club    Club                  @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club    Club                  @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
   entries TrainingPlayerEntry[]
 
   @@index([gameWorldId, clubId])
@@ -1289,8 +1656,8 @@ model TrainingPlayerEntry {
   fatigueGain    Int           @default(0)
   injuryRiskGain Int           @default(0)
 
-  plan   TrainingPlan @relation(fields: [trainingPlanId], references: [id])
-  player Player       @relation(fields: [playerId], references: [id])
+  plan   TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  player Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@index([trainingPlanId])
   @@index([playerId])
@@ -1308,7 +1675,7 @@ model Squad {
   seasonNumber     Int
   version          Int               @default(1)
 
-  club        Club              @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club        Club              @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
   memberships SquadMembership[]
 
   @@unique([gameWorldId, id])
@@ -1322,11 +1689,17 @@ model SquadMembership {
   role        String?
   shirtNumber Int?
   isActive    Boolean   @default(true)
-  startsAt    DateTime  @default(now())
-  endsAt      DateTime?
+  /// Data de MUNDO, não instante de plataforma — R-190.
+  ///
+  /// Era `DateTime @default(now())`: relógio de plataforma governando fato de
+  /// jogo. Quando um jogador entrou no elenco é regra (janela, elegibilidade),
+  /// não auditoria. `DATE` e sem default, porque um default de relógio inventa a
+  /// data e mata o replay (R-177).
+  startsAt    DateTime  @db.Date
+  endsAt      DateTime? @db.Date
 
-  squad  Squad  @relation(fields: [squadId], references: [id])
-  player Player @relation(fields: [playerId], references: [id])
+  squad  Squad  @relation(fields: [squadId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([squadId, playerId])
   @@index([playerId])
@@ -1354,8 +1727,8 @@ model ScoutReport {
   expiresAt                 DateTime?
   version                   Int       @default(1) // concorrência otimista (agregado C6 · scouting)
 
-  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  club   Club   @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
 
   @@index([gameWorldId, clubId])
   @@index([playerId])
@@ -1375,8 +1748,8 @@ model TransferListing {
   reason           String?
   version          Int            @default(1) // concorrência otimista (agregado C6)
 
-  club   Club    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
-  player Player  @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
+  club   Club    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  player Player  @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
   offers Offer[]
 
   @@index([gameWorldId, clubId])
@@ -1407,8 +1780,8 @@ model Offer {
   version                  Int                     @default(1) // concorrência otimista (agregado C6 · TransferCase)
 
   listing     TransferListing? @relation(fields: [listingId], references: [id])
-  player      Player           @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id])
-  buyingClub  Club             @relation("BuyingClubOffers", fields: [buyingClubId], references: [id])
+  player      Player           @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id], onDelete: Cascade)
+  buyingClub  Club             @relation("BuyingClubOffers", fields: [buyingClubId], references: [id], onDelete: Cascade)
   sellingClub Club?            @relation("SellingClubOffers", fields: [sellingClubId], references: [id])
 
   @@index([gameWorldId, playerId])
@@ -1434,7 +1807,7 @@ model FinancialTransaction {
   occurredAt   DateTime               @default(now())
   metadata     Json?
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
 
   @@index([gameWorldId, clubId])
 }
@@ -1454,7 +1827,7 @@ model ClubFinanceSnapshot {
   debtMinor             BigInt @default(0)
   profitMinor           BigInt
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
 
   @@unique([clubId, seasonId])
   @@index([gameWorldId, clubId])
@@ -1475,7 +1848,7 @@ model Competition {
   reputation  Int               @default(1)
   version     Int               @default(1) // concorrência otimista (agregado C7)
 
-  gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
   seasons   CompetitionSeason[]
 
   @@unique([gameWorldId, id])
@@ -1494,7 +1867,7 @@ model CompetitionSeason {
   rulesJson     Json? // regras flexíveis por competição
   version       Int          @default(1) // concorrência otimista (agregado C7 · edição)
 
-  competition       Competition               @relation(fields: [competitionId], references: [id])
+  competition       Competition               @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   clubs             CompetitionClub[]
   stages            CompetitionStage[]
   matches           Match[]
@@ -1562,8 +1935,8 @@ model Match {
 
   competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id])
   stage             CompetitionStage?    @relation(fields: [stageId], references: [id])
-  homeClub          Club                 @relation("HomeClubMatches", fields: [homeClubId], references: [id])
-  awayClub          Club                 @relation("AwayClubMatches", fields: [awayClubId], references: [id])
+  homeClub          Club                 @relation("HomeClubMatches", fields: [homeClubId], references: [id], onDelete: Cascade)
+  awayClub          Club                 @relation("AwayClubMatches", fields: [awayClubId], references: [id], onDelete: Cascade)
   teamStates        MatchTeamState[]
   lineups           MatchLineup[]
   events            MatchEvent[]
@@ -1609,7 +1982,7 @@ model MatchSimulation {
   manifestSchemaVersion Int? // versiona o formato do próprio manifesto — R-145
   version               Int     @default(1) // concorrência otimista durante a construção
 
-  match      Match                 @relation(fields: [matchId], references: [id])
+  match      Match                 @relation(fields: [matchId], references: [id], onDelete: Cascade)
   ticks      MatchSimulationTick[]
   commandLog MatchCommandLog[] // C ordenado (doc 15 §3.2) — R-145
 }
@@ -1627,7 +2000,7 @@ model MatchSimulationTick {
   awayFatigueAvg Decimal @db.Decimal(8, 4)
   data           Json?
 
-  simulation MatchSimulation @relation(fields: [simulationId], references: [id])
+  simulation MatchSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
 
   @@index([simulationId])
 }
@@ -1652,7 +2025,7 @@ model MatchTeamState {
   currentInstructions Json?
   version             Int                @default(1) // concorrência otimista (agregado C8 · runtime)
 
-  match Match @relation(fields: [matchId], references: [id])
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, clubId])
 }
@@ -1672,7 +2045,7 @@ model MatchLineup {
   snapshotJson        Json? // estado congelado (titulares/banco/funções) para o manifesto
   lineupHash          String? // hash do snapshot (integridade — doc 15 §3.3)
 
-  match   Match               @relation(fields: [matchId], references: [id])
+  match   Match               @relation(fields: [matchId], references: [id], onDelete: Cascade)
   players MatchLineupPlayer[]
 
   @@index([matchId])
@@ -1691,7 +2064,7 @@ model MatchLineupPlayer {
   individualInstructionJson Json?
 
   lineup MatchLineup @relation(fields: [lineupId], references: [id])
-  player Player      @relation(fields: [playerId], references: [id])
+  player Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@index([lineupId])
   @@index([playerId])
@@ -1713,7 +2086,7 @@ model MatchEvent {
   y               Decimal?       @db.Decimal(8, 4)
   data            Json?
 
-  match         Match   @relation(fields: [matchId], references: [id])
+  match         Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
   player        Player? @relation("EventPlayer", fields: [playerId], references: [id])
   relatedPlayer Player? @relation("EventRelatedPlayer", fields: [relatedPlayerId], references: [id])
 
@@ -1745,8 +2118,8 @@ model PlayerMatchStats {
   fatigueEnd      Int
   moraleImpact    Int     @default(0)
 
-  match  Match  @relation(fields: [matchId], references: [id])
-  player Player @relation(fields: [playerId], references: [id])
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([matchId, playerId])
 }
@@ -1767,7 +2140,7 @@ model MatchDecisionPoint {
   data                  Json?
   version               Int                  @default(1) // concorrência otimista (agregado C8 · runtime)
 
-  match           Match                       @relation(fields: [matchId], references: [id])
+  match           Match                       @relation(fields: [matchId], references: [id], onDelete: Cascade)
   recommendations MatchActionRecommendation[]
 
   @@index([matchId])
@@ -1812,7 +2185,7 @@ model ClubSeasonStats {
   averageAttendance   Int       @default(0)
   fanMood             MoodLevel @default(NEUTRAL)
 
-  club              Club               @relation(fields: [clubId], references: [id])
+  club              Club               @relation(fields: [clubId], references: [id], onDelete: Cascade)
   competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
 
   @@unique([clubId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
@@ -1834,7 +2207,7 @@ model PlayerSeasonStats {
   averageRating       Decimal @default(0) @db.Decimal(4, 2)
   injuriesCount       Int     @default(0)
 
-  player            Player             @relation(fields: [playerId], references: [id])
+  player            Player             @relation(fields: [playerId], references: [id], onDelete: Cascade)
   competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
 
   @@unique([playerId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
@@ -1854,7 +2227,7 @@ model Narrative {
   endsAt      DateTime?
   effectsJson Json? // efeitos aplicados (moral, pressão, valor etc.)
 
-  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 
   @@index([gameWorldId])
 }
@@ -1873,7 +2246,7 @@ model Notification {
   createdAt   DateTime         @default(now())
   readAt      DateTime?
 
-  gameWorld GameWorld?   @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld?   @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
   user      UserAccount? @relation(fields: [userId], references: [id])
 
   @@index([gameWorldId])
@@ -1897,7 +2270,7 @@ model GameAuditLog {
   previousIntegrityHash String? // C-12: encadeia ao registro anterior (hash-chain)
   createdAt             DateTime @default(now())
 
-  gameWorld GameWorld? @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld? @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 
   @@index([gameWorldId])
 }
@@ -1910,7 +2283,7 @@ model GameRuleConfig {
   key         String
   value       Json
 
-  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id])
+  gameWorld GameWorld @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
 
   @@unique([gameWorldId, key])
 }
@@ -1928,7 +2301,7 @@ model AutomationRule {
   actionJson    Json?
   version       Int                  @default(1)
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id])
+  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
 
   @@index([gameWorldId, clubId])
 }
@@ -1993,8 +2366,13 @@ model DomainEventLog {
   payloadJson         Json
   actorType           String?
   actorId             String?  @db.Uuid
-  correlationId       String?  @db.Uuid
-  causationId         String?  @db.Uuid
+  // Texto, não Uuid: `correlationId` e `causationId` vêm do CLIENTE (doc 08:
+  // "identificador de correlação para rastreio", sem tipo). Constranger a Uuid
+  // um valor que não controlamos não compra nada — só troca um rastreio por um
+  // erro de banco no primeiro cliente que mandar "c1". O contrato do envelope
+  // sempre disse `z.string().min(1)`; era o schema que divergia.
+  correlationId       String?
+  causationId         String?
   prevEventHash       String? // encadeamento de integridade
   eventHash           String?
   occurredAt          DateTime @default(now())
@@ -2017,6 +2395,17 @@ model IdempotencyKey {
   gameWorldId    String?   @db.Uuid
   actorId        String?   @db.Uuid
   idempotencyKey String
+  // Identifica o PEDIDO — distingue reenvio de reúso. Sem ele a chave só sabia
+  // que já fora usada, não com o quê, e `IDEMPOTENCY_KEY_REUSED`
+  // (`10-catalogo-de-commands.md:61`, errorCode comum de TODA mutação) era
+  // indetectável. É a serialização canônica do payload, não hash: comparação
+  // exata, e o core roda no React Native, sem `node:crypto`.
+  //
+  // Sem `@default`: um insert que esquecesse o campo pegaria o default calado e
+  // toda chave com fingerprint vazio casaria com toda outra — reúso viraria
+  // replay. A migration usa um default temporário só para preencher as linhas
+  // que já existem, e o derruba em seguida.
+  requestFingerprint String
   commandId      String?   @db.Uuid
   commandType    String?
   status         String    @default("PENDING")
@@ -2070,7 +2459,7 @@ model SagaStep {
   startedAt          DateTime?
   completedAt        DateTime?
 
-  saga SagaInstance @relation(fields: [sagaInstanceId], references: [id])
+  saga SagaInstance @relation(fields: [sagaInstanceId], references: [id], onDelete: Cascade)
 
   @@unique([sagaInstanceId, stepIndex])
   @@index([sagaInstanceId])
@@ -2154,8 +2543,8 @@ model JournalLine {
   referenceType      String?
   referenceId        String?              @db.Uuid
 
-  entry   JournalEntry     @relation(fields: [journalEntryId], references: [id])
-  account FinancialAccount @relation(fields: [financialAccountId], references: [id])
+  entry   JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account FinancialAccount @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
 
   @@unique([journalEntryId, lineNumber])
   @@index([financialAccountId])
@@ -2178,7 +2567,7 @@ model PlayerDevelopmentAccrual {
   lastUpdatedTick   BigInt?
   version           Int     @default(1)
 
-  player Player @relation(fields: [playerId], references: [id])
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@unique([playerId, seasonId, attributeCode])
   @@index([gameWorldId, playerId])
@@ -2231,7 +2620,7 @@ model PlayerRegistration {
   deregisteredAt DateTime?
   version        Int                  @default(1)
 
-  registration CompetitionRegistration @relation(fields: [registrationId], references: [id])
+  registration CompetitionRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
   @@unique([registrationId, playerId]) // 1 inscrição por jogador/edição
   @@unique([registrationId, shirtNumber]) // nº de camisa único por lista (nulos distintos)
@@ -2259,7 +2648,7 @@ model MatchCommandLog {
   idempotencyKey  String?
   acceptedAt      DateTime           @default(now()) // auditoria (não entra no cálculo)
 
-  simulation MatchSimulation @relation(fields: [simulationId], references: [id])
+  simulation MatchSimulation @relation(fields: [simulationId], references: [id], onDelete: Cascade)
 
   @@unique([simulationId, matchSequence])
   @@index([gameWorldId])
