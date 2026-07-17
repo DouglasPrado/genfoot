@@ -57,7 +57,7 @@ export function Squad() {
   const sheetRef = useRef<View>(null);
   const worldId = useWorldId();
   const { client, session, status, contractVersion } = useSession();
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const rosterQuery = useWorldQuery<PlayerRosterProjection>("player-roster");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -367,7 +367,7 @@ export function Squad() {
           <View>
             <Text style={styles.title}>ELENCO</Text>
             <Text style={styles.subtitle}>
-              {managedClub.identity.name.toUpperCase()} · ELENCO OFICIAL
+              {managedClub.name.toUpperCase()} · ELENCO OFICIAL
             </Text>
           </View>
           <View style={styles.ovrPill}>

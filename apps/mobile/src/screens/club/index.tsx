@@ -73,7 +73,7 @@ export function Club() {
   const worldId = useWorldId();
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
   const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
   const identityQuery =
@@ -92,12 +92,13 @@ export function Club() {
     managedClub === null
       ? null
       : {
-          name: managedClub.identity.name.toUpperCase(),
+          name: managedClub.name.toUpperCase(),
           reputation: Math.min(
             100,
             Math.max(0, managedClub.reputationBand * 20),
           ),
-          stadium: managedClub.stadium,
+          stadiumName: managedClub.stadiumName,
+          stadiumCapacity: managedClub.stadiumCapacity,
           infrastructure: buildClubInfrastructure(managedClub),
         };
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
@@ -105,16 +106,34 @@ export function Club() {
   const [customizeTracking, setCustomizeTracking] =
     useState<TrackedCommandResult | null>(null);
 
-  const visualIdentity =
-    managedClub?.identity.visualIdentity ??
-    (managedClub === null ? null : defaultVisualIdentity(managedClub.id));
+  /**
+   * A identidade visual do clube, ou a derivada do nome.
+   *
+   * O read model entrega as cores planas (`primaryColor`…) porque elas moram no
+   * PERÍODO de identidade, e quem resolve qual período vale hoje é ele (BC-003).
+   * `crestTemplateId` nulo = clube nunca personalizado — e aí vale a mesma
+   * identidade default determinística que o admin usa, derivada do nome.
+   */
+  const visualIdentity: VisualIdentity | null =
+    managedClub === null
+      ? null
+      : managedClub.crestTemplateId !== null && managedClub.primaryColor !== null
+        ? {
+            primaryColor: managedClub.primaryColor,
+            secondaryColor: managedClub.secondaryColor ?? "#F8FAFC",
+            tertiaryColor: null,
+            homeKitTemplateId: "kit-solid",
+            awayKitTemplateId: "kit-solid",
+            crestTemplateId: managedClub.crestTemplateId,
+          }
+        : defaultVisualIdentity(managedClub.name);
   const fanbaseSize =
     narrativeQuery.data?.clubs?.find(
       (entry) => entry.clubId === managedClub?.id,
     )?.fanbaseSize ?? null;
   const takenNames = (clubQuery.data?.clubs ?? [])
     .filter((club) => club.id !== managedClub?.id)
-    .map((club) => normalizeClubName(club.identity.name));
+    .map((club) => normalizeClubName(club.name));
 
   const submitCustomize = useCallback(
     (input: {
@@ -342,7 +361,7 @@ export function Club() {
               <Text style={styles.title}>{vm.name}</Text>
               <Icon name="shirt" size={16} color={color.primary} />
             </View>
-            <Text style={styles.subtitle}>{vm.stadium.name}</Text>
+            <Text style={styles.subtitle}>{vm.stadiumName}</Text>
             <View style={styles.repRow}>
               <Text style={styles.repLabel}>REPUTAÇÃO</Text>
               <View style={styles.repBar}>
@@ -542,9 +561,9 @@ export function Club() {
             }
           />
           <View style={styles.stadiumRow}>
-            <Text style={styles.stadiumName}>{vm.stadium.name}</Text>
+            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
             <Text style={styles.stadiumCap}>
-              {formatAmount(vm.stadium.capacity)} lugares
+              {formatAmount(vm.stadiumCapacity)} lugares
             </Text>
           </View>
         </Card>
@@ -555,8 +574,8 @@ export function Club() {
           visible={customizeOpen}
           onClose={() => setCustomizeOpen(false)}
           clubId={managedClub.id}
-          clubName={managedClub.identity.name}
-          clubShortCode={managedClub.identity.shortCode}
+          clubName={managedClub.name}
+          clubShortCode={managedClub.shortCode}
           initial={visualIdentity}
           takenNames={takenNames}
           submitting={

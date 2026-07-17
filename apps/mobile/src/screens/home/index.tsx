@@ -64,7 +64,7 @@ function combinedQueryState(states: readonly QueryState[]): QueryState {
 /** Painel de comando do clube: somente projeções oficiais, sem seeds de demo. */
 export function Home() {
   const { session, status } = useSession();
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const competitionQuery =
@@ -142,15 +142,15 @@ export function Home() {
             <View style={styles.hero}>
               <View style={styles.crest}>
                 <Text style={styles.crestText}>
-                  {club.identity.shortCode.slice(0, 3)}
+                  {club.shortCode.slice(0, 3)}
                 </Text>
               </View>
               <View style={styles.heroText}>
                 <Text style={styles.eyebrow}>SEU CLUBE</Text>
-                <Text style={styles.title}>{club.identity.name}</Text>
+                <Text style={styles.title}>{club.name}</Text>
                 <Text style={styles.subtitle}>
-                  {club.stadium.name} ·{" "}
-                  {club.stadium.capacity.toLocaleString("pt-BR")} lugares
+                  {club.stadiumName} ·{" "}
+                  {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                 </Text>
               </View>
             </View>

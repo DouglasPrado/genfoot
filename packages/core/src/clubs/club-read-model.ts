@@ -56,6 +56,25 @@ export interface ClubListItemView {
    * cliente como distinguir ANTES de tentar — senão a tela só descobre pelo erro.
    */
   readonly reservedUntil: string | null;
+  /**
+   * `version` do agregado. A tela precisa dele para mandar `expectedVersion` num
+   * command — concorrência otimista por agregado (R-175). Sem ele, o cliente
+   * teria de adivinhar ou o servidor teria de aceitar escrita cega.
+   */
+  readonly version: number;
+  /**
+   * Os departamentos, para a tela de infraestrutura.
+   *
+   * `maxLevel` não vem: a invariante `level ≤ maxLevel` (context map:154) é do
+   * DOMÍNIO, e mandá-la para a tela convidaria o cliente a validar por conta
+   * própria — que é como um cliente vira autoritativo sem ninguém decidir isso.
+   */
+  readonly departments: readonly {
+    readonly kind: string;
+    readonly level: number;
+    readonly capacity: number;
+    readonly condition: number;
+  }[];
 }
 
 export interface ClubWorldView {

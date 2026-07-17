@@ -6,13 +6,29 @@ import {
   squadPlayersFromProjections,
 } from "./club-projection";
 
+/**
+ * A forma que `club-detail` entrega: PLANA.
+ *
+ * Era `identity.name` / `stadium.capacity` — o `WorldClubPortfolioSnapshot` cru
+ * vazando até a tela. O read model de C3 agora resolve o período de identidade e
+ * o estádio (BC-003: o clube tem história de nomes, não um nome).
+ *
+ * `crestTemplateId: null` é o caso COMUM: clube gerado nasce sem identidade
+ * visual, e o jogador a define ao personalizar.
+ */
 const activeClub = {
   id: "club-active",
   status: "ACTIVE",
   version: 1,
-  identity: { name: "Jardim Atlético", shortCode: "JAT" },
+  name: "Jardim Atlético",
+  shortCode: "JAT",
   reputationBand: 2,
-  stadium: { name: "Estádio do Jardim", capacity: 18_500 },
+  stadiumName: "Estádio do Jardim",
+  stadiumCapacity: 18_500,
+  primaryColor: null,
+  secondaryColor: null,
+  crestTemplateId: null,
+  manager: null,
   departments: [
     { kind: "TRAINING", level: 3, capacity: 70, condition: 84 },
     { kind: "MEDICAL", level: 2, capacity: 55, condition: 91 },

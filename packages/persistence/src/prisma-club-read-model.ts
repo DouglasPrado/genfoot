@@ -42,6 +42,7 @@ export class PrismaClubReadModel implements ClubReadModel {
         // R-25: retenção mole com prazo. Só HELD conta — CONFIRMED já virou
         // controle, e RELEASED/EXPIRED são passado.
         entryReservations: { where: { status: "HELD" }, take: 1 },
+        departments: { orderBy: { type: "asc" } },
       },
       orderBy: { regionId: "asc" },
     });
@@ -67,6 +68,13 @@ export class PrismaClubReadModel implements ClubReadModel {
           crestTemplateId: identity.crestTemplateId,
           manager: toManager(row.controls[0]),
           reservedUntil: toWorldDate(row.entryReservations[0]?.expiresOn),
+          version: row.version,
+          departments: row.departments.map((d) => ({
+            kind: d.type,
+            level: d.level,
+            capacity: d.capacity,
+            condition: d.condition,
+          })),
         };
       }),
     };

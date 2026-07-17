@@ -9,20 +9,30 @@ export interface MobileVisualIdentity {
   readonly crestTemplateId: string;
 }
 
+/**
+ * O clube como o read model de C3 o entrega (`club-detail`).
+ *
+ * **Tudo PLANO.** Era aninhado (`identity.name`, `stadium.capacity`) porque a
+ * query devolvia o `WorldClubPortfolioSnapshot` cru — o mega-agregado vazando
+ * até a tela. Ele morreu (R-175), e o read model agora resolve o período de
+ * identidade e o estádio: o clube não tem nome, tem HISTÓRIA de nomes (BC-003),
+ * e a tela não tem por que saber disso.
+ */
 export interface MobileClubProjection {
   readonly id: string;
   readonly status: string;
   readonly version: number;
-  readonly identity: {
-    readonly name: string;
-    readonly shortCode: string;
-    readonly visualIdentity?: MobileVisualIdentity;
-  };
+  readonly name: string;
+  readonly shortCode: string;
   readonly reputationBand: number;
-  readonly stadium: {
-    readonly name: string;
-    readonly capacity: number;
-  };
+  readonly stadiumName: string;
+  readonly stadiumCapacity: number;
+  /** `null` quando o clube ainda não foi personalizado (BC-003). */
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
+  /** `null` = IA. Não há flag `isAi`: a IA é a ausência de controle (R-180). */
+  readonly manager: { readonly accountId: string; readonly name: string } | null;
   readonly departments: readonly {
     readonly kind: string;
     readonly level: number;
@@ -89,22 +99,22 @@ const departmentPresentation: Readonly<
 };
 
 /**
- * O clube que o jogador administra, dentro do portfólio.
+ * O clube que o jogador administra.
  *
- * **Isto está QUEBRADO e não é conserto de guard.** A query `club` devolvia o
- * portfólio inteiro (`{clubs: [...]}`); hoje ela devolve `{clubCount}` — a lista
- * mora em `club-detail`, porque o `WorldClubPortfolio` morreu com o
- * mega-agregado (R-175) e a porta de leitura ficou estreita de propósito.
+ * As telas consultavam a query `club`, que devolvia o portfólio inteiro — o
+ * mega-agregado vazando até o app. Ela hoje devolve `{clubCount}` e a lista está
+ * em `club-detail` (R-175: a porta de leitura é estreita de propósito).
  *
- * Então `portfolio.clubs` chega `undefined` e o `.find` estoura. Blindar com
- * `?? []` seria PIOR que o crash: devolveria `null`, e a tela diria "sem clube"
- * a quem acabou de assumir um. Erro que se disfarça de estado válido é o que o
- * CLAUDE.md §5 chama de fallback silencioso.
+ * Enquanto isso não foi ligado, `portfolio.clubs` chegava `undefined` e o
+ * `.find` estourava; guardar com `?? []` teria sido PIOR que o crash —
+ * devolveria `null`, e a tela diria "sem clube" a quem acabou de assumir um.
+ * Erro disfarçado de estado válido é o fallback silencioso que o CLAUDE.md §5
+ * proíbe, e foi exatamente o que apareceu na tela: "clube ainda não definido"
+ * em todas elas.
  *
- * Devolver `null` aqui é honesto porque o CHAMADOR trata `null` como "não
- * consegui ler", não como "não tem" — e as telas que dependem disto (clube,
- * elenco, home) já estão fora do ar por dependerem de C4/C7/C9, que não existem.
- * Elas voltam nas tasks #25–#27, com o read model certo.
+ * `configuredClubId` vem do controle ativo do jogador. O fallback para o
+ * primeiro ACTIVE existe para o dev que abre o app sem clube — em produção quem
+ * não tem controle nem chega aqui.
  */
 export function selectManagedClub(
   portfolio: ClubPortfolioProjection | null,
