@@ -343,6 +343,44 @@ Nada disto muda a [Q5](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco
 
 ---
 
+### R-191 — O dinheiro nasce do razão. `Currency` passa a existir, e o saldo é projeção.
+
+C9 começa a ser materializado, e a primeira coisa que ele exige é o que a
+[R-181](#r-181--dinheiro-é-bigint--currencyid-a-model-currency-passa-a-existir)
+já havia decidido e ninguém cumprira: **`model Currency` existe**. Eram 17 colunas
+`currencyId @db.Uuid` apontando para uma tabela inexistente. Nasce o catálogo,
+com uma moeda-base semeada por migração (id canônico fixo).
+
+Não são as 17 FKs de uma vez — isso é o gate DB (#40). Nascem as FKs das tabelas
+que C9 usa AGORA (`FinancialAccount`, `JournalEntry`, `JournalLine`) mais
+`GameWorld.currencyId`. As demais entram quando cada tabela for materializada.
+
+**O saldo do clube NÃO é coluna.** É a soma dos lançamentos POSTADOS na conta de
+caixa dele — projeção reconstruível (R-178). `balanceMinor` no agregado voltaria
+a permitir duas verdades: a coluna e o razão, divergindo. O físico já está certo
+(o plano de contas com faucets e sinks); o domínio o cumpre.
+
+**A dotação inicial é um lançamento de faucet, não um número mágico.** ECO-001
+manda R$ 5.000.000 (`500000000` minor) iguais para todo clube. Isso NÃO é
+`club.cashMinor = 500000000` — é um `JournalEntry` que debita a conta de caixa do
+clube e credita o faucet `SYS_INITIAL_ENDOWMENT`. O dinheiro entra na economia
+por uma torneira contabilizada, e a oferta monetária do mundo continua sendo
+`Σ faucets − Σ sinks` (ECO-003), auditável. Um número solto quebraria a economia
+fechada que o GDD §1 exige — a mesma regra que barrou o salário em C4 (R-189).
+
+**A partida é dobrada, sempre (R-178).** Todo `JournalEntry` tem `Σ débitos =
+Σ créditos por moeda`, e o domínio recusa o desbalanceado antes de gravar.
+`POSTED` é o único status que afeta saldo; reversão cria lançamento novo, nunca
+edita o publicado. `sourceEventId` dá idempotência de projeção: um evento gera um
+lançamento, e reprocessá-lo não duplica dinheiro.
+
+**Consequência que se paga aqui:** com C9, `Player.marketValueMinor` e
+`wageExpectationMinor` deixam de ser nulos por decreto (R-189) — passam a poder
+ser calculados dentro da economia. E o admin para de mockar "dinheiro global
+circulando": ele deriva do razão.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

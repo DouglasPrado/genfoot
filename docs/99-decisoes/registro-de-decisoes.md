@@ -493,9 +493,10 @@ R-173 tornou o Postgres o único armazenamento, e a primeira porta migrada revel
 - **R-186 — O barramento valida o payload.** Os errorCodes passam a ser os do catálogo, não os que o domínio inventou.
 - **R-187 — Um comando, um evento.** `ClubIdentityPeriod` não é root. Corolário: root precisa passar por DOIS testes — contenção (R-183) e `version` no físico.
 - **R-188 — O grid de atributos é o do GDD §2 (39), não o do Football Manager (33).** O schema copiou `technique`/`flair`/`teamwork`/`workRate`/`aggression`; a §2 se declara fonte única, e a R-09 agrega "o grid canônico". Corrige a premissa da R-179, não a decisão.
+- **R-191 — O dinheiro nasce do razão; `Currency` passa a existir e o saldo é projeção.** Materializa C9: `model Currency` (a R-181 decidida e não cumprida), partida dobrada sempre (R-178), dotação inicial ECO-001 (R$5M) como lançamento de faucet `SYS_INITIAL_ENDOWMENT`, não coluna. Saldo = Σ lançamentos postados, reconstruível.
 - **R-190 — O elenco tem número de camisa, e a data de entrada é do mundo.** `slot: string` livre vira `shirtNumber`; `startsAt DateTime @default(now())` era relógio de plataforma governando regra de jogo — vira `DATE` sem default (R-177). `capacity` sai do agregado: teto de elenco é regra (R-57), não dado por linha.
 - **R-189 — A gênese não assina contrato; o vínculo dela é o elenco.** `Player.clubId` morre (o canon já dizia que `PlayerContract` é autoritativo). Contrato exige salário, e salário é dinheiro: o GDD §1 proíbe gerar dinheiro "de forma isolada", fora da economia fechada. Consequência aceita: "jogador livre" não é respondível até C6/C9.
 
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-188 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179.
+> **Estado consolidado:** R-01..R-191 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial).
