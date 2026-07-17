@@ -1,6 +1,15 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { CommandTrackingStatus } from "@grinta/core";
 
 import { Card, SectionHeader } from "@/components/card";
 import { Refresh } from "@/components/refresh";
@@ -9,8 +18,6 @@ import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
-import { CommandTrackingStatus } from "@grinta/core";
-
 import {
   submitTrackedCommand,
   type TrackedCommandResult,
@@ -18,6 +25,7 @@ import {
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { useWorldId, useWorldQuery } from "@/lib/world";
+import { previewDeal } from "@/screens/market/market-model";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -38,6 +46,13 @@ interface MarketPlayer {
 
 interface MarketProjection {
   readonly players: readonly MarketPlayer[];
+}
+
+interface LedgerSummaryProjection {
+  readonly clubBalances: readonly {
+    readonly clubId: string;
+    readonly balanceMinor: number;
+  }[];
 }
 
 /** Cores por setor, como no app: goleiro, defesa, meio, ataque. */
@@ -69,6 +84,18 @@ const SECTOR: Readonly<Record<string, Filter>> = {
   LW: "ATA", RW: "ATA", ST: "ATA", CF: "ATA",
 };
 
+/** As iniciais do jogador — o domínio não tem foto, então o avatar é o nome. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase();
+}
+
+function reais(valueMinor: string | number | bigint): string {
+  return `R$ ${formatAmount(Number(valueMinor) / 100)}`;
+}
+
 /** Mercado: a vitrine de jogadores do mundo, com valor estimado (R-41). */
 export function Market() {
   const { session, status, client, contractVersion } = useSession();
@@ -76,7 +103,11 @@ export function Market() {
   const [filter, setFilter] = useState<Filter>("TODOS");
   const [signingId, setSigningId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
+  // O jogador que o técnico quer contratar: abre o modal de confirmação com os
+  // detalhes do contrato ANTES de fechar. `null` = modal fechado.
+  const [pending, setPending] = useState<MarketPlayer | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
+  const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const onboarding =
@@ -96,15 +127,31 @@ export function Market() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
 
+  const cashMinor = useMemo(() => {
+    if (managedClub === null) return null;
+    const found = ledgerQuery.data?.clubBalances.find(
+      (b) => b.clubId === managedClub.id,
+    );
+    return found?.balanceMinor ?? null;
+  }, [ledgerQuery.data, managedClub]);
+
   const refresh = useCallback(() => {
     clubQuery.refetch();
+    ledgerQuery.refetch();
     marketQuery.refetch();
-  }, [clubQuery.refetch, marketQuery.refetch]);
+  }, [clubQuery.refetch, ledgerQuery.refetch, marketQuery.refetch]);
+
+  const players = useMemo(() => {
+    const all = marketQuery.data?.players ?? [];
+    if (filter === "TODOS") return all;
+    return all.filter((p) => SECTOR[p.primaryPosition] === filter);
+  }, [marketQuery.data, filter]);
 
   /**
    * A compra de verdade (R-192). Oferta a 100% do valor estimado — dentro da
    * faixa da R-26 (40–250%) —, o servidor decide (não presume sucesso). Ao
-   * aplicar, o elenco e o caixa mudam: refaz clube e mercado.
+   * aplicar, o elenco e o caixa mudam: refaz clube, razão e mercado. Se o
+   * servidor recusar por caixa, abre o modal em vez do errinho.
    */
   const signPlayer = useCallback(
     (p: MarketPlayer) => {
@@ -142,19 +189,26 @@ export function Market() {
           result.status === CommandTrackingStatus.ACCEPTED ||
           result.status === CommandTrackingStatus.APPLIED
         ) {
+          // Fechou: some o modal e refaz elenco, caixa e vitrine.
+          setPending(null);
           clubQuery.refetch();
+          ledgerQuery.refetch();
           marketQuery.refetch();
         }
+        // Recusa (saldo, faixa) mantém o modal aberto com a mensagem — o técnico
+        // decide o que fazer sem perder o contexto do negócio.
       });
     },
-    [client, clubQuery, contractVersion, managedClub, marketQuery, worldId],
+    [
+      client,
+      clubQuery,
+      contractVersion,
+      ledgerQuery,
+      managedClub,
+      marketQuery,
+      worldId,
+    ],
   );
-
-  const players = useMemo(() => {
-    const all = marketQuery.data?.players ?? [];
-    if (filter === "TODOS") return all;
-    return all.filter((p) => SECTOR[p.primaryPosition] === filter);
-  }, [marketQuery.data, filter]);
 
   const screenState = deriveScreenState({
     session: status,
@@ -182,6 +236,12 @@ export function Market() {
     );
   }
 
+  const applied =
+    tracking !== null &&
+    (tracking.status === CommandTrackingStatus.ACCEPTED ||
+      tracking.status === CommandTrackingStatus.APPLIED);
+  const deal = pending === null ? null : previewDeal(pending.valueMinor, cashMinor);
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
@@ -192,7 +252,8 @@ export function Market() {
         <View style={styles.header}>
           <Text style={styles.title}>MERCADO</Text>
           <Text style={styles.subtitle}>
-            {players.length} jogadores · valor estimado
+            {players.length} jogadores
+            {cashMinor !== null ? ` · caixa ${reais(cashMinor)}` : ""}
           </Text>
         </View>
 
@@ -225,58 +286,51 @@ export function Market() {
                 label: p.primaryPosition,
                 tint: color.textMuted,
               };
-              const own = p.clubId === managedClub.id;
-              const busy = signingId === p.playerId;
               return (
                 <View key={p.playerId} style={styles.row}>
-                  <View style={[styles.posBadge, { backgroundColor: pos.tint }]}>
-                    <Text style={styles.posText}>{pos.label}</Text>
+                  <View style={[styles.avatar, { backgroundColor: pos.tint }]}>
+                    <Text style={styles.avatarText}>{initialsOf(p.name)}</Text>
                   </View>
                   <View style={styles.info}>
                     <Text style={styles.name} numberOfLines={1}>
                       {p.name}
                     </Text>
-                    <Text style={styles.club} numberOfLines={1}>
-                      {p.clubName} · {p.age} anos · R${" "}
-                      {formatAmount(Number(p.valueMinor) / 100)}
-                    </Text>
+                    <View style={styles.metaRow}>
+                      <View
+                        style={[styles.posBadge, { backgroundColor: pos.tint }]}
+                      >
+                        <Text style={styles.posText}>{pos.label}</Text>
+                      </View>
+                      <Text style={styles.club} numberOfLines={1}>
+                        {p.clubName} · {p.age} anos · OVR {p.overall}
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.ovr}>{p.overall}</Text>
-                  {own ? (
-                    <Text style={styles.ownTag}>SEU</Text>
-                  ) : (
+                  <View style={styles.action}>
+                    <Text style={styles.value}>{reais(p.valueMinor)}</Text>
                     <Pressable
-                      onPress={() => signPlayer(p)}
-                      disabled={busy || signingId !== null}
+                      onPress={() => {
+                        setTracking(null);
+                        setPending(p);
+                      }}
+                      disabled={signingId !== null}
                       accessibilityRole="button"
                       accessibilityLabel={`Contratar ${p.name}`}
-                      accessibilityState={{ disabled: busy || signingId !== null }}
-                      style={[styles.signBtn, busy && styles.signBtnBusy]}
+                      accessibilityState={{ disabled: signingId !== null }}
+                      style={styles.signBtn}
                     >
-                      <Text style={styles.signText}>
-                        {busy ? "..." : "CONTRATAR"}
-                      </Text>
+                      <Text style={styles.signText}>CONTRATAR</Text>
                     </Pressable>
-                  )}
+                  </View>
                 </View>
               );
             })
           )}
         </Card>
 
-        {tracking !== null &&
-          tracking.status === CommandTrackingStatus.REJECTED && (
-            <Text style={styles.error}>
-              Contratação recusada: {tracking.errorCode ?? "erro"}.
-            </Text>
-          )}
-        {tracking !== null &&
-          (tracking.status === CommandTrackingStatus.ACCEPTED ||
-            tracking.status === CommandTrackingStatus.APPLIED) && (
-            <Text style={styles.ok}>
-              Contratado. Caixa e elenco atualizados.
-            </Text>
-          )}
+        {applied && (
+          <Text style={styles.ok}>Contratado. Caixa e elenco atualizados.</Text>
+        )}
 
         <Text style={styles.note}>
           Valor estimado (R-41). A oferta sai a 100% do valor — a taxa fica na
@@ -284,7 +338,119 @@ export function Market() {
           (R-192).
         </Text>
       </ScrollView>
+
+      <Modal
+        visible={pending !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => (signingId === null ? setPending(null) : null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            {pending !== null && deal !== null && (
+              <>
+                <Text style={styles.modalTitle}>Proposta de contratação</Text>
+                <Text style={styles.modalPlayer}>
+                  {pending.name} ·{" "}
+                  {POSITION[pending.primaryPosition]?.label ??
+                    pending.primaryPosition}{" "}
+                  · OVR {pending.overall}
+                </Text>
+
+                <View style={styles.dealRows}>
+                  <DealRow label="Taxa de transferência" value={reais(deal.feeMinor)} />
+                  <DealRow
+                    label="Duração do contrato"
+                    value={`${deal.seasons} temporadas`}
+                  />
+                  <DealRow
+                    label="Salário por temporada"
+                    value={reais(deal.salaryPerSeasonMinor)}
+                  />
+                  <View style={styles.dealDivider} />
+                  <DealRow
+                    label="Seu caixa"
+                    value={cashMinor !== null ? reais(cashMinor) : "—"}
+                  />
+                  <DealRow
+                    label="Caixa após a compra"
+                    value={
+                      deal.cashAfterMinor !== null
+                        ? reais(deal.cashAfterMinor)
+                        : "—"
+                    }
+                    danger={!deal.affordable}
+                  />
+                </View>
+
+                {!deal.affordable && (
+                  <Text style={styles.error}>
+                    Caixa insuficiente. Venda um jogador ou espere entrar
+                    dinheiro antes de fechar.
+                  </Text>
+                )}
+                {tracking?.status === CommandTrackingStatus.REJECTED && (
+                  <Text style={styles.error}>
+                    Recusada: {tracking.errorCode ?? "erro"}.
+                  </Text>
+                )}
+
+                <View style={styles.modalActions}>
+                  <Pressable
+                    onPress={() => setPending(null)}
+                    disabled={signingId !== null}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancelar"
+                    accessibilityState={{ disabled: signingId !== null }}
+                    style={styles.modalCancel}
+                  >
+                    <Text style={styles.modalCancelText}>CANCELAR</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => signPlayer(pending)}
+                    disabled={!deal.affordable || signingId !== null}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Confirmar contratação de ${pending.name}`}
+                    accessibilityState={{
+                      disabled: !deal.affordable || signingId !== null,
+                    }}
+                    style={[
+                      styles.modalBtn,
+                      (!deal.affordable || signingId !== null) &&
+                        styles.modalBtnDisabled,
+                    ]}
+                  >
+                    <Text style={styles.modalBtnText}>
+                      {signingId !== null ? "..." : "CONFIRMAR"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+/** Uma linha rótulo→valor do resumo do negócio. */
+function DealRow({
+  label,
+  value,
+  danger,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly danger?: boolean;
+}) {
+  return (
+    <View style={styles.dealRow}>
+      <Text style={styles.dealLabel}>{label}</Text>
+      <Text style={[styles.dealValue, danger === true && styles.dealValueDanger]}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -320,49 +486,52 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: color.border,
   },
-  posBadge: {
-    width: 38,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: "#0B0B0D",
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  info: { flex: 1, gap: 3 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  posBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
   },
   posText: {
     color: "#0B0B0D",
     fontSize: 10,
     fontWeight: fontWeight.bold as "700",
   },
-  info: { flex: 1 },
   name: {
     color: color.text,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
     fontWeight: fontWeight.bold as "700",
   },
-  club: { color: color.textMuted, fontSize: fontSize.xs },
-  ovr: {
-    minWidth: 28,
-    textAlign: "center",
-    color: color.text,
+  club: { flex: 1, color: color.textMuted, fontSize: fontSize.xs },
+  action: { alignItems: "flex-end", gap: space.xs },
+  value: {
+    color: color.primary,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
   },
   signBtn: {
-    minWidth: 96,
+    minWidth: 104,
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
     borderRadius: radius.pill,
     backgroundColor: color.primary,
     alignItems: "center",
   },
-  signBtnBusy: { backgroundColor: color.surface },
   signText: {
     color: color.background,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold as "700",
-  },
-  ownTag: {
-    minWidth: 96,
-    textAlign: "center",
-    color: color.textMuted,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
@@ -383,5 +552,82 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
     paddingHorizontal: space.xs,
   },
-  note: { color: color.textMuted, fontSize: fontSize.xs, paddingHorizontal: space.xs },
+  note: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    paddingHorizontal: space.xs,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: color.surface,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: space.md,
+  },
+  modalTitle: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold as "700",
+  },
+  modalPlayer: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  dealRows: { gap: space.sm },
+  dealRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
+  dealLabel: { color: color.textMuted, fontSize: fontSize.sm },
+  dealValue: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  dealValueDanger: { color: color.danger },
+  dealDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: color.border,
+    marginVertical: space.xs,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  modalCancel: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.background,
+  },
+  modalCancelText: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  modalBtn: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  modalBtnDisabled: { opacity: 0.5 },
+  modalBtnText: {
+    color: color.background,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
 });

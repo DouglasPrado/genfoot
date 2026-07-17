@@ -50,6 +50,7 @@ import {
 } from "./formations";
 import { Pitch } from "./pitch";
 import { PlayerCard } from "./player-card";
+import { canSubstitute } from "./substitution-model";
 
 /** Tela de Elenco: campo tático (formação editável) + modal de substituição. */
 export function Squad() {
@@ -147,38 +148,58 @@ export function Squad() {
     const clubId = managedClub?.id ?? null;
     if (clubId === null || players.length < 11) return;
     const ids = new Set(players.map((p) => p.id));
-    const lineupValid =
+    const onPitchValid =
       onPitchIds.length === 11 && onPitchIds.every((id) => ids.has(id));
-    if (lineupValid) return;
 
-    // Monta a escalação padrão IMEDIATAMENTE (síncrono) — é o que garante que o
-    // campo nunca fique vazio quando o elenco chega.
-    setFormation("4-2-1-3");
-    setOnPitchIds(
-      assignToFormation(
+    if (!onPitchValid) {
+      // Escalação inválida (campo vazio no load, ou id que não é mais do elenco):
+      // remonta tudo IMEDIATAMENTE (síncrono) do elenco real.
+      setFormation("4-2-1-3");
+      const starters = assignToFormation(
         players.filter((p) => p.starter),
         "4-2-1-3",
-      ),
-    );
-    setBenchIds(players.filter((p) => !p.starter).map((p) => p.id));
-    setActiveSlot(null);
+      );
+      const startSet = new Set(starters);
+      setOnPitchIds(starters);
+      setBenchIds(players.filter((p) => !startSet.has(p.id)).map((p) => p.id));
+      setActiveSlot(null);
+    } else {
+      // Os 11 batem — não desfaz a tática. Só reconcilia a RESERVA: um reforço
+      // recém-comprado (que não estava na lista) entra; um vendido sai. Era o
+      // bug: sem isto, contratar não aparecia no elenco até trocar de clube.
+      const onPitch = new Set(onPitchIds);
+      const validBench = benchIds.filter(
+        (id) => ids.has(id) && !onPitch.has(id),
+      );
+      const shown = new Set([...onPitchIds, ...validBench]);
+      const missing = players
+        .filter((p) => !shown.has(p.id))
+        .map((p) => p.id);
+      if (missing.length > 0 || validBench.length !== benchIds.length) {
+        setBenchIds([...validBench, ...missing]);
+      }
+    }
 
     // Depois, tenta o rascunho salvo (assíncrono) e sobrepõe SE ainda for válido
-    // para este elenco. Uma vez por clube.
+    // para este elenco. Uma vez por clube. `players.every(...)` garante que um
+    // rascunho ANTERIOR à compra (sem o reforço) seja rejeitado — senão ele
+    // reesconderia o jogador recém-contratado.
     if (hydratedClubRef.current === clubId) return;
     hydratedClubRef.current = clubId;
     void readLineupDraft(worldId, clubId).then((draft) => {
+      if (draft === null) return;
+      const draftIds = new Set([...draft.onPitchIds, ...draft.benchIds]);
       const draftValid =
-        draft !== null &&
         draft.onPitchIds.length === 11 &&
-        [...draft.onPitchIds, ...draft.benchIds].every((id) => ids.has(id));
+        [...draftIds].every((id) => ids.has(id)) &&
+        players.every((p) => draftIds.has(p.id));
       if (draftValid) {
         setFormation(draft.formation);
         setOnPitchIds([...draft.onPitchIds]);
         setBenchIds([...draft.benchIds]);
       }
     });
-  }, [managedClub?.id, players, worldId, onPitchIds]);
+  }, [managedClub?.id, players, worldId, onPitchIds, benchIds]);
 
   // Persiste o rascunho a cada edição (pós-hidratação).
   useEffect(() => {
@@ -297,6 +318,10 @@ export function Squad() {
   const substitute = useCallback(
     (benchPlayerId: string) => {
       if (activeSlot === null) return;
+      // Trava temporária: só troca por reserva da mesma posição de origem.
+      if (!canSubstitute(byId.get(onPitchIds[activeSlot] ?? ""), byId.get(benchPlayerId))) {
+        return;
+      }
       const outgoing = onPitchIds[activeSlot];
       setOnPitchIds((prev) => {
         const next = [...prev];
@@ -308,13 +333,24 @@ export function Squad() {
       );
       setActiveSlot(null);
     },
-    [activeSlot, onPitchIds],
+    [activeSlot, onPitchIds, byId],
   );
 
   const outgoing =
     activeSlot !== null ? byId.get(onPitchIds[activeSlot] ?? "") : undefined;
   const outgoingRole =
     activeSlot !== null ? slots[activeSlot]?.role : undefined;
+  // Todas as reservas do elenco, na ordem, com a flag de elegibilidade: quem
+  // não é da posição de origem aparece escurecido e bloqueado (por ora).
+  const benchOptions = useMemo(
+    () =>
+      benchIds
+        .map((id) => byId.get(id))
+        .filter((p): p is SquadPlayer => Boolean(p))
+        .map((p) => ({ player: p, eligible: canSubstitute(outgoing, p) })),
+    [outgoing, benchIds, byId],
+  );
+  const eligibleCount = benchOptions.filter((o) => o.eligible).length;
 
   const queryState =
     clubQuery.state === "loading" ||
@@ -489,6 +525,11 @@ export function Squad() {
                   {outgoingRole ? ` (${outgoingRole})` : ""}
                 </Text>
               ) : null}
+              {outgoing ? (
+                <Text style={styles.sheetRule}>
+                  Só reservas de {outgoing.position} — mesma posição de origem
+                </Text>
+              ) : null}
             </View>
             <Pressable
               onPress={closeSheet}
@@ -501,27 +542,31 @@ export function Squad() {
             </Pressable>
           </View>
           <Text style={styles.sheetSection}>
-            ENTRA — RESERVAS ({benchIds.length})
+            ENTRA — RESERVAS ({eligibleCount} de {benchOptions.length})
           </Text>
           <ScrollView
             contentContainerStyle={styles.sheetList}
             showsVerticalScrollIndicator={false}
           >
-            {benchIds.length === 0 ? (
+            {benchOptions.length === 0 ? (
               <Text style={styles.empty}>Sem reservas disponíveis.</Text>
             ) : (
-              benchIds.map((id) => {
-                const p = byId.get(id);
-                if (!p) return null;
-                return (
-                  <Pressable
-                    key={id}
-                    onPress={() => substitute(id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Escalar ${p.name}`}
-                    style={styles.benchRow}
-                  >
-                    <PlayerCard p={p} />
+              benchOptions.map(({ player: p, eligible }) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => (eligible ? substitute(p.id) : undefined)}
+                  disabled={!eligible}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !eligible }}
+                  accessibilityLabel={
+                    eligible
+                      ? `Escalar ${p.name}`
+                      : `${p.name} bloqueado — ${p.position} não substitui ${outgoing?.position ?? ""}`
+                  }
+                  style={[styles.benchRow, eligible ? null : styles.benchBlocked]}
+                >
+                  <PlayerCard p={p} />
+                  {eligible ? (
                     <View style={styles.enterBadge}>
                       <Icon
                         name="arrow-up"
@@ -530,9 +575,14 @@ export function Squad() {
                       />
                       <Text style={styles.enterText}>ENTRAR</Text>
                     </View>
-                  </Pressable>
-                );
-              })
+                  ) : (
+                    <View style={styles.blockedBadge}>
+                      <Icon name="warning" size={11} color={color.textMuted} />
+                      <Text style={styles.blockedText}>{p.position}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              ))
             )}
           </ScrollView>
         </View>
@@ -687,6 +737,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sheetSub: { color: color.textMuted, fontSize: fontSize.xs, marginTop: 1 },
+  sheetRule: { color: color.primary, fontSize: 10, marginTop: 2, letterSpacing: 0.3 },
   sheetOut: { color: color.danger, fontWeight: fontWeight.bold as "700" },
   closeBtn: {
     width: MINIMUM_TOUCH_TARGET,
@@ -714,6 +765,28 @@ const styles = StyleSheet.create({
     paddingVertical: space.xl,
   },
   benchRow: { minHeight: MINIMUM_TOUCH_TARGET },
+  benchBlocked: { opacity: 0.38 },
+  blockedBadge: {
+    position: "absolute",
+    right: space.md,
+    top: "50%",
+    marginTop: -11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: color.surface,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.sm,
+    paddingVertical: 4,
+  },
+  blockedText: {
+    color: color.textMuted,
+    fontSize: 10,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
   enterBadge: {
     position: "absolute",
     right: space.md,

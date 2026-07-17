@@ -294,10 +294,16 @@ export function Club() {
     clubQuery.refetch();
     identityQuery.refetch();
     worldQuery.refetch();
+    // O financeiro é query própria (C9). Sem isto, puxar pra atualizar mexia em
+    // tudo menos no caixa — o saldo ficava colado no valor da última montagem.
+    ledgerQuery.refetch();
+    narrativeQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
     worldQuery.refetch,
+    ledgerQuery.refetch,
+    narrativeQuery.refetch,
   ]);
   const screenState = deriveScreenState({
     session: status,
