@@ -66,7 +66,7 @@ export function Squad() {
       ? null
       : deriveOnboardingStep(
           identityQuery.state === "ready" ? identityQuery.data : null,
-          session.subject,
+          session.accountId,
           clubQuery.asOf ?? "",
         );
   const managedClub = selectManagedClub(

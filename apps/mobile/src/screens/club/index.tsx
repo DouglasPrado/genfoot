@@ -81,7 +81,7 @@ export function Club() {
   const identity = identityQuery.state === "empty" ? null : identityQuery.data;
   const controlStep = deriveOnboardingStep(
     identity,
-    session?.subject ?? "",
+    session?.accountId ?? null,
     worldQuery.data?.currentDate ?? "",
   );
   const managedClub = selectManagedClub(

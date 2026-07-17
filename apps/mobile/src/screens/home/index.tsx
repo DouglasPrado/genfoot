@@ -78,7 +78,7 @@ export function Home() {
   const onboarding =
     session === null
       ? null
-      : deriveOnboardingStep(identity, session.subject, clubQuery.asOf ?? "");
+      : deriveOnboardingStep(identity, session.accountId, clubQuery.asOf ?? "");
   const club = selectManagedClub(
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
@@ -91,7 +91,7 @@ export function Home() {
     ) {
       return;
     }
-    if (deriveOnboardingStep(identity, session.subject).kind !== "complete") {
+    if (deriveOnboardingStep(identity, session.accountId).kind !== "complete") {
       router.replace("/onboarding");
     }
   }, [identity, identityQuery.state, session]);

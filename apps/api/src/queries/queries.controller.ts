@@ -81,8 +81,15 @@ export class QueriesController {
    */
   @ApiOperation({ summary: "Lista os mundos existentes" })
   @Get()
-  async list(): Promise<QueryEnvelope<unknown>> {
-    const worlds = await this.worldReadModel.listWorlds();
+  async list(
+    @Req() request: Request & AuthenticatedRequest,
+  ): Promise<QueryEnvelope<unknown>> {
+    // O `accountId` sai da SESSÃO, nunca de um parâmetro: "minha participação"
+    // só faz sentido para quem o token identifica. Admin não tem conta de jogo
+    // e recebe a lista sem o campo.
+    const worlds = await this.worldReadModel.listWorlds(
+      request.session?.accountId ?? null,
+    );
     return {
       data: worlds,
       asOf: new Date().toISOString().slice(0, 10),

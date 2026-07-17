@@ -88,18 +88,35 @@ const departmentPresentation: Readonly<
   COMMERCIAL: { name: "Departamento comercial", icon: "briefcase" },
 };
 
+/**
+ * O clube que o jogador administra, dentro do portfólio.
+ *
+ * **Isto está QUEBRADO e não é conserto de guard.** A query `club` devolvia o
+ * portfólio inteiro (`{clubs: [...]}`); hoje ela devolve `{clubCount}` — a lista
+ * mora em `club-detail`, porque o `WorldClubPortfolio` morreu com o
+ * mega-agregado (R-175) e a porta de leitura ficou estreita de propósito.
+ *
+ * Então `portfolio.clubs` chega `undefined` e o `.find` estoura. Blindar com
+ * `?? []` seria PIOR que o crash: devolveria `null`, e a tela diria "sem clube"
+ * a quem acabou de assumir um. Erro que se disfarça de estado válido é o que o
+ * CLAUDE.md §5 chama de fallback silencioso.
+ *
+ * Devolver `null` aqui é honesto porque o CHAMADOR trata `null` como "não
+ * consegui ler", não como "não tem" — e as telas que dependem disto (clube,
+ * elenco, home) já estão fora do ar por dependerem de C4/C7/C9, que não existem.
+ * Elas voltam nas tasks #25–#27, com o read model certo.
+ */
 export function selectManagedClub(
   portfolio: ClubPortfolioProjection | null,
   configuredClubId: string | null,
 ): MobileClubProjection | null {
-  if (portfolio === null) return null;
+  const clubs = portfolio?.clubs;
+  if (clubs === undefined) return null;
   if (configuredClubId !== null) {
-    const configured = portfolio.clubs.find(
-      (club) => club.id === configuredClubId,
-    );
+    const configured = clubs.find((club) => club.id === configuredClubId);
     if (configured !== undefined) return configured;
   }
-  return portfolio.clubs.find((club) => club.status === "ACTIVE") ?? null;
+  return clubs.find((club) => club.status === "ACTIVE") ?? null;
 }
 
 export function buildClubInfrastructure(

@@ -213,6 +213,7 @@ export class AuthController {
 
     const session = this.store.issue({
       subject,
+      accountId,
       role: wantsAdmin ? Role.ADMIN : Role.USER,
       ...(parsed.data.worldScope ? { worldScope: parsed.data.worldScope } : {}),
       nowMs: Date.now(),

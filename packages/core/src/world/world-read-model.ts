@@ -23,9 +23,38 @@ export interface WorldListItemView {
   readonly startDate: string;
   readonly rulesetVersion: string;
   readonly clubCount: number;
+  /**
+   * Clubes SEM gestor — as vagas (`M-WORLD-PICK` pede "vagas" explicitamente).
+   *
+   * É a pergunta que o jogador faz olhando a lista: "dá para entrar?". Sem ela a
+   * tela dispararia uma query de clubes por mundo só para saber se vale abrir.
+   *
+   * Vaga = ausência de `ClubControl` ativo (R-180: a IA é a ausência de
+   * controle). Não há flag "livre" para contar — há a falta de dono.
+   */
+  readonly openSlots: number;
+  /**
+   * A participação DESTE usuário neste mundo, se houver — a "elegibilidade" que
+   * o doc pede, na forma que o domínio sabe responder.
+   *
+   * `null` = nunca entrou. Quem já tem clube aqui não escolhe mundo, volta para
+   * ele; quem saiu pode estar em cooldown (R-26). A tela decide o rótulo; o read
+   * model entrega o fato.
+   */
+  readonly myParticipation: {
+    readonly status: string;
+    readonly hasActiveControl: boolean;
+    readonly cooldownUntilOn: string | null;
+  } | null;
 }
 
 export interface WorldReadModel {
-  /** Todos os mundos. Sem paginação: são dezenas, não milhões. */
-  listWorlds(): Promise<readonly WorldListItemView[]>;
+  /**
+   * Todos os mundos. Sem paginação: são dezenas, não milhões.
+   *
+   * `accountId` opcional: o admin lista sem conta (e `myParticipation` vem
+   * `null`); o jogador lista com a dele, e a mesma query responde "posso entrar
+   * aqui?" sem uma segunda ida ao servidor.
+   */
+  listWorlds(accountId?: string | null): Promise<readonly WorldListItemView[]>;
 }
