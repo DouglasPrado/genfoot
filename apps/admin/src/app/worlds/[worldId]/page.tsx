@@ -69,13 +69,17 @@ function Stat({
 export default function WorldDetailPage() {
   const params = useParams<{ worldId: string }>();
   const worldId = params.worldId;
-  const { api } = useSession();
+  const { api, session } = useSession();
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
   const [clubs, setClubs] = useState<readonly ClubRow[]>([]);
   const [commandTypes, setCommandTypes] = useState<readonly string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    // Nada dispara antes de a sessão existir: uma query sem token leva 401, e
+    // 401 na janela de hidratação não é sessão expirada — é pergunta feita antes
+    // da hora.
+    if (session === null) return;
     let alive = true;
     api
       .query<WorldSnapshot>(worldId)
@@ -102,7 +106,7 @@ export default function WorldDetailPage() {
     return () => {
       alive = false;
     };
-  }, [api, worldId, refreshKey]);
+  }, [api, session, worldId, refreshKey]);
 
   const dinheiro = mockDinheiroCirculante(worldId, clubs.length);
   const jogadores = mockJogadores(worldId, clubs.length);

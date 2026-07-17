@@ -53,6 +53,8 @@ export class PrismaClubReadModel implements ClubReadModel {
           stadiumName: row.stadium?.name ?? "",
           stadiumCapacity: row.stadium?.capacity ?? 0,
           primaryColor: identity.primaryColor,
+          secondaryColor: identity.secondaryColor,
+          crestTemplateId: identity.crestTemplateId,
         };
       }),
     };

@@ -35,12 +35,18 @@ export interface WorldSlice {
     }[];
   } | null;
   readonly clubs: {
-    readonly clubs: readonly {
-      readonly id: string;
-      readonly name: string;
-      readonly shortCode: string;
-    }[];
+    readonly clubs: readonly ClubIdentity[];
   } | null;
+}
+
+/** O clube com a identidade visual junto: o escudo anda com o nome. */
+export interface ClubIdentity {
+  readonly id: string;
+  readonly name: string;
+  readonly shortCode: string;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
 }
 
 export interface UserRow {
@@ -49,7 +55,7 @@ export interface UserRow {
   readonly worldId: string;
   readonly worldSeed: string;
   readonly clubId: string | null;
-  readonly clubName: string | null;
+  readonly club: ClubIdentity | null;
 }
 
 export function buildUserDirectory(
@@ -83,7 +89,7 @@ export function buildUserDirectory(
         clubId: control?.clubId ?? null,
         // Clube ausente é null, nunca "—" nem string vazia: quem decide como
         // mostrar ausência é a tela, não o modelo.
-        clubName: club?.name ?? null,
+        club: club ?? null,
       });
     }
   }

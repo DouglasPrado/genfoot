@@ -1,3 +1,4 @@
+import { ClubName } from "@/components/club-crest";
 import { Mock } from "@/components/mock";
 import { mockNumerosDoClube } from "@/lib/mock-world";
 
@@ -24,6 +25,8 @@ export interface ClubRow {
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
   readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
 }
 
 function money(minor: bigint): string {
@@ -93,19 +96,7 @@ export function ClubsTable({
             return (
             <tr key={club.id} className="border-b border-border/60 last:border-0">
               <td className="px-3 py-2 font-medium">
-                <span className="flex items-center gap-2">
-                  {/* Clube gerado nasce SEM identidade visual — o jogador a
-                      define ao personalizar (BC-003). Sem cor, sem bolinha: um
-                      cinza genérico fingiria que ele já tem cor. */}
-                  {club.primaryColor === null ? null : (
-                    <span
-                      aria-hidden
-                      className="size-2.5 shrink-0 rounded-full border border-border"
-                      style={{ backgroundColor: club.primaryColor }}
-                    />
-                  )}
-                  {club.name}
-                </span>
+                <ClubName club={club} size="md" />
               </td>
               <td className="mono px-3 py-2 text-muted-foreground">
                 {club.shortCode}

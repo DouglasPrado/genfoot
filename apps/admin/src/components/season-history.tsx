@@ -3,6 +3,7 @@
 import { Trophy } from "lucide-react";
 import { useState } from "react";
 
+import { ClubCrest, ClubName } from "@/components/club-crest";
 import type { ClubRow } from "@/components/clubs-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,9 +65,7 @@ export function SeasonHistory({
             className="justify-start"
             onClick={() => setSelecionado(c.id)}
           >
-            <span className="mono text-[10px] text-muted-foreground">
-              {c.shortCode}
-            </span>
+            <ClubCrest club={c} />
             <span className="truncate">{c.name}</span>
           </Button>
         ))}
@@ -74,7 +73,10 @@ export function SeasonHistory({
 
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <span className="font-heading text-base">{clube.name}</span>
+          <span className="font-heading flex items-center gap-2 text-base">
+            <ClubCrest club={clube} size="lg" />
+            {clube.name}
+          </span>
           <Badge tone={titulos > 0 ? "ok" : "neutral"}>
             <Trophy className="size-3" />
             {titulos} {titulos === 1 ? "título" : "títulos"}

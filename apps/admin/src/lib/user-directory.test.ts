@@ -15,10 +15,25 @@ const identity: WorldSlice["identity"] = {
   ],
 };
 
+/** Clube gerado nasce SEM identidade visual (BC-003) — é o caso comum. */
 const clubs: WorldSlice["clubs"] = {
   clubs: [
-    { id: "club-1", name: "Real do Vale", shortCode: "RDV" },
-    { id: "club-2", name: "Horizonte", shortCode: "HRZ" },
+    {
+      id: "club-1",
+      name: "Real do Vale",
+      shortCode: "RDV",
+      primaryColor: null,
+      secondaryColor: null,
+      crestTemplateId: null,
+    },
+    {
+      id: "club-2",
+      name: "Horizonte",
+      shortCode: "HRZ",
+      primaryColor: "#0a3d62",
+      secondaryColor: "#ffffff",
+      crestTemplateId: "crest-shield",
+    },
   ],
 };
 
@@ -50,7 +65,6 @@ describe("buildUserDirectory", () => {
     expect(row).toMatchObject({
       accountId: "acc-1",
       clubId: "club-1",
-      clubName: "Real do Vale",
       worldSeed: "grinta-demo",
     });
   });
@@ -60,7 +74,7 @@ describe("buildUserDirectory", () => {
       (r) => r.accountId === "acc-2",
     );
     expect(row?.clubId).toBeNull();
-    expect(row?.clubName).toBeNull();
+    expect(row?.club).toBeNull();
   });
 
   it("participação sem clube aparece com clube nulo — não some da lista", () => {
@@ -79,7 +93,7 @@ describe("buildUserDirectory", () => {
   it("controle apontando clube desconhecido fica com nome nulo", () => {
     const rows = buildUserDirectory([slice({ clubs: { clubs: [] } })]);
     expect(rows[0]?.clubId).toBe("club-1");
-    expect(rows[0]?.clubName).toBeNull();
+    expect(rows[0]?.club).toBeNull();
   });
 
   it("mundos sem identidade não derrubam os demais", () => {
@@ -94,6 +108,6 @@ describe("buildUserDirectory", () => {
   it("mundo sem clubes ainda lista os usuários", () => {
     const rows = buildUserDirectory([slice({ clubs: null })]);
     expect(rows).toHaveLength(3);
-    expect(rows[0]?.clubName).toBeNull();
+    expect(rows[0]?.club).toBeNull();
   });
 });

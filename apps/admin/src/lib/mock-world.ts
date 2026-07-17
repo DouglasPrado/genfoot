@@ -261,9 +261,7 @@ export type Zona = "TITULO" | "CONTINENTAL" | "NEUTRA" | "REBAIXAMENTO";
 
 export interface MockLinhaTabela {
   readonly posicao: number;
-  readonly clubId: string;
-  readonly clube: string;
-  readonly shortCode: string;
+  readonly clube: ClubeRef;
   readonly pontos: number;
   readonly jogos: number;
   readonly vitorias: number;
@@ -275,10 +273,20 @@ export interface MockLinhaTabela {
   readonly zona: Zona;
 }
 
-interface ClubeRef {
+/**
+ * O clube como as telas o exibem: com a identidade visual junto.
+ *
+ * Carregar `name` solto obrigaria cada tabela a reencontrar o clube para achar o
+ * escudo — e a que esquecesse mostraria nome sem escudo. O par nome+escudo anda
+ * junto porque é assim que o clube aparece.
+ */
+export interface ClubeRef {
   readonly id: string;
   readonly name: string;
   readonly shortCode: string;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
 }
 
 export function mockTabela(
@@ -294,9 +302,7 @@ export function mockTabela(
     const golsPro = vitorias * 2 + empates + pick(chave, 11, 0, 12);
     const golsContra = derrotas * 2 + empates + pick(chave, 13, 0, 10);
     return {
-      clubId: clube.id,
-      clube: clube.name,
-      shortCode: clube.shortCode,
+      clube,
       pontos: vitorias * 3 + empates,
       jogos,
       vitorias,
@@ -353,9 +359,7 @@ export function mockGrupos(
         const golsPro = vitorias * 2 + pick(chave, 11, 0, 5);
         const golsContra = derrotas * 2 + pick(chave, 13, 0, 4);
         return {
-          clubId: clube.id,
-          clube: clube.name,
-          shortCode: clube.shortCode,
+          clube,
           pontos: vitorias * 3 + empates,
           jogos,
           vitorias,
@@ -383,8 +387,8 @@ export function mockGrupos(
 
 export interface MockConfronto {
   readonly id: string;
-  readonly casa: string;
-  readonly fora: string;
+  readonly casa: ClubeRef;
+  readonly fora: ClubeRef;
   readonly golsCasa: number | null;
   readonly golsFora: number | null;
   readonly decidido: boolean;
@@ -399,6 +403,12 @@ export interface MockFaseMataMata {
 export function mockChave(
   torneioId: string,
   clubes: readonly ClubeRef[],
+  /**
+   * Torneio encerrado NÃO tem jogo indeciso. Sem isto, a final de uma temporada
+   * passada aparecia "em aberto" e sem campeão — um torneio que acabou sem
+   * decidir a final é incoerente, e a tela mostrava isso com toda a calma.
+   */
+  emAndamento = false,
 ): readonly MockFaseMataMata[] {
   const nomes = ["Oitavas", "Quartas", "Semifinal", "Final"];
   const fases: MockFaseMataMata[] = [];
@@ -411,13 +421,15 @@ export function mockChave(
       const casa = vivos[i]!;
       const fora = vivos[i + 1]!;
       const chave = `${torneioId}:${nome}:${casa.id}:${fora.id}`;
-      const decidido = pick(chave, 3, 0, 4) > 0;
+      // A final é a última a se decidir: num torneio em andamento, ela fica em
+      // aberto e as fases anteriores já correram.
+      const decidido = !emAndamento || nome !== "Final";
       const golsCasa = pick(chave, 5, 0, 4);
       const golsFora = pick(chave, 7, 0, 3);
       confrontos.push({
         id: chave,
-        casa: casa.name,
-        fora: fora.name,
+        casa,
+        fora,
         // Confronto não decidido não tem placar: `null`, não `0 x 0` — que é um
         // placar de verdade e diria que o jogo terminou empatado.
         golsCasa: decidido ? golsCasa : null,
@@ -432,11 +444,26 @@ export function mockChave(
   return fases;
 }
 
+/**
+ * As posições do canon (`genesis-types.ts:10`). Não inventei sigla: o domínio
+ * valida `primaryPosition` contra esta lista, e uma sigla fora dela seria um
+ * jogador que o jogo não sabe gerar.
+ */
+export const POSICOES = [
+  "GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LW", "RW", "ST", "CF",
+] as const;
+
+export type Posicao = (typeof POSICOES)[number];
+
 /** C4 + C5. Artilharia e — o nome do canon — GARÇOM, o líder de assistências. */
 export interface MockJogadorRanking {
-  readonly posicao: number;
+  /** A colocação no ranking. Nada a ver com a posição em campo. */
+  readonly colocacao: number;
   readonly jogador: string;
-  readonly clube: string;
+  /** Número da camisa — `shirtNumber` no schema (`:1626`). */
+  readonly numero: number;
+  readonly posicao: Posicao;
+  readonly clube: ClubeRef | null;
   readonly valor: number;
   readonly jogos: number;
 }
@@ -447,11 +474,20 @@ const NOMES = [
   "Igor Salles", "Murilo Tavares",
 ];
 
+/**
+ * Artilheiro é atacante quase sempre. Sortear a posição uniformemente daria um
+ * goleiro artilheiro — o mock estaria errado sobre o JOGO, não só sobre o
+ * número.
+ */
+const POSICOES_ARTILHEIRO: readonly Posicao[] = ["ST", "CF", "LW", "RW", "CAM"];
+/** Garçom vem do meio e das pontas: quem dá o passe, não quem finaliza. */
+const POSICOES_GARCOM: readonly Posicao[] = ["CAM", "CM", "LW", "RW", "LB", "RB"];
+
 export function mockArtilharia(
   torneioId: string,
   clubes: readonly ClubeRef[],
 ): readonly MockJogadorRanking[] {
-  return ranking(`${torneioId}:gols`, clubes, 5, 24);
+  return ranking(`${torneioId}:gols`, clubes, 5, 24, POSICOES_ARTILHEIRO);
 }
 
 /** "Garçom (líder de assistências)" — `06-temporada-e-competicoes.md:§7`. */
@@ -459,7 +495,7 @@ export function mockGarcons(
   torneioId: string,
   clubes: readonly ClubeRef[],
 ): readonly MockJogadorRanking[] {
-  return ranking(`${torneioId}:assist`, clubes, 3, 16);
+  return ranking(`${torneioId}:assist`, clubes, 3, 16, POSICOES_GARCOM);
 }
 
 function ranking(
@@ -467,19 +503,22 @@ function ranking(
   clubes: readonly ClubeRef[],
   min: number,
   max: number,
+  posicoes: readonly Posicao[],
 ): readonly MockJogadorRanking[] {
   return NOMES.map((jogador, index) => {
     const chave = `${chaveBase}:${index}`;
     return {
       jogador,
-      clube: clubes[index % Math.max(1, clubes.length)]?.name ?? "—",
+      numero: pick(chave, 11, 1, 40),
+      posicao: posicoes[pick(chave, 13, 0, posicoes.length - 1)]!,
+      clube: clubes[index % Math.max(1, clubes.length)] ?? null,
       valor: pick(chave, 3, min, max),
       jogos: pick(chave, 7, 18, 30),
-      posicao: 0,
+      colocacao: 0,
     };
   })
     .sort((a, b) => b.valor - a.valor)
-    .map((linha, index) => ({ ...linha, posicao: index + 1 }));
+    .map((linha, index) => ({ ...linha, colocacao: index + 1 }));
 }
 
 /**
@@ -490,7 +529,7 @@ function ranking(
 export interface MockPremio {
   readonly categoria: string;
   readonly jogador: string;
-  readonly clube: string;
+  readonly clube: ClubeRef | null;
 }
 
 const CATEGORIAS = [
@@ -515,7 +554,7 @@ export function mockPremiacao(
     return {
       categoria,
       jogador: NOMES[pick(chave, 3, 0, NOMES.length - 1)]!,
-      clube: clubes[pick(chave, 7, 0, Math.max(0, clubes.length - 1))]?.name ?? "—",
+      clube: clubes[pick(chave, 7, 0, Math.max(0, clubes.length - 1))] ?? null,
     };
   });
 }
@@ -532,4 +571,97 @@ export function mockEstatisticas(torneioId: string) {
     cartoesVermelhos: pick(torneioId, 13, 10, 60),
     vitoriasCasa: pick(torneioId, 17, 35, 55),
   };
+}
+
+/**
+ * Premiação em DINHEIRO por clube.
+ *
+ * Isto é diferente dos prêmios do §7: aqueles são individuais (melhor jogador,
+ * artilheiro, garçom) e "afetam reputação e mercado". O dinheiro do CLUBE entra
+ * por `ClubSeasonUpdate.budgetChange` (§9), quando a temporada vira.
+ *
+ * **Os pesos são os da R-59**, não inventados: `financialWeight` (0–1) define
+ * "quanto cada competição move a receita ao virar a temporada". Mundial 0,90;
+ * Continental 0,85; Liga nacional 1,00; Copa nacional 0,70; Estadual 0,35. A
+ * razão está na própria decisão: "a liga nacional domina a RECEITA recorrente,
+ * enquanto continental/mundial dominam o PRESTÍGIO" — por isso a liga vale mais
+ * dinheiro que a continental, mesmo sendo menos prestigiosa.
+ *
+ * Quando C7 e C9 voltarem, os pesos saem daqui e vão para o ruleset
+ * (`05-catalogo-de-regras-e-formulas.md`, como a R-59 manda). O que fica é a
+ * forma: prêmio de clube é receita por colocação, não uma linha por categoria.
+ */
+export const FINANCIAL_WEIGHT: Record<TipoTorneio, number> = {
+  [TipoTorneio.LIGA_NACIONAL]: 1.0,
+  [TipoTorneio.CONTINENTAL]: 0.85,
+  [TipoTorneio.COPA_ELIMINATORIA]: 0.7,
+  [TipoTorneio.ESTADUAL]: 0.35,
+};
+
+/** Base de premiação do campeão, antes do peso. Balanceamento, não regra. */
+const PREMIO_BASE_MINOR = 20_000_000n;
+
+export interface MockPremioDinheiro {
+  readonly colocacao: string;
+  readonly clube: ClubeRef | null;
+  readonly valorMinor: bigint;
+}
+
+/**
+ * A tabela de premiação do torneio. Liga paga por POSIÇÃO; mata-mata paga por
+ * FASE — o formato manda aqui também.
+ */
+export function mockPremiacaoDinheiro(
+  torneio: MockTorneio,
+  clubes: readonly ClubeRef[],
+): readonly MockPremioDinheiro[] {
+  const peso = FINANCIAL_WEIGHT[torneio.tipo];
+  const escala = (fracao: number): bigint =>
+    (PREMIO_BASE_MINOR * BigInt(Math.round(fracao * peso * 1000))) / 1000n;
+
+  if (torneio.formato === "PONTOS_CORRIDOS") {
+    const tabela = mockTabela(torneio.id, clubes);
+    const fracoes: readonly [string, number][] = [
+      ["Campeão", 1],
+      ["Vice", 0.5],
+      ["3º lugar", 0.3],
+      ["4º lugar", 0.22],
+      ["5º ao 8º", 0.12],
+      ["9º ao 12º", 0.06],
+      ["Demais", 0.03],
+    ];
+    return fracoes.map(([colocacao, fracao], index) => ({
+      colocacao,
+      clube: index < 4 ? (tabela[index]?.clube ?? null) : null,
+      valorMinor: escala(fracao),
+    }));
+  }
+
+  const fases = mockChave(torneio.id, clubes, torneio.emAndamento);
+  const decisao = fases[fases.length - 1]?.confrontos[0];
+  const campeao =
+    decisao === undefined || !decisao.decidido
+      ? null
+      : (decisao.golsCasa ?? 0) >= (decisao.golsFora ?? 0)
+        ? decisao.casa
+        : decisao.fora;
+  const vice =
+    decisao === undefined || !decisao.decidido
+      ? null
+      : campeao === decisao.casa
+        ? decisao.fora
+        : decisao.casa;
+
+  const fracoes: readonly [string, number, ClubeRef | null][] = [
+    ["Campeão", 1, campeao],
+    ["Vice", 0.5, vice],
+    ["Semifinalista", 0.28, null],
+    ["Quartas de final", 0.15, null],
+    ["Oitavas de final", 0.08, null],
+  ];
+  return fracoes.map(([colocacao, fracao, clube]) => ({
+    colocacao,
+    clube,
+    valorMinor: escala(fracao),
+  }));
 }

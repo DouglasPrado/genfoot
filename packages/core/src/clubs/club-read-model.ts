@@ -20,8 +20,16 @@ export interface ClubListItemView {
   readonly reputationBand: number;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
-  /** Cor primária da identidade visual, ou `null` — clube gerado nasce sem ela. */
+  /**
+   * A identidade visual do período vigente, ou `null` — clube GERADO nasce sem
+   * ela, e o jogador a define ao personalizar (BC-003).
+   *
+   * `crestTemplateId` referencia o catálogo canônico (`visual-identity-catalog`,
+   * 4 modelos). O cliente renderiza o SVG pelo id; a API não manda desenho.
+   */
   readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
 }
 
 export interface ClubWorldView {

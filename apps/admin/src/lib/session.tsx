@@ -93,10 +93,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
          *
          * Interceptar no `fetch` pega TODA chamada — query, command, catálogo —
          * sem cada tela ter de lembrar de tratar 401 por conta própria.
+         *
+         * **`session !== null` é obrigatório, e a falta dele derrubava o login a
+         * cada F5.** No primeiro render a sessão é `null` — o localStorage só é
+         * lido depois do mount, para não haver mismatch de hidratação. Uma query
+         * que dispare nessa janela vai SEM token e leva 401 — 401 esperado, que
+         * não diz nada sobre a sessão guardada. Sem esta guarda, o interceptor
+         * chamava `logout()` e apagava o localStorage a cada carregamento: um
+         * interceptor de expiração que expirava a sessão sozinho.
+         *
+         * 401 só significa "a sessão morreu" quando havia sessão para morrer.
          */
         fetch: async (input, init) => {
           const response = await globalThis.fetch(input, init);
-          if (response.status === 401) logoutRef.current();
+          if (response.status === 401 && session !== null) logoutRef.current();
           return response;
         },
         // Telemetria segura (FR-013): só IDs, nunca payload/PII.

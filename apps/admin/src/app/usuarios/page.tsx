@@ -4,6 +4,7 @@ import { RefreshCw, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { AppShell, PageHeader } from "@/components/app-shell";
+import { ClubName } from "@/components/club-crest";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -142,8 +143,10 @@ export default function UsersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {row.clubName ?? (
+                      {row.club === null ? (
                         <span className="text-muted-foreground">sem clube</span>
+                      ) : (
+                        <ClubName club={row.club} size="md" />
                       )}
                     </td>
                   </tr>
