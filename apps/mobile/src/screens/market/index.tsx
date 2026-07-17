@@ -1,502 +1,199 @@
-import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { CommandTrackingStatus } from "@grinta/core";
+import { useCallback, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Icon } from "@/components/icon";
+import { Card, SectionHeader } from "@/components/card";
 import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
-import {
-  submitTrackedCommand,
-  type TrackedCommandResult,
-} from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
-import { addWorldDays } from "@/screens/onboarding/onboarding-model";
-import { color, fontSize, fontWeight, formatAmount, radius, space } from "@/theme";
+import { useWorldQuery } from "@/lib/world";
 import {
-  deriveListingAction,
-  deriveMarketPresentation,
-  matchesSearch,
-  type MarketListingProjection,
-  type MarketSummaryProjection,
-} from "./market-state";
+  deriveOnboardingStep,
+  type MobileIdentityProjection,
+} from "@/screens/onboarding/onboarding-model";
+import { color, fontSize, fontWeight, formatAmount, radius, space } from "@/theme";
 
-/** Mercado oficial: nunca inventa listagens nem permite negociar sem contexto. */
+interface MarketPlayer {
+  readonly playerId: string;
+  readonly name: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly primaryPosition: string;
+  readonly age: number;
+  readonly overall: number;
+  readonly potential: number;
+  readonly valueMinor: string;
+}
+
+interface MarketProjection {
+  readonly players: readonly MarketPlayer[];
+}
+
+/** Cores por setor, como no app: goleiro, defesa, meio, ataque. */
+const POSITION: Readonly<Record<string, { label: string; tint: string }>> = {
+  GK: { label: "GOL", tint: "#F59E0B" },
+  CB: { label: "ZAG", tint: "#38BDF8" },
+  LB: { label: "LE", tint: "#38BDF8" },
+  RB: { label: "LD", tint: "#38BDF8" },
+  LWB: { label: "ALA", tint: "#38BDF8" },
+  RWB: { label: "ALA", tint: "#38BDF8" },
+  CDM: { label: "VOL", tint: "#34D399" },
+  CM: { label: "MC", tint: "#34D399" },
+  CAM: { label: "MEI", tint: "#34D399" },
+  LM: { label: "ME", tint: "#34D399" },
+  RM: { label: "MD", tint: "#34D399" },
+  LW: { label: "PE", tint: "#F87171" },
+  RW: { label: "PD", tint: "#F87171" },
+  ST: { label: "ATA", tint: "#F87171" },
+  CF: { label: "CA", tint: "#F87171" },
+};
+
+const FILTERS = ["TODOS", "GOL", "DEF", "MEI", "ATA"] as const;
+type Filter = (typeof FILTERS)[number];
+
+const SECTOR: Readonly<Record<string, Filter>> = {
+  GK: "GOL",
+  CB: "DEF", LB: "DEF", RB: "DEF", LWB: "DEF", RWB: "DEF",
+  CDM: "MEI", CM: "MEI", CAM: "MEI", LM: "MEI", RM: "MEI",
+  LW: "ATA", RW: "ATA", ST: "ATA", CF: "ATA",
+};
+
+/** Mercado: a vitrine de jogadores do mundo, com valor estimado (R-41). */
 export function Market() {
-  const worldId = useWorldId();
-  const { client, contractVersion, status } = useSession();
-  const query = useWorldQuery<MarketSummaryProjection>("market");
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
-  const managedClub = selectManagedClub(clubQuery.data, null);
-  const [tracking, setTracking] = useState<
-    (TrackedCommandResult & { readonly playerId: string }) | null
-  >(null);
-  const [search, setSearch] = useState("");
-  const [negotiating, setNegotiating] = useState<
-    (TrackedCommandResult & { readonly listingId: string }) | null
-  >(null);
-  const presentation = deriveMarketPresentation(query.state, query.data);
-  const negotiations = query.data?.negotiations ?? [];
-  const listings = (query.data?.listings ?? []).filter(
-    (listing) =>
-      listing.status === "ACTIVE" &&
-      matchesSearch(search, listing.playerName, listing.primaryPosition),
+  const { session, status } = useSession();
+  const [filter, setFilter] = useState<Filter>("TODOS");
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
+  const identityQuery =
+    useWorldQuery<MobileIdentityProjection>("identity-detail");
+  const onboarding =
+    session === null
+      ? null
+      : deriveOnboardingStep(
+          identityQuery.state === "ready" ? identityQuery.data : null,
+          session.accountId,
+          clubQuery.asOf ?? "",
+        );
+  const managedClub = selectManagedClub(
+    clubQuery.data,
+    onboarding?.kind === "complete" ? onboarding.clubId : null,
+  );
+  const marketQuery = useWorldQuery<MarketProjection>(
+    managedClub === null ? null : "market",
+    managedClub === null ? undefined : { clubId: managedClub.id },
   );
 
-  /**
-   * Fluxo de negociação (GP-008): PROPOR abre a negociação e envia a 1ª oferta
-   * (fatia comprável do saga); o aceite muda o estado oficial para ACCEPTED.
-   * Cada passo é um command idempotente confirmado por re-query — nunca simula.
-   */
-  const negotiate = useCallback(
-    (listing: MarketListingProjection) => {
-      if (
-        client === null ||
-        contractVersion === null ||
-        managedClub === null ||
-        status !== "online"
-      ) {
-        return;
-      }
-      const worldDate = query.asOf ?? "2026-01-01";
-      const feeMinor = listing.askingFeeMinor;
-      const wageMinor = Math.max(100_000, Math.round(feeMinor / 200));
-      const submit = async () => {
-        const baseKey = `neg:${managedClub.id}:${listing.playerId}`;
-        setNegotiating({
-          listingId: listing.id,
-          status: CommandTrackingStatus.SUBMITTING,
-          commandId: null,
-          resource: null,
-          correlationId: `mobile:${baseKey}`,
-          errorCode: null,
-        });
-        const opened = await submitTrackedCommand(client, {
-          clientContractVersion: "v1",
-          serverContractVersion: contractVersion,
-          commandType: "market:open-negotiation",
-          worldId,
-          payload: {
-            playerId: listing.playerId,
-            buyerClubId: managedClub.id,
-            sellerClubId: listing.sellerClubId,
-          },
-          idempotencyKey: `${baseKey}:open`,
-          correlationId: `mobile:${baseKey}:open`,
-        });
-        if (
-          opened.status !== CommandTrackingStatus.ACCEPTED &&
-          opened.status !== CommandTrackingStatus.APPLIED
-        ) {
-          setNegotiating({ ...opened, listingId: listing.id });
-          query.refetch();
-          return;
-        }
-        // Confirma pelo estado oficial e recupera a negociação criada.
-        const official = await client.query<MarketSummaryProjection>(
-          worldId,
-          "market",
-        );
-        const negotiation = (official.data.negotiations ?? []).find(
-          (candidate) =>
-            candidate.playerId === listing.playerId &&
-            candidate.buyerClubId === managedClub.id &&
-            candidate.status !== "CANCELLED" &&
-            candidate.status !== "EXPIRED",
-        );
-        if (negotiation === undefined) {
-          setNegotiating({
-            ...opened,
-            listingId: listing.id,
-            status: CommandTrackingStatus.UNKNOWN_RECOVERING,
-          });
-          query.refetch();
-          return;
-        }
-        const offered = await submitTrackedCommand(client, {
-          clientContractVersion: "v1",
-          serverContractVersion: contractVersion,
-          commandType: "market:submit-offer",
-          worldId,
-          payload: {
-            negotiationId: negotiation.id,
-            createdByClubId: managedClub.id,
-            feeMinor,
-            wageMinor,
-            contractYears: 3,
-            expiresOn: addWorldDays(worldDate, 30),
-            expectedVersion: negotiation.currentVersion,
-          },
-          idempotencyKey: `${baseKey}:offer:${negotiation.currentVersion}`,
-          correlationId: `mobile:${baseKey}:offer`,
-        });
-        setNegotiating({ ...offered, listingId: listing.id });
-        query.refetch();
-      };
-      Alert.alert(
-        "Enviar proposta?",
-        `${listing.playerName} — taxa R$ ${formatAmount(feeMinor / 100)}, salário R$ ${formatAmount(wageMinor / 100)}, 3 anos. A proposta é oficial e não pode ser desfeita.`,
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Propor", style: "destructive", onPress: () => void submit() },
-        ],
-      );
-    },
-    [client, contractVersion, managedClub, query, status, worldId],
-  );
+  const refresh = useCallback(() => {
+    clubQuery.refetch();
+    marketQuery.refetch();
+  }, [clubQuery.refetch, marketQuery.refetch]);
 
-  /** Aceite do vendedor (atalho de demonstração — o mundo demo não tem IA). */
-  const acceptAsSeller = useCallback(
-    (listing: MarketListingProjection, negotiationId: string, version: number) => {
-      if (client === null || contractVersion === null || status !== "online") {
-        return;
-      }
-      const key = `neg-accept:${negotiationId}:${version}`;
-      setNegotiating({
-        listingId: listing.id,
-        status: CommandTrackingStatus.SUBMITTING,
-        commandId: null,
-        resource: null,
-        correlationId: `mobile:${key}`,
-        errorCode: null,
-      });
-      void submitTrackedCommand(client, {
-        clientContractVersion: "v1",
-        serverContractVersion: contractVersion,
-        commandType: "market:accept-offer",
-        worldId,
-        payload: { negotiationId, version },
-        idempotencyKey: key,
-        correlationId: `mobile:${key}`,
-      }).then((result) => {
-        setNegotiating({ ...result, listingId: listing.id });
-        query.refetch();
-      });
-    },
-    [client, contractVersion, query, status, worldId],
-  );
+  const players = useMemo(() => {
+    const all = marketQuery.data?.players ?? [];
+    if (filter === "TODOS") return all;
+    return all.filter((p) => SECTOR[p.primaryPosition] === filter);
+  }, [marketQuery.data, filter]);
+
   const screenState = deriveScreenState({
     session: status,
-    query: query.state,
-    hasCachedData: query.isStale,
+    query:
+      clubQuery.state === "loading" || marketQuery.state === "loading"
+        ? "loading"
+        : marketQuery.state === "offline"
+          ? "offline"
+          : marketQuery.state === "error"
+            ? "error"
+            : "ready",
+    hasCachedData: marketQuery.isStale,
   });
-  const requestScouting = useCallback(
-    (playerId: string) => {
-      if (
-        client === null ||
-        contractVersion === null ||
-        managedClub === null ||
-        status !== "online"
-      ) {
-        return;
-      }
-      const idempotencyKey = `mobile:scout:${managedClub.id}:${playerId}`;
-      setTracking({
-        playerId,
-        status: CommandTrackingStatus.SUBMITTING,
-        commandId: null,
-        resource: null,
-        correlationId: idempotencyKey,
-        errorCode: null,
-      });
-      void submitTrackedCommand(client, {
-        clientContractVersion: "v1",
-        serverContractVersion: contractVersion,
-        commandType: "market:request-scouting",
-        worldId,
-        payload: {
-          playerId,
-          observerClubId: managedClub.id,
-          scoutingCapacity: 80,
-          observations: ["capacidade atual", "potencial", "encaixe tático"],
-          validUntil: "2099-12-31",
-        },
-        idempotencyKey,
-        correlationId: idempotencyKey,
-      }).then(async (result) => {
-        setTracking({ ...result, playerId });
-        if (
-          result.status === CommandTrackingStatus.ACCEPTED ||
-          result.status === CommandTrackingStatus.APPLIED
-        ) {
-          const official = await client.query<MarketSummaryProjection>(
-            worldId,
-            "market",
-          );
-          const applied = official.data.scoutingReports.some(
-            (report) =>
-              report.playerId === playerId &&
-              report.observerClubId === managedClub.id,
-          );
-          if (applied) {
-            setTracking({
-              ...result,
-              playerId,
-              status: CommandTrackingStatus.APPLIED,
-            });
-          }
-          query.refetch();
-        }
-      });
-    },
-    [client, contractVersion, managedClub, query.refetch, status, worldId],
-  );
+
+  if (screenState !== "success" || managedClub === null) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.content}>
+          <ScreenStatePanel
+            state={screenState === "success" ? "empty" : screenState}
+            onRetry={refresh}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<Refresh onRefresh={query.refetch} />}
+        refreshControl={<Refresh onRefresh={refresh} />}
       >
         <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Icon name="transfer" size={24} color={color.primary} />
-          </View>
-          <View>
-            <Text style={styles.title}>MERCADO</Text>
-            <Text style={styles.subtitle}>TRANSFERÊNCIAS OFICIAIS</Text>
-          </View>
-        </View>
-
-        {screenState !== "success" ? (
-          <ScreenStatePanel
-            state={screenState}
-            title={
-              screenState === "empty" ? "MERCADO AINDA NÃO ABERTO" : undefined
-            }
-            body={
-              screenState === "empty"
-                ? "A temporada deste mundo ainda não inicializou o mercado. Nenhuma negociação está disponível."
-                : undefined
-            }
-            onRetry={query.refetch}
-          />
-        ) : (
-          <View style={styles.stateCard}>
-            <Icon name="checkmark-circle" size={30} color={color.success} />
-            <Text style={styles.stateTitle}>{presentation.title}</Text>
-            <Text style={styles.stateBody}>{presentation.body}</Text>
-
-            <View style={styles.stats}>
-              {presentation.stats.map((stat) => (
-                <View key={stat.label} style={styles.stat}>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.searchBox}>
-              <Icon name="search" size={16} color={color.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Buscar por nome ou posição…"
-                placeholderTextColor={color.textMuted}
-                accessibilityLabel="Buscar jogador"
-              />
-            </View>
-
-            {listings.length > 0 ? (
-              <Text style={styles.sectionLabel}>LISTADOS PARA VENDA</Text>
-            ) : null}
-            {listings.map((listing) => {
-              const action = deriveListingAction(
-                listing,
-                negotiations,
-                managedClub?.id ?? "",
-              );
-              const busy =
-                negotiating?.listingId === listing.id &&
-                negotiating.status === CommandTrackingStatus.SUBMITTING;
-              return (
-                <View key={listing.id} style={styles.playerRow}>
-                  <View style={styles.playerOverall}>
-                    <Text style={styles.playerOverallValue}>
-                      {listing.currentAbility}
-                    </Text>
-                  </View>
-                  <View style={styles.playerIdentity}>
-                    <Text style={styles.playerName}>{listing.playerName}</Text>
-                    <Text style={styles.playerMeta}>
-                      {listing.primaryPosition} · pedida R${" "}
-                      {formatAmount(listing.askingFeeMinor / 100)}
-                    </Text>
-                  </View>
-                  {busy ? (
-                    <ActivityIndicator size="small" color={color.primary} />
-                  ) : action.kind === "mine" ? (
-                    <View style={styles.scoutedBadge}>
-                      <Icon name="shield" size={14} color={color.textMuted} />
-                      <Text style={styles.mineText}>SEU CLUBE</Text>
-                    </View>
-                  ) : action.kind === "accepted" ? (
-                    <View style={styles.scoutedBadge}>
-                      <Icon
-                        name="checkmark-circle"
-                        size={14}
-                        color={color.success}
-                      />
-                      <Text style={styles.scoutedText}>ACEITA</Text>
-                    </View>
-                  ) : action.kind === "offered" ? (
-                    <Pressable
-                      style={styles.acceptButton}
-                      onPress={() =>
-                        acceptAsSeller(
-                          listing,
-                          action.negotiation.id,
-                          action.negotiation.currentVersion,
-                        )
-                      }
-                      disabled={status !== "online"}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Aceite do vendedor para ${listing.playerName} (demonstração)`}
-                    >
-                      <Text style={styles.acceptText}>ACEITE·DEMO</Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      style={styles.scoutButton}
-                      onPress={() => negotiate(listing)}
-                      disabled={status !== "online" || managedClub === null}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Propor por ${listing.playerName}`}
-                    >
-                      <Text style={styles.scoutButtonText}>PROPOR</Text>
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })}
-            {negotiating?.status === CommandTrackingStatus.REJECTED ? (
-              <Text
-                style={styles.commandError}
-                accessibilityLiveRegion="assertive"
-              >
-                Negociação rejeitada:{" "}
-                {negotiating.errorCode ?? "regra do mercado"}.
-              </Text>
-            ) : null}
-
-            <Text style={styles.sectionLabel}>AGENTES LIVRES</Text>
-            {query.data?.availablePlayers
-              .filter((player) =>
-                matchesSearch(search, player.name, player.primaryPosition),
-              )
-              .slice(0, 24)
-              .map((player) => (
-              <View key={player.id} style={styles.playerRow}>
-                <View style={styles.playerOverall}>
-                  <Text style={styles.playerOverallValue}>
-                    {player.currentAbility}
-                  </Text>
-                </View>
-                <View style={styles.playerIdentity}>
-                  <Text style={styles.playerName}>{player.name}</Text>
-                  <Text style={styles.playerMeta}>
-                    {player.primaryPosition} · {player.nationality} · POT{" "}
-                    {player.potentialAbility}
-                  </Text>
-                </View>
-                {query.data?.scoutingReports.some(
-                  (report) =>
-                    report.playerId === player.id &&
-                    report.observerClubId === managedClub?.id,
-                ) ? (
-                  <View style={styles.scoutedBadge}>
-                    <Icon
-                      name="checkmark-circle"
-                      size={14}
-                      color={color.success}
-                    />
-                    <Text style={styles.scoutedText}>OBSERVADO</Text>
-                  </View>
-                ) : (
-                  <Pressable
-                    style={styles.scoutButton}
-                    onPress={() => requestScouting(player.id)}
-                    disabled={
-                      status !== "online" ||
-                      managedClub === null ||
-                      (tracking?.playerId === player.id &&
-                        (tracking.status === CommandTrackingStatus.SUBMITTING ||
-                          tracking.status === CommandTrackingStatus.ACCEPTED))
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={`Observar ${player.name}`}
-                    accessibilityState={{
-                      disabled: status !== "online" || managedClub === null,
-                      busy:
-                        tracking?.playerId === player.id &&
-                        (tracking.status === CommandTrackingStatus.SUBMITTING ||
-                          tracking.status === CommandTrackingStatus.ACCEPTED),
-                    }}
-                  >
-                    {tracking?.playerId === player.id &&
-                    tracking.status === CommandTrackingStatus.SUBMITTING ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={color.primaryContrast}
-                      />
-                    ) : (
-                      <Text style={styles.scoutButtonText}>OBSERVAR</Text>
-                    )}
-                  </Pressable>
-                )}
-              </View>
-            ))}
-
-            {tracking?.status === CommandTrackingStatus.REJECTED ? (
-              <Text
-                style={styles.commandError}
-                accessibilityLiveRegion="assertive"
-              >
-                Não foi possível observar:{" "}
-                {tracking.errorCode ?? "regra do mercado"}.
-              </Text>
-            ) : null}
-
-            <Pressable
-              style={styles.retry}
-              onPress={query.refetch}
-              accessibilityRole="button"
-              accessibilityLabel="Atualizar estado do mercado"
-            >
-              <Icon
-                name="swap-horizontal"
-                size={15}
-                color={color.primaryContrast}
-              />
-              <Text style={styles.retryText}>ATUALIZAR</Text>
-            </Pressable>
-          </View>
-        )}
-
-        <View style={styles.ruleCard}>
-          <Icon name="shield" size={18} color={color.textMuted} />
-          <Text style={styles.ruleText}>
-            Propostas, contratos e transferências exigem conexão. O app nunca
-            simula sucesso nem enfileira essas ações offline.
+          <Text style={styles.title}>MERCADO</Text>
+          <Text style={styles.subtitle}>
+            {players.length} jogadores · valor estimado
           </Text>
         </View>
+
+        <View style={styles.filters}>
+          {FILTERS.map((f) => (
+            <Pressable
+              key={f}
+              onPress={() => setFilter(f)}
+              accessibilityRole="button"
+              accessibilityLabel={`Filtrar por ${f}`}
+              accessibilityState={{ selected: filter === f }}
+              style={[styles.chip, filter === f && styles.chipActive]}
+            >
+              <Text
+                style={[styles.chipText, filter === f && styles.chipTextActive]}
+              >
+                {f}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Card>
+          <SectionHeader title="OBSERVAR" />
+          {players.length === 0 ? (
+            <Text style={styles.empty}>Nenhum jogador nesta posição.</Text>
+          ) : (
+            players.map((p) => {
+              const pos = POSITION[p.primaryPosition] ?? {
+                label: p.primaryPosition,
+                tint: color.textMuted,
+              };
+              return (
+                <View key={p.playerId} style={styles.row}>
+                  <View style={[styles.posBadge, { backgroundColor: pos.tint }]}>
+                    <Text style={styles.posText}>{pos.label}</Text>
+                  </View>
+                  <View style={styles.info}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Text style={styles.club} numberOfLines={1}>
+                      {p.clubName} · {p.age} anos
+                    </Text>
+                  </View>
+                  <Text style={styles.ovr}>{p.overall}</Text>
+                  <Text style={styles.value}>
+                    R$ {formatAmount(Number(p.valueMinor) / 100)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </Card>
+
+        <Text style={styles.note}>
+          Valor estimado (R-41). A negociação de verdade — contrato e dinheiro —
+          chega quando o mercado abrir.
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -504,210 +201,72 @@ export function Market() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
-  content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
-  header: { flexDirection: "row", alignItems: "center", gap: space.md },
-  headerIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.primaryDim,
-    backgroundColor: color.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  content: { padding: space.lg, gap: space.md },
+  header: { gap: space.xs },
   title: {
     color: color.text,
-    fontSize: fontSize.xl2,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
-  },
-  subtitle: {
-    color: color.primary,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold as "700",
-    letterSpacing: 0.8,
-  },
-  stateCard: {
-    minHeight: 300,
-    backgroundColor: color.surface,
-    borderWidth: 1,
-    borderColor: color.borderStrong,
-    borderRadius: radius.lg,
-    padding: space.xl,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.md,
-  },
-  stateTitle: {
-    color: color.text,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
-    textAlign: "center",
-  },
-  stateBody: {
-    color: color.textMuted,
-    fontSize: fontSize.sm,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-  stats: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: space.sm,
-    alignSelf: "stretch",
-  },
-  stat: {
-    width: "47%",
-    flexGrow: 1,
-    backgroundColor: color.backgroundElevated,
-    borderRadius: radius.sm,
-    padding: space.md,
-    alignItems: "center",
-  },
-  statValue: {
-    color: color.primary,
     fontSize: fontSize.xl,
-    fontWeight: fontWeight.black as "800",
-  },
-  statLabel: {
-    color: color.textMuted,
-    fontSize: 9,
     fontWeight: fontWeight.bold as "700",
   },
-  retry: {
-    minHeight: 48,
-    paddingHorizontal: space.xl,
-    borderRadius: radius.sm,
-    backgroundColor: color.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-  },
-  retryText: {
-    color: color.primaryContrast,
-    fontWeight: fontWeight.black as "800",
-    letterSpacing: 0.8,
-  },
-  playerRow: {
-    alignSelf: "stretch",
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.md,
-    padding: space.sm,
-    borderRadius: radius.sm,
-    backgroundColor: color.backgroundElevated,
-  },
-  playerOverall: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: color.primaryDim,
-  },
-  playerOverallValue: {
-    color: color.primary,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.black as "800",
-  },
-  playerIdentity: { flex: 1 },
-  playerName: {
-    color: color.text,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold as "700",
-  },
-  playerMeta: { color: color.textMuted, fontSize: fontSize.xs },
-  scoutButton: {
-    minHeight: 44,
-    minWidth: 82,
-    paddingHorizontal: space.sm,
-    borderRadius: radius.sm,
-    backgroundColor: color.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scoutButtonText: {
-    color: color.primaryContrast,
-    fontSize: 10,
-    fontWeight: fontWeight.black as "800",
-  },
-  scoutedBadge: {
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-  },
-  scoutedText: {
-    color: color.success,
-    fontSize: 9,
-    fontWeight: fontWeight.bold as "700",
-  },
-  searchBox: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.sm,
-    backgroundColor: color.backgroundElevated,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: color.border,
+  subtitle: { color: color.textMuted, fontSize: fontSize.sm },
+  filters: { flexDirection: "row", gap: space.xs, flexWrap: "wrap" },
+  chip: {
     paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
   },
-  searchInput: {
-    flex: 1,
-    minHeight: 44,
-    color: color.text,
-    fontSize: fontSize.sm,
-  },
-  sectionLabel: {
-    alignSelf: "stretch",
-    color: color.primary,
-    fontSize: 10,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
-    letterSpacing: 1,
-    marginTop: space.sm,
-  },
-  mineText: {
+  chipActive: { backgroundColor: color.primary },
+  chipText: {
     color: color.textMuted,
-    fontSize: 9,
+    fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
-  acceptButton: {
-    minHeight: 44,
-    minWidth: 82,
-    paddingHorizontal: space.sm,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: color.warning,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  acceptText: {
-    color: color.warning,
-    fontSize: 9,
-    fontWeight: fontWeight.black as "800",
-  },
-  commandError: {
-    color: color.danger,
-    fontSize: fontSize.xs,
-    textAlign: "center",
-  },
-  ruleCard: {
+  chipTextActive: { color: color.background },
+  row: {
     flexDirection: "row",
+    alignItems: "center",
     gap: space.sm,
-    backgroundColor: color.backgroundElevated,
-    borderRadius: radius.md,
-    padding: space.md,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
   },
-  ruleText: {
-    flex: 1,
-    color: color.textMuted,
+  posBadge: {
+    width: 38,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    alignItems: "center",
+  },
+  posText: {
+    color: "#0B0B0D",
+    fontSize: 10,
+    fontWeight: fontWeight.bold as "700",
+  },
+  info: { flex: 1 },
+  name: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  club: { color: color.textMuted, fontSize: fontSize.xs },
+  ovr: {
+    minWidth: 28,
+    textAlign: "center",
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  value: {
+    minWidth: 96,
+    textAlign: "right",
+    color: color.primary,
     fontSize: fontSize.xs,
-    lineHeight: 17,
+    fontWeight: fontWeight.bold as "700",
   },
+  empty: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    paddingVertical: space.sm,
+  },
+  note: { color: color.textMuted, fontSize: fontSize.xs, paddingHorizontal: space.xs },
 });
