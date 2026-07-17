@@ -15,20 +15,18 @@ import {
 } from "@/lib/user-directory";
 import { useKnownWorlds } from "@/lib/worlds";
 
-const brl = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-});
-
-function formatBalance(minor: number | null): string {
-  // null = o ledger não conhece o clube; diferente de saldo zero.
-  return minor === null ? "—" : brl.format(minor / 100);
-}
-
 /**
- * A-IAM (L-A01): usuários por mundo, com clube controlado e saldo do clube.
- * Fontes oficiais: identity-detail, club e ledger. O identificador é o subject
- * do provedor (R-171) — e-mail/nome vivem no Clerk, fora da API do jogo.
+ * A-IAM (L-A01): usuários por mundo, com o clube controlado.
+ *
+ * Fontes oficiais: `identity-detail` e `club-detail`, ambas Postgres. O
+ * identificador é o `accountId` (conta global, R-172) — nome e e-mail vivem no
+ * Clerk e não passam pela API do jogo.
+ *
+ * O SALDO SAIU da tabela. Ele vinha da query `ledger`, e C9 foi apagado com os
+ * mega-agregados (R-175); balanço é projeção do razão (Decisão 19.10) e não há
+ * de onde tirar. Mostrar "—" em toda linha seria uma coluna que não informa
+ * nada; mockar um número que o operador poderia levar a sério seria pior. Volta
+ * com C9.
  */
 export default function UsersPage() {
   const { api } = useSession();
@@ -45,27 +43,17 @@ export default function UsersPage() {
         worlds.map(async (world): Promise<WorldSlice> => {
           // Mundo sem contexto inicializado responde 404: vira fatia nula em
           // vez de derrubar a listagem dos demais.
-          const [identity, clubs, ledger] = await Promise.all([
+          const [identity, clubs] = await Promise.all([
             api
               .query<WorldSlice["identity"]>(world.id, "identity-detail")
               .then((env) => env.data)
               .catch(() => null),
             api
-              .query<WorldSlice["clubs"]>(world.id, "club")
-              .then((env) => env.data)
-              .catch(() => null),
-            api
-              .query<WorldSlice["ledger"]>(world.id, "ledger")
+              .query<WorldSlice["clubs"]>(world.id, "club-detail")
               .then((env) => env.data)
               .catch(() => null),
           ]);
-          return {
-            worldId: world.id,
-            worldSeed: world.seed,
-            identity,
-            clubs,
-            ledger,
-          };
+          return { worldId: world.id, worldSeed: world.seed, identity, clubs };
         }),
       );
       setRows(buildUserDirectory(slices));
@@ -84,7 +72,7 @@ export default function UsersPage() {
     <AppShell>
       <PageHeader
         title="Usuários"
-        hint="Contas por mundo, com o clube controlado e o saldo oficial do clube."
+        hint="Contas por mundo, com o clube controlado. Dado real — Postgres."
         actions={
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy}>
             <RefreshCw className="mr-2 h-4 w-4" />
@@ -125,11 +113,10 @@ export default function UsersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3">Usuário (subject)</th>
+                  <th className="px-4 py-3">Conta</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Mundo</th>
                   <th className="px-4 py-3">Clube</th>
-                  <th className="px-4 py-3 text-right">Saldo do clube</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,7 +125,9 @@ export default function UsersPage() {
                     key={`${row.worldId}:${row.accountId}`}
                     className="border-b border-border/50 last:border-0"
                   >
-                    <td className="px-4 py-3 font-mono text-xs">{row.subject}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {row.accountId.slice(0, 8)}…
+                    </td>
                     <td className="px-4 py-3">
                       <Badge
                         tone={row.accountStatus === "ACTIVE" ? "ok" : "danger"}
@@ -156,9 +145,6 @@ export default function UsersPage() {
                       {row.clubName ?? (
                         <span className="text-muted-foreground">sem clube</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatBalance(row.balanceMinor)}
                     </td>
                   </tr>
                 ))}

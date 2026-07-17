@@ -1,21 +1,30 @@
 /**
- * Diretório de usuários do A-IAM: junta, por mundo, conta → controle ativo →
- * clube → saldo. Só dados oficiais das queries `identity-detail`, `club` e
- * `ledger` — a tabela não inventa: clube ausente é null, saldo desconhecido é
- * null (não zero).
+ * Diretório de usuários: junta, por mundo, participação → controle ativo →
+ * clube.
  *
- * O "usuário" aqui é o subject do provedor (R-171), extraído da idempotencyKey
- * que o app grava (`mobile-account:<subject>`). E-mail/nome vivem no Clerk e
- * não passam pela API do jogo — a coluna mostra o id estável.
+ * **Estava sempre vazio, e ninguém tinha visto.** Ele lia
+ * `identity.accounts[].idempotencyKey`, e o read model de C1 (R-175) não tem
+ * `accounts` — tem `participations`. Como o campo era opcional, o `?? []`
+ * engolia a divergência em silêncio e a tabela renderizava zero linha sem erro
+ * nenhum. É o tipo de defeito que só aparece quando alguém abre a tela.
+ *
+ * O identificador do usuário é o `accountId` (uuid da conta global, R-172). O
+ * `subject` do provedor NÃO passa mais por aqui: ele era extraído da
+ * `idempotencyKey` que o app gravava (`mobile-account:<subject>`), e essa chave
+ * deixou de ser estado do agregado (R-176) — virou `attemptKey`, semente de id,
+ * que o read model não expõe nem deve. Nome e e-mail vivem no Clerk.
+ *
+ * O saldo é MOCK e está marcado como tal na tela: C9 (razão) foi apagado com os
+ * mega-agregados, e balanço é projeção do razão (Decisão 19.10) — não há de onde
+ * tirar. Saldo desconhecido nunca vira zero: zero é uma afirmação.
  */
 
 export interface WorldSlice {
   readonly worldId: string;
   readonly worldSeed: string;
   readonly identity: {
-    readonly accounts?: readonly {
-      readonly id: string;
-      readonly idempotencyKey: string;
+    readonly participations: readonly {
+      readonly accountId: string;
       readonly status: string;
     }[];
     readonly controls: readonly {
@@ -28,34 +37,19 @@ export interface WorldSlice {
   readonly clubs: {
     readonly clubs: readonly {
       readonly id: string;
-      readonly identity: { readonly name: string };
-    }[];
-  } | null;
-  readonly ledger: {
-    readonly clubBalances: readonly {
-      readonly clubId: string;
-      readonly balanceMinor: number;
+      readonly name: string;
+      readonly shortCode: string;
     }[];
   } | null;
 }
 
 export interface UserRow {
-  readonly subject: string;
   readonly accountId: string;
   readonly accountStatus: string;
   readonly worldId: string;
   readonly worldSeed: string;
   readonly clubId: string | null;
   readonly clubName: string | null;
-  readonly balanceMinor: number | null;
-}
-
-const ACCOUNT_KEY_PREFIX = "mobile-account:";
-
-export function subjectFromIdempotencyKey(key: string): string {
-  return key.startsWith(ACCOUNT_KEY_PREFIX)
-    ? key.slice(ACCOUNT_KEY_PREFIX.length)
-    : key;
 }
 
 export function buildUserDirectory(
@@ -64,39 +58,32 @@ export function buildUserDirectory(
   const rows: UserRow[] = [];
 
   for (const slice of slices) {
-    const accounts = slice.identity?.accounts ?? [];
+    const participations = slice.identity?.participations ?? [];
     const controls = slice.identity?.controls ?? [];
     const clubById = new Map(
       (slice.clubs?.clubs ?? []).map((club) => [club.id, club]),
     );
-    const balanceByClub = new Map(
-      (slice.ledger?.clubBalances ?? []).map((entry) => [
-        entry.clubId,
-        entry.balanceMinor,
-      ]),
-    );
 
-    for (const account of accounts) {
+    for (const participation of participations) {
+      // Só o controle ATIVO conta: quem largou o clube continua participando do
+      // mundo, e some da coluna de clube — não da lista.
       const control = controls.find(
         (candidate) =>
-          candidate.accountId === account.id && candidate.status === "ACTIVE",
+          candidate.accountId === participation.accountId &&
+          candidate.status === "ACTIVE",
       );
       const club =
         control === undefined ? undefined : clubById.get(control.clubId);
-      const balance =
-        control === undefined
-          ? undefined
-          : balanceByClub.get(control.clubId);
 
       rows.push({
-        subject: subjectFromIdempotencyKey(account.idempotencyKey),
-        accountId: account.id,
-        accountStatus: account.status,
+        accountId: participation.accountId,
+        accountStatus: participation.status,
         worldId: slice.worldId,
         worldSeed: slice.worldSeed,
         clubId: control?.clubId ?? null,
-        clubName: club?.identity.name ?? null,
-        balanceMinor: balance ?? null,
+        // Clube ausente é null, nunca "—" nem string vazia: quem decide como
+        // mostrar ausência é a tela, não o modelo.
+        clubName: club?.name ?? null,
       });
     }
   }

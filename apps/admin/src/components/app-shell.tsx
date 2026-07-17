@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, Globe2, LogOut, ShieldAlert, Terminal, Users } from "lucide-react";
+import { Globe2, LogOut, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -9,12 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/session";
 
+/**
+ * Duas telas. Só isso.
+ *
+ * Saíram "Console" (solto — ele agora vive DENTRO do mundo, que é onde um
+ * command acontece), "Anti-abuso" e "Laboratório": eram telas de contextos
+ * apagados com os mega-agregados (R-175), e um item de menu que abre numa tela
+ * sem fonte faz o operador procurar defeito onde não há.
+ */
 const NAV = [
   { href: "/worlds", label: "Mundos", icon: Globe2 },
   { href: "/usuarios", label: "Usuários", icon: Users },
-  { href: "/console", label: "Console", icon: Terminal },
-  { href: "/anti-abuse", label: "Anti-abuso", icon: ShieldAlert },
-  { href: "/laboratorio", label: "Laboratório", icon: FlaskConical },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

@@ -1,103 +1,99 @@
 import { describe, expect, it } from "vitest";
 
-import { buildUserDirectory, subjectFromIdempotencyKey } from "./user-directory";
+import { buildUserDirectory, type WorldSlice } from "./user-directory";
 
-const identity = {
-  accounts: [
-    {
-      id: "acc-1",
-      idempotencyKey: "mobile-account:user_clerk123",
-      status: "ACTIVE",
-    },
-    { id: "acc-2", idempotencyKey: "mobile-account:user_sem_clube", status: "ACTIVE" },
-    { id: "acc-3", idempotencyKey: "mobile-account:user_inativo", status: "SUSPENDED" },
+const identity: WorldSlice["identity"] = {
+  participations: [
+    { accountId: "acc-1", status: "ACTIVE" },
+    { accountId: "acc-2", status: "ACTIVE" },
+    { accountId: "acc-3", status: "ENDED" },
   ],
   controls: [
-    { id: "ctl-1", accountId: "acc-1", clubId: "club-pio", status: "ACTIVE" },
-    { id: "ctl-old", accountId: "acc-1", clubId: "club-antigo", status: "ENDED" },
+    { id: "ctl-1", accountId: "acc-1", clubId: "club-1", status: "ACTIVE" },
+    // Encerrado: o dono saiu, e o clube não é mais dele.
+    { id: "ctl-2", accountId: "acc-2", clubId: "club-2", status: "ENDED" },
   ],
 };
 
-const clubs = {
+const clubs: WorldSlice["clubs"] = {
   clubs: [
-    { id: "club-pio", identity: { name: "Pioneiros" } },
-    { id: "club-antigo", identity: { name: "Extintos" } },
+    { id: "club-1", name: "Real do Vale", shortCode: "RDV" },
+    { id: "club-2", name: "Horizonte", shortCode: "HRZ" },
   ],
 };
 
-const ledger = {
-  clubBalances: [
-    { clubId: "club-pio", balanceMinor: 500_000_000 },
-    { clubId: "club-antigo", balanceMinor: 1 },
-  ],
-};
-
-describe("subjectFromIdempotencyKey", () => {
-  it("extrai o subject da chave do app", () => {
-    expect(subjectFromIdempotencyKey("mobile-account:user_abc")).toBe("user_abc");
-  });
-
-  it("chave fora do padrão volta inteira, nunca vazia", () => {
-    expect(subjectFromIdempotencyKey("outra-coisa")).toBe("outra-coisa");
-  });
-});
+function slice(over: Partial<WorldSlice> = {}): WorldSlice {
+  return {
+    worldId: "world-1",
+    worldSeed: "grinta-demo",
+    identity,
+    clubs,
+    ...over,
+  };
+}
 
 describe("buildUserDirectory", () => {
-  const rows = buildUserDirectory([
-    { worldId: "w1", worldSeed: "demo", identity, clubs, ledger },
-  ]);
+  /**
+   * O teste que faltava, e que teria pego a tela vazia.
+   *
+   * O modelo antigo lia `identity.accounts[]`, campo que o read model de C1
+   * (R-175) não tem — e o `?? []` engolia isso em silêncio: zero linha, zero
+   * erro. O teste antigo passava porque a FIXTURE tinha `accounts`. Ele
+   * concordava consigo mesmo, não com a API.
+   */
+  it("lista uma linha por PARTICIPAÇÃO — é o que o read model entrega", () => {
+    expect(buildUserDirectory([slice()])).toHaveLength(3);
+  });
 
-  it("junta conta → controle ativo → clube → saldo", () => {
-    expect(rows[0]).toEqual({
-      subject: "user_clerk123",
+  it("junta participação → controle ativo → clube", () => {
+    const row = buildUserDirectory([slice()])[0];
+    expect(row).toMatchObject({
       accountId: "acc-1",
-      accountStatus: "ACTIVE",
-      worldId: "w1",
-      worldSeed: "demo",
-      clubId: "club-pio",
-      clubName: "Pioneiros",
-      balanceMinor: 500_000_000,
+      clubId: "club-1",
+      clubName: "Real do Vale",
+      worldSeed: "grinta-demo",
     });
   });
 
   it("controle encerrado não conta como clube do usuário", () => {
-    expect(rows[0]?.clubId).not.toBe("club-antigo");
+    const row = buildUserDirectory([slice()]).find(
+      (r) => r.accountId === "acc-2",
+    );
+    expect(row?.clubId).toBeNull();
+    expect(row?.clubName).toBeNull();
   });
 
-  it("conta sem clube aparece com clube nulo — não some da lista", () => {
-    const semClube = rows.find((r) => r.subject === "user_sem_clube");
-    expect(semClube).toMatchObject({
-      clubId: null,
-      clubName: null,
-      balanceMinor: null,
-    });
+  it("participação sem clube aparece com clube nulo — não some da lista", () => {
+    const rows = buildUserDirectory([slice()]);
+    expect(rows.map((r) => r.accountId)).toContain("acc-2");
   });
 
-  it("conta suspensa aparece com o status real", () => {
-    const suspensa = rows.find((r) => r.subject === "user_inativo");
-    expect(suspensa?.accountStatus).toBe("SUSPENDED");
+  it("participação encerrada aparece com o status real", () => {
+    const row = buildUserDirectory([slice()]).find(
+      (r) => r.accountId === "acc-3",
+    );
+    expect(row?.accountStatus).toBe("ENDED");
   });
 
-  it("clube sem saldo no ledger fica com saldo nulo, não zero", () => {
-    const rows2 = buildUserDirectory([
-      {
-        worldId: "w1",
-        worldSeed: "demo",
-        identity,
-        clubs,
-        ledger: { clubBalances: [] },
-      },
+  /** Clube que a query não trouxe é null, não string inventada. */
+  it("controle apontando clube desconhecido fica com nome nulo", () => {
+    const rows = buildUserDirectory([slice({ clubs: { clubs: [] } })]);
+    expect(rows[0]?.clubId).toBe("club-1");
+    expect(rows[0]?.clubName).toBeNull();
+  });
+
+  it("mundos sem identidade não derrubam os demais", () => {
+    const rows = buildUserDirectory([
+      slice({ worldId: "world-vazio", identity: null }),
+      slice(),
     ]);
-    // null = "não sabemos", 0 = "sabemos que é zero". A tabela não inventa.
-    expect(rows2[0]?.balanceMinor).toBeNull();
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.worldId === "world-1")).toBe(true);
   });
 
-  it("mundos sem identidade inicializada não derrubam os demais", () => {
-    const rows3 = buildUserDirectory([
-      { worldId: "w0", worldSeed: "vazio", identity: null, clubs: null, ledger: null },
-      { worldId: "w1", worldSeed: "demo", identity, clubs, ledger },
-    ]);
-    expect(rows3).toHaveLength(3);
-    expect(rows3.every((r) => r.worldId === "w1")).toBe(true);
+  it("mundo sem clubes ainda lista os usuários", () => {
+    const rows = buildUserDirectory([slice({ clubs: null })]);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]?.clubName).toBeNull();
   });
 });
