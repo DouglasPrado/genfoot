@@ -15,6 +15,7 @@ import { SeasonHistory } from "@/components/season-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WorldParametersTable } from "@/components/world-parameters-table";
 import {
   mockCompeticoes,
   mockDinheiroCirculante,
@@ -23,10 +24,19 @@ import {
 } from "@/lib/mock-world";
 import { useSession } from "@/lib/session";
 
+/**
+ * O que `GET /worlds/:worldId` serve: o `GameWorldSnapshot` inteiro, via
+ * `InspectWorld` (queries.controller.ts:116). Esta interface declarava só quatro
+ * campos — os que a tela usava — e a aba de Parâmetros precisa dos oito. Não é
+ * campo novo na API: é campo que já vinha e ninguém tipava.
+ */
 interface WorldSnapshot {
   readonly status: string;
   readonly currentDate: string;
+  readonly startDate: string;
   readonly seed: string;
+  readonly rulesetVersion: string;
+  readonly worldSequence: number;
   readonly version: number;
 }
 
@@ -238,6 +248,7 @@ export default function WorldDetailPage() {
             <TabsTrigger value="competicoes">Competições</TabsTrigger>
             <TabsTrigger value="temporadas">Temporadas</TabsTrigger>
             <TabsTrigger value="console">Console</TabsTrigger>
+            <TabsTrigger value="parametros">Parâmetros</TabsTrigger>
           </TabsList>
 
           <TabsContent value="clubes">
@@ -296,6 +307,24 @@ export default function WorldDetailPage() {
               </CardHeader>
               <CardContent>
                 <CommandConsole worldId={worldId} commandTypes={commandTypes} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="parametros">
+            <Card>
+              <CardHeader>
+                <CardTitle>Parâmetros do mundo</CardTitle>
+                <Badge tone="ok">dado real · sem mock</Badge>
+              </CardHeader>
+              <CardContent>
+                {/* `clubs` só é contagem confiável depois que a query volta.
+                    Antes disso é `[]`, e `0` afirmaria "mundo sem clube". A
+                    tabela recebe `null` e mostra "—" até saber. */}
+                <WorldParametersTable
+                  snapshot={snapshot}
+                  observedClubCount={snapshot === null ? null : clubs.length}
+                />
               </CardContent>
             </Card>
           </TabsContent>

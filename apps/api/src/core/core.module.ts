@@ -5,6 +5,7 @@ import {
   PrismaClubReadModel,
   PrismaClubRepository,
   PrismaIdentityReadModel,
+  PrismaUserAccountRepository,
   PrismaIdentityUnitOfWork,
   PrismaWorldReadModel,
   PrismaWorldRepository,
@@ -21,6 +22,7 @@ import {
   IDENTITY_READ_MODEL,
   IDENTITY_UNIT_OF_WORK,
   PRISMA_CLIENT,
+  USER_ACCOUNT_REPOSITORY,
   WORLD_READ_MODEL,
 } from "./tokens.js";
 
@@ -96,6 +98,12 @@ import {
         new PrismaIdentityReadModel(client),
     },
     {
+      provide: USER_ACCOUNT_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaUserAccountRepository =>
+        new PrismaUserAccountRepository(client),
+    },
+    {
       provide: IDEMPOTENCY_STORE,
       useFactory: (): IdempotencyStore => new IdempotencyStore(),
     },
@@ -110,6 +118,7 @@ import {
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,
     IDENTITY_READ_MODEL,
+    USER_ACCOUNT_REPOSITORY,
   ],
 })
 export class CoreModule {}

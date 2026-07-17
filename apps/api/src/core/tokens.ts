@@ -23,6 +23,8 @@ export const WORLD_READ_MODEL = "WORLD_READ_MODEL";
 export const IDEMPOTENCY_STORE = "IDEMPOTENCY_STORE";
 export const REALTIME_PUBLISHER = "REALTIME_PUBLISHER";
 export const SESSION_STORE = "SESSION_STORE";
+/** A conta de plataforma (R-172). Global: não pende de mundo. */
+export const USER_ACCOUNT_REPOSITORY = "USER_ACCOUNT_REPOSITORY";
 /**
  * Escopo transacional de C1 (R-175). Único caminho de escrita da identidade:
  * agregado e evento no mesmo commit (Decisão 19.10).

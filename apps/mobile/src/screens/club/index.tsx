@@ -191,10 +191,10 @@ export function Club() {
         return;
       }
       const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
-      const cooldownUntil = addWorldDays(
-        worldDate,
-        identity?.cooldownDays ?? 30,
-      );
+      // R-26. `cooldownDays` saiu da projeção de identidade: era config de mundo
+      // lida do mega-agregado, e config de mundo é `GameRuleConfig` (R-182) —
+      // que ainda não existe. Constante declarada, não número mágico escondido.
+      const cooldownUntil = addWorldDays(worldDate, COOLDOWN_DAYS);
       Alert.alert(
         reason === "EXIT" ? "Deixar o clube?" : "Iniciar troca de clube?",
         `O controle será encerrado agora. Você só poderá assumir outro clube a partir de ${cooldownUntil}. O histórico do clube será preservado.`,
@@ -257,7 +257,6 @@ export function Club() {
       client,
       contractVersion,
       controlStep,
-      identity?.cooldownDays,
       identityQuery.refetch,
       worldId,
       worldQuery.data?.currentDate,
@@ -574,6 +573,9 @@ export function Club() {
     </SafeAreaView>
   );
 }
+
+/** R-26: o cooldown de saída. Volta para `GameRuleConfig` com C2 (R-182). */
+const COOLDOWN_DAYS = 30;
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },

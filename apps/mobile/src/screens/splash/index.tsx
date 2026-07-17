@@ -11,7 +11,6 @@ import { useSession } from "@/lib/session";
 import { useWorldQuery } from "@/lib/world";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import type { MobileIdentityProjection } from "@/screens/onboarding/onboarding-model";
-import { mobileAccountKey } from "@/screens/onboarding/onboarding-model";
 import { bootSteps } from "./boot-model";
 import { connectionLabel, deriveSplashDecision } from "./splash-model";
 
@@ -36,15 +35,14 @@ export function SplashScreen() {
     // Contexto de identidade não inicializado: não há clube — vai ao onboarding.
     if (identityQuery.state === "empty") return false;
     if (identityQuery.data === null) return null;
-    const account = (identityQuery.data.accounts ?? []).find(
-      (candidate) =>
-        candidate.idempotencyKey === mobileAccountKey(session.subject) &&
-        candidate.status === "ACTIVE",
-    );
-    if (account === undefined) return false;
+    // A conta vem da SESSÃO (R-171/R-172), não de `identity.accounts[]` — campo
+    // que o read model de C1 nunca teve, e cuja ausência silenciosa mandava todo
+    // mundo para o onboarding, inclusive quem já tinha clube.
+    if (session.accountId === null) return false;
     return identityQuery.data.controls.some(
       (candidate) =>
-        candidate.accountId === account.id && candidate.status === "ACTIVE",
+        candidate.accountId === session.accountId &&
+        candidate.status === "ACTIVE",
     );
   }, [identityQuery.data, identityQuery.state, session]);
 

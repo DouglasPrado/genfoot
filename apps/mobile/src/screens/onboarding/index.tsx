@@ -13,7 +13,24 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CommandTrackingStatus } from "@grinta/core";
 
 import { Icon } from "@/components/icon";
-import { type ClubPortfolioProjection } from "@/lib/club-projection";
+/**
+ * O que a tela precisa de `club-detail`: o clube com nome PLANO.
+ *
+ * O read model de C3 resolve o período de identidade — o clube não tem nome, tem
+ * HISTÓRIA de nomes (BC-003), e a tela não tem por que saber disso. Era
+ * `club.name` quando a query devolvia o portfólio inteiro; o portfólio
+ * morreu com o mega-agregado (R-175).
+ */
+interface OnboardingClubList {
+  readonly clubs: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly shortCode: string;
+    readonly status: string;
+    readonly stadiumName: string;
+    readonly stadiumCapacity: number;
+  }[];
+}
 import {
   submitTrackedCommand,
   type TrackedCommandResult,
@@ -24,7 +41,6 @@ import { color, fontSize, fontWeight, radius, space } from "@/theme";
 import {
   addWorldDays,
   deriveOnboardingStep,
-  mobileAccountKey,
   projectionAdvancedPast,
   type MobileIdentityProjection,
   type OnboardingStep,
@@ -35,14 +51,11 @@ interface WorldProjection {
 }
 
 const COPY = {
-  initialize: [
-    "PREPARAR PERFIL",
-    "Ative o contexto de identidade deste mundo para começar.",
-  ],
-  "register-account": [
-    "CRIAR PERFIL DE GESTOR",
-    "Crie sua identidade oficial dentro deste mundo.",
-  ],
+  // `initialize` e `register-account` saíram: os commands não existem mais
+  // (R-175 / R-172). O que entrou no lugar diz a verdade — ou a sessão não tem
+  // conta, ou a projeção ainda não chegou.
+  authenticate: ["ENTRAR", "Faça login para assumir um clube neste mundo."],
+  loading: ["CARREGANDO", "Buscando sua situação neste mundo."],
   "join-world": [
     "ENTRAR NO MUNDO",
     "Registre sua participação antes de escolher um clube.",
@@ -64,9 +77,14 @@ const COPY = {
     "Seu controle foi confirmado pela projeção oficial.",
   ],
 } as const;
+/**
+ * As etapas do onboarding, na ordem — é o que a barra de progresso mede.
+ *
+ * `authenticate` e `loading` ficam FORA: não são etapas, são estados de "ainda
+ * não dá para começar". Contá-las diria ao jogador que ele já andou dois passos
+ * antes de fazer coisa alguma. `indexOf` devolve -1 para elas, e a barra trata.
+ */
 const STEP_ORDER = [
-  "initialize",
-  "register-account",
   "join-world",
   "cooldown",
   "choose-club",
@@ -81,12 +99,20 @@ export function Onboarding() {
   const worldQuery = useWorldQuery<WorldProjection>("world");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
-  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club");
-  const subject = session?.subject ?? "";
+    // `club` devolve CONTADOR; a lista está em `club-detail` — a porta de leitura
+  // é estreita de propósito (R-175), e a tela que quer lista pede a lista.
+  const clubQuery = useWorldQuery<OnboardingClubList>("club-detail");
+  /**
+   * O `accountId` vem da SESSÃO: o `/auth/session` verifica o token do provedor
+   * e resolve a conta do jogo (R-171/R-172). A tela não garimpa mais a conta na
+   * projeção — o campo `accounts[]` que ela procurava nunca existiu no read
+   * model, e o app ficava preso em "registrar conta" para sempre.
+   */
+  const accountId = session?.accountId ?? null;
   const identity = identityQuery.state === "empty" ? null : identityQuery.data;
   const step = deriveOnboardingStep(
     identity,
-    subject,
+    accountId,
     worldQuery.data?.currentDate ?? "",
   );
   const clubs =
@@ -160,18 +186,11 @@ export function Onboarding() {
 
   const act = useCallback(() => {
     const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
-    if (step.kind === "initialize")
-      return void execute(
-        "identity:initialize",
-        {},
-        `identity-init:${worldId}`,
-      );
-    if (step.kind === "register-account")
-      return void execute(
-        "identity:register-account",
-        { locale: "pt-BR" },
-        mobileAccountKey(subject),
-      );
+    // `identity:initialize` e `identity:register-account` NÃO EXISTEM MAIS. O
+    // primeiro era do mega-agregado de identidade (R-175): não há agregado do
+    // mundo para inicializar — os roots nascem quando o jogador age. O segundo
+    // morreu com a conta virando global (R-172): ela nasce no /auth/session, a
+    // partir do token verificado do Clerk.
     if (step.kind === "join-world")
       return void execute(
         "identity:join-world",
@@ -186,7 +205,7 @@ export function Onboarding() {
       const expiresOn = addWorldDays(worldDate, 7);
       Alert.alert(
         "Reservar clube?",
-        `${selectedClub.identity.name} ficará reservado até ${expiresOn}.`,
+        `${selectedClub.name} ficará reservado até ${expiresOn}.`,
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -196,11 +215,13 @@ export function Onboarding() {
                 step.switchMode
                   ? "identity:request-switch"
                   : "identity:reserve-club",
+                // `request-switch` É um `reserve-club` por dentro — mesmo
+                // input. O `targetClubId` que estava aqui não existe em lado
+                // nenhum: era um campo inventado que o barramento ignorava em
+                // silêncio e o domínio recusava.
                 {
                   accountId: step.accountId,
-                  ...(step.switchMode
-                    ? { targetClubId: selectedClub.id }
-                    : { clubId: selectedClub.id }),
+                  clubId: selectedClub.id,
                   expiresOn,
                 },
                 `${step.switchMode ? "switch" : "reserve"}:${step.accountId}:${selectedClub.id}`,
@@ -211,17 +232,31 @@ export function Onboarding() {
       return;
     }
     if (step.kind === "confirm-control") {
+      /**
+       * Risco ALTO no catálogo (`10-catalogo-de-commands.md:81`): assumir o
+       * clube é assumir o ESTADO HERDADO — dívidas, contratos, promessas. O
+       * `acceptInheritedState` é essa confirmação, e o barramento a exige como
+       * `literal(true)`.
+       *
+       * Por isso o texto DIZ o que se herda. Mandar `true` com um alerta
+       * genérico seria cumprir o tipo e furar a regra: o campo existe para o
+       * jogador consentir com o que vem junto, não para o cliente marcar sozinho.
+       */
       Alert.alert(
         "Assumir o clube?",
-        "Isto ativa seu controle oficial. Sair ou trocar depois aplica período de espera.",
+        "Você assume o clube COM TUDO que ele tem hoje: dívidas, contratos e " +
+          "promessas da diretoria. Sair ou trocar depois aplica período de espera.",
         [
           { text: "Revisar", style: "cancel" },
           {
-            text: "Assumir clube",
+            text: "Aceito e assumo",
             onPress: () =>
               void execute(
                 "identity:confirm-onboarding",
-                { reservationId: step.reservationId },
+                {
+                  reservationId: step.reservationId,
+                  acceptInheritedState: true,
+                },
                 `confirm:${step.reservationId}`,
               ),
           },
@@ -235,7 +270,6 @@ export function Onboarding() {
     refresh,
     selectedClub,
     step,
-    subject,
     worldId,
     worldQuery.data?.currentDate,
   ]);
@@ -250,7 +284,9 @@ export function Onboarding() {
     worldQuery.state === "error" ||
     clubQuery.state === "error" ||
     identityQuery.state === "error";
-  const stepIndex = STEP_ORDER.indexOf(step.kind);
+  // `indexOf` devolve -1 em `authenticate`/`loading`, que não são etapas do
+  // onboarding — a barra fica em zero em vez de fingir progresso.
+  const stepIndex = STEP_ORDER.indexOf(step.kind as (typeof STEP_ORDER)[number]);
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -308,18 +344,18 @@ export function Onboarding() {
                     onPress={() => setSelectedClubId(club.id)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
-                    accessibilityLabel={`Selecionar ${club.identity.name}`}
+                    accessibilityLabel={`Selecionar ${club.name}`}
                   >
                     <View style={styles.clubCrest}>
                       <Text style={styles.clubInitial}>
-                        {club.identity.shortCode}
+                        {club.shortCode}
                       </Text>
                     </View>
                     <View style={styles.clubInfo}>
-                      <Text style={styles.clubName}>{club.identity.name}</Text>
+                      <Text style={styles.clubName}>{club.name}</Text>
                       <Text style={styles.clubMeta}>
-                        {club.stadium.name} ·{" "}
-                        {club.stadium.capacity.toLocaleString("pt-BR")} lugares
+                        {club.stadiumName} ·{" "}
+                        {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                       </Text>
                     </View>
                     {selected ? (

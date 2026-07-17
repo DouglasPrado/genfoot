@@ -3,11 +3,19 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 
 import { ApiException } from "../common/standard-error.js";
-import { SESSION_STORE } from "../core/tokens.js";
+import {
+  ResolveAccountForSubject,
+  type UserAccountRepository,
+} from "@grinta/core";
+
+import { SESSION_STORE, USER_ACCOUNT_REPOSITORY } from "../core/tokens.js";
 import { Role } from "./auth.types.js";
 import { Public } from "./public.decorator.js";
 import { SessionStore } from "./session-store.js";
-import { createClerkVerifier } from "./clerk-identity.js";
+import {
+  createClerkVerifier,
+  type VerifiedIdentity,
+} from "./clerk-identity.js";
 import { decideSessionGrant } from "./session-policy.js";
 
 const sessionRequest = z.object({
@@ -21,6 +29,33 @@ const sessionRequest = z.object({
   clerkToken: z.string().optional(),
 });
 
+/**
+ * A conta é GLOBAL (R-172): não vive em mundo nenhum, logo não tem data de
+ * mundo. Este valor existe só para semear o id determinístico da conta — o
+ * instante de plataforma real quem grava é o `@default(now())` da coluna.
+ *
+ * Está declarado como pendência em `reescrita-do-core-2026-07-16.md`: decidir se
+ * o `createdOn` sai do snapshot (é só semente) ou ganha coluna própria.
+ */
+const PLATFORM_EPOCH = "1970-01-01";
+
+/**
+ * A identidade do caminho de DEV (`GRINTA_API_ALLOW_DEV_SESSIONS=1`), onde não
+ * há token para verificar.
+ *
+ * O e-mail é derivado do subject e fica num domínio reservado (`.invalid`, RFC
+ * 2606): ele nunca colide com e-mail real, então uma sessão de dev não consegue
+ * — nem por acidente — ligar-se à conta de alguém pelo casamento de e-mail que o
+ * `ResolveAccountForSubject` faz.
+ */
+function devIdentity(subject: string): VerifiedIdentity {
+  return {
+    subject,
+    email: `${subject}@dev.invalid`,
+    name: subject,
+  };
+}
+
 /** Chave de bootstrap para emitir tokens admin (dev). Produção usa credencial C1. */
 const ADMIN_KEY = process.env.GRINTA_API_ADMIN_KEY ?? "grinta-dev-admin";
 
@@ -31,6 +66,10 @@ const clerk = createClerkVerifier();
 export class AuthController {
   constructor(
     @Inject(SESSION_STORE) private readonly store: SessionStore,
+    // A conta do jogo (R-172, global). É aqui que o subject do Clerk vira uma
+    // linha em `UserAccount` — a ponte que faltava.
+    @Inject(USER_ACCOUNT_REPOSITORY)
+    private readonly accounts: UserAccountRepository,
   ) {}
 
   @ApiOperation({
@@ -48,6 +87,8 @@ export class AuthController {
     role: Role;
     expiresAtMs: number;
     worldScope: readonly string[];
+    /** A conta do JOGO (R-172). `null` em sessão admin de dev, que não tem uma. */
+    accountId: string | null;
   }> {
     const parsed = sessionRequest.safeParse(body);
     if (!parsed.success) {
@@ -104,10 +145,14 @@ export class AuthController {
     // Sessão de usuário: o subject sai do `sub` verificado pelo provedor, e
     // não do corpo da requisição.
     let subject = parsed.data.subject;
+    let identity: VerifiedIdentity | null = null;
+
     if (grant.kind === "verify-clerk") {
       try {
-        subject = await clerk.verify(grant.token);
+        identity = await clerk.verify(grant.token);
+        subject = identity.subject;
       } catch (error) {
+        if (error instanceof ApiException) throw error;
         throw new ApiException({
           code: "UNAUTHENTICATED",
           messageKey:
@@ -119,6 +164,51 @@ export class AuthController {
           recoveryAction: "AUTHENTICATE",
         }, HttpStatus.UNAUTHORIZED);
       }
+    }
+
+    /**
+     * A CONTA NASCE AQUI, e é a ponte que faltava.
+     *
+     * O Clerk autenticava e ninguém criava a linha em `UserAccount` — o app
+     * ficava preso num `identity:register-account` que não existe mais (a conta
+     * virou global, R-172). O doc do caso de uso já dizia onde ele mora: "Todo
+     * acesso passa por aqui (R-171/R-172), então o caminho comum — conta já
+     * existente — não escreve nada."
+     *
+     * **Vale para os DOIS caminhos de usuário**, e é por isso que está aqui fora
+     * e não dentro do `verify-clerk`. O que muda entre eles é DE ONDE vem a
+     * identidade — do token verificado, ou do subject de dev —, não SE a conta
+     * precisa existir. Resolver só no caminho do Clerk deixava o dev sem conta,
+     * e o app travava em "autenticar" com sessão válida na mão.
+     *
+     * Admin NÃO tem conta de jogo: `accountId` fica `null`. Criar uma poria um
+     * jogador fantasma no mundo, com clube e tudo.
+     */
+    let accountId: string | null = null;
+    if (!wantsAdmin) {
+      const claim = identity ?? devIdentity(subject);
+      const resolved = await new ResolveAccountForSubject(this.accounts).execute({
+        subject: claim.subject,
+        email: claim.email,
+        name: claim.name,
+        occurredOn: PLATFORM_EPOCH,
+        idempotencySeed: claim.subject,
+      });
+      if (!resolved.ok) {
+        throw new ApiException(
+          {
+            code: resolved.error.code,
+            messageKey: resolved.error.message,
+            correlationId: "unknown",
+            retryable: false,
+            fieldErrors: [],
+            blockingReason: resolved.error.code,
+            recoveryAction: null,
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+      accountId = resolved.value.id;
     }
 
     const session = this.store.issue({
@@ -133,6 +223,17 @@ export class AuthController {
       role: session.role,
       expiresAtMs: session.expiresAtMs,
       worldScope: session.worldScope,
+      /**
+       * O id da conta do JOGO, não o subject do provedor.
+       *
+       * É o que o cliente usa em `identity:join-world` e `reserve-club`. Antes o
+       * app tentava descobri-lo varrendo `identity-detail.accounts[]` — campo
+       * que o read model de C1 nunca teve. Quem sabe a conta é quem a resolveu.
+       *
+       * `null` em sessão admin de dev: ela não tem conta de jogo, e inventar uma
+       * daria ao operador um jogador fantasma no mundo.
+       */
+      accountId,
     };
   }
 }
