@@ -7,6 +7,7 @@ import type {
   MatchesReadModel,
   MarketReadModel,
   FanbaseReadModel,
+  NarrativeReadModel,
 } from "@grinta/core";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
@@ -33,6 +34,7 @@ export interface QueryContext {
   readonly matchesReadModel: MatchesReadModel;
   readonly marketReadModel: MarketReadModel;
   readonly fanbaseReadModel: FanbaseReadModel;
+  readonly narrativeReadModel: NarrativeReadModel;
 }
 
 /**
@@ -93,6 +95,16 @@ const handlers: Record<string, QueryHandler> = {
       );
     }
     return succeed(await fanbaseReadModel.fanbaseForClub(worldId, clubId));
+  },
+  narrative: async ({ narrativeReadModel }, worldId, params) => {
+    const limit =
+      typeof params.limit === "string" ? Number(params.limit) : 30;
+    return succeed(
+      await narrativeReadModel.recentForWorld(
+        worldId,
+        Number.isFinite(limit) && limit > 0 ? Math.min(limit, 100) : 30,
+      ),
+    );
   },
 };
 

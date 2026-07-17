@@ -480,6 +480,33 @@ reação são o próximo passo.
 
 ---
 
+### R-195 (C11) — A imprensa narra o fato, no mesmo commit do fato. Nunca inventa.
+
+O doc 11 §10 é enfático: "a imprensa transforma fatos REAIS em narrativas, não
+inventa acusações ou acontecimentos inexistentes". A reescrita expôs por que isso é
+uma decisão de arquitetura, não só de conteúdo: o `DomainEventLog` só guarda 3
+eventos de onboarding — transferências e rodadas não escrevem nele —, então um feed
+"leia o log de eventos" narraria quase nada. A fonte fiel do fato é o **próprio ato
+que o cria**.
+
+**C11 vertical A — a transferência emite a manchete:**
+
+- Quando `SignPlayer` (R-192) fecha uma contratação, ela **acrescenta uma
+  `Narrative`** ao mundo, DENTRO da mesma transação. Fato e narração nascem juntos:
+  não há transferência sem notícia, nem notícia sem transferência. O `TransferUnitOfWork`
+  ganhou um quarto repositório (`narratives`), como o razão e o contrato.
+- A manchete é **factual** — quem assinou, por quanto, por quantas temporadas —, com
+  id determinístico pelo fato (mesmo mundo/jogador/data ⇒ mesma manchete): reprocessar
+  não duplica. A intensidade (1–5) cresce com a taxa: contratação cara é manchete maior.
+- Query `narrative`: as manchetes recentes do mundo, mais nova primeiro.
+
+**O que isto NÃO é:** a máquina de pautas da IA (§10), as narrativas que acumulam
+reputação com a repetição (§11), as 8 posturas de comunicação (R-71), as manchetes de
+resultado/rodada e de torcida. Aqui a imprensa cobre a transferência; as outras fontes
+e a curadoria são os próximos passos.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

@@ -21,6 +21,8 @@ export * from "./prisma-competition-repository.js";
 export * from "./prisma-competition-read-model.js";
 export * from "./prisma-fanbase-repository.js";
 export * from "./prisma-fanbase-read-model.js";
+export * from "./prisma-narrative-repository.js";
+export * from "./prisma-narrative-read-model.js";
 export * from "./prisma-match-play-repository.js";
 export * from "./prisma-matches-read-model.js";
 export * from "./prisma-market-read-model.js";

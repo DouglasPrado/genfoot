@@ -13,6 +13,8 @@ import type { SquadRepository } from "../clubs/squad-repository.js";
 import { Squad } from "../clubs/squad.js";
 import type { PlayerRepository } from "../players/player-repository.js";
 import { derivePlayerOverall } from "../players/player-attributes.js";
+import type { NarrativeRepository } from "../narrative/narrative-types.js";
+import { buildTransferNarrative } from "../narrative/transfer-narrative.js";
 import {
   estimatePlayerValueMinor,
   estimateSalaryPerSeasonMinor,
@@ -34,6 +36,8 @@ export interface TransferRepositories {
   readonly squads: SquadRepository;
   readonly ledger: LedgerRepository;
   readonly contracts: ContractRepository;
+  /** C11 — a imprensa narra a contratação no mesmo commit do fato. */
+  readonly narratives: NarrativeRepository;
 }
 
 export interface TransferUnitOfWork {
@@ -248,6 +252,22 @@ export class SignPlayer {
       });
       if (!entry.ok) return entry;
       await repos.ledger.appendJournalEntry(entry.value.snapshot());
+
+      // ── C11: a imprensa narra o fato, no MESMO commit. Idempotente por id
+      // determinístico — reprocessar a transferência não duplica a manchete.
+      await repos.narratives.append(
+        buildTransferNarrative({
+          gameWorldId: input.gameWorldId,
+          worldSeed: input.worldSeed,
+          buyingClubId: input.buyingClubId,
+          playerId: input.playerId,
+          playerName:
+            `${aggregate.person.firstName} ${aggregate.person.lastName}`.trim(),
+          feeMinor: input.feeMinor,
+          currencyId: BASE_CURRENCY_ID,
+          occurredOn: input.occurredOn,
+        }),
+      );
 
       return succeed({
         playerId: input.playerId,

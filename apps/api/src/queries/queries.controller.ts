@@ -3,6 +3,7 @@ import type {
   CompetitionReadModel,
   LedgerReadModel,
   FanbaseReadModel,
+  NarrativeReadModel,
   MarketReadModel,
   MatchesReadModel,
   SquadReadModel,
@@ -38,6 +39,7 @@ import {
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
+  NARRATIVE_READ_MODEL,
   OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
@@ -85,6 +87,8 @@ export class QueriesController {
     private readonly marketReadModel: MarketReadModel,
     @Inject(FANBASE_READ_MODEL)
     private readonly fanbaseReadModel: FanbaseReadModel,
+    @Inject(NARRATIVE_READ_MODEL)
+    private readonly narrativeReadModel: NarrativeReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -258,6 +262,7 @@ export class QueriesController {
         matchesReadModel: this.matchesReadModel,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,
+        narrativeReadModel: this.narrativeReadModel,
       },
       worldId.value,
       query,

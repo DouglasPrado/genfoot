@@ -19,6 +19,11 @@ import type {
 } from "../players/player-repository.js";
 import { estimatePlayerValueMinor } from "../players/player-value.js";
 
+import type {
+  NarrativeItemSnapshot,
+  NarrativeRepository,
+} from "../narrative/narrative-types.js";
+
 import {
   ContractStatus,
   type ContractRepository,
@@ -47,16 +52,19 @@ class FakeWorld {
   public accounts: LedgerAccountSnapshot[] = [];
   public journal: JournalEntrySnapshot[] = [];
   public contracts: PlayerContractSnapshot[] = [];
+  public narratives: NarrativeItemSnapshot[] = [];
   public cashByClub = new Map<string, bigint>();
 
   public checkpoint(): () => void {
     const squads = new Map(this.squads);
     const journal = [...this.journal];
     const contracts = [...this.contracts];
+    const narratives = [...this.narratives];
     return () => {
       this.squads = squads;
       this.journal = journal;
       this.contracts = contracts;
+      this.narratives = narratives;
     };
   }
 }
@@ -115,6 +123,15 @@ function fakeContracts(world: FakeWorld): ContractRepository {
   };
 }
 
+function fakeNarratives(world: FakeWorld): NarrativeRepository {
+  return {
+    append: (item) => {
+      world.narratives.push(item);
+      return Promise.resolve();
+    },
+  };
+}
+
 /** UnitOfWork que desfaz por exceção — o mesmo contrato do `$transaction`. */
 function fakeUnitOfWork(world: FakeWorld): TransferUnitOfWork {
   const repos: TransferRepositories = {
@@ -122,6 +139,7 @@ function fakeUnitOfWork(world: FakeWorld): TransferUnitOfWork {
     squads: fakeSquads(world),
     ledger: fakeLedger(world),
     contracts: fakeContracts(world),
+    narratives: fakeNarratives(world),
   };
   return {
     run: async (work) => {
@@ -282,6 +300,11 @@ describe("SignPlayer — a compra de verdade (R-192)", () => {
     expect(credit.financialAccountId).toBe(`acc-cash-${BUYER}`);
     expect(debit.amountMinor).toBe(fee);
     expect(credit.amountMinor).toBe(fee);
+
+    // Efeito 4 (C11) — a imprensa narra a contratação, no mesmo commit.
+    expect(world.narratives).toHaveLength(1);
+    expect(world.narratives[0]!.playerId).toBe(targetId);
+    expect(world.narratives[0]!.clubId).toBe(BUYER);
   });
 
   it("recusa a taxa fora da faixa da R-26 sem gravar nada", async () => {
