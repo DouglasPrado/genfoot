@@ -24,9 +24,26 @@ const UNIT_TESTS = [
   "apps/admin/**/*.test.ts",
 ];
 
+/**
+ * A suíte inteira aponta para o banco DE TESTE — inclusive a e2e da API, que
+ * sobe o Nest e o Nest lê `DATABASE_URL` (o boot exige o banco desde que o JSON
+ * morreu).
+ *
+ * Sem este override, rodar `pnpm test` com a API de dev configurada escrevia (e,
+ * pelo TRUNCATE do harness, APAGAVA) o banco de desenvolvimento. Foi o que
+ * aconteceu: o gate verde levou junto os 16 clubes do mundo que eu acabara de
+ * provar por HTTP, e o admin abriu vazio.
+ *
+ * `TEST_DATABASE_URL` vazia deixa `DATABASE_URL` vazia de propósito: os testes
+ * de Postgres se PULAM dizendo por quê, em vez de cair no banco que estiver por
+ * perto.
+ */
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
+
 export default defineConfig({
   resolve: { alias },
   test: {
+    env: { DATABASE_URL: TEST_DATABASE_URL },
     coverage: {
       reporter: ["text", "json", "html"],
     },

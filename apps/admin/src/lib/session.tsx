@@ -13,6 +13,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -64,6 +65,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AdminSession | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [cache] = useState(() => new QueryCache());
+  /**
+   * O `logout` é lido por REF dentro do fetch. Pô-lo na dependência do `api`
+   * recriaria o client a cada render do provider, e todo componente que tem
+   * `api` no array de efeito refaria as queries em loop.
+   */
+  const logoutRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     setSession(loadStored());
@@ -75,6 +82,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       createClient({
         baseUrl: BASE_URL,
         ...(session ? { token: session.token } : {}),
+        /**
+         * Sessão morta derruba a sessão local, em vez de encher a tela de erro.
+         *
+         * O `SessionStore` da API é um `Map` em memória (`session-store.ts:15`):
+         * reiniciar a API invalida todo token, e o admin seguia mandando um
+         * token que não existe mais — cada clique virava UNAUTHENTICATED e
+         * parecia defeito de tela. O token está no localStorage e sobrevive ao
+         * que o emitiu; quem descobre que ele morreu é a primeira resposta 401.
+         *
+         * Interceptar no `fetch` pega TODA chamada — query, command, catálogo —
+         * sem cada tela ter de lembrar de tratar 401 por conta própria.
+         */
+        fetch: async (input, init) => {
+          const response = await globalThis.fetch(input, init);
+          if (response.status === 401) logoutRef.current();
+          return response;
+        },
         // Telemetria segura (FR-013): só IDs, nunca payload/PII.
         onTelemetry: (event) => {
           if (typeof console !== "undefined") {
@@ -102,6 +126,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     cache.clear(); // revalida na troca de escopo/sessão (FR-009)
     window.localStorage.removeItem(STORAGE_KEY);
   }, [cache]);
+
+  // O `AppShell` já manda para /login quando a sessão some — então derrubar a
+  // sessão aqui é o bastante para a expiração levar o operador ao login.
+  logoutRef.current = logout;
 
   const stepUp = useCallback<SessionContextValue["stepUp"]>(
     async (adminKey) => {
