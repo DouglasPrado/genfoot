@@ -1088,7 +1088,8 @@ model Club {
   entryReservations ClubEntryReservation[]
   departments       ClubDepartment[]
   aiProfile         ClubAIProfile?
-  players           Player[]
+  // `players` saiu daqui junto com `Player.clubId` (R-189): a relação existia
+  // só para a FK duplicada. Quem diz o elenco do clube é `squads`.
   playerContracts   PlayerContract[]
   staffContracts    StaffContract[]
   trainingPlans     TrainingPlan[]
@@ -1277,7 +1278,11 @@ model Player {
   id                      String                 @id @default(uuid(7)) @db.Uuid
   gameWorldId             String                 @db.Uuid
   personId                String                 @unique @db.Uuid
-  clubId                  String?                @db.Uuid
+  // `clubId` morreu aqui — R-189. O canon já dizia que `PlayerContract` é a
+  // fonte autoritativa do vínculo jogador↔clube (`02-modelo-de-dados.md:57`), e
+  // isto dizia o mesmo fato por outro caminho: a duplicata que a R-180 matou em
+  // `Club.controlType`. O elenco (`Squad`/`SquadMembership`) diz por quem o
+  // jogador joga; o contrato dirá de quem ele é, quando C9 materializar dinheiro.
   primaryPosition         PlayerPosition
   secondaryPosition       PlayerPosition?
   dominantFoot            DominantFoot
@@ -1289,15 +1294,34 @@ model Player {
   availability            PlayerAvailability     @default(AVAILABLE) // M-02: disponibilidade esportiva (separada da carreira em `status`)
   currentAbility          Int
   potentialAbility        Int
-  currencyId              String                 @db.Uuid
-  marketValueMinor        BigInt // dinheiro em unidade mínima
-  wageExpectationMinor    BigInt
+  /// Dinheiro do jogador — NULO até C9 existir (R-189).
+  ///
+  /// Eram NOT NULL, e isso tornava impossível materializar um jogador sem
+  /// inventar valor. `0` não é "barato", é MENTIRA: diria que o jogador não vale
+  /// nada. Nulo diz a verdade — ainda não se sabe.
+  ///
+  /// E não é preguiça: o GDD §1 proíbe gerar dinheiro "de forma isolada", fora da
+  /// economia fechada. Preço e salário se calculam "considerando o equilíbrio de
+  /// todo o universo", que é C9. Mesmo motivo do grid de goleiro em quem não é
+  /// goleiro (R-188): nulo é "não se aplica ainda", zero é uma afirmação falsa.
+  currencyId              String?                @db.Uuid
+  marketValueMinor        BigInt?
+  wageExpectationMinor    BigInt?
   // estado dinâmico
   morale                  Int                    @default(50)
   confidence              Int                    @default(50)
   happiness               Int                    @default(50)
   fatigue                 Int                    @default(0)
   matchSharpness          Int                    @default(50)
+  /// Até que dia do mundo o jogador já foi processado (`Player.processUntil`).
+  ///
+  /// Faltava: o agregado tinha o estado e o físico não tinha onde guardá-lo, e
+  /// o adapter só descobriu ao tentar reidratar. Sem ele o decaimento diário
+  /// reprocessa desde sempre a cada carga.
+  ///
+  /// `DATE` sem default — é data de MUNDO (R-177), e um `now()` aqui inventaria
+  /// a data e mataria o replay.
+  lastProcessedOn         DateTime               @db.Date
   // traços persistentes
   //
   // `consistency` saiu deste bloco (R-188): é a "regularidade" da §2 do GDD —
@@ -1315,7 +1339,6 @@ model Player {
 
   gameWorld             GameWorld                     @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
   person                Person                        @relation(fields: [gameWorldId, personId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
-  club                  Club?                         @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
   attributes            PlayerAttributes?
   background            PlayerBackground?
   personality           PlayerPersonality?
@@ -1338,7 +1361,6 @@ model Player {
 
   @@unique([gameWorldId, personId])
   @@unique([gameWorldId, id])
-  @@index([gameWorldId, clubId])
 }
 
 /// O grid canônico do jogador — R-188.

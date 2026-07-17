@@ -240,6 +240,65 @@ Consequência aceita: a migração é destrutiva. Não há o que preservar — p
 
 ---
 
+### R-189 — `Player.clubId` morre. A gênese materializa o elenco sem contrato, e assume a dívida.
+
+**A Q5 do context map (`12-context-map-e-blueprint.md:296`) já tinha decidido
+tudo isto, e eu quase a contradisse.** Ela vale citada inteira:
+
+> **Fonte autoritativa do vínculo = `PlayerContract` (C6).** `Player` **não**
+> carrega `clubId` autoritativo; `SquadMembership` (C3) e `Player.currentClubId`
+> são **projeções** de `ContractSigned`/`TransferSigned`. Elimina o triângulo de
+> escrita.
+
+São **três** representações do mesmo vínculo — `Player.clubId`, o contrato e o
+elenco —, e a Q5 chama isso de "triângulo de escrita". A duplicata que a
+[R-180](#r-180--ia-é-a-ausência-de-controle-não-um-tipo-de-controle) matou em
+`Club.controlType` × `ClubControl` é a mesma doença com dois vértices.
+
+**`Player.clubId` morre.** Não é decisão nova — é cumprir a que já existia.
+
+O contrato, porém, não nasce agora, e a razão vence a R-57. A R-57 manda o
+elenco inicial ter "contratos curtos"; contrato tem `salaryPerSeasonMinor`, e
+salário é dinheiro. O GDD §1 (`01-mundo-persistente-e-clubes.md:257`) é
+categórico:
+
+> O Grinta opera como uma **economia fechada, controlada e balanceada por
+> ciclos**. **Nada é gerado de forma isolada**: novos clubes, jogadores,
+> dinheiro, **salários** e preços são calculados considerando o equilíbrio de
+> todo o universo.
+
+Salário inventado em C4, sem C9, é exatamente o "gerado de forma isolada" que a
+frase proíbe. E não é lacuna de pesquisa: **não existe fórmula de salário
+inicial em lugar nenhum do corpus** — nem no GDD, nem no catálogo de fórmulas,
+nem na Série R. `wageBill` aparece como *entrada* da R-42 (saúde financeira),
+nunca como saída de uma regra de geração.
+
+Então a gênese materializa `Squad`/`SquadMembership` **diretamente**, e isso é
+legítimo por [R-185](#r-185): a gênese é a ORIGEM do mundo, não a projeção de
+nada — ela materializa efeitos, e as linhas de elenco são efeito dela, como as
+linhas de `Club` já são. Não é o elenco fazendo as vezes do contrato.
+
+**A dívida, dita com todas as letras:** de C6 em diante o elenco é *projeção* de
+`ContractSigned`/`TransferSigned` (Q5). Enquanto o contrato não existir, a
+projeção fica sem fonte — ninguém a mantém, porque não há evento que a mova.
+Para o mundo inicial isso não custa nada (o elenco nasce certo e ninguém
+transfere), mas o primeiro command de transferência **tem** que vir com o
+contrato, ou o elenco começa a mentir.
+
+**Consequência aceita:** enquanto C6/C9 não existirem, "jogador livre" **não é
+pergunta respondível**. Livre é a ausência de contrato ativo — e sem contratos,
+todos são livres e ninguém é. O contador de jogadores livres do admin segue
+mockado, com o selo dizendo qual contexto falta; a tela do jogador não exibe
+vínculo. Preferir um número falso a um número ausente é o que a §5.1 chama de
+pintar de verde.
+
+**E o `Squad` é de C3, não de C4** (`12-context-map-e-blueprint.md:59` e `:159`):
+"o elenco/hierarquia interna (`Squad`/`SquadMembership`) é dado do
+**Clube/Estrutura**". Ele já tem agregado em `clubs/squad.ts`. C4 não define
+elenco nenhum — quem o materializa na gênese é o lado do clube.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.
