@@ -1,4 +1,4 @@
-import type { ClubReadModel } from "@grinta/core";
+import type { ClubReadModel, WorldReadModel } from "@grinta/core";
 import {
   Controller,
   Get,
@@ -23,6 +23,7 @@ import {
   GAME_WORLD_REPOSITORY,
   IDENTITY_READ_MODEL,
   CLUB_READ_MODEL,
+  WORLD_READ_MODEL,
 } from "../core/tokens.js";
 import { registeredQueryNames, resolveQueryHandler } from "./query-registry.js";
 import {
@@ -62,7 +63,43 @@ export class QueriesController {
     private readonly identityReadModel: IdentityReadModel,
     // O mundo é tabela, sempre (R-173/R-182).
     @Inject(GAME_WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Inject(WORLD_READ_MODEL) private readonly worldReadModel: WorldReadModel,
   ) {}
+
+  /**
+   * A lista dos mundos que EXISTEM.
+   *
+   * Faltava, e a falta era invisível: o admin listava os mundos do
+   * `localStorage` do navegador. O efeito só apareceu quando o banco foi
+   * recriado — o console seguiu mostrando mundos apagados, e clicar num deles
+   * dava tela vazia sem erro. E a tela de Usuários, que varre os mundos
+   * conhecidos, vinha vazia em qualquer navegador que não tivesse criado os
+   * mundos ele mesmo.
+   *
+   * Vem ANTES de `@Get(":worldId")` de propósito: o Nest casa na ordem de
+   * declaração, e depois dela "worlds" seria lido como um `worldId` inválido.
+   */
+  @ApiOperation({ summary: "Lista os mundos existentes" })
+  @Get()
+  async list(): Promise<QueryEnvelope<unknown>> {
+    const worlds = await this.worldReadModel.listWorlds();
+    return {
+      data: worlds,
+      asOf: new Date().toISOString().slice(0, 10),
+      projectionVersion: 1,
+      pagination: {
+        limit: worlds.length,
+        offset: 0,
+        returned: worlds.length,
+        total: worlds.length,
+        hasMore: false,
+      },
+      // Sem `worldId` no escopo: esta query não tem mundo — ela é a que os
+      // descobre. O `scope` é `Record<string, string>`, e enfiar um `null` ali
+      // com um cast seria mentir para o tipo em vez de dizer o que é verdade.
+      scope: { queryType: "worlds" },
+    };
+  }
 
   @ApiOperation({ summary: "Snapshot do mundo (envelope de query)" })
   @ApiParam({ name: "worldId", description: "UUID do mundo" })

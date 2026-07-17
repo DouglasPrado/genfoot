@@ -75,3 +75,4 @@ export * from "./clients/clients-runtime.js";
 export * from "./clients/screen-registry.js";
 export * from "./clients/golden-path-registry.js";
 export * from "./clubs/club-read-model.js";
+export * from "./world/world-read-model.js";

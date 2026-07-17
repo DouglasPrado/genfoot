@@ -2,50 +2,63 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const KEY = "grinta.admin.knownWorlds";
+import { useSession } from "@/lib/session";
 
 export interface KnownWorld {
   readonly id: string;
   readonly seed: string;
-}
-
-function read(): KnownWorld[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as KnownWorld[]) : [];
-  } catch {
-    return [];
-  }
+  readonly status: string;
+  readonly currentDate: string;
+  readonly clubCount: number;
 }
 
 /**
- * Mundos conhecidos pelo console (criados/abertos), persistidos localmente.
- * A API expõe queries por-id; um endpoint de listagem no servidor é follow-up.
+ * Os mundos que EXISTEM, vindos da API.
+ *
+ * Antes isto lia o `localStorage` — e o comentário anterior já sabia que estava
+ * errado: "um endpoint de listagem no servidor é follow-up". O custo apareceu
+ * quando o banco foi recriado: o console seguiu listando três mundos, DOIS deles
+ * apagados, e clicar num fantasma dava tela vazia sem erro nenhum. Pior, a tela
+ * de Usuários varre os mundos conhecidos — em qualquer navegador que não tivesse
+ * criado os mundos ele mesmo, ela vinha vazia para sempre.
+ *
+ * Um console de operação mostra o que o servidor tem, não o que este navegador
+ * lembra.
  */
 export function useKnownWorlds() {
-  const [worlds, setWorlds] = useState<KnownWorld[]>([]);
+  const { api, session } = useSession();
+  const [worlds, setWorlds] = useState<readonly KnownWorld[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    setWorlds(read());
-  }, []);
+    if (session === null) return;
+    let alive = true;
+    setLoading(true);
+    api
+      .worlds()
+      .then((list) => {
+        if (!alive) return;
+        setWorlds(list);
+        setError(null);
+      })
+      .catch(() => {
+        if (!alive) return;
+        // Lista vazia com erro NOMEADO. Cair calado em `[]` diria "não há
+        // mundos" quando a verdade é "não consegui perguntar".
+        setWorlds([]);
+        setError("Falha ao listar os mundos.");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [api, session, tick]);
 
-  const remember = useCallback((world: KnownWorld) => {
-    setWorlds((current) => {
-      if (current.some((entry) => entry.id === world.id)) return current;
-      const next = [world, ...current];
-      window.localStorage.setItem(KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  const forget = useCallback((id: string) => {
-    setWorlds((current) => {
-      const next = current.filter((entry) => entry.id !== id);
-      window.localStorage.setItem(KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  return { worlds, remember, forget };
+  return { worlds, loading, error, refresh };
 }

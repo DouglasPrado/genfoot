@@ -9,6 +9,7 @@ import {
   type SessionResponse,
   type StandardError,
   type ValidationReport,
+  type WorldListItem,
 } from "./types.js";
 
 type FetchLike = (
@@ -133,6 +134,20 @@ export class GrintaClient {
 
   async catalog(): Promise<Catalog> {
     return (await this.request<Catalog>("GET", "/api/v1/commands/catalog")).body;
+  }
+
+  /**
+   * Os mundos que existem. É a única query sem `worldId` — ela é a que os
+   * descobre. Sem ela, o admin listava mundos do `localStorage` do navegador e
+   * seguia mostrando os que já tinham sido apagados.
+   */
+  async worlds(): Promise<readonly WorldListItem[]> {
+    return (
+      await this.request<QueryEnvelope<readonly WorldListItem[]>>(
+        "GET",
+        "/api/v1/worlds",
+      )
+    ).body.data;
   }
 
   /** Roda a calibração (VAL-001) e devolve o relatório com bandas e gate. */

@@ -16,6 +16,8 @@ export const CLUB_REPOSITORY = "CLUB_REPOSITORY";
  * outra é o defeito que o e2e pegou com um 500.
  */
 export const CLUB_READ_MODEL = "CLUB_READ_MODEL";
+/** C2 leitura: a LISTA dos mundos. Sem ela o admin só via o que o navegador lembrava. */
+export const WORLD_READ_MODEL = "WORLD_READ_MODEL";
 export const IDEMPOTENCY_STORE = "IDEMPOTENCY_STORE";
 export const REALTIME_PUBLISHER = "REALTIME_PUBLISHER";
 export const SESSION_STORE = "SESSION_STORE";

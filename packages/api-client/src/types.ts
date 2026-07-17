@@ -44,6 +44,17 @@ export interface QueryEnvelope<T = unknown> {
   readonly scope: Record<string, string>;
 }
 
+/** Uma linha da lista de mundos (`GET /api/v1/worlds`). */
+export interface WorldListItem {
+  readonly id: string;
+  readonly seed: string;
+  readonly status: string;
+  readonly currentDate: string;
+  readonly startDate: string;
+  readonly rulesetVersion: string;
+  readonly clubCount: number;
+}
+
 export interface Catalog {
   readonly commands: readonly string[];
   readonly queries: readonly string[];

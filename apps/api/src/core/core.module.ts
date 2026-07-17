@@ -5,6 +5,7 @@ import {
   PrismaClubRepository,
   PrismaIdentityReadModel,
   PrismaIdentityUnitOfWork,
+  PrismaWorldReadModel,
   PrismaWorldRepository,
   type PrismaClient,
 } from "@grinta/persistence";
@@ -18,6 +19,7 @@ import {
   IDENTITY_READ_MODEL,
   IDENTITY_UNIT_OF_WORK,
   PRISMA_CLIENT,
+  WORLD_READ_MODEL,
 } from "./tokens.js";
 
 /**
@@ -56,6 +58,12 @@ import {
         new PrismaWorldRepository(client),
     },
     {
+      provide: WORLD_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaWorldReadModel =>
+        new PrismaWorldReadModel(client),
+    },
+    {
       provide: CLUB_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubRepository =>
@@ -87,6 +95,7 @@ import {
   exports: [
     PRISMA_CLIENT,
     GAME_WORLD_REPOSITORY,
+    WORLD_READ_MODEL,
     CLUB_REPOSITORY,
     CLUB_READ_MODEL,
     IDEMPOTENCY_STORE,
