@@ -94,6 +94,7 @@ export * from "./finance/ledger-repository.js";
 export * from "./finance/ledger-bootstrap.js";
 export * from "./finance/cost-estimators.js";
 export * from "./finance/season-cost-model.js";
+export * from "./finance/close-season-finances.js";
 export * from "./competitions/competition-types.js";
 export * from "./competitions/competition-bootstrap.js";
 export * from "./competitions/competition-repository.js";
