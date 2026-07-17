@@ -47,6 +47,7 @@ export * from "./clubs/club-types.js";
 export * from "./clubs/club-bootstrap.js";
 export * from "./clubs/visual-identity-catalog.js";
 export * from "./clubs/squad.js";
+export * from "./clubs/squad-repository.js";
 export * from "./clubs/infrastructure-project.js";
 export * from "./clubs/infrastructure-project-types.js";
 
