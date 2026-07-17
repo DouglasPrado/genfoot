@@ -1,5 +1,7 @@
 import type { EntityId, GameWorldId, RulesetVersion } from "@grinta/shared";
 
+import type { PlayerAttributes } from "../players/player-attributes.js";
+
 export type ClubId = EntityId<"Club">;
 export type PersonId = EntityId<"Person">;
 export type PlayerId = EntityId<"Player">;
@@ -58,12 +60,14 @@ export interface GeneratedPerson {
   readonly primaryNationality: "BR";
 }
 
-export interface GeneratedPlayerAttributes {
-  readonly technical: number;
-  readonly physical: number;
-  readonly mental: number;
-  readonly goalkeeping: number;
-}
+/**
+ * Os 39 atributos do GDD §2 — R-188.
+ *
+ * Eram 4 escalares agrupados (`technical`/`physical`/`mental`/`goalkeeping`).
+ * Os grupos não sumiram: viraram **rollup derivado** (`rollupAttributes`), que é
+ * o que a R-179 decidiu. O que sumiu foi eles serem a FONTE.
+ */
+export type GeneratedPlayerAttributes = PlayerAttributes;
 
 export interface GeneratedPlayer {
   readonly id: PlayerId;

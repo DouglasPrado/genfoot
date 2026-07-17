@@ -52,6 +52,7 @@ export * from "./clubs/infrastructure-project-types.js";
 
 // Gênese — gera o mundo inicial. É o que o admin usa para criar clubes.
 export * from "./genesis/genesis-types.js";
+export * from "./genesis/player-generation.js";
 export * from "./genesis/world-genesis-generator.js";
 export * from "./genesis/world-genesis-use-cases.js";
 export * from "./genesis/world-genesis-validator.js";
@@ -60,6 +61,8 @@ export * from "./genesis/world-genesis-validator.js";
 // `match-kernel` é a simulação de partida e só depende de `SeededRandom`.
 export * from "./matches/match-kernel.js";
 export * from "./matches/match-types.js";
+// O grid canônico do GDD §2 (R-188) e a derivação do overall (R-09).
+export * from "./players/player-attributes.js";
 export * from "./players/player.js";
 export * from "./players/player-lifecycle-types.js";
 export * from "./scheduling/season.js";

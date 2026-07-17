@@ -49,8 +49,11 @@ describe("geração do elenco inicial (GDD §1 · teto comum de pontos)", () => 
     }
   });
 
-  /** "média-alvo 60; **média nunca superior a 62**" — o limite é do GDD. */
-  it("a média nunca passa de 62", () => {
+  /**
+   * R-57: "A média-alvo é 60 e a geração deve permanecer em **58–60**, jamais
+   * acima de 62". A R-57 é mais estreita que o §1 do GDD, e é ela que vale.
+   */
+  it("a média fica na banda 58–60 da R-57", () => {
     for (let clubIndex = 0; clubIndex < 16; clubIndex += 1) {
       const squad = elenco("grinta-demo", clubIndex);
       const media =
@@ -58,7 +61,38 @@ describe("geração do elenco inicial (GDD §1 · teto comum de pontos)", () => 
           (sum, p) => sum + derivePlayerOverall(p.position, p.attributes),
           0,
         ) / squad.length;
-      expect(media).toBeLessThanOrEqual(62);
+      expect(media).toBeGreaterThanOrEqual(58);
+      expect(media).toBeLessThanOrEqual(60);
+    }
+  });
+
+  /**
+   * R-57: "predomínio **26–33 anos** (≈70% em 29–33 e ≈30% em 26–28)".
+   *
+   * O gerador do mundo sorteava idade UNIFORME em 26–33, o que dá ~62%/38% e
+   * não é o que a R-57 pede. A curva importa: "o elenco inicial típico é
+   * veterano" (§1) é o que força o valor a vir da gestão, não da largada.
+   */
+  it("a curva etária é a 70/30 da R-57, não um sorteio uniforme", () => {
+    const idades = Array.from({ length: 16 }, (_, clubIndex) =>
+      elenco("grinta-demo", clubIndex).map((p) => p.age),
+    ).flat();
+
+    expect(Math.min(...idades)).toBeGreaterThanOrEqual(26);
+    expect(Math.max(...idades)).toBeLessThanOrEqual(33);
+
+    const veteranos = idades.filter((age) => age >= 29 && age <= 33).length;
+    const proporcao = veteranos / idades.length;
+    expect(proporcao).toBeGreaterThan(0.6);
+    expect(proporcao).toBeLessThan(0.8);
+  });
+
+  /** "potencial limitado" (R-57): não se compra craque na largada. */
+  it("o potencial é limitado e nunca abaixo da nota atual", () => {
+    for (const player of elenco("grinta-demo", 0)) {
+      const nota = derivePlayerOverall(player.position, player.attributes);
+      expect(player.potentialAbility).toBeGreaterThanOrEqual(nota);
+      expect(player.potentialAbility).toBeLessThanOrEqual(85);
     }
   });
 

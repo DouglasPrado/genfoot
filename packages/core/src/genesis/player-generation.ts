@@ -143,6 +143,35 @@ const WEAK_MALUS = 12;
 export interface GeneratedSquadPlayer {
   readonly position: PlayerPosition;
   readonly attributes: PlayerAttributes;
+  /** Idade em anos na data de início do mundo (R-57: 26–33). */
+  readonly age: number;
+  readonly potentialAbility: number;
+}
+
+/**
+ * A curva etária da R-57: "predomínio 26–33 anos (**≈70% em 29–33 e ≈30% em
+ * 26–28**)".
+ *
+ * Não é o mesmo que sortear uniforme em 26–33 — isso daria ~62/38. A diferença
+ * é de projeto: "o elenco inicial típico é veterano" (§1) é o que força o valor
+ * a vir da gestão, e não da largada.
+ */
+function ageFor(random: SeededRandom): number {
+  return random.nextInt(0, 100) < 70
+    ? random.nextInt(29, 34) // 70% veteranos
+    : random.nextInt(26, 29); // 30% em maturação
+}
+
+/**
+ * "potencial limitado" (R-57).
+ *
+ * O potencial nunca fica abaixo da nota atual — seria um jogador que já passou
+ * do próprio teto, e o agregado usa `potential` como trava de evolução. E a
+ * folga encolhe com a idade: aos 33 não há para onde crescer.
+ */
+function potentialFor(overall: number, age: number, random: SeededRandom): number {
+  const folga = Math.max(0, 34 - age); // 8 aos 26; 1 aos 33
+  return Math.min(85, overall + random.nextInt(0, folga + 1));
 }
 
 export interface GenerateSquadInput {
@@ -261,12 +290,20 @@ export function generateSquadAttributes(
       worldSeed: input.worldSeed,
       context: `player:${input.clubIndex}:${slot}`,
     });
+    const attributes = shiftToTarget(
+      position,
+      archetypeGrid(position, random),
+      targets[slot]!,
+    );
+    const age = ageFor(random);
     return {
       position,
-      attributes: shiftToTarget(
-        position,
-        archetypeGrid(position, random),
-        targets[slot]!,
+      attributes,
+      age,
+      potentialAbility: potentialFor(
+        derivePlayerOverall(position, attributes),
+        age,
+        random,
       ),
     };
   });

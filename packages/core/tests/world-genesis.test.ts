@@ -5,7 +5,7 @@ import {
   GameWorld,
   PlayerPosition,
   WorldGenesisGenerator,
-  calculatePlayerOverall,
+  derivePlayerOverall,
   validateWorldGenesis,
   type GameWorldSnapshot,
 } from "../src/index.js";
@@ -63,9 +63,16 @@ describe("WorldGenesisGenerator", () => {
     expect(
       new Set(genesis.players.map(({ personId }) => personId)),
     ).toHaveLength(368);
-    expect(
-      genesis.players.every((player) => calculatePlayerOverall(player) === 60),
-    ).toBe(true);
+    // NÃO se exige 60 por jogador — era o que estava aqui, e contradizia a
+    // R-57: "os pontos podem ser distribuídos de formas diferentes entre
+    // goleiros, defesa, meio e ataque". Com todo mundo em 60 não há
+    // distribuição possível, e o elenco não tem titular nem reserva. O que
+    // vale é o TETO, checado por elenco logo abaixo.
+    const notas = genesis.players.map((player) =>
+      derivePlayerOverall(player.primaryPosition, player.attributes),
+    );
+    expect(Math.min(...notas)).toBeGreaterThan(40);
+    expect(Math.max(...notas)).toBeLessThan(80);
 
     for (const squad of genesis.squads) {
       const players = squad.playerIds.map((id) =>
@@ -80,7 +87,9 @@ describe("WorldGenesisGenerator", () => {
       ).toHaveLength(2);
       expect(
         players.reduce(
-          (total, player) => total + calculatePlayerOverall(player!),
+          (total, player) =>
+            total +
+            derivePlayerOverall(player!.primaryPosition, player!.attributes),
           0,
         ),
       ).toBe(1_380);
