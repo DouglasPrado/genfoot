@@ -83,8 +83,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setSession(opened);
         setAuthedClient(base.withToken(opened.token));
         setStatus("online");
-      } catch {
+      } catch (error) {
         if (cancelled) return;
+        /**
+         * O erro VAI para o log. Este catch era vazio, e o custo apareceu na
+         * primeira vez que o app não conectou: a tela dizia "sem conexão" e a
+         * causa — rede? contrato? o /auth/session recusando o token? — tinha
+         * sido jogada fora. "Offline" virava o nome de qualquer falha.
+         *
+         * O usuário segue vendo "sem conexão", que é o que ele pode fazer algo
+         * a respeito. Quem precisa da causa é quem lê o log.
+         */
+        console.error("[session] bootstrap falhou:", error);
         setStatus("offline");
       }
     })();

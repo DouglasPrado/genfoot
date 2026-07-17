@@ -43,6 +43,19 @@ export interface ClubListItemView {
    * fontes para "quem comanda" divergem em silêncio.
    */
   readonly manager: { readonly accountId: string; readonly name: string } | null;
+  /**
+   * Até quando o clube está RESERVADO por alguém que ainda decide, ou `null`.
+   *
+   * É estado diferente de ter dono, e a diferença é do canon: a reserva é
+   * retenção MOLE com prazo (R-25) — o clube volta ao pool se o prazo vencer ou
+   * o jogador desistir. Quem tem `manager` está tomado; quem tem
+   * `reservedUntil` está em decisão.
+   *
+   * Os dois errorCodes já separam isso (R-186): `CLUB_ALREADY_CONTROLLED` para
+   * o primeiro, `CLUB_SLOT_UNAVAILABLE` para o segundo. A leitura tem de dar ao
+   * cliente como distinguir ANTES de tentar — senão a tela só descobre pelo erro.
+   */
+  readonly reservedUntil: string | null;
 }
 
 export interface ClubWorldView {

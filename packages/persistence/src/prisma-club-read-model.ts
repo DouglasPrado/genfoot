@@ -39,6 +39,9 @@ export class PrismaClubReadModel implements ClubReadModel {
           take: 1,
           include: { worldParticipant: { include: { user: true } } },
         },
+        // R-25: retenção mole com prazo. Só HELD conta — CONFIRMED já virou
+        // controle, e RELEASED/EXPIRED são passado.
+        entryReservations: { where: { status: "HELD" }, take: 1 },
       },
       orderBy: { regionId: "asc" },
     });
@@ -63,6 +66,7 @@ export class PrismaClubReadModel implements ClubReadModel {
           secondaryColor: identity.secondaryColor,
           crestTemplateId: identity.crestTemplateId,
           manager: toManager(row.controls[0]),
+          reservedUntil: toWorldDate(row.entryReservations[0]?.expiresOn),
         };
       }),
     };
@@ -88,4 +92,11 @@ function toManager(
   return user === undefined || user === null
     ? null
     : { accountId: user.id, name: user.name };
+}
+
+/** Só a data: o domínio não conhece hora (R-177). */
+function toWorldDate(value: Date | null | undefined): string | null {
+  return value === null || value === undefined
+    ? null
+    : value.toISOString().slice(0, 10);
 }

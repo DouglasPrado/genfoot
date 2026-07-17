@@ -21,15 +21,21 @@ import { Icon } from "@/components/icon";
  * `club.name` quando a query devolvia o portfólio inteiro; o portfólio
  * morreu com o mega-agregado (R-175).
  */
+interface OnboardingClub {
+  readonly id: string;
+  readonly name: string;
+  readonly shortCode: string;
+  readonly status: string;
+  readonly stadiumName: string;
+  readonly stadiumCapacity: number;
+  /** `null` = IA. Clube com gestor não entra na lista (R-180). */
+  readonly manager: { readonly accountId: string; readonly name: string } | null;
+  /** Reservado por alguém que ainda decide (R-25). Aparece, mas bloqueado. */
+  readonly reservedUntil: string | null;
+}
+
 interface OnboardingClubList {
-  readonly clubs: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly shortCode: string;
-    readonly status: string;
-    readonly stadiumName: string;
-    readonly stadiumCapacity: number;
-  }[];
+  readonly clubs: readonly OnboardingClub[];
 }
 import {
   submitTrackedCommand,
@@ -115,12 +121,35 @@ export function Onboarding() {
     accountId,
     worldQuery.data?.currentDate ?? "",
   );
+  /**
+   * O que o jogador pode escolher.
+   *
+   * **Clube com gestor SOME** — ele tem dono, e a API responderia
+   * `CLUB_ALREADY_CONTROLLED`. Oferecer o que já é de alguém é convidar para uma
+   * recusa. Sem gestor é a IA que toca (R-180: a IA é a AUSÊNCIA de controle).
+   *
+   * **Clube reservado FICA, bloqueado.** É retenção mole com prazo (R-25): quem
+   * reservou pode desistir ou o prazo vencer, e o clube volta ao pool em
+   * minutos. Sumir com ele diria que acabou, quando não acabou — e o jogador
+   * nunca saberia que o clube que ele quer está a um prazo de distância. É
+   * exatamente a distinção que os dois errorCodes fazem (R-186), agora visível
+   * ANTES de tentar.
+   */
   const clubs =
-    clubQuery.data?.clubs.filter((club) => club.status === "ACTIVE") ?? [];
+    clubQuery.data?.clubs.filter(
+      (club) => club.status === "ACTIVE" && club.manager === null,
+    ) ?? [];
+  const disponiveis = clubs.filter((club) => club.reservedUntil === null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const selectedClub = useMemo(
-    () => clubs.find((club) => club.id === selectedClubId) ?? clubs[0] ?? null,
-    [clubs, selectedClubId],
+    // O default cai no primeiro DISPONÍVEL, não no primeiro da lista: abrir a
+    // tela com um clube reservado pré-selecionado deixaria o botão de reservar
+    // apontando para uma recusa certa.
+    () =>
+      clubs.find((club) => club.id === selectedClubId) ??
+      disponiveis[0] ??
+      null,
+    [clubs, disponiveis, selectedClubId],
   );
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [submittedStep, setSubmittedStep] = useState<
@@ -333,6 +362,7 @@ export function Onboarding() {
           {!loading && !technicalError && step.kind === "choose-club" ? (
             <View style={styles.clubList}>
               {clubs.map((club) => {
+                const reservado = club.reservedUntil !== null;
                 const selected = club.id === selectedClub?.id;
                 return (
                   <Pressable
@@ -340,11 +370,20 @@ export function Onboarding() {
                     style={[
                       styles.clubRow,
                       selected ? styles.clubSelected : null,
+                      reservado ? styles.clubReserved : null,
                     ]}
+                    // Reservado não é clicável: a API recusaria com
+                    // CLUB_SLOT_UNAVAILABLE, e deixar clicar seria oferecer um
+                    // erro. Ele fica visível porque volta ao pool no prazo.
+                    disabled={reservado}
                     onPress={() => setSelectedClubId(club.id)}
                     accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Selecionar ${club.name}`}
+                    accessibilityState={{ selected, disabled: reservado }}
+                    accessibilityLabel={
+                      reservado
+                        ? `${club.name}, reservado até ${club.reservedUntil}`
+                        : `Selecionar ${club.name}`
+                    }
                   >
                     <View style={styles.clubCrest}>
                       <Text style={styles.clubInitial}>
@@ -354,11 +393,14 @@ export function Onboarding() {
                     <View style={styles.clubInfo}>
                       <Text style={styles.clubName}>{club.name}</Text>
                       <Text style={styles.clubMeta}>
-                        {club.stadiumName} ·{" "}
-                        {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
+                        {reservado
+                          ? `Reservado até ${club.reservedUntil} — pode voltar`
+                          : `${club.stadiumName} · ${club.stadiumCapacity.toLocaleString("pt-BR")} lugares`}
                       </Text>
                     </View>
-                    {selected ? (
+                    {reservado ? (
+                      <Icon name="time-outline" size={20} color={color.textMuted} />
+                    ) : selected ? (
                       <Icon
                         name="checkmark-circle"
                         size={20}
@@ -478,6 +520,7 @@ const styles = StyleSheet.create({
     padding: space.sm,
     backgroundColor: color.backgroundElevated,
   },
+  clubReserved: { opacity: 0.45 },
   clubSelected: { borderColor: color.primary, backgroundColor: "#151c0e" },
   clubCrest: {
     width: 42,
