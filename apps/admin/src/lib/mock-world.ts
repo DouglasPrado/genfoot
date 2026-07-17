@@ -526,35 +526,113 @@ function ranking(
  * ele as lista. Não inventei categoria: elas "afetam reputação e mercado" e
  * encaixam no sistema psicológico — inventar uma seria inventar efeito de jogo.
  */
+/**
+ * O `reputationWeight` da R-59 — o par do `financialWeight`. A decisão define os
+ * dois juntos: "quanto cada competição move a REPUTAÇÃO (clube/jogador) e a
+ * receita ao virar a temporada".
+ *
+ * É ele que faz "Melhor jogador do Continental" (0,85) valer mais que "Melhor
+ * jogador do Estadual" (0,30). Sem o peso, um prêmio de torneio regional
+ * valorizaria tanto quanto um continental — e aí a competição não importaria.
+ */
+export const REPUTATION_WEIGHT: Record<TipoTorneio, number> = {
+  [TipoTorneio.CONTINENTAL]: 0.85,
+  [TipoTorneio.LIGA_NACIONAL]: 0.7,
+  [TipoTorneio.COPA_ELIMINATORIA]: 0.55,
+  [TipoTorneio.ESTADUAL]: 0.3,
+};
+
+/**
+ * O efeito do prêmio no jogador.
+ *
+ * A corrente é a do canon: prêmio "afeta reputação e mercado" (§7), e "a
+ * reputação do jogador afeta salário, VALOR DE MERCADO, propostas, pressão,
+ * moral" (`00-gdd-overview.md:226`). Logo a valorização não é efeito direto do
+ * prêmio — é efeito da reputação que o prêmio move. Por isso ela escala pelo
+ * `reputationWeight` da R-59.
+ *
+ * **O ganho de overall EXTENDE o canon.** O §7 fala em reputação, mercado e
+ * psicologia — não em atributo. É decisão de produto (do dono, 2026-07-16) e
+ * está declarada como tal: quando C4 voltar, ela precisa de um R- próprio, senão
+ * vira regra de jogo que ninguém ratificou.
+ *
+ * `Jogador decepção` é NEGATIVO nos dois. O canon o lista entre os prêmios, mas
+ * ele é o oposto de um: tratá-lo como bônus daria valorização a quem decepcionou.
+ */
 export interface MockPremio {
   readonly categoria: string;
   readonly jogador: string;
   readonly clube: ClubeRef | null;
+  /** Valorização de mercado, em %. Negativa na decepção. */
+  readonly valorizacao: number;
+  /** Pontos de overall ganhos. Negativo na decepção. */
+  readonly overall: number;
+  /**
+   * Moral, em %. É a parte MAIS canônica das três: o §7 diz que os prêmios
+   * "encaixam no sistema psicológico (ex.: eleito revelação ganha confiança, mas
+   * passa a sofrer mais pressão)", e o overview:226 lista moral entre o que a
+   * reputação do jogador move.
+   *
+   * A contrapartida da pressão que o §7 cita NÃO está aqui — é outro eixo, e
+   * inventá-lo como coluna diria que prêmio só tem lado bom. Fica anotado para
+   * quando C4 voltar.
+   */
+  readonly moral: number;
 }
 
-const CATEGORIAS = [
-  "Melhor jogador do campeonato",
-  "Craque da torcida",
-  "Artilheiro",
-  "Garçom (líder de assistências)",
-  "Revelação",
-  "Melhor goleiro",
-  "Melhor zagueiro",
-  "Melhor técnico",
-  "Jogador mais evoluído",
-  "Jogador decepção",
+/**
+ * As categorias do §7, na ordem dele, com o peso de cada uma.
+ *
+ * `base` é a valorização em % antes do `reputationWeight`; `ovr` é o ganho de
+ * overall. "Melhor jogador" pesa mais que "Melhor zagueiro" porque é o prêmio do
+ * campeonato inteiro, não de um setor. "Melhor técnico" não move NADA de jogador
+ * — ele não é jogador, e dar-lhe overall seria inventar atributo para quem não
+ * entra em campo.
+ */
+const CATEGORIAS: readonly {
+  nome: string;
+  base: number;
+  ovr: number;
+  moral: number;
+}[] = [
+  { nome: "Melhor jogador do campeonato", base: 28, ovr: 3, moral: 20 },
+  // Craque da torcida move POUCO mercado e MUITA moral: é o afeto da
+  // arquibancada, não a leitura do olheiro. O overview:226 separa as duas coisas
+  // — "relação com a torcida" e "valor de mercado" são efeitos distintos.
+  { nome: "Craque da torcida", base: 12, ovr: 1, moral: 25 },
+  { nome: "Artilheiro", base: 22, ovr: 2, moral: 18 },
+  { nome: "Garçom (líder de assistências)", base: 18, ovr: 2, moral: 15 },
+  // "Revelação ganha confiança" — o exemplo é literalmente o do §7.
+  { nome: "Revelação", base: 35, ovr: 4, moral: 30 },
+  { nome: "Melhor goleiro", base: 15, ovr: 2, moral: 12 },
+  { nome: "Melhor zagueiro", base: 15, ovr: 2, moral: 12 },
+  // Técnico não é jogador: sem overall, sem moral de atleta, sem valor de
+  // mercado. Dar-lhe atributo seria inventar jogador que não entra em campo.
+  { nome: "Melhor técnico", base: 0, ovr: 0, moral: 0 },
+  { nome: "Jogador mais evoluído", base: 20, ovr: 3, moral: 15 },
+  { nome: "Jogador decepção", base: -18, ovr: -2, moral: -22 },
 ];
 
 export function mockPremiacao(
-  torneioId: string,
+  torneio: MockTorneio,
   clubes: readonly ClubeRef[],
 ): readonly MockPremio[] {
+  const peso = REPUTATION_WEIGHT[torneio.tipo];
   return CATEGORIAS.map((categoria, index) => {
-    const chave = `${torneioId}:premio:${index}`;
+    const chave = `${torneio.id}:premio:${index}`;
+    // A variação por sorteio é pequena de propósito: o que decide o tamanho do
+    // prêmio é a CATEGORIA e o peso do torneio, não o acaso.
+    const ruido = pick(chave, 11, 90, 110) / 100;
     return {
-      categoria,
+      categoria: categoria.nome,
       jogador: NOMES[pick(chave, 3, 0, NOMES.length - 1)]!,
       clube: clubes[pick(chave, 7, 0, Math.max(0, clubes.length - 1))] ?? null,
+      valorizacao: Math.round(categoria.base * peso * ruido * 10) / 10,
+      moral: Math.round(categoria.moral * peso * ruido * 10) / 10,
+      // Overall é INTEIRO: atributo de jogador não tem meio ponto. Um prêmio
+      // pequeno num torneio fraco arredonda para 0 — e 0 é a resposta certa:
+      // ser melhor zagueiro do estadual não muda o jogador.
+      overall: Math.round(categoria.ovr * peso),
     };
   });
 }

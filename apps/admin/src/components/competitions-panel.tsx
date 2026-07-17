@@ -19,6 +19,7 @@ import {
   mockPremiacao,
   mockPremiacaoDinheiro,
   FINANCIAL_WEIGHT,
+  REPUTATION_WEIGHT,
   mockTabela,
   mockTorneiosDaTemporada,
   type ClubeRef,
@@ -583,7 +584,13 @@ export function CompetitionsPanel({
             </p>
           </div>
 
-          <h3 className="font-heading mb-2 text-sm">Prêmios individuais</h3>
+          <div className="mb-2 flex flex-wrap items-baseline gap-3">
+            <h3 className="font-heading text-sm">Prêmios individuais</h3>
+            <span className="mono text-[11px] text-muted-foreground">
+              reputationWeight {REPUTATION_WEIGHT[torneio.tipo].toFixed(2)} ·
+              R-59
+            </span>
+          </div>
           <div className="overflow-x-auto rounded-sm border border-border">
             <table className="w-full text-sm">
               <thead>
@@ -591,10 +598,15 @@ export function CompetitionsPanel({
                   <th className="px-3 py-2 font-medium">Categoria</th>
                   <th className="px-3 py-2 font-medium">Eleito</th>
                   <th className="px-3 py-2 font-medium">Clube</th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    Valorização
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">Overall</th>
+                  <th className="px-3 py-2 text-right font-medium">Moral</th>
                 </tr>
               </thead>
               <tbody>
-                {mockPremiacao(torneio.id, refs).map((premio) => (
+                {mockPremiacao(torneio, refs).map((premio) => (
                   <tr
                     key={premio.categoria}
                     className="border-b border-border/60 even:bg-surface-2/40 last:border-0"
@@ -608,6 +620,9 @@ export function CompetitionsPanel({
                         <ClubName club={premio.clube} />
                       )}
                     </td>
+                    <Delta valor={premio.valorizacao} sufixo="%" />
+                    <Delta valor={premio.overall} sufixo="" />
+                    <Delta valor={premio.moral} sufixo="%" />
                   </tr>
                 ))}
               </tbody>
@@ -686,6 +701,26 @@ function Ranking({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Um efeito do prêmio. Verde sobe, vermelho desce, cinza não move.
+ *
+ * O zero é cinza e sem sinal de propósito: "Melhor técnico" não move nada de
+ * jogador — ele não é jogador —, e um `+0` verde diria que moveu.
+ */
+function Delta({ valor, sufixo }: { valor: number; sufixo: string }) {
+  const cor =
+    valor > 0
+      ? "text-[color:var(--ok)]"
+      : valor < 0
+        ? "text-[color:var(--danger)]"
+        : "text-muted-foreground";
+  return (
+    <td className={`mono px-3 py-2 text-right tabular-nums ${cor}`}>
+      {valor === 0 ? "—" : `${valor > 0 ? "+" : ""}${valor}${sufixo}`}
+    </td>
   );
 }
 
