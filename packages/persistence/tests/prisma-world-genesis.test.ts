@@ -29,6 +29,11 @@ const GENESIS_TABLES = [
   "FinancialAccount",
   "JournalEntry",
   "JournalLine",
+  "Competition",
+  "Season",
+  "CompetitionSeason",
+  "CompetitionClub",
+  "Match",
 ];
 
 describe.skipIf(!hasDatabase)(
@@ -168,6 +173,40 @@ describe.skipIf(!hasDatabase)(
       expect(
         await client.journalEntry.count({ where: { gameWorldId: WORLD_ID } }),
       ).toBe(16);
+    });
+
+    it("materializa a liga com 240 partidas agendadas", async () => {
+      await generate.execute(WORLD_ID as never);
+      expect(
+        await client.competition.count({ where: { gameWorldId: WORLD_ID } }),
+      ).toBe(1);
+      expect(
+        await client.competitionClub.count(),
+      ).toBe(16);
+      expect(await client.match.count({ where: { gameWorldId: WORLD_ID } })).toBe(240);
+      // Nasce tudo SCHEDULED/PENDING: ninguém jogou.
+      expect(
+        await client.match.count({
+          where: { gameWorldId: WORLD_ID, runtimeStatus: "SCHEDULED" },
+        }),
+      ).toBe(240);
+    });
+
+    it("cada clube joga 30 partidas (ida e volta contra 15)", async () => {
+      await generate.execute(WORLD_ID as never);
+      const clubs = await client.club.findMany({
+        where: { gameWorldId: WORLD_ID },
+        select: { id: true },
+      });
+      for (const club of clubs) {
+        const games = await client.match.count({
+          where: {
+            gameWorldId: WORLD_ID,
+            OR: [{ homeClubId: club.id }, { awayClubId: club.id }],
+          },
+        });
+        expect(games).toBe(30);
+      }
     });
 
     /** A soma dos overalls de cada elenco é o teto comum de 1.380 (R-57). */

@@ -1,5 +1,6 @@
 import type {
   ClubReadModel,
+  CompetitionReadModel,
   LedgerReadModel,
   SquadReadModel,
   WorldReadModel,
@@ -30,6 +31,7 @@ import {
   CLUB_READ_MODEL,
   SQUAD_READ_MODEL,
   LEDGER_READ_MODEL,
+  COMPETITION_READ_MODEL,
   OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
@@ -69,6 +71,8 @@ export class QueriesController {
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
     @Inject(SQUAD_READ_MODEL) private readonly squadReadModel: SquadReadModel,
     @Inject(LEDGER_READ_MODEL) private readonly ledgerReadModel: LedgerReadModel,
+    @Inject(COMPETITION_READ_MODEL)
+    private readonly competitionReadModel: CompetitionReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -238,6 +242,7 @@ export class QueriesController {
         clubReadModel: this.clubReadModel,
         squadReadModel: this.squadReadModel,
         ledgerReadModel: this.ledgerReadModel,
+        competitionReadModel: this.competitionReadModel,
       },
       worldId.value,
       query,

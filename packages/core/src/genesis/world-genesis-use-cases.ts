@@ -10,6 +10,7 @@ import { buildClubsFromGenesis } from "../clubs/club-bootstrap.js";
 import type { ClubRepository } from "../clubs/club-repository.js";
 import { Club } from "../clubs/club.js";
 import { Squad } from "../clubs/squad.js";
+import { buildCompetitionGenesis } from "../competitions/competition-bootstrap.js";
 import { buildLedgerGenesis } from "../finance/ledger-bootstrap.js";
 import { Player } from "../players/player.js";
 import {
@@ -112,6 +113,7 @@ export class GenerateWorldGenesis {
     const players = buildPlayersFromGenesis(world, genesis);
     const squads = buildSquadsFromGenesis(world, genesis);
     const ledger = buildLedgerGenesis(world, genesis);
+    const competition = buildCompetitionGenesis(world, genesis);
 
     // Reidrata tudo ANTES de abrir a transação: um snapshot inválido é erro de
     // gênese, não de banco, e não deve deixar uma transação meio aberta.
@@ -136,6 +138,8 @@ export class GenerateWorldGenesis {
       // O razão por último: a conta de caixa e a dotação de cada clube dependem
       // de o clube já existir (a FK da conta aponta para o clube).
       any = (await materializeLedger(repositories, ledger)) || any;
+      // A competição por último: as partidas referenciam os clubes.
+      any = (await repositories.competitions.materializeGenesis(competition)) || any;
       return any;
     });
     return succeed(created);

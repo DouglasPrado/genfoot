@@ -3,6 +3,7 @@ import type { GenesisRepositories, GenesisUnitOfWork } from "@grinta/core";
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
 import { PrismaClubRepository } from "./prisma-club-repository.js";
+import { PrismaCompetitionRepository } from "./prisma-competition-repository.js";
 import { PrismaLedgerRepository } from "./prisma-ledger-repository.js";
 import { PrismaPlayerRepository } from "./prisma-player-repository.js";
 import { PrismaSquadRepository } from "./prisma-squad-repository.js";
@@ -39,5 +40,6 @@ export function bindGenesis(tx: Prisma.TransactionClient): GenesisRepositories {
     players: new PrismaPlayerRepository(tx),
     squads: new PrismaSquadRepository(tx),
     ledger: new PrismaLedgerRepository(tx),
+    competitions: new PrismaCompetitionRepository(tx),
   };
 }

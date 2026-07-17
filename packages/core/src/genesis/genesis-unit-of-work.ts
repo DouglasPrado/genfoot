@@ -1,5 +1,6 @@
 import type { ClubRepository } from "../clubs/club-repository.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
+import type { CompetitionRepository } from "../competitions/competition-repository.js";
 import type { LedgerRepository } from "../finance/ledger-repository.js";
 import type { PlayerRepository } from "../players/player-repository.js";
 
@@ -15,6 +16,7 @@ export interface GenesisRepositories {
   readonly players: PlayerRepository;
   readonly squads: SquadRepository;
   readonly ledger: LedgerRepository;
+  readonly competitions: CompetitionRepository;
 }
 
 /**

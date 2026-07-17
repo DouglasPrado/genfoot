@@ -113,6 +113,8 @@ describe("API command catalog integrity (e2e)", () => {
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // A tabela da liga (C7): derivada dos jogos terminados.
+      "competitions",
       "identity",
       "identity-detail",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
