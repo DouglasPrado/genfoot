@@ -121,3 +121,69 @@ export class ActivateWorld {
     });
   }
 }
+
+export interface DeleteWorldInput {
+  readonly gameWorldId: GameWorldId;
+  /**
+   * O `seed` do mundo, digitado por quem confirma.
+   *
+   * A confirmação é checada NO SERVIDOR, não só na tela. Uma confirmação que
+   * mora só no cliente não protege nada: quem chama a API direto — script,
+   * curl, um bug de outra tela — apaga o mundo sem digitar coisa alguma. Aqui
+   * ela é pré-condição do comando.
+   */
+  readonly confirmSeed: string;
+}
+
+/**
+ * Apaga o mundo e tudo que pende dele. Irreversível.
+ *
+ * **Recusa mundo com gestor ativo.** Não é zelo excessivo: a R-56 exige 30 dias
+ * de aviso prévio para ARQUIVAR um mundo — operação que preserva tudo e é
+ * reversível. Apagar sem aviso o mundo onde alguém tem clube é estritamente pior
+ * que o que a decisão já protege. Quem quiser mesmo apagar encerra os controles
+ * primeiro, e aí a intenção está explícita.
+ */
+export class DeleteWorld {
+  public constructor(
+    private readonly worlds: WorldRepository,
+    private readonly controls: { countActiveControls(gameWorldId: GameWorldId): Promise<number> },
+  ) {}
+
+  public async execute(
+    input: DeleteWorldInput,
+  ): Promise<Result<{ readonly seed: string }, DomainError>> {
+    const world = await this.worlds.findById(input.gameWorldId);
+    if (world === null) {
+      return fail(
+        new DomainError("WORLD_NOT_FOUND", "Mundo não encontrado.", {
+          gameWorldId: input.gameWorldId,
+        }),
+      );
+    }
+
+    if (input.confirmSeed !== world.seed) {
+      return fail(
+        new DomainError(
+          "WORLD_DELETE_CONFIRMATION_MISMATCH",
+          "A confirmação não bate com o seed do mundo.",
+          { expected: world.seed },
+        ),
+      );
+    }
+
+    const ativos = await this.controls.countActiveControls(input.gameWorldId);
+    if (ativos > 0) {
+      return fail(
+        new DomainError(
+          "WORLD_HAS_ACTIVE_CONTROLS",
+          `O mundo tem ${ativos} clube(s) com gestor ativo. Encerre os controles antes de apagar.`,
+          { activeControls: ativos },
+        ),
+      );
+    }
+
+    await this.worlds.delete(input.gameWorldId);
+    return succeed({ seed: world.seed });
+  }
+}

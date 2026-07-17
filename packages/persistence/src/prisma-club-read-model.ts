@@ -32,6 +32,13 @@ export class PrismaClubReadModel implements ClubReadModel {
       include: {
         stadium: true,
         identityPeriods: { where: { effectiveThrough: null }, take: 1 },
+        // R-180: quem comanda é o controle ATIVO. Sem ele, o clube é da IA — e
+        // é por isso que não há um campo "isAi" para ler.
+        controls: {
+          where: { status: "ACTIVE" },
+          take: 1,
+          include: { worldParticipant: { include: { user: true } } },
+        },
       },
       orderBy: { regionId: "asc" },
     });
@@ -55,8 +62,30 @@ export class PrismaClubReadModel implements ClubReadModel {
           primaryColor: identity.primaryColor,
           secondaryColor: identity.secondaryColor,
           crestTemplateId: identity.crestTemplateId,
+          manager: toManager(row.controls[0]),
         };
       }),
     };
   }
+}
+
+interface ControlRow {
+  readonly worldParticipant: { readonly user: { readonly id: string; readonly name: string } | null } | null;
+}
+
+/**
+ * O gestor, ou `null` para IA.
+ *
+ * `null` também quando o controle existe mas o join não resolve a conta: é linha
+ * corrompida, e inventar um nome ali esconderia o defeito. Um clube que aparece
+ * como automático quando deveria ter dono é visível; um clube com nome inventado
+ * não é.
+ */
+function toManager(
+  control: ControlRow | undefined,
+): { accountId: string; name: string } | null {
+  const user = control?.worldParticipant?.user;
+  return user === undefined || user === null
+    ? null
+    : { accountId: user.id, name: user.name };
 }

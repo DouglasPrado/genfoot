@@ -85,6 +85,7 @@ describe("API command catalog integrity (e2e)", () => {
       "identity:reserve-club",
       "world:activate",
       "world:create",
+      "world:delete",
       "world:genesis",
     ]);
   });
@@ -94,7 +95,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(9);
+    expect(response.body.commandCount).toBe(10);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([

@@ -58,6 +58,27 @@ export class PrismaWorldRepository implements WorldRepository {
       throw new WorldVersionConflict(snapshot.id, expectedVersion);
     }
   }
+
+  /**
+   * Apaga o mundo. As 14 FKs que apontam para `GameWorld` são `ON DELETE
+   * CASCADE` (migration `mundo_cascata`), então clubes, participações, jogadores
+   * e o resto morrem com ele — sem lista de tabelas para alguém esquecer de
+   * atualizar quando um contexto voltar.
+   *
+   * `DomainEventLog` e `IdempotencyKey` são a exceção, e por isso este método
+   * não é um `delete` de uma linha: os dois guardam `gameWorldId` SEM FK
+   * declarada (campo solto no schema, sem `@relation`), então o CASCADE não os
+   * alcança. Sem apagá-los aqui, o mundo sumiria e a cadeia de eventos dele
+   * ficaria órfã no banco para sempre.
+   *
+   * Numa transação: mundo sem eventos e eventos sem mundo são estados que
+   * ninguém deve conseguir observar.
+   */
+  public async delete(id: GameWorldId): Promise<void> {
+    await this.client.domainEventLog.deleteMany({ where: { gameWorldId: id } });
+    await this.client.idempotencyKey.deleteMany({ where: { gameWorldId: id } });
+    await this.client.gameWorld.delete({ where: { id } });
+  }
 }
 
 export class WorldVersionConflict extends Error {

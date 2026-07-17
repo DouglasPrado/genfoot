@@ -15,6 +15,12 @@ import type { Prisma } from "./generated/prisma/client.js";
 export class PrismaClubControlRepository implements ClubControlRepository {
   public constructor(private readonly client: Prisma.TransactionClient) {}
 
+  public countActiveControls(gameWorldId: string): Promise<number> {
+    return this.client.clubControl.count({
+      where: { gameWorldId, status: "ACTIVE" },
+    });
+  }
+
   public async findControlById(
     gameWorldId: string,
     id: string,

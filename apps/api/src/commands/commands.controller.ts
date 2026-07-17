@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type {
+  ClubControlRepository,
   ClubRepository,
   IdentityUnitOfWork,
   WorldRepository,
@@ -23,11 +24,12 @@ import { registeredQueryNames } from "../queries/query-registry.js";
 import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
+  CLUB_CONTROL_REPOSITORY,
+  CLUB_REPOSITORY,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
   REALTIME_PUBLISHER,
-  CLUB_REPOSITORY,
 } from "../core/tokens.js";
 import type { RealtimePublisher } from "../realtime/realtime-publisher.js";
 import {
@@ -47,11 +49,10 @@ const SUPPORTED_CONTRACT_VERSIONS = new Set(["v1"]);
 export class CommandsController {
   constructor(
     @Inject(CLUB_REPOSITORY) private readonly clubs: ClubRepository,
+    @Inject(CLUB_CONTROL_REPOSITORY)
+    private readonly controls: ClubControlRepository,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
-    // C1 já está no Postgres (R-173/R-175); os outros quinze contextos seguem
-    // no `repository` JSON. Dois caminhos é transitório e declarado — some
-    // quando o último contexto migrar.
     @Inject(IDENTITY_UNIT_OF_WORK)
     private readonly identityUnitOfWork: IdentityUnitOfWork,
     // O mundo é tabela, sempre (R-173/R-182) — raiz de tudo.
@@ -81,10 +82,7 @@ export class CommandsController {
     summary: "Envia um command (envelope idempotente)",
     description:
       "commandType roteia para o caso de uso. Resposta: ACCEPTED | " +
-      "ALREADY_APPLIED | REJECTED. 127 tipos em 17 contextos (world, club, " +
-      "market, ledger, infrastructure, scheduler, season, automation, staff, " +
-      "competition, player, narrative, inbox, admin, identity, eventing, match). " +
-      "Veja GET /commands/catalog.",
+      "ALREADY_APPLIED | REJECTED. Veja GET /commands/catalog.",
   })
   @ApiBody({
     schema: {
@@ -187,6 +185,7 @@ export class CommandsController {
     try {
       result = await handler({
         clubs: this.clubs,
+        controls: this.controls,
         identityUnitOfWork: this.identityUnitOfWork,
         worlds: this.worlds,
         envelope,

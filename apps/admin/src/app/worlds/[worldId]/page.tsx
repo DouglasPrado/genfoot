@@ -8,6 +8,7 @@ import { AppShell, PageHeader } from "@/components/app-shell";
 import { ClubsTable, type ClubRow } from "@/components/clubs-table";
 import { CommandConsole } from "@/components/command-console";
 import { CompetitionsPanel } from "@/components/competitions-panel";
+import { DeleteWorldDialog } from "@/components/delete-world-dialog";
 import { Mock, MockNotice } from "@/components/mock";
 import { QuickActions } from "@/components/quick-actions";
 import { SeasonHistory } from "@/components/season-history";
@@ -148,7 +149,19 @@ export default function WorldDetailPage() {
                 <div className="mono mt-0.5 text-lg">{clubs.length}</div>
               </div>
             </div>
-            <QuickActions worldId={worldId} onDone={() => setRefreshKey((k) => k + 1)} />
+            <div className="flex items-center gap-2">
+              <QuickActions
+                worldId={worldId}
+                onDone={() => setRefreshKey((k) => k + 1)}
+              />
+              {snapshot === null ? null : (
+                <DeleteWorldDialog
+                  worldId={worldId}
+                  seed={snapshot.seed}
+                  clubCount={clubs.length}
+                />
+              )}
+            </div>
           </CardContent>
         </Card>
 

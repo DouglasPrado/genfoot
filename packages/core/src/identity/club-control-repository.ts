@@ -10,6 +10,16 @@ import type { ClubControlSnapshot } from "./club-control.js";
  * inteiro carregado.
  */
 export interface ClubControlRepository {
+  /**
+   * Quantos clubes deste mundo têm gestor ativo.
+   *
+   * É a pergunta que `DeleteWorld` faz antes de apagar: a R-56 exige 30 dias de
+   * aviso para ARQUIVAR um mundo (operação reversível, que preserva tudo), então
+   * apagá-lo sem aviso enquanto alguém tem clube é pior que o que a decisão já
+   * protege. `count`, e não a lista: quem pergunta quer saber SE pode, não quem
+   * são.
+   */
+  countActiveControls(gameWorldId: string): Promise<number>;
   findControlById(
     gameWorldId: string,
     id: string,

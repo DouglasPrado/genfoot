@@ -30,6 +30,19 @@ export interface ClubListItemView {
   readonly primaryColor: string | null;
   readonly secondaryColor: string | null;
   readonly crestTemplateId: string | null;
+  /**
+   * Quem comanda o clube, ou `null` — e `null` significa **IA**.
+   *
+   * Isto é a R-180 na tela: "IA é a AUSÊNCIA de controle, não um tipo de
+   * controle". Não existe `controlType: "AI"` para consultar; existe um
+   * `ClubControl` ativo, ou não existe. O read model resolve o join
+   * (`Club → ClubControl ACTIVE → WorldParticipant → UserAccount`) e entrega a
+   * pergunta respondida.
+   *
+   * Um campo `isAi: boolean` seria a projeção duplicada que a R-180 matou: duas
+   * fontes para "quem comanda" divergem em silêncio.
+   */
+  readonly manager: { readonly accountId: string; readonly name: string } | null;
 }
 
 export interface ClubWorldView {

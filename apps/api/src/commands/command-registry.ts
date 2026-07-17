@@ -2,6 +2,7 @@ import {
   ActivateProvisionedWorld,
   ConfirmOnboarding,
   CreateWorld,
+  DeleteWorld,
   EndClubControl,
   GenerateWorldGenesis,
   InspectWorld,
@@ -9,6 +10,7 @@ import {
   ReleaseClubReservation,
   RequestClubSwitch,
   ReserveClub,
+  type ClubControlRepository,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldMutationResult,
@@ -30,9 +32,9 @@ import type { CommandEnvelope } from "./command-contract.js";
 /**
  * O barramento de commands depois do extermínio da arquitetura morta (R-175).
  *
- * Eram ~148 commands sobre 16 mega-agregados e o adapter JSON. **Sobraram 9** —
+ * Eram ~148 commands sobre 16 mega-agregados e o adapter JSON. **Sobraram 10** —
  * os que uma vertical viva exige hoje: o admin criando um mundo, gerando os
- * clubes e ativando; e o jogador entrando e escolhendo clube.
+ * clubes, ativando e apagando; e o jogador entrando e escolhendo clube.
  *
  * Os outros não foram adiados: foram APAGADOS, com os contextos que os serviam.
  * Voltam um a um, já em agregado por entidade sobre Postgres, quando uma tela
@@ -55,6 +57,8 @@ export interface CommandContext {
   readonly worlds: WorldRepository;
   /** C3 — o clube é tabela. É o que destrava `identity:reserve-club`. */
   readonly clubs: ClubRepository;
+  /** C1 — só para perguntar se alguém está jogando antes de apagar o mundo. */
+  readonly controls: ClubControlRepository;
   readonly envelope: CommandEnvelope;
 }
 
@@ -65,6 +69,18 @@ export type CommandHandler = (
 function invalidPayload(error: z.ZodError): DomainError {
   return new DomainError("COMMAND_PAYLOAD_INVALID", error.message);
 }
+
+/**
+ * A confirmação vai no PAYLOAD, e é checada no domínio.
+ *
+ * Uma confirmação que mora só no modal não protege nada: quem chama a API direto
+ * — script, curl, um bug de outra tela — apaga o mundo sem digitar coisa alguma.
+ * O modal pede nome e uuid porque é bom para o operador; o comando exige o seed
+ * porque é o que impede o acidente.
+ */
+const deleteWorldPayload = z.object({
+  confirmSeed: z.string().min(1),
+});
 
 const createWorldPayload = z.object({
   seed: z.string().min(1),
@@ -98,40 +114,62 @@ interface IdentityUseCase {
 }
 
 /**
- * Os payloads de C1, conforme `10-catalogo-de-commands.md`.
+ * Os payloads de C1.
  *
  * Isto NÃO existia, e o buraco era real: o `ic()` repassava `...payload` como
  * `never` direto ao caso de uso. Um campo obrigatório ausente não virava
  * `COMMAND_PAYLOAD_INVALID` — descia até o Prisma e voltava como crash, com o
  * caminho do arquivo e o CÓDIGO-FONTE do adapter dentro da resposta HTTP.
  *
- * `acceptInheritedState` é `literal(true)`, não `boolean`: o catálogo o define
- * como a confirmação de assumir o clube COM o estado herdado — dívidas,
- * contratos, promessas — e marca o command como risco alto. Um `false` não é
- * "outro caminho", é ausência de consentimento; recusá-lo na borda deixa o
- * domínio livre de um flag que só pode valer `true`.
+ * **Cada schema espelha o `Input` do caso de uso — não o que eu achava que ele
+ * pedia.** A primeira versão destes schemas foi escrita de memória, e dois dos
+ * seis estavam errados: `end-club-control` e `request-switch` pediam
+ * `{accountId, clubId}` quando o domínio quer `controlId`. Uma validação
+ * inventada é pior que nenhuma — ela RECUSA o payload certo e diz que a culpa é
+ * do cliente. Só apareceu ao chamar por HTTP.
+ *
+ * `acceptInheritedState` é `literal(true)` e NÃO vai ao domínio: o catálogo o
+ * define como a confirmação de assumir o clube COM o estado herdado — dívidas,
+ * contratos, promessas — e marca o command como risco alto. `false` não é "outro
+ * caminho", é ausência de consentimento; recusá-lo na borda deixa o domínio
+ * livre de um flag que só pode valer `true`.
  */
 const identityPayloads: Record<string, z.ZodType> = {
+  // JoinWorldInput
   "identity:join-world": z.object({ accountId: z.string().uuid() }),
+  // ReserveClubInput (o `attemptKey` vem do envelope, não do payload)
   "identity:reserve-club": z.object({
     accountId: z.string().uuid(),
     clubId: z.string().uuid(),
     expiresOn: z.string(),
   }),
+  // ConfirmOnboardingInput + a confirmação de risco alto do catálogo (:81)
   "identity:confirm-onboarding": z.object({
     reservationId: z.string().uuid(),
     acceptInheritedState: z.literal(true),
   }),
+  // ReleaseClubReservationInput
   "identity:release-club-reservation": z.object({
     reservationId: z.string().uuid(),
   }),
+  /**
+   * EndClubControlInput — `controlId`, não `clubId`: quem termina é o CONTROLE,
+   * e o clube continua existindo (a IA assume, R-180).
+   *
+   * `cooldownDays` tem default aqui e isso é dívida declarada: ele é config de
+   * mundo (`GameRuleConfig`) e volta para lá com C2 (R-182). O próprio input do
+   * domínio já diz isso. 30 é o valor de R-26.
+   */
   "identity:end-club-control": z.object({
-    accountId: z.string().uuid(),
-    clubId: z.string().uuid(),
+    controlId: z.string().uuid(),
+    reason: z.string().min(1),
+    cooldownDays: z.number().int().nonnegative().default(30),
   }),
+  // RequestClubSwitch É um ReserveClub por dentro — mesmo input.
   "identity:request-switch": z.object({
     accountId: z.string().uuid(),
     clubId: z.string().uuid(),
+    expiresOn: z.string(),
   }),
 };
 
@@ -241,6 +279,32 @@ const handlers: Record<string, CommandHandler> = {
       resource: `world:${worldId.value}`,
       mutation: result.value,
     });
+  },
+
+  /**
+   * Apaga o mundo e TUDO que pende dele. Irreversível.
+   *
+   * Não confunda com arquivar (R-56): arquivar põe em read-only, preserva
+   * "histórico, títulos e recordes" e é reversível. O canon só tem essa; deletar
+   * é ferramenta de operação, não regra de jogo — e por isso recusa mundo com
+   * gestor ativo.
+   */
+  "world:delete": async ({ worlds, controls, envelope }) => {
+    const raw = requireWorldId(envelope.worldId);
+    if (!raw.ok) return raw;
+    const worldId = parseGameWorldId(raw.value);
+    if (!worldId.ok) return worldId;
+    const parsed = deleteWorldPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new DeleteWorld(worlds, controls).execute({
+      gameWorldId: worldId.value,
+      confirmSeed: parsed.data.confirmSeed,
+    });
+    if (!result.ok) return result;
+    // `resource` null: o recurso deixou de existir — apontar para ele seria
+    // mandar o cliente buscar um 404.
+    return succeed({ resource: null });
   },
 
   "identity:join-world": ic((u) => new JoinWorld(u)),

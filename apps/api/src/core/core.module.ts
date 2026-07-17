@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import {
   createPrismaClient,
+  PrismaClubControlRepository,
   PrismaClubReadModel,
   PrismaClubRepository,
   PrismaIdentityReadModel,
@@ -12,6 +13,7 @@ import {
 
 import { IdempotencyStore } from "./idempotency-store.js";
 import {
+  CLUB_CONTROL_REPOSITORY,
   CLUB_READ_MODEL,
   CLUB_REPOSITORY,
   GAME_WORLD_REPOSITORY,
@@ -76,6 +78,12 @@ import {
         new PrismaClubReadModel(client),
     },
     {
+      provide: CLUB_CONTROL_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaClubControlRepository =>
+        new PrismaClubControlRepository(client),
+    },
+    {
       provide: IDENTITY_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaIdentityUnitOfWork =>
@@ -98,6 +106,7 @@ import {
     WORLD_READ_MODEL,
     CLUB_REPOSITORY,
     CLUB_READ_MODEL,
+    CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,
     IDENTITY_READ_MODEL,

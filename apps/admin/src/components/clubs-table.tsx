@@ -1,3 +1,5 @@
+import { Bot } from "lucide-react";
+
 import { ClubName } from "@/components/club-crest";
 import { Mock } from "@/components/mock";
 import { mockNumerosDoClube } from "@/lib/mock-world";
@@ -27,6 +29,8 @@ export interface ClubRow {
   readonly primaryColor: string | null;
   readonly secondaryColor: string | null;
   readonly crestTemplateId: string | null;
+  /** `null` = IA. Não há flag "isAi": a IA É a ausência de controle (R-180). */
+  readonly manager: { readonly accountId: string; readonly name: string } | null;
 }
 
 function money(minor: bigint): string {
@@ -63,6 +67,7 @@ export function ClubsTable({
             <th className="px-3 py-2 font-medium">Clube</th>
             <th className="px-3 py-2 font-medium">Código</th>
             <th className="px-3 py-2 font-medium">Região</th>
+            <th className="px-3 py-2 font-medium">Gestor</th>
             <th className="px-3 py-2 text-right font-medium">Capacidade</th>
             <th className="px-3 py-2 text-right font-medium">Reputação</th>
             {/* As quatro colunas mockadas ficam juntas e à direita, com o selo
@@ -106,6 +111,19 @@ export function ClubsTable({
               </td>
               <td className="mono px-3 py-2 text-xs text-muted-foreground">
                 {club.regionId}
+              </td>
+              <td className="px-3 py-2">
+                {/* R-180 na tela: sem controle ativo, o clube é da IA. Não é um
+                    estado de erro nem "sem dono" — é o estado normal de 15 dos
+                    16 clubes de um mundo novo. */}
+                {club.manager === null ? (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Bot className="size-3.5 shrink-0" />
+                    automático
+                  </span>
+                ) : (
+                  <span className="text-xs">{club.manager.name}</span>
+                )}
               </td>
               <td className="mono px-3 py-2 text-right tabular-nums text-muted-foreground">
                 {club.stadiumCapacity.toLocaleString("pt-BR")}
