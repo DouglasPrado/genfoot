@@ -418,10 +418,20 @@ export function Club() {
           </View>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.push("/financas")}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir finanças"
+        >
         <Card>
           <SectionHeader
             title="FINANÇAS"
-            trailing={<Icon name="wallet" size={16} color={color.textMuted} />}
+            trailing={
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text style={styles.openHint}>ABRIR</Text>
+                <Icon name="chevron-forward" size={16} color={color.textMuted} />
+              </View>
+            }
           />
           {ledgerQuery.state === "ready" && ledgerQuery.data !== null ? (
             <View style={styles.financeContent}>
@@ -462,6 +472,7 @@ export function Club() {
             </View>
           )}
         </Card>
+        </Pressable>
 
         <Card>
           <SectionHeader
@@ -758,6 +769,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   repBar: { flex: 1 },
+  openHint: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
   financeContent: { gap: space.sm },
   finGrid: { flexDirection: "row", gap: space.sm },
   fanMeter: {
