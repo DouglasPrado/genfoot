@@ -19,3 +19,4 @@ export * from "./prisma-ledger-repository.js";
 export * from "./prisma-ledger-read-model.js";
 export * from "./prisma-competition-repository.js";
 export * from "./prisma-competition-read-model.js";
+export * from "./prisma-match-play-repository.js";

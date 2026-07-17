@@ -96,6 +96,8 @@ describe("API command catalog integrity (e2e)", () => {
       "world:delete",
       "world:genesis",
       "world:pause",
+      // C5: joga a próxima rodada da liga (simulação determinística).
+      "world:play-round",
       "world:resume",
       "world:set-identity",
     ]);
@@ -106,7 +108,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(15);
+    expect(response.body.commandCount).toBe(16);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

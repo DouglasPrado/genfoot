@@ -22,6 +22,7 @@ export const COMPETITION_READ_MODEL = "COMPETITION_READ_MODEL";
 /** Escopo transacional de C3 (Decisão 19.10): clube + evento no mesmo commit. */
 export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
 export const GENESIS_UNIT_OF_WORK = "GENESIS_UNIT_OF_WORK";
+export const MATCH_PLAY_REPOSITORY = "MATCH_PLAY_REPOSITORY";
 /** C1 leitura fora do UoW: "alguém está jogando este mundo?" antes de apagá-lo. */
 export const CLUB_CONTROL_REPOSITORY = "CLUB_CONTROL_REPOSITORY";
 /** C2 leitura: a LISTA dos mundos. Sem ela o admin só via o que o navegador lembrava. */

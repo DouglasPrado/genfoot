@@ -7,6 +7,7 @@ import {
   DeleteWorld,
   EndClubControl,
   GenerateWorldGenesis,
+  PlayNextRound,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -18,6 +19,7 @@ import {
   type ClubControlRepository,
   type ClubUnitOfWork,
   type GenesisUnitOfWork,
+  type MatchPlayRepository,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldMutationResult,
@@ -70,6 +72,8 @@ export interface CommandContext {
   readonly clubUnitOfWork: ClubUnitOfWork;
   /** A gênese é atômica: 16 clubes + 368 jogadores + 16 elencos numa transação. */
   readonly genesisUnitOfWork: GenesisUnitOfWork;
+  /** C5 — joga a próxima rodada da liga (simulação determinística). */
+  readonly matchPlay: MatchPlayRepository;
   /**
    * Quem agiu — a conta do JOGO, vinda da SESSÃO.
    *
@@ -349,6 +353,22 @@ const handlers: Record<string, CommandHandler> = {
     ).execute(worldId.value);
     if (!result.ok) return result;
     return succeed({ resource: `world:${worldId.value}` });
+  },
+
+  /**
+   * Joga a próxima rodada não disputada da liga (C5). O placar emerge do kernel
+   * determinístico a partir da força dos elencos — não é definido por ninguém.
+   * A tabela (projeção, R-178) se preenche sozinha depois.
+   */
+  "world:play-round": async ({ worlds, matchPlay, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const result = await new PlayNextRound(
+      world.value.snapshot.seed,
+      matchPlay,
+    ).execute(world.value.worldId);
+    if (!result.ok) return result;
+    return succeed({ resource: `round:${result.value.roundNumber}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

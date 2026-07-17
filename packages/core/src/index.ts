@@ -97,3 +97,6 @@ export * from "./competitions/competition-bootstrap.js";
 export * from "./competitions/competition-repository.js";
 export * from "./competitions/standings.js";
 export * from "./competitions/competition-read-model.js";
+export * from "./matches/match-simulation.js";
+export * from "./matches/match-play-repository.js";
+export * from "./matches/play-next-round.js";

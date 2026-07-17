@@ -16,6 +16,7 @@ import type {
   ClubUnitOfWork,
   GenesisUnitOfWork,
   IdentityUnitOfWork,
+  MatchPlayRepository,
   WorldRepository,
 } from "@grinta/core";
 import type { Request } from "express";
@@ -30,6 +31,7 @@ import {
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
+  MATCH_PLAY_REPOSITORY,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
@@ -59,6 +61,8 @@ export class CommandsController {
     private readonly clubUnitOfWork: ClubUnitOfWork,
     @Inject(GENESIS_UNIT_OF_WORK)
     private readonly genesisUnitOfWork: GenesisUnitOfWork,
+    @Inject(MATCH_PLAY_REPOSITORY)
+    private readonly matchPlay: MatchPlayRepository,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
     @Inject(IDENTITY_UNIT_OF_WORK)
@@ -196,6 +200,7 @@ export class CommandsController {
         controls: this.controls,
         clubUnitOfWork: this.clubUnitOfWork,
         genesisUnitOfWork: this.genesisUnitOfWork,
+        matchPlay: this.matchPlay,
         // Quem agiu vem do TOKEN, não do corpo. O evento grava isso.
         actorId: request.session?.accountId ?? null,
         identityUnitOfWork: this.identityUnitOfWork,

@@ -9,6 +9,7 @@ import {
   PrismaClubRepository,
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
+  PrismaMatchPlayRepository,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
   PrismaIdentityUnitOfWork,
@@ -27,6 +28,7 @@ import {
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
+  MATCH_PLAY_REPOSITORY,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_READ_MODEL,
@@ -120,6 +122,12 @@ import {
         new PrismaGenesisUnitOfWork(client),
     },
     {
+      provide: MATCH_PLAY_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMatchPlayRepository =>
+        new PrismaMatchPlayRepository(client),
+    },
+    {
       provide: CLUB_CONTROL_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubControlRepository =>
@@ -159,6 +167,7 @@ import {
     COMPETITION_READ_MODEL,
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
+    MATCH_PLAY_REPOSITORY,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,
