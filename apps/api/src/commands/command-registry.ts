@@ -1,5 +1,7 @@
 import {
   ActivateProvisionedWorld,
+  ApplyClubIdentity,
+  ArchiveWorld,
   ConfirmOnboarding,
   CreateWorld,
   DeleteWorld,
@@ -7,10 +9,14 @@ import {
   GenerateWorldGenesis,
   InspectWorld,
   JoinWorld,
+  PauseWorld,
   ReleaseClubReservation,
   RequestClubSwitch,
   ReserveClub,
+  ResumeWorld,
+  SetWorldIdentity,
   type ClubControlRepository,
+  type ClubUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldMutationResult,
@@ -59,6 +65,19 @@ export interface CommandContext {
   readonly clubs: ClubRepository;
   /** C1 — só para perguntar se alguém está jogando antes de apagar o mundo. */
   readonly controls: ClubControlRepository;
+  /** Escopo transacional de C3: clube + evento no mesmo commit (Decisão 19.10). */
+  readonly clubUnitOfWork: ClubUnitOfWork;
+  /**
+   * Quem agiu — a conta do JOGO, vinda da SESSÃO.
+   *
+   * Nunca do payload: o evento grava `actorId`, e quem é o ator é o token que
+   * chegou, não o que o cliente escreveu. Um `actorId` de payload deixaria
+   * qualquer um assinar o rebranding em nome de outro.
+   *
+   * `null` = comando de sistema (admin, scheduler) — o `actorType` do evento
+   * vira SYSTEM.
+   */
+  readonly actorId: string | null;
   readonly envelope: CommandEnvelope;
 }
 
@@ -82,10 +101,68 @@ const deleteWorldPayload = z.object({
   confirmSeed: z.string().min(1),
 });
 
+/**
+ * `ApplyClubIdentity` (catálogo `:386`, risco baixo, MF-25).
+ *
+ * O payload do catálogo é `{crestAssetId?, colors?, kitAssetId?, tributes?}` —
+ * puramente cosmético. O nome/código NÃO estão lá, e é a extensão que o BC-003
+ * fez conscientemente (892e0e9): a identidade do clube é um PERÍODO, e nome e
+ * visual mudam juntos ao abrir um. Segui o modelo do BC-003 e os NOMES DE EVENTO
+ * do catálogo — eles não conflitam.
+ *
+ * `expectedVersion` é obrigatório: concorrência otimista por agregado (R-175).
+ * Sem ele, dois rebrandings simultâneos escreveriam um por cima do outro.
+ */
+const applyClubIdentityPayload = z.object({
+  clubId: z.string().uuid(),
+  expectedVersion: z.number().int().positive(),
+  name: z.string().min(1),
+  // O catálogo canônico do domínio valida o resto (visual-identity-catalog):
+  // aqui só a forma. Duplicar a regra de paleta seria dois donos para ela.
+  shortCode: z.string().regex(/^[A-Z0-9]{2,5}$/u),
+  visualIdentity: z
+    .object({
+      primaryColor: z.string(),
+      secondaryColor: z.string(),
+      tertiaryColor: z.string().nullable(),
+      homeKitTemplateId: z.string(),
+      awayKitTemplateId: z.string(),
+      crestTemplateId: z.string(),
+    })
+    .optional(),
+});
+
 const createWorldPayload = z.object({
   seed: z.string().min(1),
   startDate: z.string(),
   rulesetVersion: z.string().default("1.0.0"),
+});
+
+/**
+ * Congelar e inativar aceitam um motivo, que viaja até o evento.
+ *
+ * Opcional de propósito: exigir motivo obrigatório em operação de incidente é
+ * atrito na hora errada, e produz "asdf" como motivo. Ausente vira `null` — que
+ * é "não disseram", e não uma string vazia fingindo texto.
+ */
+const worldLifecyclePayload = z.object({
+  reason: z.string().trim().min(1).max(280).optional(),
+});
+
+/**
+ * Identidade do mundo. Update parcial, e os três casos são distintos:
+ * campo ausente = não mexe · `null` = limpa · texto = grava.
+ *
+ * `nullable().optional()` carrega essa diferença até o domínio. Um
+ * `.optional()` sozinho tornaria "limpar o nome" inexprimível pela API.
+ *
+ * Os limites (60/500) NÃO são repetidos aqui: quem valida tamanho é o agregado,
+ * e um número duplicado na borda vira dois números que divergem. O zod só
+ * garante o tipo.
+ */
+const worldIdentityPayload = z.object({
+  name: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
 });
 
 function requireWorldId(
@@ -282,11 +359,90 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   /**
+   * Nome e descrição. Vale em qualquer status — identidade é rótulo
+   * administrativo, não simulação.
+   */
+  "world:set-identity": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldIdentityPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new SetWorldIdentity(worlds).execute(
+      loaded.value.worldId,
+      parsed.data,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
+   * Congela o mundo: segue legível, o relógio para. Reversível por `world:resume`.
+   */
+  "world:pause": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldLifecyclePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new PauseWorld(worlds).execute(
+      loaded.value.worldId,
+      parsed.data.reason ?? null,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /** Descongela — de CONGELADO ou de INATIVO (R-56: arquivar é reversível). */
+  "world:resume": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+
+    const result = await new ResumeWorld(worlds).execute(loaded.value.worldId);
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
+   * Inativa (arquiva, R-56): read-only, preserva histórico/títulos/recordes,
+   * REVERSÍVEL por `world:resume`. Não é `world:delete`.
+   *
+   * O gatilho de R-56 (≥2 temporadas ociosas, aviso de 30 dias) não é conferido:
+   * não há temporada ligada nem medida de atividade para conferir. Quem julga o
+   * ócio é o operador — a lacuna está declarada no agregado, não escondida aqui.
+   */
+  "world:archive": async ({ worlds, envelope }) => {
+    const loaded = await loadWorld(worlds, envelope.worldId);
+    if (!loaded.ok) return loaded;
+    const parsed = worldLifecyclePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await new ArchiveWorld(worlds).execute(
+      loaded.value.worldId,
+      parsed.data.reason ?? null,
+    );
+    if (!result.ok) return result;
+    return succeed({
+      resource: `world:${loaded.value.worldId}`,
+      mutation: result.value,
+    });
+  },
+
+  /**
    * Apaga o mundo e TUDO que pende dele. Irreversível.
    *
    * Não confunda com arquivar (R-56): arquivar põe em read-only, preserva
-   * "histórico, títulos e recordes" e é reversível. O canon só tem essa; deletar
-   * é ferramenta de operação, não regra de jogo — e por isso recusa mundo com
+   * "histórico, títulos e recordes" e é reversível — e agora existe, em
+   * `world:archive`. Deletar não é nada disso, e por isso recusa mundo com
    * gestor ativo.
    */
   "world:delete": async ({ worlds, controls, envelope }) => {
@@ -305,6 +461,48 @@ const handlers: Record<string, CommandHandler> = {
     // `resource` null: o recurso deixou de existir — apontar para ele seria
     // mandar o cliente buscar um 404.
     return succeed({ resource: null });
+  },
+
+  /**
+   * Personalizar o clube (BC-003 / MF-25). Voltou: o command vivia dentro do
+   * `WorldClubPortfolio` e foi apagado com ele (R-175).
+   */
+  "club:apply-identity": async ({ worlds, clubUnitOfWork, envelope, actorId }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = applyClubIdentityPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    if (actorId === null) {
+      // Personalizar clube é ato de JOGADOR. Sem conta de jogo não há quem
+      // assine — e o `actorId` do evento não pode ser inventado.
+      return fail(
+        new DomainError(
+          "FORBIDDEN_NOT_CONTROLLER",
+          "É preciso uma conta de jogo para personalizar um clube.",
+        ),
+      );
+    }
+
+    const { visualIdentity, ...identity } = parsed.data;
+    const result = await new ApplyClubIdentity(clubUnitOfWork).execute({
+      ...identity,
+      // `exactOptionalPropertyTypes`: `visualIdentity: undefined` NÃO é o mesmo
+      // que ausente. Ausente = "não mexe no visual"; presente-e-undefined seria
+      // um valor. O spread condicional preserva a diferença.
+      ...(visualIdentity === undefined ? {} : { visualIdentity }),
+      gameWorldId: world.value.worldId,
+      worldSeed: world.value.snapshot.seed,
+      // A data do MUNDO, não a do relógio: o período de identidade vige em data
+      // de mundo (R-177), e é ela que decide se o rebranding abre período novo
+      // ou substitui o de hoje.
+      occurredOn: world.value.snapshot.currentDate,
+      actorId,
+      ...(envelope.correlationId === undefined
+        ? {}
+        : { correlationId: envelope.correlationId }),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   "identity:join-world": ic((u) => new JoinWorld(u)),

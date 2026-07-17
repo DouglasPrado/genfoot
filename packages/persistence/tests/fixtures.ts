@@ -130,5 +130,22 @@ export async function seedClub(client: PrismaClient, id = CLUB_ID): Promise<stri
       rulesetVersion: "1.0.0",
     },
   });
+  // O estádio é OBRIGATÓRIO no domínio (`ClubSnapshot.stadium`, não opcional):
+  // clube sem estádio não existe, e uma fixture que o omitia produzia um clube
+  // que o `Club.fromSnapshot` recusaria. Ela mentia — o read model, ao exigi-lo,
+  // só tornou a mentira visível.
+  await client.stadium.create({
+    data: {
+      id: `019b76da-a800-7bbb-9462-${id.slice(-12)}`,
+      gameWorldId: WORLD_ID,
+      clubId: id,
+      name: `Estádio ${id.slice(-4)}`,
+      tenure: "OWNED",
+      capacity: 10_000,
+      pitchQuality: 60,
+      condition: 100,
+      licenseStatus: "LICENSED",
+    },
+  });
   return id;
 }

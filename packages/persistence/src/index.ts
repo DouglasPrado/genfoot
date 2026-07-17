@@ -11,3 +11,4 @@ export * from "./prisma-world-participant-repository.js";
 export * from "./prisma-club-repository.js";
 export * from "./prisma-club-read-model.js";
 export * from "./prisma-world-read-model.js";
+export * from "./prisma-club-unit-of-work.js";

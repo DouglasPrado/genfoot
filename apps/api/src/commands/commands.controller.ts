@@ -13,6 +13,7 @@ import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type {
   ClubControlRepository,
   ClubRepository,
+  ClubUnitOfWork,
   IdentityUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -26,6 +27,7 @@ import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
   CLUB_CONTROL_REPOSITORY,
   CLUB_REPOSITORY,
+  CLUB_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
@@ -51,6 +53,8 @@ export class CommandsController {
     @Inject(CLUB_REPOSITORY) private readonly clubs: ClubRepository,
     @Inject(CLUB_CONTROL_REPOSITORY)
     private readonly controls: ClubControlRepository,
+    @Inject(CLUB_UNIT_OF_WORK)
+    private readonly clubUnitOfWork: ClubUnitOfWork,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
     @Inject(IDENTITY_UNIT_OF_WORK)
@@ -186,6 +190,9 @@ export class CommandsController {
       result = await handler({
         clubs: this.clubs,
         controls: this.controls,
+        clubUnitOfWork: this.clubUnitOfWork,
+        // Quem agiu vem do TOKEN, não do corpo. O evento grava isso.
+        actorId: request.session?.accountId ?? null,
         identityUnitOfWork: this.identityUnitOfWork,
         worlds: this.worlds,
         envelope,

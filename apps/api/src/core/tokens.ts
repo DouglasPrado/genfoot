@@ -16,6 +16,8 @@ export const CLUB_REPOSITORY = "CLUB_REPOSITORY";
  * outra é o defeito que o e2e pegou com um 500.
  */
 export const CLUB_READ_MODEL = "CLUB_READ_MODEL";
+/** Escopo transacional de C3 (Decisão 19.10): clube + evento no mesmo commit. */
+export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
 /** C1 leitura fora do UoW: "alguém está jogando este mundo?" antes de apagá-lo. */
 export const CLUB_CONTROL_REPOSITORY = "CLUB_CONTROL_REPOSITORY";
 /** C2 leitura: a LISTA dos mundos. Sem ela o admin só via o que o navegador lembrava. */
