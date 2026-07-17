@@ -518,7 +518,7 @@ export function Club() {
               />
             }
           />
-          {(narrativeQuery.data?.items.length ?? 0) === 0 ? (
+          {(narrativeQuery.data?.items?.length ?? 0) === 0 ? (
             <Text style={styles.pressEmpty}>
               {narrativeQuery.state === "loading"
                 ? "Buscando as manchetes…"
