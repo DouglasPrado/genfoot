@@ -54,6 +54,20 @@ export interface SimulatedMatchResult {
   readonly awayScorers: readonly Scorer[];
   /** O feed de gols com minuto, ordenado (C5-V1). */
   readonly goalEvents: readonly GoalEvent[];
+  /** O manifesto de replay (C5-V2): o que reproduz a partida bit a bit. */
+  readonly manifest: SimulationReplayManifest;
+}
+
+/** O manifesto persistível de replay (C5-V2, doc 15 §3.1). */
+export interface SimulationReplayManifest {
+  readonly engineBuild: string;
+  readonly chances: number;
+  readonly randomSeed: string;
+  readonly homeStrength: number;
+  readonly awayStrength: number;
+  readonly inputHash: string;
+  readonly resultHash: string;
+  readonly statsHash: string;
 }
 
 /**
@@ -117,5 +131,15 @@ export function simulateScheduledMatch(
     homeScorers,
     awayScorers,
     goalEvents,
+    manifest: {
+      engineBuild: MATCH_ENGINE_BUILD,
+      chances: MATCH_CHANCES,
+      randomSeed: worldSeed,
+      homeStrength: match.homeStrength,
+      awayStrength: match.awayStrength,
+      inputHash,
+      resultHash: output.resultHash,
+      statsHash: output.statsHash,
+    },
   };
 }

@@ -80,36 +80,61 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
           finishedAt: new Date(),
         },
       });
-      // Só grava a artilharia da partida que ESTE processamento fechou —
-      // reprocessar (a partida já FINISHED) não duplica os gols.
+      // Só processa a partida que ESTE `saveResults` fechou — reprocessar (já
+      // FINISHED) não duplica nada.
       if (count === 0) continue;
-      const goals = [...result.homeScorers, ...result.awayScorers];
-      if (goals.length === 0) continue;
-      await this.client.playerMatchStats.deleteMany({
+
+      // O manifesto de replay (C5-V2): reproduz a partida bit a bit (doc 15
+      // §3.1). Vale para TODA partida jogada, inclusive 0×0. Reescrito por
+      // matchId (unique) — reprocessar não duplica.
+      const m = result.manifest;
+      await this.client.matchSimulation.deleteMany({
         where: { matchId: result.matchId },
       });
-      await this.client.playerMatchStats.createMany({
-        data: goals.map((scorer) => ({
+      await this.client.matchSimulation.create({
+        data: {
+          gameWorldId,
           matchId: result.matchId,
-          playerId: scorer.playerId,
-          goals: scorer.goals,
-          // Só gols são simulados hoje; o resto fica zerado até o motor evoluir.
-          assists: 0,
-          shots: 0,
-          shotsOnTarget: 0,
-          passesAttempted: 0,
-          passesCompleted: 0,
-          tackles: 0,
-          interceptions: 0,
-          foulsCommitted: 0,
-          yellowCards: 0,
-          redCards: 0,
-          saves: 0,
-          goalsConceded: 0,
-          fatigueStart: 0,
-          fatigueEnd: 0,
-        })),
+          engineVersion: m.engineBuild,
+          tickIntervalSeconds: 0, // o kernel resolve por chances, não por segundos
+          totalTicks: m.chances,
+          homeStrengthSnapshot: { overall: m.homeStrength },
+          awayStrengthSnapshot: { overall: m.awayStrength },
+          randomSeed: m.randomSeed,
+          inputHash: m.inputHash,
+          resultHash: m.resultHash,
+        },
       });
+
+      // A artilharia da partida (C7-V5). Reescrita — reprocessar não soma.
+      const goals = [...result.homeScorers, ...result.awayScorers];
+      if (goals.length > 0) {
+        await this.client.playerMatchStats.deleteMany({
+          where: { matchId: result.matchId },
+        });
+        await this.client.playerMatchStats.createMany({
+          data: goals.map((scorer) => ({
+            matchId: result.matchId,
+            playerId: scorer.playerId,
+            goals: scorer.goals,
+            // Só gols são simulados hoje; o resto fica zerado até o motor evoluir.
+            assists: 0,
+            shots: 0,
+            shotsOnTarget: 0,
+            passesAttempted: 0,
+            passesCompleted: 0,
+            tackles: 0,
+            interceptions: 0,
+            foulsCommitted: 0,
+            yellowCards: 0,
+            redCards: 0,
+            saves: 0,
+            goalsConceded: 0,
+            fatigueStart: 0,
+            fatigueEnd: 0,
+          })),
+        });
+      }
 
       // O feed da partida (C5-V1): um MatchEvent GOAL por gol, já com minuto e
       // ordem total (eventSequence). O clube vem do lado. Reescrito, não somado.
