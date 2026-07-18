@@ -1,10 +1,15 @@
-import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
+import { PositionBadge, positionGroupTint } from "@/components/position-badge";
+import {
+  PlayerSkillCard,
+  type PlayerSkillCardData,
+} from "@/components/player-skill-card";
 import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
@@ -18,7 +23,8 @@ import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
-import { color, fontSize, fontWeight, space } from "@/theme";
+import type { PositionGroup } from "@/screens/squad/squad-data";
+import { color, fontSize, fontWeight, radius, space } from "@/theme";
 
 interface YouthPlayer {
   readonly playerId: string;
@@ -27,15 +33,32 @@ interface YouthPlayer {
   readonly overall: number;
   readonly potential: number;
   readonly age: number;
+  readonly groups?: {
+    readonly technical: number;
+    readonly physical: number;
+    readonly mental: number;
+    readonly goalkeeping: number | null;
+  } | null;
+  readonly attributes?: Record<string, number | null> | null;
 }
 
 interface YouthProjection {
   readonly players: readonly YouthPlayer[];
 }
 
-/** Base (C8) — os jovens em formação do clube gerido, do maior potencial ao menor. */
+/** Setor da posição — o mesmo do Mercado/escalação, pro tingimento do card. */
+const SECTOR: Readonly<Record<string, PositionGroup>> = {
+  GK: "GOL",
+  CB: "DEF", LB: "DEF", RB: "DEF", LWB: "DEF", RWB: "DEF",
+  CDM: "MEI", CM: "MEI", CAM: "MEI", LM: "MEI", RM: "MEI",
+  LW: "ATA", RW: "ATA", ST: "ATA", CF: "ATA",
+};
+const sectorOf = (code: string): PositionGroup => SECTOR[code] ?? "MEI";
+
+/** Base (C8) — os jovens em formação; toca no jogador pra ver o card completo. */
 export function Youth() {
   const { session, status } = useSession();
+  const [inspect, setInspect] = useState<YouthPlayer | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -120,25 +143,70 @@ export function Youth() {
               <Text style={styles.empty}>Sem categoria de base.</Text>
             ) : (
               players.map((p) => (
-                <View key={p.playerId} style={styles.row}>
+                <Pressable
+                  key={p.playerId}
+                  onPress={() => setInspect(p)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver ${p.name}`}
+                  accessibilityState={{}}
+                  style={styles.row}
+                >
+                  <PositionBadge
+                    label={p.primaryPosition}
+                    tint={positionGroupTint(sectorOf(p.primaryPosition))}
+                  />
                   <View style={styles.info}>
                     <Text style={styles.name} numberOfLines={1}>
                       {p.name}
                     </Text>
                     <Text style={styles.meta} numberOfLines={1}>
-                      {p.primaryPosition} · {p.age} anos
+                      {p.age} anos
                     </Text>
                   </View>
                   <Text style={styles.ovr}>
                     {p.overall}
                     <Text style={styles.pot}> → {p.potential}</Text>
                   </Text>
-                </View>
+                </Pressable>
               ))
             )}
           </Card>
         </ScrollView>
       )}
+
+      <Modal
+        visible={inspect !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInspect(null)}
+      >
+        <View style={styles.inspectRoot}>
+          <Pressable
+            style={styles.inspectBackdrop}
+            onPress={() => setInspect(null)}
+          />
+          <View style={styles.inspectWrap} pointerEvents="box-none">
+            {inspect !== null && (
+              <PlayerSkillCard
+                data={
+                  {
+                    name: inspect.name,
+                    position: inspect.primaryPosition,
+                    positionTint: positionGroupTint(
+                      sectorOf(inspect.primaryPosition),
+                    ),
+                    age: inspect.age,
+                    ovr: inspect.overall,
+                    pot: inspect.potential,
+                    groups: inspect.groups ?? null,
+                    attributes: inspect.attributes ?? null,
+                  } satisfies PlayerSkillCardData
+                }
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -188,5 +256,15 @@ const styles = StyleSheet.create({
     color: color.textMuted,
     fontSize: fontSize.sm,
     paddingVertical: space.sm,
+  },
+  inspectRoot: { flex: 1, justifyContent: "center" },
+  inspectBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+  },
+  inspectWrap: {
+    paddingHorizontal: space.lg,
+    alignItems: "center",
+    gap: space.md,
   },
 });
