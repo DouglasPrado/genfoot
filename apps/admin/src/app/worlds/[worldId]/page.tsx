@@ -6,7 +6,11 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { AppShell, PageHeader } from "@/components/app-shell";
-import { ClubsTable, type ClubRow } from "@/components/clubs-table";
+import {
+  ClubsTable,
+  type ClubRow,
+  type ClubFinanceRow,
+} from "@/components/clubs-table";
 import { CommandConsole } from "@/components/command-console";
 import { CompetitionsPanel } from "@/components/competitions-panel";
 import { DeleteWorldDialog } from "@/components/delete-world-dialog";
@@ -21,7 +25,6 @@ import { WorldParametersTable } from "@/components/world-parameters-table";
 import { WorldSettingsPanel } from "@/components/world-settings-panel";
 import {
   mockCompeticoes,
-  mockDinheiroCirculante,
   mockJogadores,
   mockTendencia,
 } from "@/lib/mock-world";
@@ -50,7 +53,18 @@ interface WorldSnapshot {
   readonly version: number;
 }
 
-function money(minor: bigint): string {
+/**
+ * O que `finance-snapshot` (C9) serve por clube. A tela só lê caixa e a folha
+ * (custo total de temporada) — o resto da view (linhas, saúde, proveniência)
+ * é da tela M-FINANCE, não do dashboard.
+ */
+interface ClubFinanceSnapshot {
+  readonly clubId: string;
+  readonly cashMinor: number;
+  readonly seasonCost: { readonly totalMinor: number };
+}
+
+function money(minor: number | bigint): string {
   return (Number(minor) / 100).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -94,6 +108,11 @@ export default function WorldDetailPage() {
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [clubs, setClubs] = useState<readonly ClubRow[]>([]);
+  // `null` = ainda não carregou; `Map` com chave `null` = clube sem finanças.
+  const [finances, setFinances] = useState<ReadonlyMap<
+    string,
+    ClubFinanceRow | null
+  > | null>(null);
   const [commandTypes, setCommandTypes] = useState<readonly string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -149,7 +168,54 @@ export default function WorldDetailPage() {
     };
   }, [api, session, worldId, refreshKey]);
 
-  const dinheiro = mockDinheiroCirculante(worldId, clubs.length);
+  // Caixa e folha reais, uma query `finance-snapshot` por clube (C9). São N
+  // chamadas, mas é dashboard de operador — e o dado é real, não estimado.
+  useEffect(() => {
+    if (session === null) return;
+    if (clubs.length === 0) {
+      setFinances(null);
+      return;
+    }
+    let alive = true;
+    setFinances(null);
+    void Promise.all(
+      clubs.map(async (club) => {
+        try {
+          const e = await api.query<ClubFinanceSnapshot | null>(
+            worldId,
+            "finance-snapshot",
+            { params: { clubId: club.id } },
+          );
+          const row: ClubFinanceRow | null =
+            e.data === null
+              ? null
+              : {
+                  cashMinor: e.data.cashMinor,
+                  seasonCostMinor: e.data.seasonCost.totalMinor,
+                };
+          return [club.id, row] as const;
+        } catch {
+          // Falha na query = "não sei", não R$ 0. A tabela mostra "—".
+          return [club.id, null] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (alive) setFinances(new Map(entries));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [api, session, worldId, clubs]);
+
+  // Dinheiro circulante real = Σ do caixa de cada clube (o próprio hint da tela).
+  // `null` até todas as snapshots voltarem — não some com mock nem afirma R$ 0.
+  const dinheiroReal =
+    finances === null
+      ? null
+      : [...finances.values()].reduce(
+          (sum, f) => sum + (f?.cashMinor ?? 0),
+          0,
+        );
   const jogadores = mockJogadores(worldId, clubs.length);
   const competicoes = mockCompeticoes(worldId);
   const tendencia = mockTendencia(worldId);
@@ -185,7 +251,7 @@ export default function WorldDetailPage() {
           </p>
         ) : null}
 
-        <MockNotice reais={1} total={6} />
+        <MockNotice reais={2} total={6} />
 
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-6">
@@ -224,9 +290,8 @@ export default function WorldDetailPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="Dinheiro circulante"
-            value={money(dinheiro)}
-            hint="soma do razão de todos os clubes"
-            badge={<Mock contexto="C9 razão" />}
+            value={dinheiroReal === null ? "…" : money(dinheiroReal)}
+            hint="soma do caixa (razão) de todos os clubes"
           />
           <Stat
             label="Tendência do mundo"
@@ -305,7 +370,11 @@ export default function WorldDetailPage() {
                 <Badge tone="ok">dado real · Postgres</Badge>
               </CardHeader>
               <CardContent>
-                <ClubsTable worldId={worldId} clubs={clubs} />
+                <ClubsTable
+                  worldId={worldId}
+                  clubs={clubs}
+                  finances={finances}
+                />
               </CardContent>
             </Card>
           </TabsContent>
