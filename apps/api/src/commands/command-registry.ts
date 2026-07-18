@@ -756,6 +756,8 @@ const handlers: Record<string, CommandHandler> = {
     const result = await new FinishCompetition(competitionUnitOfWork).execute({
       gameWorldId: world.value.worldId,
       competitionId: parsed.data.competitionId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
     });
     if (!result.ok) return result;
     return succeed({ resource: `competition:${parsed.data.competitionId}` });

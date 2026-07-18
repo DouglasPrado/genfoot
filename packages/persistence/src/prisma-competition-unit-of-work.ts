@@ -4,6 +4,7 @@ import type {
 } from "@grinta/core";
 
 import type { Prisma } from "./generated/prisma/client.js";
+import { PrismaLedgerRepository } from "./prisma-ledger-repository.js";
 import type { PrismaClient } from "./prisma-connection.js";
 import { PrismaCompetitionAggregateRepository } from "./prisma-competition-aggregate-repository.js";
 
@@ -26,5 +27,8 @@ export class PrismaCompetitionUnitOfWork implements CompetitionUnitOfWork {
 }
 
 function bind(tx: Prisma.TransactionClient): CompetitionRepositories {
-  return { competitions: new PrismaCompetitionAggregateRepository(tx) };
+  return {
+    competitions: new PrismaCompetitionAggregateRepository(tx),
+    ledger: new PrismaLedgerRepository(tx),
+  };
 }

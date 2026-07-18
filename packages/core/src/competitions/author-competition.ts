@@ -1,5 +1,19 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
+import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import { BASE_CURRENCY_ID } from "../finance/ledger-bootstrap.js";
+import { JournalEntry } from "../finance/journal-entry.js";
+import type { LedgerRepository } from "../finance/ledger-repository.js";
+import {
+  AccountNormalSide,
+  AccountOwnerScope,
+  FinancialAccountType,
+  JournalLineDirection,
+  MoneyFlowClass,
+  SystemAccount,
+  type LedgerAccountSnapshot,
+} from "../finance/ledger-types.js";
+
 import {
   generateSchedule,
   type ScheduledMatchDraw,
@@ -14,7 +28,16 @@ import {
   CompetitionFormat,
   type CompetitionType,
 } from "./competition-types.js";
+import { buildStandings, type FinishedMatchInput } from "./standings.js";
 import type { CompetitionAggregateSnapshot } from "./competition.js";
+
+/** O que a homologação precisa saber da edição para pagar prêmios (C7-V6). */
+export interface EditionResults {
+  readonly clubIds: readonly string[];
+  readonly finishedMatches: readonly FinishedMatchInput[];
+  /** O artilheiro e o clube dele (para o prêmio individual); `null` se ninguém marcou. */
+  readonly topScorer: { readonly playerId: string; readonly clubId: string } | null;
+}
 
 /**
  * Casos de uso da competição autorada (C7, R-202). Cada um carrega UM agregado,
@@ -38,10 +61,17 @@ export interface CompetitionAggregateRepository {
     competitionId: string,
     draws: readonly ScheduledMatchDraw[],
   ): Promise<void>;
+  /** Resultados da edição para a homologação (C7-V6): jogos, clubes, artilheiro. */
+  findEditionResults(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<EditionResults | null>;
 }
 
 export interface CompetitionRepositories {
   readonly competitions: CompetitionAggregateRepository;
+  /** C9 — o razão, para a homologação pagar os prêmios (R-205). */
+  readonly ledger: LedgerRepository;
 }
 
 export interface CompetitionUnitOfWork {
@@ -224,12 +254,207 @@ export class StartCompetition {
   }
 }
 
-/** Homologa (EM_ANDAMENTO→ENCERRADA). */
+export interface HomologateCompetitionInput {
+  readonly gameWorldId: string;
+  readonly competitionId: string;
+  /** Seed do mundo, para ids determinísticos dos lançamentos (R-182). */
+  readonly worldSeed: string;
+  /** Data do mundo na homologação (R-177). */
+  readonly occurredOn: string;
+  readonly seasonNumber?: number;
+}
+
+/**
+ * Homologa a competição (EM_ANDAMENTO→ENCERRADA) e PAGA os prêmios no mesmo
+ * commit (C7-V6, R-205): lê a classificação final (projeção dos jogos, R-178) e
+ * credita cada clube pelo razão — cota de participação + prêmio por posição, e o
+ * prêmio do artilheiro ao clube dele. O dinheiro entra por faucet do sistema
+ * (`SYS:PRIZE_FAUCET`, criado sob demanda), preservando Σdébito=Σcrédito.
+ *
+ * Acesso/rebaixamento fica para depois (precisa de divisões, C7-V3b).
+ */
 export class FinishCompetition {
   public constructor(private readonly unitOfWork: CompetitionUnitOfWork) {}
-  public execute(input: CompetitionTransitionInput) {
-    return applyTransition(this.unitOfWork, input, "finish");
+
+  public execute(
+    input: HomologateCompetitionInput,
+  ): Promise<Result<{ competitionId: string }, DomainError>> {
+    return run(this.unitOfWork, async (repos) => {
+      const snap = await repos.competitions.findCompetitionById(
+        input.gameWorldId,
+        input.competitionId,
+      );
+      if (snap === null) {
+        return fail(
+          new DomainError("COMPETITION_NOT_FOUND", "Competição não encontrada."),
+        );
+      }
+      const agg = Competition.fromSnapshot(snap);
+      if (!agg.ok) return agg;
+      const finished = agg.value.finish();
+      if (!finished.ok) return finished;
+      await repos.competitions.saveCompetition(agg.value.snapshot(), snap.version);
+
+      const results = await repos.competitions.findEditionResults(
+        input.gameWorldId,
+        input.competitionId,
+      );
+      if (results !== null) {
+        const paid = await payPrizes(repos, input, snap, results);
+        if (!paid.ok) return paid;
+      }
+      return succeed({ competitionId: input.competitionId });
+    });
   }
+}
+
+/** Credita os prêmios da config pelo razão (R-205). Um lançamento por clube. */
+async function payPrizes(
+  repos: CompetitionRepositories,
+  input: HomologateCompetitionInput,
+  snap: CompetitionAggregateSnapshot,
+  results: EditionResults,
+): Promise<Result<void, DomainError>> {
+  const prizes = snap.config.prizes;
+  const seasonNumber = input.seasonNumber ?? 1;
+  const timestampMilliseconds = Date.parse(`${input.occurredOn}T00:00:00.000Z`);
+  const uuid = (context: string) =>
+    deterministicUuidV7({
+      worldSeed: input.worldSeed,
+      context: `${input.competitionId}:${context}`,
+      timestampMilliseconds,
+    });
+
+  const faucet = await ensurePrizeFaucet(
+    repos.ledger,
+    input.gameWorldId,
+    uuid("prize-faucet"),
+  );
+
+  const standings = buildStandings(results.clubIds, results.finishedMatches);
+  const participation = BigInt(prizes.participationMinor);
+
+  // A cada clube: participação + prêmio da colocação final.
+  for (let rank = 0; rank < standings.length; rank += 1) {
+    const clubId = standings[rank]!.clubId;
+    const positionMinor = BigInt(prizes.positionMinor[rank] ?? "0");
+    const total = participation + positionMinor;
+    const posted = await postPrize(repos.ledger, {
+      gameWorldId: input.gameWorldId,
+      clubId,
+      amountMinor: total,
+      description: `Premiação (${rank + 1}º) — ${snap.name}`,
+      entryId: uuid(`prize:${clubId}`),
+      sourceEventId: uuid(`prize-event:${clubId}`),
+      faucetAccountId: faucet.id,
+      seasonNumber,
+      occurredOn: input.occurredOn,
+    });
+    if (!posted.ok) return posted;
+  }
+
+  // Prêmio do artilheiro ao clube dele.
+  const topScorerMinor = BigInt(prizes.topScorerMinor);
+  if (results.topScorer !== null && topScorerMinor > 0n) {
+    const posted = await postPrize(repos.ledger, {
+      gameWorldId: input.gameWorldId,
+      clubId: results.topScorer.clubId,
+      amountMinor: topScorerMinor,
+      description: `Prêmio de artilheiro — ${snap.name}`,
+      entryId: uuid(`topscorer:${results.topScorer.playerId}`),
+      sourceEventId: uuid(`topscorer-event:${results.topScorer.playerId}`),
+      faucetAccountId: faucet.id,
+      seasonNumber,
+      occurredOn: input.occurredOn,
+    });
+    if (!posted.ok) return posted;
+  }
+
+  return succeed(undefined);
+}
+
+/** Encontra ou cria o faucet de prêmio do mundo (aditivo — a gênese não o cria). */
+async function ensurePrizeFaucet(
+  ledger: LedgerRepository,
+  gameWorldId: string,
+  id: string,
+): Promise<LedgerAccountSnapshot> {
+  const existing = await ledger.findAccount(
+    gameWorldId as never,
+    AccountOwnerScope.WORLD,
+    "SYS:PRIZE_FAUCET",
+  );
+  if (existing !== null) return existing;
+  const account: LedgerAccountSnapshot = {
+    id,
+    gameWorldId,
+    ownerScope: AccountOwnerScope.WORLD,
+    clubId: null,
+    systemAccount: SystemAccount.SYS_PRIZE_FAUCET,
+    accountCode: "SYS:PRIZE_FAUCET",
+    accountType: FinancialAccountType.SYSTEM_FAUCET,
+    normalSide: AccountNormalSide.CREDIT,
+    currencyId: BASE_CURRENCY_ID,
+    version: 1,
+  } as LedgerAccountSnapshot;
+  await ledger.saveAccount(account, null);
+  return account;
+}
+
+/** Um prêmio: DÉBITO no caixa do clube (ativo sobe), CRÉDITO no faucet. */
+async function postPrize(
+  ledger: LedgerRepository,
+  p: {
+    gameWorldId: string;
+    clubId: string;
+    amountMinor: bigint;
+    description: string;
+    entryId: string;
+    sourceEventId: string;
+    faucetAccountId: string;
+    seasonNumber: number;
+    occurredOn: string;
+  },
+): Promise<Result<void, DomainError>> {
+  if (p.amountMinor <= 0n) return succeed(undefined);
+  const cash = await ledger.findAccount(
+    p.gameWorldId as never,
+    AccountOwnerScope.CLUB,
+    `CASH:${p.clubId}`,
+  );
+  if (cash === null) {
+    return fail(
+      new DomainError("LEDGER_ACCOUNT_MISSING", "Conta de caixa não existe."),
+    );
+  }
+  const entry = JournalEntry.post({
+    id: p.entryId,
+    gameWorldId: p.gameWorldId as never,
+    clubId: p.clubId as never,
+    currencyId: BASE_CURRENCY_ID,
+    flowClass: MoneyFlowClass.FAUCET,
+    description: p.description,
+    sourceEventId: p.sourceEventId,
+    seasonNumber: p.seasonNumber,
+    occurredOn: p.occurredOn,
+    lines: [
+      {
+        financialAccountId: cash.id,
+        direction: JournalLineDirection.DEBIT,
+        amountMinor: p.amountMinor,
+        currencyId: BASE_CURRENCY_ID,
+      },
+      {
+        financialAccountId: p.faucetAccountId,
+        direction: JournalLineDirection.CREDIT,
+        amountMinor: p.amountMinor,
+        currencyId: BASE_CURRENCY_ID,
+      },
+    ],
+  });
+  if (!entry.ok) return entry;
+  await ledger.appendJournalEntry(entry.value.snapshot());
+  return succeed(undefined);
 }
 
 class Rollback extends Error {

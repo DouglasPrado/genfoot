@@ -5,6 +5,7 @@ import {
   type CompetitionAggregateSnapshot,
   type CompetitionConfig,
   type CompetitionId,
+  type EditionResults,
   type ScheduledMatchDraw,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
@@ -216,6 +217,68 @@ export class PrismaCompetitionAggregateRepository
         data: { groupName: group },
       });
     }
+  }
+
+  public async findEditionResults(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<EditionResults | null> {
+    const edition = await this.client.competitionSeason.findFirst({
+      where: { competitionId },
+      orderBy: { startsAt: "desc" },
+      select: { id: true, clubs: { select: { clubId: true } } },
+    });
+    if (edition === null) return null;
+
+    const matches = await this.client.match.findMany({
+      where: {
+        competitionSeasonId: edition.id,
+        runtimeStatus: { in: ["FINISHED", "PROCESSED"] },
+        resultStatus: "NORMAL",
+      },
+      select: {
+        id: true,
+        homeClubId: true,
+        awayClubId: true,
+        homeGoals: true,
+        awayGoals: true,
+      },
+    });
+
+    // O artilheiro da edição: soma dos gols nos jogos desta edição, maior
+    // primeiro; depois resolvemos o clube dele (elenco profissional).
+    const matchIds = matches.map((m) => m.id);
+    let topScorer: EditionResults["topScorer"] = null;
+    if (matchIds.length > 0) {
+      const top = await this.client.playerMatchStats.groupBy({
+        by: ["playerId"],
+        where: { matchId: { in: matchIds }, goals: { gt: 0 } },
+        _sum: { goals: true },
+        orderBy: { _sum: { goals: "desc" } },
+        take: 1,
+      });
+      const playerId = top[0]?.playerId;
+      if (playerId !== undefined) {
+        const membership = await this.client.squadMembership.findFirst({
+          where: { playerId, squad: { category: "FIRST_TEAM" } },
+          select: { squad: { select: { clubId: true } } },
+        });
+        if (membership !== null) {
+          topScorer = { playerId, clubId: membership.squad.clubId };
+        }
+      }
+    }
+
+    return {
+      clubIds: edition.clubs.map((c) => c.clubId),
+      finishedMatches: matches.map((m) => ({
+        homeClubId: m.homeClubId,
+        awayClubId: m.awayClubId,
+        homeGoals: m.homeGoals,
+        awayGoals: m.awayGoals,
+      })),
+      topScorer,
+    };
   }
 
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */
