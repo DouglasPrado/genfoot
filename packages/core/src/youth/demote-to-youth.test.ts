@@ -53,7 +53,7 @@ class FakeWorld {
 function fakeUnitOfWork(world: FakeWorld): DemoteToYouthUnitOfWork {
   const players: PlayerRepository = {
     findPlayerById: (_w, id) => {
-      const birthDate = world.birthByPlayer.get(id as string);
+      const birthDate = world.birthByPlayer.get(id);
       if (birthDate === undefined) return Promise.resolve(null);
       return Promise.resolve({
         person: { birthDate },

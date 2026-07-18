@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { SquadCategory, type SquadSnapshot } from "../clubs/club-types.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
+import type {
+  PlayerAggregateSnapshot,
+  PlayerRepository,
+} from "../players/player-repository.js";
 
 import {
   ContractStatus,
@@ -39,6 +43,7 @@ function squad(playerIds: readonly string[]): SquadSnapshot {
 class FakeWorld {
   public squad: SquadSnapshot = squad([PLAYER, "p2"]);
   public contracts: PlayerContractSnapshot[] = [];
+  public savedPlayer: PlayerAggregateSnapshot | null = null;
   public checkpoint(): () => void {
     const s = this.squad;
     const c = [...this.contracts];
@@ -47,6 +52,36 @@ class FakeWorld {
       this.contracts = c;
     };
   }
+}
+
+/** Um agregado mínimo: só o que o release lê (attributes + dynamicState). */
+function playerAggregate(): PlayerAggregateSnapshot {
+  return {
+    person: { birthDate: "2000-01-01" },
+    player: {
+      id: PLAYER,
+      primaryPosition: "ST",
+      attributes: { finishing: 70, pace: 60, goalkeeping: null },
+      dynamicState: {
+        morale: 60,
+        confidence: 50,
+        happiness: 70,
+        fatigue: 0,
+        matchSharpness: 50,
+      },
+      version: 1,
+    },
+  } as unknown as PlayerAggregateSnapshot;
+}
+
+function fakePlayers(world: FakeWorld): PlayerRepository {
+  return {
+    findPlayerById: () => Promise.resolve(playerAggregate()),
+    savePlayer: (snapshot) => {
+      world.savedPlayer = snapshot;
+      return Promise.resolve();
+    },
+  };
 }
 
 function fakeUnitOfWork(world: FakeWorld): ReleaseUnitOfWork {
@@ -73,7 +108,11 @@ function fakeUnitOfWork(world: FakeWorld): ReleaseUnitOfWork {
       return Promise.resolve();
     },
   };
-  const repos: ReleaseRepositories = { squads, contracts };
+  const repos: ReleaseRepositories = {
+    squads,
+    contracts,
+    players: fakePlayers(world),
+  };
   return {
     run: async (work) => {
       const rollback = world.checkpoint();
@@ -125,6 +164,21 @@ describe("ReleasePlayer — dispensar (C6)", () => {
     const result = await new ReleasePlayer(fakeUnitOfWork(world)).execute(input);
     expect(result.ok).toBe(true);
     expect(world.squad.memberships).toHaveLength(1);
+  });
+
+  it("ser dispensado abala o jogador: atributos −4 e ânimo cai (R-201)", async () => {
+    const world = new FakeWorld();
+    await new ReleasePlayer(fakeUnitOfWork(world)).execute(input);
+    const saved = world.savedPlayer;
+    expect(saved).not.toBeNull();
+    const attrs = saved!.player.attributes as Record<string, number | null>;
+    expect(attrs.finishing).toBe(66); // 70 − 4
+    expect(attrs.pace).toBe(56); // 60 − 4
+    expect(attrs.goalkeeping).toBeNull();
+    const dyn = saved!.player.dynamicState;
+    expect(dyn.morale).toBe(40); // 60 − 20
+    expect(dyn.confidence).toBe(35); // 50 − 15
+    expect(dyn.happiness).toBe(45); // 70 − 25
   });
 
   it("recusa quem não está no elenco", async () => {

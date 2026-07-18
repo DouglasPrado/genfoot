@@ -2,11 +2,16 @@ import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
 import { Squad } from "../clubs/squad.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
+import type { PlayerAttributes } from "../players/player-attributes.js";
+import type { PlayerRepository } from "../players/player-repository.js";
 
 import {
   ContractStatus,
   type ContractRepository,
 } from "./contract-types.js";
+
+/** Quanto a nota (overall) cai ao ser dispensado — R-201. */
+const RELEASE_OVERALL_PENALTY = 4;
 
 /**
  * Dispensar um jogador (C6): o clube encerra o vínculo e o jogador deixa o
@@ -17,6 +22,7 @@ import {
 export interface ReleaseRepositories {
   readonly squads: SquadRepository;
   readonly contracts: ContractRepository;
+  readonly players: PlayerRepository;
 }
 
 export interface ReleaseUnitOfWork {
@@ -74,9 +80,53 @@ export class ReleasePlayer {
         });
       }
 
+      // Ser dispensado abala o jogador (R-201): a nota cai (atributos −4, e como
+      // a nota é derivada dos atributos, ela cai junto na gravação) e o ânimo
+      // despenca — moral, confiança e felicidade descem.
+      const aggregate = await repos.players.findPlayerById(
+        worldId,
+        input.playerId as never,
+      );
+      if (aggregate !== null) {
+        const d = aggregate.player.dynamicState;
+        await repos.players.savePlayer(
+          {
+            person: aggregate.person,
+            player: {
+              ...aggregate.player,
+              attributes: degrade(aggregate.player.attributes),
+              dynamicState: {
+                ...d,
+                morale: drop(d.morale, 20),
+                confidence: drop(d.confidence, 15),
+                happiness: drop(d.happiness, 25),
+                matchSharpness: drop(d.matchSharpness, 10),
+              },
+              version: aggregate.player.version + 1,
+            },
+          },
+          aggregate.player.version,
+        );
+      }
+
       return succeed({ playerId: input.playerId });
     });
   }
+}
+
+/** Baixa cada atributo em `RELEASE_OVERALL_PENALTY`; goleiragem `null` fica null. */
+function degrade(attributes: PlayerAttributes): PlayerAttributes {
+  const lowered: Record<string, number | null> = {};
+  for (const [code, value] of Object.entries(attributes)) {
+    lowered[code] =
+      value === null ? null : Math.max(1, value - RELEASE_OVERALL_PENALTY);
+  }
+  return lowered as PlayerAttributes;
+}
+
+/** Reduz um estado dinâmico (0–100) por `amount`, sem passar de 0. */
+function drop(value: number, amount: number): number {
+  return Math.max(0, value - amount);
 }
 
 class Rollback extends Error {

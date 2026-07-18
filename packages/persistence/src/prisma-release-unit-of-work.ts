@@ -3,6 +3,7 @@ import type { ReleaseRepositories, ReleaseUnitOfWork } from "@grinta/core";
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
 import { PrismaContractRepository } from "./prisma-contract-repository.js";
+import { PrismaPlayerRepository } from "./prisma-player-repository.js";
 import { PrismaSquadRepository } from "./prisma-squad-repository.js";
 
 /**
@@ -26,5 +27,6 @@ function bind(tx: Prisma.TransactionClient): ReleaseRepositories {
   return {
     squads: new PrismaSquadRepository(tx),
     contracts: new PrismaContractRepository(tx),
+    players: new PrismaPlayerRepository(tx),
   };
 }
