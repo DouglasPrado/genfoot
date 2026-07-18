@@ -90,6 +90,7 @@ describe("API command catalog integrity (e2e)", () => {
       "identity:reserve-club",
       // C6: a compra de verdade — dinheiro, contrato e elenco num só commit (R-192).
       "market:release-player",
+      "market:sell-player",
       "market:sign-player",
       "world:activate",
       // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
@@ -118,7 +119,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(21);
+    expect(response.body.commandCount).toBe(22);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

@@ -302,6 +302,19 @@ export function RosterList() {
                     ) : null}
                     <Pressable
                       onPress={() =>
+                        act("market:sell-player", inspect.playerId)
+                      }
+                      disabled={actingId !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Vender ${inspect.name}`}
+                      accessibilityState={{ disabled: actingId !== null }}
+                      style={styles.actionSell}
+                    >
+                      <Icon name="cart" size={14} color={color.background} />
+                      <Text style={styles.actionSellText}>VENDER</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
                         act("market:release-player", inspect.playerId)
                       }
                       disabled={actingId !== null}
@@ -430,6 +443,21 @@ const styles = StyleSheet.create({
   },
   actionGhostText: {
     color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
+  actionSell: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  actionSellText: {
+    color: color.background,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
     letterSpacing: 0.5,

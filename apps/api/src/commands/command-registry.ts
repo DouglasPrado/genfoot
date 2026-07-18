@@ -14,6 +14,7 @@ import {
   PromoteYouthPlayer,
   DemoteToYouthPlayer,
   ReleasePlayer,
+  SellPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -32,6 +33,7 @@ import {
   type PromoteYouthUnitOfWork,
   type DemoteToYouthUnitOfWork,
   type ReleaseUnitOfWork,
+  type SellUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -95,6 +97,8 @@ export interface CommandContext {
   readonly demoteToYouthUnitOfWork: DemoteToYouthUnitOfWork;
   /** C6 — dispensa um jogador (tira do elenco + encerra contrato). */
   readonly releaseUnitOfWork: ReleaseUnitOfWork;
+  /** C6/C9 — vende um jogador ao mercado (crédito do valor via faucet, R-199). */
+  readonly sellUnitOfWork: SellUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -507,6 +511,25 @@ const handlers: Record<string, CommandHandler> = {
 
   /** C8 — descer à base: profissional ≤ 21 volta ao YOUTH_ACADEMY. */
   /** C6 — dispensar: o clube encerra o vínculo e o jogador deixa o elenco. */
+  /** C6/C9 — vender: o clube recebe o valor estimado, o jogador sai (R-199). */
+  "market:sell-player": async ({ worlds, sellUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SellPlayer(sellUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      currentSeason: 1,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
   "market:release-player": async ({ worlds, releaseUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
