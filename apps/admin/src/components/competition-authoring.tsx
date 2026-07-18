@@ -32,6 +32,26 @@ interface CompetitionSummary {
   readonly endsOn: string | null;
 }
 
+interface StandingRow {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly played: number;
+  readonly points: number;
+  readonly goalDifference: number;
+}
+interface StandingsView {
+  readonly competitionName: string;
+  readonly playedMatches: number;
+  readonly totalMatches: number;
+  readonly table: readonly StandingRow[];
+}
+interface TopScorer {
+  readonly playerId: string;
+  readonly name: string;
+  readonly clubName: string;
+  readonly goals: number;
+}
+
 const LIFECYCLE_LABEL: Record<
   string,
   { label: string; tone: "neutral" | "live" | "ok" | "danger" }
@@ -84,6 +104,8 @@ export function CompetitionAuthoring({
   const { api, session } = useSession();
   const { error: showError } = useToast();
   const [items, setItems] = useState<readonly CompetitionSummary[]>([]);
+  const [standings, setStandings] = useState<StandingsView | null>(null);
+  const [scorers, setScorers] = useState<readonly TopScorer[]>([]);
   const [busy, setBusy] = useState(false);
   const [configuring, setConfiguring] = useState<CompetitionSummary | null>(
     null,
@@ -101,6 +123,14 @@ export function CompetitionAuthoring({
         setItems([]);
         showError("Falha ao carregar competições.");
       });
+    api
+      .query<StandingsView | null>(worldId, "competitions")
+      .then((e) => setStandings(e.data))
+      .catch(() => setStandings(null));
+    api
+      .query<{ scorers: readonly TopScorer[] }>(worldId, "top-scorers")
+      .then((e) => setScorers(e.data.scorers ?? []))
+      .catch(() => setScorers([]));
   }, [api, session, worldId, showError]);
 
   useEffect(() => {
@@ -172,6 +202,96 @@ export function CompetitionAuthoring({
         busy={busy}
         onCreate={(payload) => dispatch("competition:create", payload)}
       />
+
+      {/* Acompanhamento REAL (C7-V5): joga a próxima rodada e vê a tabela +
+          artilharia se preencherem dos jogos (R-178). */}
+      <div className="space-y-3 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h4 className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
+            Acompanhamento
+          </h4>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => dispatch("world:play-round", {})}
+          >
+            Jogar próxima rodada
+          </Button>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-1">
+            <div className="text-[11px] text-muted-foreground">
+              {standings
+                ? `${standings.competitionName} · ${standings.playedMatches}/${standings.totalMatches} jogos`
+                : "Tabela — sem competição em andamento"}
+            </div>
+            {standings && standings.table.length > 0 ? (
+              <div className="overflow-hidden rounded-sm border border-border">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {standings.table.slice(0, 8).map((row, i) => (
+                      <tr
+                        key={row.clubId}
+                        className="border-b border-border/60 last:border-0"
+                      >
+                        <td className="w-6 px-2 py-1 text-muted-foreground">
+                          {i + 1}
+                        </td>
+                        <td className="px-2 py-1">{row.clubName}</td>
+                        <td className="px-2 py-1 text-right text-muted-foreground">
+                          {row.played}j
+                        </td>
+                        <td className="px-2 py-1 text-right text-muted-foreground">
+                          {row.goalDifference > 0 ? "+" : ""}
+                          {row.goalDifference}
+                        </td>
+                        <td className="px-2 py-1 text-right font-semibold">
+                          {row.points}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+          <div className="space-y-1">
+            <div className="text-[11px] text-muted-foreground">
+              Artilharia {scorers.length > 0 ? `· ${scorers.length}` : ""}
+            </div>
+            {scorers.length > 0 ? (
+              <div className="overflow-hidden rounded-sm border border-border">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {scorers.slice(0, 8).map((s, i) => (
+                      <tr
+                        key={s.playerId}
+                        className="border-b border-border/60 last:border-0"
+                      >
+                        <td className="w-6 px-2 py-1 text-muted-foreground">
+                          {i + 1}
+                        </td>
+                        <td className="px-2 py-1">{s.name}</td>
+                        <td className="px-2 py-1 text-muted-foreground">
+                          {s.clubName}
+                        </td>
+                        <td className="px-2 py-1 text-right font-semibold">
+                          {s.goals}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-[11px] text-muted-foreground">
+                Nenhum gol ainda — jogue uma rodada.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       <Dialog
         open={configuring !== null}
