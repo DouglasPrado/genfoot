@@ -158,3 +158,40 @@ export function defaultVisualIdentity(seed: string): VisualIdentity {
     awayKitTemplateId: "kit-solid",
   };
 }
+
+/** Dado de escudo pronto pro `ClubCrest` (template + cores + inicial). */
+export interface ClubCrestData {
+  readonly templateId: string;
+  readonly primary: string;
+  readonly secondary: string;
+  readonly tertiary: string | null;
+  readonly letter: string;
+}
+
+/**
+ * Monta o escudo de um clube: usa a identidade real quando personalizada; senão
+ * a default determinística pelo nome (a mesma do admin). A inicial vem do nome.
+ */
+export function clubCrestData(
+  name: string,
+  primaryColor: string | null,
+  secondaryColor: string | null,
+  crestTemplateId: string | null,
+): ClubCrestData {
+  const id =
+    crestTemplateId !== null && primaryColor !== null
+      ? {
+          crestTemplateId,
+          primaryColor,
+          secondaryColor: secondaryColor ?? "#F8FAFC",
+          tertiaryColor: null,
+        }
+      : defaultVisualIdentity(name);
+  return {
+    templateId: id.crestTemplateId,
+    primary: id.primaryColor,
+    secondary: id.secondaryColor,
+    tertiary: id.tertiaryColor,
+    letter: name.charAt(0) || "?",
+  };
+}

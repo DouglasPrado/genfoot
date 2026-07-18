@@ -7,7 +7,7 @@ import Svg, {
   LinearGradient,
   Stop,
 } from "react-native-svg";
-import { Icon } from "@/components/icon";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { color, radius, fontWeight } from "@/theme";
 import type { SquadPlayer, PositionGroup } from "./squad-data";
 import type { Slot } from "./formations";
@@ -187,7 +187,9 @@ function Token({
           selected ? styles.photoSelected : null,
         ]}
       >
-        <Icon name="person" size={22} color={color.textMuted} />
+        {player ? (
+          <PlayerAvatar size={PHOTO - 4} radius={(PHOTO - 4) / 2} />
+        ) : null}
         <View style={styles.numberBadge}>
           <Text style={styles.numberText}>{player?.number ?? "?"}</Text>
         </View>

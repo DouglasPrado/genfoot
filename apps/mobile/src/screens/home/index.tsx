@@ -14,6 +14,8 @@ import {
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { useWorldQuery, type QueryState } from "@/lib/world";
+import { ClubCrest } from "@/screens/club/customization/crest";
+import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -148,9 +150,15 @@ export function Home() {
           <>
             <View style={styles.hero}>
               <View style={styles.crest}>
-                <Text style={styles.crestText}>
-                  {club.shortCode.slice(0, 3)}
-                </Text>
+                <ClubCrest
+                  {...clubCrestData(
+                    club.name,
+                    club.primaryColor,
+                    club.secondaryColor,
+                    club.crestTemplateId,
+                  )}
+                  size={64}
+                />
               </View>
               <View style={styles.heroText}>
                 <Text style={styles.eyebrow}>SEU CLUBE</Text>
@@ -364,20 +372,10 @@ const styles = StyleSheet.create({
   },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
   crest: {
-    width: 68,
-    height: 68,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: color.primary,
-    backgroundColor: color.surface,
+    width: 64,
+    height: 64,
     alignItems: "center",
     justifyContent: "center",
-  },
-  crestText: {
-    color: color.primary,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
   },
   heroText: { flex: 1 },
   eyebrow: {

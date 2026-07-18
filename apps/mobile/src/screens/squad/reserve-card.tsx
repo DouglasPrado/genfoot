@@ -1,5 +1,7 @@
 import { View, Text, StyleSheet } from "react-native";
 import { Icon, type IconName } from "@/components/icon";
+import { PlayerAvatar } from "@/components/player-avatar";
+import type { ClubCrestData } from "@/screens/club/customization/visual-identity";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
 import {
   compareStat,
@@ -64,10 +66,12 @@ export function ReserveCard({
   p,
   outgoing,
   fit,
+  crest,
 }: {
   p: SquadPlayer;
   outgoing: SquadPlayer | undefined;
   fit: PositionFit;
+  crest?: ClubCrestData | null;
 }) {
   const eligible = fit !== "none";
   const form = FORM[p.form];
@@ -79,9 +83,7 @@ export function ReserveCard({
         <View style={styles.number}>
           <Text style={styles.numberText}>{p.number}</Text>
         </View>
-        <View style={styles.avatar}>
-          <Icon name="person" size={16} color={color.textMuted} />
-        </View>
+        <PlayerAvatar size={32} radius={16} crest={crest} style={styles.avatar} />
         <Text style={styles.name} numberOfLines={1}>
           {p.name}
         </Text>

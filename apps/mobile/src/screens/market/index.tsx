@@ -35,6 +35,10 @@ import {
   PlayerSkillCard,
   type PlayerSkillCardData,
 } from "@/components/player-skill-card";
+import { PlayerAvatar } from "@/components/player-avatar";
+import { PositionBadge, positionGroupTint } from "@/components/position-badge";
+import { clubCrestData } from "@/screens/club/customization/visual-identity";
+import type { PositionGroup } from "@/screens/squad/squad-data";
 import { Icon } from "@/components/icon";
 
 interface MarketPlayer {
@@ -42,6 +46,9 @@ interface MarketPlayer {
   readonly name: string;
   readonly clubId: string;
   readonly clubName: string;
+  readonly clubPrimaryColor?: string | null;
+  readonly clubSecondaryColor?: string | null;
+  readonly clubCrestTemplateId?: string | null;
   readonly primaryPosition: string;
   readonly age: number;
   readonly overall: number;
@@ -91,19 +98,26 @@ const POSITION: Readonly<Record<string, { label: string; tint: string }>> = {
 const FILTERS = ["TODOS", "GOL", "DEF", "MEI", "ATA"] as const;
 type Filter = (typeof FILTERS)[number];
 
-const SECTOR: Readonly<Record<string, Filter>> = {
+const SECTOR: Readonly<Record<string, PositionGroup>> = {
   GK: "GOL",
   CB: "DEF", LB: "DEF", RB: "DEF", LWB: "DEF", RWB: "DEF",
   CDM: "MEI", CM: "MEI", CAM: "MEI", LM: "MEI", RM: "MEI",
   LW: "ATA", RW: "ATA", ST: "ATA", CF: "ATA",
 };
 
-/** As iniciais do jogador — o domínio não tem foto, então o avatar é o nome. */
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + last).toUpperCase();
+/** Setor (grupo) da posição, com fallback pro meio. */
+function sectorOf(code: string): PositionGroup {
+  return SECTOR[code] ?? "MEI";
+}
+
+/** Escudo do clube do jogador, pro avatar da vitrine. */
+function crestOf(p: MarketPlayer) {
+  return clubCrestData(
+    p.clubName,
+    p.clubPrimaryColor ?? null,
+    p.clubSecondaryColor ?? null,
+    p.clubCrestTemplateId ?? null,
+  );
 }
 
 function reais(valueMinor: string | number | bigint): string {
@@ -310,23 +324,20 @@ export function Market() {
                     accessibilityLabel={`Ver card de ${p.name}`}
                     style={styles.identity}
                   >
-                    <View style={[styles.avatar, { backgroundColor: pos.tint }]}>
-                      <Text style={styles.avatarText}>{initialsOf(p.name)}</Text>
-                    </View>
+                    <PlayerAvatar crest={crestOf(p)} size={44} crestSize={19} />
                     <View style={styles.info}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      <View style={styles.metaRow}>
-                        <View
-                          style={[styles.posBadge, { backgroundColor: pos.tint }]}
-                        >
-                          <Text style={styles.posText}>{pos.label}</Text>
-                        </View>
-                        <Text style={styles.club} numberOfLines={1}>
-                          {p.clubName} · {p.age} anos · OVR {p.overall}
+                      <View style={styles.nameRow}>
+                        <PositionBadge
+                          label={pos.label}
+                          tint={positionGroupTint(sectorOf(p.primaryPosition))}
+                        />
+                        <Text style={styles.name} numberOfLines={1}>
+                          {p.name}
                         </Text>
                       </View>
+                      <Text style={styles.club} numberOfLines={1}>
+                        {p.clubName} · {p.age} anos · OVR {p.overall}
+                      </Text>
                     </View>
                   </Pressable>
                   <View style={styles.action}>
@@ -476,13 +487,15 @@ export function Market() {
                       position:
                         POSITION[inspect.primaryPosition]?.label ??
                         inspect.primaryPosition,
-                      positionTint:
-                        POSITION[inspect.primaryPosition]?.tint ?? color.primary,
+                      positionTint: positionGroupTint(
+                        sectorOf(inspect.primaryPosition),
+                      ),
                       age: inspect.age,
                       ovr: inspect.overall,
                       pot: inspect.potential,
                       groups: inspect.groups ?? null,
                       attributes: inspect.attributes ?? null,
+                      crest: crestOf(inspect),
                     } satisfies PlayerSkillCardData
                   }
                 />
@@ -583,36 +596,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.sm,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "#0B0B0D",
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold as "700",
-  },
   info: { flex: 1, gap: 3 },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  posBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: radius.sm,
-  },
-  posText: {
-    color: "#0B0B0D",
-    fontSize: 10,
-    fontWeight: fontWeight.bold as "700",
-  },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
   name: {
+    flexShrink: 1,
     color: color.text,
     fontSize: fontSize.md,
     fontWeight: fontWeight.bold as "700",
   },
-  club: { flex: 1, color: color.textMuted, fontSize: fontSize.xs },
+  club: { color: color.textMuted, fontSize: fontSize.xs },
   action: { alignItems: "flex-end", gap: space.xs },
   value: {
     color: color.primary,

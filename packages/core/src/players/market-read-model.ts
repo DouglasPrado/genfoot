@@ -19,6 +19,10 @@ export interface MarketPlayerView {
   readonly name: string;
   readonly clubId: string;
   readonly clubName: string;
+  /** Identidade visual do clube (C3) — pro escudo na vitrine. `null` sem período. */
+  readonly clubPrimaryColor: string | null;
+  readonly clubSecondaryColor: string | null;
+  readonly clubCrestTemplateId: string | null;
   readonly primaryPosition: PlayerPosition;
   readonly age: number;
   readonly overall: number;

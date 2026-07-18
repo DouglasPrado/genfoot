@@ -15,7 +15,13 @@ import {
   GOALKEEPING_ATTRIBUTES,
 } from "@grinta/core";
 import { ProgressBar } from "@/components/progress-bar";
+import { PlayerAvatar } from "@/components/player-avatar";
+import { PositionBadge } from "@/components/position-badge";
+import type { ClubCrestData } from "@/screens/club/customization/visual-identity";
 import { color, space, radius, fontSize, fontWeight } from "@/theme";
+
+/** Escudo do clube do jogador (template + cores + inicial). */
+export type PlayerCardCrest = ClubCrestData;
 
 /** Os 4 grupos reais (RosterView.groups), escala 0–100. */
 export interface PlayerCardGroups {
@@ -31,6 +37,10 @@ export interface PlayerSkillCardData {
   readonly number?: number | null;
   readonly position: string;
   readonly positionTint?: string;
+  /** Foto do jogador; sem ela, cai no placeholder da silhueta. */
+  readonly photoUrl?: string | null;
+  /** Escudo do clube do jogador — sobreposto no canto da foto. */
+  readonly crest?: PlayerCardCrest | null;
   readonly age: number;
   readonly ovr: number;
   readonly pot: number;
@@ -171,16 +181,28 @@ export function PlayerSkillCard({ data }: { data: PlayerSkillCardData }) {
   return (
     <View style={styles.card}>
       <View style={styles.hero}>
-        <View style={styles.ratingBox}>
-          <Text style={styles.ovr}>{data.ovr}</Text>
-          <View style={[styles.posChip, { backgroundColor: posTint }]}>
-            <Text style={styles.posText}>{data.position}</Text>
+        <View style={styles.avatarWrap}>
+          <PlayerAvatar
+            photoUrl={data.photoUrl}
+            crest={data.crest}
+            size={76}
+            radius={radius.md}
+            crestSize={28}
+            style={styles.avatar}
+          />
+          <View style={styles.ovrBadgeWrap} pointerEvents="none">
+            <View style={styles.ovrPill}>
+              <Text style={styles.ovrValue}>{data.ovr}</Text>
+            </View>
           </View>
         </View>
         <View style={styles.heroInfo}>
-          <Text style={styles.name} numberOfLines={2}>
-            {data.name}
-          </Text>
+          <View style={styles.nameRow}>
+            <PositionBadge label={data.position} tint={posTint} />
+            <Text style={styles.name} numberOfLines={2}>
+              {data.name}
+            </Text>
+          </View>
           <Text style={styles.heroMeta}>
             {data.number != null ? `#${data.number} · ` : ""}
             {data.age} anos
@@ -334,28 +356,41 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.md,
   },
-  hero: { flexDirection: "row", gap: space.lg, alignItems: "center" },
-  ratingBox: { alignItems: "center", gap: space.sm, width: 72 },
-  ovr: {
-    color: color.primary,
-    fontSize: 48,
+  hero: {
+    flexDirection: "row",
+    gap: space.lg,
+    alignItems: "center",
+    paddingTop: space.xs,
+  },
+  avatarWrap: { width: 76, alignItems: "center", justifyContent: "center" },
+  avatar: { borderWidth: 1, borderColor: color.border },
+  ovrBadgeWrap: {
+    position: "absolute",
+    top: -13,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
+  ovrPill: {
+    minWidth: 38,
+    alignItems: "center",
+    paddingHorizontal: space.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+    borderWidth: 2,
+    borderColor: color.backgroundElevated,
+  },
+  ovrValue: {
+    color: color.primaryContrast,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
-    lineHeight: 50,
-  },
-  posChip: {
-    borderRadius: radius.sm,
-    paddingHorizontal: space.sm,
-    paddingVertical: 2,
-  },
-  posText: {
-    color: color.primaryContrast,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.black as "800",
-    letterSpacing: 0.5,
   },
   heroInfo: { flex: 1, gap: 4 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   name: {
+    flex: 1,
     color: color.text,
     fontSize: fontSize.xl,
     fontWeight: fontWeight.black as "800",

@@ -70,11 +70,15 @@ export class PrismaMarketReadModel implements MarketReadModel {
       if (p.attributes === null) continue;
       const age = ageOn(p.person.birthDate, asOf);
       const grid = readGrid(p.attributes);
+      const identity = names.get(clubId);
       items.push({
         playerId: p.id,
         name: `${p.person.firstName} ${p.person.lastName}`,
         clubId,
-        clubName: names.get(clubId)?.name ?? "—",
+        clubName: identity?.name ?? "—",
+        clubPrimaryColor: identity?.primaryColor ?? null,
+        clubSecondaryColor: identity?.secondaryColor ?? null,
+        clubCrestTemplateId: identity?.crestTemplateId ?? null,
         primaryPosition: p.primaryPosition,
         age,
         overall: p.currentAbility,
@@ -92,12 +96,38 @@ export class PrismaMarketReadModel implements MarketReadModel {
   private async clubNames(
     gameWorldId: GameWorldId,
     clubIds: readonly string[],
-  ): Promise<Map<string, { name: string }>> {
+  ): Promise<
+    Map<
+      string,
+      {
+        name: string;
+        primaryColor: string | null;
+        secondaryColor: string | null;
+        crestTemplateId: string | null;
+      }
+    >
+  > {
     const periods = await this.client.clubIdentityPeriod.findMany({
       where: { gameWorldId, clubId: { in: [...clubIds] }, effectiveThrough: null },
-      select: { clubId: true, name: true },
+      select: {
+        clubId: true,
+        name: true,
+        primaryColor: true,
+        secondaryColor: true,
+        crestTemplateId: true,
+      },
     });
-    return new Map(periods.map((p) => [p.clubId, { name: p.name }]));
+    return new Map(
+      periods.map((p) => [
+        p.clubId,
+        {
+          name: p.name,
+          primaryColor: p.primaryColor,
+          secondaryColor: p.secondaryColor,
+          crestTemplateId: p.crestTemplateId,
+        },
+      ]),
+    );
   }
 }
 

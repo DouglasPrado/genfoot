@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,9 +17,12 @@ import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
   buildClubInfrastructure,
   selectManagedClub,
+  squadPlayersFromRoster,
   type ClubPortfolioProjection,
+  type MobileRosterProjection,
 } from "@/lib/club-projection";
 import { ClubCrest } from "@/screens/club/customization/crest";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { CustomizeClubModal, normalizeClubName } from "@/screens/club/customization/customize-modal";
 import {
   defaultVisualIdentity,
@@ -134,6 +137,23 @@ export function Club() {
     managedClub === null ? null : "finance-snapshot",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
+  // O elenco (R-190), recortado pelo clube gerido — alimenta a PRÉVIA do card
+  // ELENCO (contagem + média do XI). O elenco editável de fato mora na tela
+  // empilhada /elenco; aqui é só o resumo com o gancho pra abrir.
+  const rosterQuery = useWorldQuery<MobileRosterProjection>(
+    managedClub === null ? null : "roster",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const squadPreview = useMemo(() => {
+    const players = squadPlayersFromRoster(rosterQuery.data);
+    if (players.length === 0) return null;
+    const byOvr = [...players].sort((a, b) => b.ovr - a.ovr);
+    const topXi = byOvr.slice(0, 11);
+    const avgXi = Math.round(
+      topXi.reduce((sum, p) => sum + p.ovr, 0) / (topXi.length || 1),
+    );
+    return { count: players.length, avgXi, top: byOvr.slice(0, 5) };
+  }, [rosterQuery.data]);
   const vm =
     managedClub === null
       ? null
@@ -336,6 +356,7 @@ export function Club() {
     financeQuery.refetch();
     narrativeQuery.refetch();
     fanbaseQuery.refetch();
+    rosterQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
@@ -343,6 +364,7 @@ export function Club() {
     financeQuery.refetch,
     narrativeQuery.refetch,
     fanbaseQuery.refetch,
+    rosterQuery.refetch,
   ]);
   const screenState = deriveScreenState({
     session: status,
@@ -430,6 +452,61 @@ export function Club() {
         </Pressable>
 
         <Pressable
+          onPress={() => router.push("/elenco")}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir elenco"
+        >
+          <Card>
+            <SectionHeader
+              title="ELENCO"
+              trailing={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text style={styles.openHint}>ABRIR</Text>
+                  <Icon name="chevron-forward" size={16} color={color.textMuted} />
+                </View>
+              }
+            />
+            {squadPreview !== null ? (
+              <View style={styles.squadContent}>
+                <View style={styles.squadStats}>
+                  <View style={styles.squadStat}>
+                    <Text style={styles.squadStatValue}>
+                      {squadPreview.count}
+                    </Text>
+                    <Text style={styles.finBoxLabel}>JOGADORES</Text>
+                  </View>
+                  <View style={styles.squadDivider} />
+                  <View style={styles.squadStat}>
+                    <Text style={styles.squadStatValue}>
+                      {squadPreview.avgXi}
+                    </Text>
+                    <Text style={styles.finBoxLabel}>MÉDIA XI</Text>
+                  </View>
+                </View>
+                <View style={styles.squadAvatars}>
+                  {squadPreview.top.map((p, i) => (
+                    <PlayerAvatar
+                      key={p.id}
+                      size={38}
+                      style={[styles.squadAvatar, i === 0 ? null : styles.squadAvatarStacked]}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.financeUnavailable}>
+                <Icon name="people" size={18} color={color.textMuted} />
+                <Text style={styles.financeUnavailableText}>
+                  {rosterQuery.state === "loading"
+                    ? "Sincronizando o elenco…"
+                    : "O elenco ainda não existe neste mundo."}
+                </Text>
+              </View>
+            )}
+          </Card>
+        </Pressable>
+
+        <Pressable
           onPress={() => router.push("/financas")}
           accessibilityRole="button"
           accessibilityLabel="Abrir finanças"
@@ -495,50 +572,6 @@ export function Club() {
           )}
         </Card>
         </Pressable>
-
-        <Card>
-          <SectionHeader
-            title="TORCIDA"
-            trailing={<Icon name="people" size={16} color={color.textMuted} />}
-          />
-          {fanbaseQuery.state === "ready" && fanbase !== null ? (
-            <View style={styles.financeContent}>
-              <View style={styles.finBalance}>
-                <Text style={styles.finBoxLabel}>TAMANHO DA TORCIDA</Text>
-                <Text style={styles.finBalanceValue}>
-                  {formatAmount(fanbase.headcount)}
-                </Text>
-              </View>
-              <View style={styles.fanMeter}>
-                <View style={styles.fanMeterHead}>
-                  <Text style={styles.finBoxLabel}>PACIÊNCIA DA DIRETORIA</Text>
-                  <Text style={styles.fanMeterValue}>
-                    {fanbase.boardPatience}
-                  </Text>
-                </View>
-                <ProgressBar value={fanbase.boardPatience / 100} height={6} />
-              </View>
-              <View style={styles.fanMeter}>
-                <View style={styles.fanMeterHead}>
-                  <Text style={styles.finBoxLabel}>PRESSÃO</Text>
-                  <Text style={styles.fanMeterValue}>
-                    {fanbase.pressureLevel}
-                  </Text>
-                </View>
-                <ProgressBar value={fanbase.pressureLevel / 100} height={6} />
-              </View>
-            </View>
-          ) : (
-            <View style={styles.financeUnavailable}>
-              <Icon name="people" size={18} color={color.textMuted} />
-              <Text style={styles.financeUnavailableText}>
-                {fanbaseQuery.state === "loading"
-                  ? "Sincronizando a torcida…"
-                  : "A torcida ainda não existe neste mundo."}
-              </Text>
-            </View>
-          )}
-        </Card>
 
         <Card>
           <SectionHeader
@@ -798,6 +831,35 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   financeContent: { gap: space.sm },
+  squadContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
+  squadStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+  },
+  squadStat: { alignItems: "flex-start", gap: 2 },
+  squadStatValue: {
+    color: color.primary,
+    fontSize: fontSize.xl2,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  squadDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    backgroundColor: color.border,
+  },
+  squadAvatars: { flexDirection: "row", alignItems: "center" },
+  squadAvatar: {
+    borderWidth: 2,
+    borderColor: color.backgroundElevated,
+  },
+  squadAvatarStacked: { marginLeft: -13 },
   finGrid: { flexDirection: "row", gap: space.sm },
   fanMeter: {
     backgroundColor: color.backgroundElevated,

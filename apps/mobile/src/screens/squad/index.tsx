@@ -12,6 +12,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { CommandTrackingStatus } from "@grinta/core";
 import { Icon } from "@/components/icon";
 import { MINIMUM_TOUCH_TARGET, useReducedMotion } from "@/lib/accessibility";
@@ -58,16 +59,11 @@ import {
 } from "./substitution-model";
 import {
   PlayerSkillCard,
+  type PlayerCardCrest,
   type PlayerSkillCardData,
 } from "@/components/player-skill-card";
-
-/** Cor do setor, pro chip de posição do card FC. */
-const GROUP_TINT: Record<string, string> = {
-  GOL: color.warning,
-  DEF: color.info,
-  MEI: color.success,
-  ATA: color.danger,
-};
+import { positionGroupTint } from "@/components/position-badge";
+import { clubCrestData } from "@/screens/club/customization/visual-identity";
 
 /** Tela de Elenco: campo tático (formação editável) + modal de substituição. */
 export function Squad() {
@@ -89,6 +85,20 @@ export function Squad() {
   const managedClub = selectManagedClub(
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
+  );
+  // Escudo do clube gerido, pro card do jogador. Usa a identidade real quando
+  // personalizada; senão a default determinística pelo nome (mesma do admin).
+  const clubCrest = useMemo<PlayerCardCrest | null>(
+    () =>
+      managedClub === null
+        ? null
+        : clubCrestData(
+            managedClub.name,
+            managedClub.primaryColor,
+            managedClub.secondaryColor,
+            managedClub.crestTemplateId,
+          ),
+    [managedClub],
   );
   // O elenco é da query `roster`, recortada pelo clube gerido (R-190). `null`
   // enquanto o clube não é conhecido — a query só dispara com o clubId em mãos.
@@ -418,6 +428,15 @@ export function Squad() {
     return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.content}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao clube"
+            style={styles.backRow}
+          >
+            <Icon name="arrow-back" size={22} color={color.text} />
+            <Text style={styles.backText}>CLUBE</Text>
+          </Pressable>
           <ScreenStatePanel
             state={screenState === "success" ? "empty" : screenState}
             title={
@@ -445,11 +464,22 @@ export function Squad() {
         refreshControl={<Refresh onRefresh={refresh} />}
       >
         <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>ELENCO</Text>
-            <Text style={styles.subtitle}>
-              {managedClub.name.toUpperCase()} · ELENCO OFICIAL
-            </Text>
+          <View style={styles.headerLeft}>
+            <Pressable
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar ao clube"
+              hitSlop={8}
+              style={styles.back}
+            >
+              <Icon name="arrow-back" size={22} color={color.text} />
+            </Pressable>
+            <View style={{ flexShrink: 1 }}>
+              <Text style={styles.title}>ELENCO</Text>
+              <Text style={styles.subtitle}>
+                {managedClub.name.toUpperCase()} · ELENCO OFICIAL
+              </Text>
+            </View>
           </View>
           <View style={styles.ovrPill}>
             <Text style={styles.ovrLabel}>MÉDIA XI</Text>
@@ -597,7 +627,12 @@ export function Squad() {
                   }
                   style={[styles.benchRow, eligible ? null : styles.benchBlocked]}
                 >
-                  <ReserveCard p={p} outgoing={outgoing} fit={fit} />
+                  <ReserveCard
+                    p={p}
+                    outgoing={outgoing}
+                    fit={fit}
+                    crest={clubCrest}
+                  />
                 </Pressable>
               ))
             )}
@@ -618,7 +653,7 @@ export function Squad() {
                     name: detail.name,
                     number: detail.number,
                     position: detail.position,
-                    positionTint: GROUP_TINT[detail.group] ?? color.primary,
+                    positionTint: positionGroupTint(detail.group),
                     age: detail.age,
                     ovr: detail.ovr,
                     pot: detail.pot,
@@ -626,6 +661,7 @@ export function Squad() {
                     morale: detail.morale,
                     groups: detail.groups,
                     attributes: detail.attributes,
+                    crest: clubCrest,
                   } satisfies PlayerSkillCardData
                 }
               />
@@ -712,6 +748,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    flexShrink: 1,
+  },
+  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    marginBottom: space.md,
+  },
+  backText: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
   },
   title: {
     color: color.text,
