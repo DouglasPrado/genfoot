@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 import {
   lifecycleActions,
@@ -47,8 +48,8 @@ export function WorldSettingsPanel({
   onChanged: () => void;
 }) {
   const { api } = useSession();
+  const { error: showError } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<LifecycleAction | null>(null);
   const [reason, setReason] = useState("");
 
@@ -67,7 +68,6 @@ export function WorldSettingsPanel({
 
   async function run(action: LifecycleAction, withReason: string) {
     setBusy(action.key);
-    setError(null);
     try {
       const response = await api.command({
         commandType: action.commandType,
@@ -82,12 +82,12 @@ export function WorldSettingsPanel({
         ...(expectedVersion === null ? {} : { expectedVersion }),
       });
       if (response.status === "REJECTED") {
-        setError(response.error?.code ?? "REJECTED");
+        showError(response.error?.code ?? "REJECTED");
         return;
       }
       onChanged();
     } catch (err) {
-      setError(
+      showError(
         err instanceof GrintaApiError ? err.standard.code : "Falha na API",
       );
     } finally {
@@ -98,7 +98,6 @@ export function WorldSettingsPanel({
   }
 
   function click(action: LifecycleAction) {
-    setError(null);
     if (action.confirm || action.reason) {
       setReason("");
       setPending(action);
@@ -169,22 +168,15 @@ export function WorldSettingsPanel({
         </div>
       )}
 
-      {error !== null ? (
-        // Erro NOMEADO, com o código do domínio. "Não foi possível" não diz ao
-        // operador se ele errou o estado, perdeu a corrida ou perdeu a sessão.
-        <p className="mono rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
-
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        <span className="font-semibold">Inativar não é apagar.</span> R-56 define
-        o arquivamento como read-only reversível, preservando histórico, títulos e
-        recordes — quem apaga é <span className="mono">world:delete</span>, na aba
-        do mundo, e não tem volta. O gatilho de R-56 (≥ 2 temporadas ociosas,
-        aviso de 30 dias) <span className="font-semibold">não é verificado</span>:
-        não há temporada ligada nem medida de atividade para conferir. Quem julga
-        o ócio é você.
+        <span className="font-semibold">Inativar não é apagar.</span> R-56
+        define o arquivamento como read-only reversível, preservando histórico,
+        títulos e recordes — quem apaga é{" "}
+        <span className="mono">world:delete</span>, na aba do mundo, e não tem
+        volta. O gatilho de R-56 (≥ 2 temporadas ociosas, aviso de 30 dias){" "}
+        <span className="font-semibold">não é verificado</span>: não há
+        temporada ligada nem medida de atividade para conferir. Quem julga o
+        ócio é você.
       </p>
 
       <Dialog

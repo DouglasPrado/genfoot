@@ -20,6 +20,7 @@ import { QuickActions } from "@/components/quick-actions";
 import { SeasonHistory } from "@/components/season-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorldIdentityForm } from "@/components/world-identity-form";
 import { WorldParametersTable } from "@/components/world-parameters-table";
@@ -93,7 +94,9 @@ function Stat({
           </span>
           {badge}
         </div>
-        <div className="mono text-2xl tabular-nums text-foreground">{value}</div>
+        <div className="mono text-2xl tabular-nums text-foreground">
+          {value}
+        </div>
         {hint ? (
           <div className="text-xs text-muted-foreground">{hint}</div>
         ) : null}
@@ -106,8 +109,8 @@ export default function WorldDetailPage() {
   const params = useParams<{ worldId: string }>();
   const worldId = params.worldId;
   const { api, session } = useSession();
+  const { error: showError } = useToast();
   const [snapshot, setSnapshot] = useState<WorldSnapshot | null>(null);
-  const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [clubs, setClubs] = useState<readonly ClubRow[]>([]);
   // `null` = ainda não carregou; `Map` com chave `null` = clube sem finanças.
   const [finances, setFinances] = useState<ReadonlyMap<
@@ -123,7 +126,6 @@ export default function WorldDetailPage() {
     // da hora.
     if (session === null) return;
     let alive = true;
-    setSnapshotError(null);
     api
       .query<WorldSnapshot>(worldId)
       .then((e) => {
@@ -144,8 +146,15 @@ export default function WorldDetailPage() {
       .catch((err: unknown) => {
         if (!alive) return;
         setSnapshot(null);
-        setSnapshotError(
-          err instanceof GrintaApiError ? err.standard.code : "Falha na API",
+        const code =
+          err instanceof GrintaApiError ? err.standard.code : "Falha na API";
+        const expired =
+          code.toLowerCase().includes("token") ||
+          code.includes("UNAUTHENTICATED");
+        showError(
+          `Não consegui carregar o mundo (${code}). O que a tela mostra não é o estado dele.${
+            expired ? " Sua sessão expirou — entre de novo." : ""
+          }`,
         );
       });
     // Os clubes são o ÚNICO dado real desta tela. Se a query falhar, a tabela
@@ -167,7 +176,7 @@ export default function WorldDetailPage() {
     return () => {
       alive = false;
     };
-  }, [api, session, worldId, refreshKey]);
+  }, [api, session, worldId, refreshKey, showError]);
 
   // Caixa e folha reais, uma query `finance-snapshot` por clube (C9). São N
   // chamadas, mas é dashboard de operador — e o dado é real, não estimado.
@@ -213,10 +222,7 @@ export default function WorldDetailPage() {
   const dinheiroReal =
     finances === null
       ? null
-      : [...finances.values()].reduce(
-          (sum, f) => sum + (f?.cashMinor ?? 0),
-          0,
-        );
+      : [...finances.values()].reduce((sum, f) => sum + (f?.cashMinor ?? 0), 0);
   const jogadores = mockJogadores(worldId, clubs.length);
   const competicoes = mockCompeticoes(worldId);
   const tendencia = mockTendencia(worldId);
@@ -238,20 +244,6 @@ export default function WorldDetailPage() {
         }
       />
       <div className="space-y-6 p-6">
-        {/* Sessão morta é a causa mais comum, e o operador não tinha como saber:
-            o erro sumia e a tela parecia um mundo sem dado. */}
-        {snapshotError !== null ? (
-          <p className="rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
-            Não consegui carregar o mundo (
-            <span className="mono">{snapshotError}</span>). O que a tela mostra
-            abaixo não é o estado dele.
-            {snapshotError.toLowerCase().includes("token") ||
-            snapshotError.includes("UNAUTHENTICATED")
-              ? " Sua sessão expirou — entre de novo."
-              : null}
-          </p>
-        ) : null}
-
         <MockNotice reais={2} total={6} />
 
         <Card>
@@ -297,7 +289,11 @@ export default function WorldDetailPage() {
           <Stat
             label="Tendência do mundo"
             value={`${tendencia.crescente ? "+" : "−"}${tendencia.percentual.toFixed(1)}%`}
-            hint={tendencia.crescente ? "economia crescente" : "economia decrescente"}
+            hint={
+              tendencia.crescente
+                ? "economia crescente"
+                : "economia decrescente"
+            }
             badge={<Mock contexto="C9 razão" />}
           />
           {/* "Campeonatos rodando" de N: uma temporada tem VÁRIOS torneios —

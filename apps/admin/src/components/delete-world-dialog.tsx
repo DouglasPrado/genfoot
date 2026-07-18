@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 /**
@@ -43,12 +44,12 @@ export function DeleteWorldDialog({
   clubCount: number;
 }) {
   const { api } = useSession();
+  const { error: showError } = useToast();
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState("");
   const [uuid, setUuid] = useState("");
   const [busy, setBusy] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
 
   // Os dois têm de bater. Comparar com `trim()` porque copiar de uma tabela traz
   // espaço junto, e recusar por espaço invisível é raiva sem motivo.
@@ -57,7 +58,6 @@ export function DeleteWorldDialog({
   async function apagar() {
     if (!confere) return;
     setBusy(true);
-    setErro(null);
     try {
       const r = await api.command({
         commandType: "world:delete",
@@ -66,7 +66,7 @@ export function DeleteWorldDialog({
         idempotencyKey: `delete-${worldId}`,
       });
       if (r.status === "REJECTED") {
-        setErro(r.error?.messageKey ?? r.error?.code ?? "REJECTED");
+        showError(r.error?.messageKey ?? r.error?.code ?? "REJECTED");
         return;
       }
       setAberto(false);
@@ -74,7 +74,9 @@ export function DeleteWorldDialog({
       // query. `replace` e não `push` — não há para onde "voltar".
       router.replace("/worlds");
     } catch (err) {
-      setErro(err instanceof GrintaApiError ? err.standard.code : "Falha na API.");
+      showError(
+        err instanceof GrintaApiError ? err.standard.code : "Falha na API.",
+      );
     } finally {
       setBusy(false);
     }
@@ -90,12 +92,15 @@ export function DeleteWorldDialog({
         if (!open) {
           setNome("");
           setUuid("");
-          setErro(null);
         }
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-danger hover:text-danger">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-danger hover:text-danger"
+        >
           <Trash2 className="size-4" />
           Apagar mundo
         </Button>
@@ -110,8 +115,8 @@ export function DeleteWorldDialog({
           </DialogTitle>
           <DialogDescription>
             Isto apaga o mundo e <strong>tudo que pende dele</strong> —{" "}
-            {clubCount} clubes, identidades, estádios, participações, controles e
-            a cadeia de eventos. <strong>Não tem desfazer</strong>, e não é o
+            {clubCount} clubes, identidades, estádios, participações, controles
+            e a cadeia de eventos. <strong>Não tem desfazer</strong>, e não é o
             mesmo que arquivar: arquivar preserva histórico e é reversível
             (R-56).
           </DialogDescription>
@@ -134,7 +139,9 @@ export function DeleteWorldDialog({
           <div className="space-y-1.5">
             <Label htmlFor="confirmUuid">
               Digite o UUID:{" "}
-              <span className="mono text-[10px] text-foreground">{worldId}</span>
+              <span className="mono text-[10px] text-foreground">
+                {worldId}
+              </span>
             </Label>
             <Input
               id="confirmUuid"
@@ -144,12 +151,6 @@ export function DeleteWorldDialog({
               autoComplete="off"
             />
           </div>
-
-          {erro === null ? null : (
-            <p className="mono rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-              {erro}
-            </p>
-          )}
 
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setAberto(false)}>

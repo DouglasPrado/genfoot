@@ -7,20 +7,20 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 export default function LoginPage() {
   const { login } = useSession();
+  const { error: showError } = useToast();
   const router = useRouter();
   const [subject, setSubject] = useState("operador");
   const [adminKey, setAdminKey] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setError(null);
     try {
       await login({
         subject,
@@ -29,7 +29,7 @@ export default function LoginPage() {
       });
       router.replace("/worlds");
     } catch (err) {
-      setError(
+      showError(
         err instanceof GrintaApiError
           ? err.standard.code
           : "Falha ao conectar à API.",
@@ -83,12 +83,6 @@ export default function LoginPage() {
               className="mono"
             />
           </div>
-
-          {error ? (
-            <p className="mono rounded-sm border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {error}
-            </p>
-          ) : null}
 
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Conectando…" : "Entrar no console"}

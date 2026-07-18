@@ -8,6 +8,7 @@ import { ClubName } from "@/components/club-crest";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 import {
   buildUserDirectory,
@@ -31,14 +32,13 @@ import { useKnownWorlds } from "@/lib/worlds";
  */
 export default function UsersPage() {
   const { api } = useSession();
-  const { worlds } = useKnownWorlds();
+  const { error: showError } = useToast();
+  const { worlds, failed: worldsFailed } = useKnownWorlds();
   const [rows, setRows] = useState<readonly UserRow[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true);
-    setError(null);
     try {
       const slices = await Promise.all(
         worlds.map(async (world): Promise<WorldSlice> => {
@@ -59,11 +59,11 @@ export default function UsersPage() {
       );
       setRows(buildUserDirectory(slices));
     } catch {
-      setError("Falha ao consultar a API.");
+      showError("Falha ao consultar a API.");
     } finally {
       setBusy(false);
     }
-  }, [api, worlds]);
+  }, [api, worlds, showError]);
 
   useEffect(() => {
     void load();
@@ -75,24 +75,23 @@ export default function UsersPage() {
         title="Usuários"
         hint="Contas por mundo, com o clube controlado. Dado real — Postgres."
         actions={
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={busy}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load()}
+            disabled={busy}
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             {busy ? "Atualizando…" : "Atualizar"}
           </Button>
         }
       />
 
-      {error === null ? null : (
-        <Card>
-          <CardContent className="py-4 text-sm text-red-400">{error}</CardContent>
-        </Card>
-      )}
-
-      {worlds.length === 0 ? (
+      {worldsFailed ? null : worlds.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-sm text-muted-foreground">
-            Nenhum mundo conhecido neste console. Abra ou crie um em Mundos —
-            a listagem de usuários varre os mundos conhecidos.
+            Nenhum mundo conhecido neste console. Abra ou crie um em Mundos — a
+            listagem de usuários varre os mundos conhecidos.
           </CardContent>
         </Card>
       ) : rows === null ? (

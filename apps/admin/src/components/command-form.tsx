@@ -13,12 +13,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 import type { CommandSpec, FieldSpec } from "@/lib/command-specs";
 
 type Value = string | boolean;
 
-function initialValues(spec: CommandSpec, actor: string): Record<string, Value> {
+function initialValues(
+  spec: CommandSpec,
+  actor: string,
+): Record<string, Value> {
   const values: Record<string, Value> = {};
   for (const field of spec.fields) {
     if (field.kind === "checkbox") values[field.name] = false;
@@ -72,16 +76,14 @@ export function CommandForm({
   onDone?: () => void;
 }) {
   const { api, session, stepUp } = useSession();
+  const { error: showError } = useToast();
   const [values, setValues] = useState<Record<string, Value>>(() =>
     initialValues(spec, session?.subject ?? "operador"),
   );
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(
-    null,
-  );
+  const [result, setResult] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reauthKey, setReauthKey] = useState("");
-  const [reauthError, setReauthError] = useState<string | null>(null);
 
   function setField(name: string, value: Value) {
     setValues((v) => ({ ...v, [name]: value }));
@@ -96,20 +98,18 @@ export function CommandForm({
         payload: buildPayload(spec, values),
         idempotencyKey: newKey(),
       });
-      setResult({
-        ok: response.status !== "REJECTED",
-        text:
-          response.status === "REJECTED"
-            ? `REJECTED · ${response.error?.code}`
-            : `${response.status}${response.resource ? " · " + response.resource : ""}`,
-      });
+      if (response.status === "REJECTED") {
+        showError(response.error?.code ?? "REJECTED");
+        return;
+      }
+      setResult(
+        `${response.status}${response.resource ? " · " + response.resource : ""}`,
+      );
       onDone?.();
     } catch (err) {
-      setResult({
-        ok: false,
-        text:
-          err instanceof GrintaApiError ? err.standard.code : "Falha na API",
-      });
+      showError(
+        err instanceof GrintaApiError ? err.standard.code : "Falha na API",
+      );
     } finally {
       setBusy(false);
     }
@@ -122,7 +122,6 @@ export function CommandForm({
     setResult(null);
     if (requiresConfirmation(spec.commandType)) {
       setReauthKey("");
-      setReauthError(null);
       setConfirmOpen(true);
       return;
     }
@@ -132,7 +131,7 @@ export function CommandForm({
   async function confirmAndRun() {
     if (needsReauth) {
       if (!reauthKey) {
-        setReauthError("Digite a chave admin.");
+        showError("Digite a chave admin.");
         return;
       }
       try {
@@ -141,7 +140,7 @@ export function CommandForm({
         await execute(stepped);
         return;
       } catch (err) {
-        setReauthError(
+        showError(
           err instanceof GrintaApiError ? err.standard.code : "reauth falhou",
         );
         return;
@@ -157,7 +156,11 @@ export function CommandForm({
         {spec.fields.map((field: FieldSpec) => (
           <div
             key={field.name}
-            className={field.kind === "checkbox" ? "col-span-2 flex items-center gap-2" : "space-y-1"}
+            className={
+              field.kind === "checkbox"
+                ? "col-span-2 flex items-center gap-2"
+                : "space-y-1"
+            }
           >
             {field.kind === "checkbox" ? (
               <>
@@ -212,11 +215,7 @@ export function CommandForm({
           {busy ? "Executando…" : spec.label}
         </Button>
         {result ? (
-          <span
-            className={`mono text-xs ${result.ok ? "text-[color:var(--ok)]" : "text-danger"}`}
-          >
-            {result.text}
-          </span>
+          <span className="mono text-xs text-[color:var(--ok)]">{result}</span>
         ) : null}
       </div>
 
@@ -239,9 +238,6 @@ export function CommandForm({
                 autoFocus
               />
             </div>
-          ) : null}
-          {reauthError ? (
-            <p className="mono mt-2 text-xs text-danger">{reauthError}</p>
           ) : null}
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
