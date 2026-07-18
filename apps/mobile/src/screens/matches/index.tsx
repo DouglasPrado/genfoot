@@ -1,8 +1,10 @@
 import { useCallback } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import { Card, SectionHeader } from "@/components/card";
+import { Icon } from "@/components/icon";
 import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
@@ -101,8 +103,19 @@ export function Matches() {
         refreshControl={<Refresh onRefresh={refresh} />}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>PARTIDAS</Text>
-          <Text style={styles.subtitle}>{managedClub.name.toUpperCase()}</Text>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao início"
+            hitSlop={8}
+            style={styles.back}
+          >
+            <Icon name="arrow-back" size={22} color={color.text} />
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>PARTIDAS</Text>
+            <Text style={styles.subtitle}>{managedClub.name.toUpperCase()}</Text>
+          </View>
         </View>
 
         <Card>
@@ -182,7 +195,9 @@ function Result({ match, myId }: { match: MatchItem; myId: string }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.md },
-  header: { gap: space.xs },
+  header: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1, gap: space.xs },
   title: { color: color.text, fontSize: fontSize.xl, fontWeight: fontWeight.bold as "700" },
   subtitle: { color: color.textMuted, fontSize: fontSize.sm },
   row: {

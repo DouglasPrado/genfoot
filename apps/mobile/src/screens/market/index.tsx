@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import { CommandTrackingStatus } from "@grinta/core";
 
@@ -280,11 +281,22 @@ export function Market() {
         refreshControl={<Refresh onRefresh={refresh} />}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>MERCADO</Text>
-          <Text style={styles.subtitle}>
-            {players.length} jogadores
-            {cashMinor !== null ? ` · caixa ${reais(cashMinor)}` : ""}
-          </Text>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao elenco"
+            hitSlop={8}
+            style={styles.back}
+          >
+            <Icon name="arrow-back" size={22} color={color.text} />
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>MERCADO</Text>
+            <Text style={styles.subtitle}>
+              {players.length} jogadores
+              {cashMinor !== null ? ` · caixa ${reais(cashMinor)}` : ""}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.filters}>
@@ -566,7 +578,9 @@ function DealRow({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.md },
-  header: { gap: space.xs },
+  header: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1, gap: space.xs },
   title: {
     color: color.text,
     fontSize: fontSize.xl,

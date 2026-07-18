@@ -385,6 +385,15 @@ export function Club() {
     return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.content}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao início"
+            style={styles.backRow}
+          >
+            <Icon name="arrow-back" size={22} color={color.text} />
+            <Text style={styles.backText}>INÍCIO</Text>
+          </Pressable>
           <ScreenStatePanel
             state={screenState === "success" ? "empty" : screenState}
             title={vm === null ? "CLUBE NÃO DISPONÍVEL" : undefined}
@@ -406,6 +415,16 @@ export function Club() {
         showsVerticalScrollIndicator={false}
         refreshControl={<Refresh onRefresh={refresh} />}
       >
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar ao início"
+          style={styles.backRow}
+        >
+          <Icon name="arrow-back" size={22} color={color.text} />
+          <Text style={styles.backText}>INÍCIO</Text>
+        </Pressable>
+
         <Pressable
           style={styles.hero}
           onPress={() => setCustomizeOpen(true)}
@@ -827,6 +846,18 @@ const COOLDOWN_DAYS = 30;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+  },
+  backText: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
   crest: {
     width: 60,

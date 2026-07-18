@@ -431,11 +431,11 @@ export function Squad() {
           <Pressable
             onPress={() => router.back()}
             accessibilityRole="button"
-            accessibilityLabel="Voltar ao clube"
+            accessibilityLabel="Voltar ao elenco"
             style={styles.backRow}
           >
             <Icon name="arrow-back" size={22} color={color.text} />
-            <Text style={styles.backText}>CLUBE</Text>
+            <Text style={styles.backText}>ELENCO</Text>
           </Pressable>
           <ScreenStatePanel
             state={screenState === "success" ? "empty" : screenState}
@@ -468,7 +468,7 @@ export function Squad() {
             <Pressable
               onPress={() => router.back()}
               accessibilityRole="button"
-              accessibilityLabel="Voltar ao clube"
+              accessibilityLabel="Voltar ao elenco"
               hitSlop={8}
               style={styles.back}
             >

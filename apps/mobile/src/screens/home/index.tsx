@@ -1,7 +1,16 @@
 import { useCallback, useEffect } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
+import {
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from "react-native";
+import { router, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { Card, SectionHeader } from "@/components/card";
 import { Icon } from "@/components/icon";
@@ -21,6 +30,15 @@ import {
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
+
+/**
+ * Arte gerada (higgsfield, estilo do protótipo): o fundo de campo da Home e as
+ * fotos dos cards de jogo. O domínio não entrega arte, então são estáticas do
+ * bundle — decorativas, não representam dado de mundo.
+ */
+const FIELD_BG = require("../../../assets/home-field-bg.jpg") as ImageSourcePropType;
+const CARD_PARTIDAS = require("../../../assets/card-partidas.jpg") as ImageSourcePropType;
+const CARD_CLUBE = require("../../../assets/card-clube.jpg") as ImageSourcePropType;
 
 /**
  * A tabela da liga como a query `competitions` a entrega (C7). Antes esta tela
@@ -129,7 +147,14 @@ export function Home() {
   });
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.root}>
+      <ImageBackground
+        source={FIELD_BG}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+      <View style={styles.fieldScrim} pointerEvents="none" />
+      <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -168,6 +193,23 @@ export function Home() {
                   {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                 </Text>
               </View>
+            </View>
+
+            <View style={styles.featured}>
+              <GameCard
+                image={CARD_CLUBE}
+                eyebrow="GERIR"
+                title="CLUBE"
+                subtitle="Elenco e finanças"
+                to="/clube"
+              />
+              <GameCard
+                image={CARD_PARTIDAS}
+                eyebrow="JOGAR"
+                title="PARTIDAS"
+                subtitle="Calendário e resultados"
+                to="/partidas"
+              />
             </View>
 
             <Card>
@@ -289,7 +331,60 @@ export function Home() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+/**
+ * Card de jogo destacável: a foto (higgsfield) com um escurecimento pra baixo
+ * pra legibilidade do título, e navegação pra rota empilhada. É o lançador que
+ * substituiu a barra de menu inferior.
+ */
+function GameCard({
+  image,
+  eyebrow,
+  title,
+  subtitle,
+  to,
+}: {
+  readonly image: ImageSourcePropType;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly to: Href;
+}) {
+  const gradId = `scrim-${title}`;
+  return (
+    <Pressable
+      onPress={() => router.push(to)}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir ${title}`}
+      style={({ pressed }) => [styles.gameCard, pressed ? styles.gameCardPressed : null]}
+    >
+      <ImageBackground
+        source={image}
+        style={styles.gameCardImage}
+        imageStyle={styles.gameCardImageRadius}
+        resizeMode="cover"
+      >
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#06080A" stopOpacity={0} />
+              <Stop offset="0.5" stopColor="#06080A" stopOpacity={0.3} />
+              <Stop offset="1" stopColor="#06080A" stopOpacity={0.92} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradId})`} />
+        </Svg>
+        <View style={styles.gameCardContent}>
+          <Text style={styles.gameCardEyebrow}>{eyebrow}</Text>
+          <Text style={styles.gameCardTitle}>{title}</Text>
+          <Text style={styles.gameCardSubtitle}>{subtitle}</Text>
+        </View>
+      </ImageBackground>
+    </Pressable>
   );
 }
 
@@ -330,8 +425,48 @@ function InlineUnavailable({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: color.background },
+  root: { flex: 1, backgroundColor: color.background },
+  fieldScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(6,8,10,0.62)",
+  },
+  safe: { flex: 1, backgroundColor: "transparent" },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
+  featured: { flexDirection: "row", gap: space.md },
+  gameCard: {
+    flex: 1,
+    height: 190,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: color.primaryDim,
+    overflow: "hidden",
+  },
+  gameCardPressed: { opacity: 0.9 },
+  gameCardImage: { flex: 1, justifyContent: "flex-end" },
+  gameCardImageRadius: { borderRadius: radius.xl },
+  gameCardContent: {
+    padding: space.md,
+  },
+  gameCardEyebrow: {
+    color: color.primary,
+    fontSize: 10,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  gameCardTitle: {
+    color: color.text,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
+  gameCardSubtitle: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold as "600",
+    marginTop: 1,
+  },
   competitionNote: {
     marginTop: space.sm,
     color: color.primary,
