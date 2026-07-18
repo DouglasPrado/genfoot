@@ -21,6 +21,8 @@ const GENESIS_TABLES = [
   "TicketPricePolicy",
   "CommercialAgreement",
   "BoardDecision",
+  "StaffContract",
+  "StaffMember",
   "Person",
   "Player",
   "PlayerAttributes",
@@ -64,10 +66,14 @@ describe.skipIf(!hasDatabase)(
       expect(result.ok).toBe(true);
 
       expect(await client.club.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
-      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(368);
+      // 368 jogadores + 112 da comissão técnica (16 clubes × 7 cargos, C8) = 480 pessoas.
+      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(480);
       expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(368);
       expect(await client.playerAttributes.count()).toBe(368);
       expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
+      // C8: a comissão técnica — 7 cargos por clube, cada um com contrato ativo.
+      expect(await client.staffMember.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
+      expect(await client.staffContract.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
     });
 
     it("cada elenco tem os 23 jogadores com camisa única", async () => {

@@ -4,6 +4,7 @@ import type { CompetitionRepository } from "../competitions/competition-reposito
 import type { FanbaseRepository } from "../fanbase/fanbase-repository.js";
 import type { LedgerRepository } from "../finance/ledger-repository.js";
 import type { PlayerRepository } from "../players/player-repository.js";
+import type { StaffRepository } from "../staff/staff-types.js";
 
 /**
  * Os repositórios que a gênese escreve, todos ligados à MESMA transação.
@@ -19,6 +20,7 @@ export interface GenesisRepositories {
   readonly ledger: LedgerRepository;
   readonly competitions: CompetitionRepository;
   readonly fanbase: FanbaseRepository;
+  readonly staff: StaffRepository;
 }
 
 /**

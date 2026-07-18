@@ -538,6 +538,46 @@ entrada tem uma fonte (a transferência) e um resumo; o resto do inbox vem depoi
 
 ---
 
+### R-197 (C8) — A comissão técnica nasce na gênese COM contrato. Ao contrário do jogador (R-189).
+
+O `StaffMember` não tem `clubId`: o único vínculo staff↔clube é o `StaffContract`
+(salariado). Isso reabre o dilema da [R-189](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco-sem-contrato-e-assume-a-dívida)
+— "contrato exige salário, e salário é dinheiro". Mas a R-189 e esta decisão vão para
+lados OPOSTOS, e a diferença é o vínculo alternativo:
+
+- O **jogador** da gênese tinha o ELENCO (projeção, R-190) para se ligar ao clube; podia
+  esperar C6 para o contrato sem ficar órfão. Por isso a R-189 adiou o contrato.
+- O **staff** não tem projeção nenhuma. Sem `StaffContract`, não existe comissão de clube
+  — a pergunta "quem é o técnico do clube X" fica sem resposta possível. Adiar aqui é não
+  ter C8.
+
+Então a gênese cria o `StaffContract`. E isso NÃO gera dinheiro: o contrato é uma
+**obrigação registrada** (o `salaryPerSeasonMinor` é dado, não lançamento) — nenhum
+`JournalEntry` nasce disto, o caixa do clube não muda, a oferta monetária (ECO-003) fica
+intacta. A folha (mover o dinheiro por temporada) é do ciclo econômico (C9), que LÊ estes
+contratos quando existir. Registrar a dívida ≠ pagá-la.
+
+**C8 vertical A — a gênese materializa a comissão:**
+
+- Por clube, 7 cargos essenciais (técnico, auxiliar, preparador físico, de goleiros,
+  olheiro, médico, coordenador de base), determinísticos por `(seed, clubIndex)` (R-182):
+  cada um vira uma `Person` + um `StaffMember` (cargo, tier de qualidade enviesado para
+  baixo, 7 atributos ancorados na habilidade com ênfase no cargo) + um `StaffContract`
+  ligando ao clube. 16 clubes × 7 = 112 membros. Idempotente por `staffId`.
+- Read model `staffForClub` (junta contrato→membro→pessoa).
+
+**Fiação deferida:** query `staff` + tela ficam de fora (tocam arquivos sob refatoração
+paralela). Entregue o backend isolado: geração, adapters, teste de integração Postgres,
+prova por HTTP (a gênese cria a comissão).
+
+**O que isto NÃO é (o que falta para C8 pleno):** os níveis de estrutura por núcleo/área
+(§1–3), o multiplicador de evolução que a comissão aplica ao treino (§4), a capacidade
+operacional do CT (§3.6), os relatórios de olheiro (`ScoutReport`, §5), o mercado de staff
+(contratar/demitir) e a categoria de base (youth) de fato — jogadores sub-N em formação.
+Aqui a comissão é um plantel de profissionais com cargo e qualidade; os efeitos vêm depois.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.
