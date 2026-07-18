@@ -134,3 +134,6 @@ export * from "./contracts/transfer-player.js";
 export * from "./contracts/release-player.js";
 export * from "./contracts/sell-player.js";
 export * from "./contracts/list-player.js";
+export * from "./automation/automation-types.js";
+export * from "./automation/club-ai-profile.js";
+export * from "./automation/set-offline-plan.js";

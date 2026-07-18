@@ -21,6 +21,7 @@ import {
   LockCompetition,
   StartCompetition,
   FinishCompetition,
+  SetOfflinePlan,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -42,6 +43,8 @@ import {
   type SellUnitOfWork,
   type ListUnitOfWork,
   type CompetitionUnitOfWork,
+  type AutomationUnitOfWork,
+  type OfflinePlan,
   type ConfigureCompetitionPatch,
   type ClubRepository,
   type IdentityUnitOfWork,
@@ -114,6 +117,8 @@ export interface CommandContext {
   readonly listUnitOfWork: ListUnitOfWork;
   /** C7 — competição autorada: criar, configurar, travar, iniciar, homologar (R-202). */
   readonly competitionUnitOfWork: CompetitionUnitOfWork;
+  /** X-001 — o plano offline do clube: o que a IA pode decidir na ausência. */
+  readonly automationUnitOfWork: AutomationUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -277,6 +282,30 @@ const configureCompetitionPayload = z.object({
 });
 const competitionTransitionPayload = z.object({
   competitionId: z.string().uuid(),
+});
+
+// X-001 — o plano offline. O zod só valida a FORMA; as invariantes (alto risco
+// não delegável, coerência nível×profundidade) são do agregado ClubAIProfile.
+const minorStr = z.string().regex(/^\d+$/u);
+const setOfflinePlanPayload = z.object({
+  clubId: z.string().uuid(),
+  automationLevel: z.enum([
+    "MANUAL",
+    "ASSISTED",
+    "SEMI_AUTOMATED",
+    "FULLY_AUTOMATED",
+  ]),
+  offlineDecisionLevel: z.number().int(),
+  lineupPolicy: z.string().min(1),
+  substitutionPolicy: z.string().min(1),
+  marketPolicy: z.string().min(1),
+  crisisPolicy: z.string().min(1),
+  authorityLimits: z.object({
+    maxDebtMinor: minorStr,
+    maxTransferSpendMinor: minorStr,
+    canSellKeyPlayers: z.boolean(),
+    canChangeIdentity: z.boolean(),
+  }),
 });
 
 const createWorldPayload = z.object({
@@ -761,6 +790,26 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  // X-001 — o clube define o que a IA pode decidir na sua ausência (R-01).
+  "automation:set-offline-plan": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = setOfflinePlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const { clubId, ...plan } = parsed.data;
+    const result = await new SetOfflinePlan(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId,
+      plan: plan as OfflinePlan,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${clubId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {
