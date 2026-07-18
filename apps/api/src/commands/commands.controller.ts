@@ -12,9 +12,14 @@ import {
 import { ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type {
   ClubControlRepository,
+  ClubReadModel,
   ClubRepository,
   ClubUnitOfWork,
+  GenesisUnitOfWork,
   IdentityUnitOfWork,
+  MatchPlayRepository,
+  SeasonFinanceUnitOfWork,
+  TransferUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
 import type { Request } from "express";
@@ -26,8 +31,13 @@ import { ApiException } from "../common/standard-error.js";
 import { IdempotencyStore } from "../core/idempotency-store.js";
 import {
   CLUB_CONTROL_REPOSITORY,
+  CLUB_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
+  GENESIS_UNIT_OF_WORK,
+  MATCH_PLAY_REPOSITORY,
+  TRANSFER_UNIT_OF_WORK,
+  SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_UNIT_OF_WORK,
@@ -55,6 +65,15 @@ export class CommandsController {
     private readonly controls: ClubControlRepository,
     @Inject(CLUB_UNIT_OF_WORK)
     private readonly clubUnitOfWork: ClubUnitOfWork,
+    @Inject(GENESIS_UNIT_OF_WORK)
+    private readonly genesisUnitOfWork: GenesisUnitOfWork,
+    @Inject(MATCH_PLAY_REPOSITORY)
+    private readonly matchPlay: MatchPlayRepository,
+    @Inject(TRANSFER_UNIT_OF_WORK)
+    private readonly transferUnitOfWork: TransferUnitOfWork,
+    @Inject(SEASON_FINANCE_UNIT_OF_WORK)
+    private readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork,
+    @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
     @Inject(IDEMPOTENCY_STORE) private readonly idempotency: IdempotencyStore,
     @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
     @Inject(IDENTITY_UNIT_OF_WORK)
@@ -191,6 +210,11 @@ export class CommandsController {
         clubs: this.clubs,
         controls: this.controls,
         clubUnitOfWork: this.clubUnitOfWork,
+        genesisUnitOfWork: this.genesisUnitOfWork,
+        matchPlay: this.matchPlay,
+        transferUnitOfWork: this.transferUnitOfWork,
+        seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
+        clubReadModel: this.clubReadModel,
         // Quem agiu vem do TOKEN, não do corpo. O evento grava isso.
         actorId: request.session?.accountId ?? null,
         identityUnitOfWork: this.identityUnitOfWork,

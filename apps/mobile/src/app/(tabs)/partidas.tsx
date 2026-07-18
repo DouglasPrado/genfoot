@@ -1,5 +1,5 @@
-import { LiveMatch } from "@/screens/live-match";
+import { Matches } from "@/screens/matches";
 
 export default function PartidasRoute() {
-  return <LiveMatch />;
+  return <Matches />;
 }

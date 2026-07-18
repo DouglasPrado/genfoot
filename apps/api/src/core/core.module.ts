@@ -3,8 +3,20 @@ import {
   createPrismaClient,
   PrismaClubControlRepository,
   PrismaClubReadModel,
+  PrismaSquadReadModel,
+  PrismaLedgerReadModel,
+  PrismaClubFinanceReadModel,
+  PrismaCompetitionReadModel,
+  PrismaMatchesReadModel,
+  PrismaMarketReadModel,
+  PrismaFanbaseReadModel,
+  PrismaNarrativeReadModel,
   PrismaClubRepository,
   PrismaClubUnitOfWork,
+  PrismaGenesisUnitOfWork,
+  PrismaMatchPlayRepository,
+  PrismaTransferUnitOfWork,
+  PrismaSeasonFinanceUnitOfWork,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
   PrismaIdentityUnitOfWork,
@@ -17,8 +29,20 @@ import { IdempotencyStore } from "./idempotency-store.js";
 import {
   CLUB_CONTROL_REPOSITORY,
   CLUB_READ_MODEL,
+  SQUAD_READ_MODEL,
+  LEDGER_READ_MODEL,
+  CLUB_FINANCE_READ_MODEL,
+  COMPETITION_READ_MODEL,
+  MATCHES_READ_MODEL,
+  MARKET_READ_MODEL,
+  FANBASE_READ_MODEL,
+  NARRATIVE_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
+  GENESIS_UNIT_OF_WORK,
+  MATCH_PLAY_REPOSITORY,
+  TRANSFER_UNIT_OF_WORK,
+  SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
   IDENTITY_READ_MODEL,
@@ -82,10 +106,82 @@ import {
         new PrismaClubReadModel(client),
     },
     {
+      provide: SQUAD_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaSquadReadModel =>
+        new PrismaSquadReadModel(client),
+    },
+    {
+      provide: LEDGER_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaLedgerReadModel =>
+        new PrismaLedgerReadModel(client),
+    },
+    {
+      provide: CLUB_FINANCE_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaClubFinanceReadModel =>
+        new PrismaClubFinanceReadModel(client),
+    },
+    {
+      provide: COMPETITION_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaCompetitionReadModel =>
+        new PrismaCompetitionReadModel(client),
+    },
+    {
+      provide: MATCHES_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMatchesReadModel =>
+        new PrismaMatchesReadModel(client),
+    },
+    {
+      provide: MARKET_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMarketReadModel =>
+        new PrismaMarketReadModel(client),
+    },
+    {
+      provide: FANBASE_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaFanbaseReadModel =>
+        new PrismaFanbaseReadModel(client),
+    },
+    {
+      provide: NARRATIVE_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaNarrativeReadModel =>
+        new PrismaNarrativeReadModel(client),
+    },
+    {
       provide: CLUB_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubUnitOfWork =>
         new PrismaClubUnitOfWork(client),
+    },
+    {
+      provide: GENESIS_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaGenesisUnitOfWork =>
+        new PrismaGenesisUnitOfWork(client),
+    },
+    {
+      provide: MATCH_PLAY_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMatchPlayRepository =>
+        new PrismaMatchPlayRepository(client),
+    },
+    {
+      provide: TRANSFER_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTransferUnitOfWork =>
+        new PrismaTransferUnitOfWork(client),
+    },
+    {
+      provide: SEASON_FINANCE_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaSeasonFinanceUnitOfWork =>
+        new PrismaSeasonFinanceUnitOfWork(client),
     },
     {
       provide: CLUB_CONTROL_REPOSITORY,
@@ -122,7 +218,19 @@ import {
     WORLD_READ_MODEL,
     CLUB_REPOSITORY,
     CLUB_READ_MODEL,
+    SQUAD_READ_MODEL,
+    LEDGER_READ_MODEL,
+    CLUB_FINANCE_READ_MODEL,
+    COMPETITION_READ_MODEL,
+    MATCHES_READ_MODEL,
+    MARKET_READ_MODEL,
+    FANBASE_READ_MODEL,
+    NARRATIVE_READ_MODEL,
     CLUB_UNIT_OF_WORK,
+    GENESIS_UNIT_OF_WORK,
+    MATCH_PLAY_REPOSITORY,
+    TRANSFER_UNIT_OF_WORK,
+    SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,
     IDENTITY_UNIT_OF_WORK,

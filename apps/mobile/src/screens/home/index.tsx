@@ -20,18 +20,25 @@ import {
 } from "@/screens/onboarding/onboarding-model";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 
-interface CompetitionSummaryProjection {
-  readonly editionCount: number;
-  readonly participantCount: number;
-  readonly fixtureCount: number;
-  readonly finalFixtureCount: number;
-  readonly homologatedEditionCount: number;
-  readonly nextKickoffOn: string | null;
-  readonly competitions: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly status: string;
-    readonly startOn: string;
+/**
+ * A tabela da liga como a query `competitions` a entrega (C7). Antes esta tela
+ * esperava um resumo do mega-agregado (`editionCount`, `fixtureCount`) que a
+ * R-175 matou; agora lê a classificação real, derivada dos jogos (R-178).
+ */
+interface CompetitionStandingsProjection {
+  readonly competitionName: string;
+  readonly totalMatches: number;
+  readonly playedMatches: number;
+  readonly table: readonly {
+    readonly clubId: string;
+    readonly clubName: string;
+    readonly shortCode: string;
+    readonly points: number;
+    readonly played: number;
+    readonly won: number;
+    readonly drawn: number;
+    readonly lost: number;
+    readonly goalDifference: number;
   }[];
 }
 
@@ -68,7 +75,7 @@ export function Home() {
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const competitionQuery =
-    useWorldQuery<CompetitionSummaryProjection>("competitions");
+    useWorldQuery<CompetitionStandingsProjection>("competitions");
   const matchQuery = useWorldQuery<MatchSummaryProjection>("matches");
   const inboxQuery = useWorldQuery<InboxSummaryProjection>("inbox");
   const automationQuery =
@@ -199,27 +206,27 @@ export function Home() {
               {competitionQuery.state === "ready" &&
               competitionQuery.data !== null ? (
                 <>
-                  <View style={styles.metrics}>
-                    <Metric
-                      value={competitionQuery.data.editionCount}
-                      label="COMPETIÇÕES"
-                    />
-                    <Metric
-                      value={competitionQuery.data.fixtureCount}
-                      label="PARTIDAS MARCADAS"
-                    />
-                    <Metric
-                      value={competitionQuery.data.finalFixtureCount}
-                      label="ENCERRADAS"
-                    />
-                  </View>
-                  {competitionQuery.data.competitions[0] ? (
-                    <Text style={styles.competitionNote}>
-                      {competitionQuery.data.competitions[0].name} · estreia em{" "}
-                      {competitionQuery.data.nextKickoffOn ??
-                        competitionQuery.data.competitions[0].startOn}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.competitionNote}>
+                    {competitionQuery.data.competitionName} ·{" "}
+                    {competitionQuery.data.playedMatches}/
+                    {competitionQuery.data.totalMatches} partidas
+                  </Text>
+                  {competitionQuery.data.table.slice(0, 5).map((row, index) => (
+                    <View key={row.clubId} style={styles.standingRow}>
+                      <Text style={styles.standingPos}>{index + 1}</Text>
+                      <Text style={styles.standingName} numberOfLines={1}>
+                        {row.clubName}
+                      </Text>
+                      <Text style={styles.standingStat}>{row.played}</Text>
+                      <Text style={styles.standingStat}>
+                        {row.goalDifference > 0 ? "+" : ""}
+                        {row.goalDifference}
+                      </Text>
+                      <Text style={styles.standingPoints}>{row.points}</Text>
+                    </View>
+                  ))}
+                  {/* A tabela é derivada dos jogos (R-178): no início da
+                      temporada todos zerados; a cada rodada jogada, ela move. */}
                 </>
               ) : (
                 <InlineUnavailable
@@ -321,6 +328,38 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
     color: color.primary,
     fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  standingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  standingPos: {
+    width: 18,
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  standingName: {
+    flex: 1,
+    color: color.text,
+    fontSize: fontSize.sm,
+  },
+  standingStat: {
+    width: 28,
+    textAlign: "right",
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+  },
+  standingPoints: {
+    width: 32,
+    textAlign: "right",
+    color: color.text,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
   },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },

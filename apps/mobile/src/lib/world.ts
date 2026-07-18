@@ -40,6 +40,7 @@ interface WorldQueryResult<T> {
  */
 export function useWorldQuery<T = unknown>(
   queryType: string | null,
+  params?: Record<string, string>,
 ): WorldQueryResult<T> {
   const {
     client,
@@ -56,9 +57,15 @@ export function useWorldQuery<T = unknown>(
   const [isStale, setIsStale] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
+  // Serializa os params para caber nas deps do efeito e na chave de cache sem
+  // reabrir a query a cada render (o objeto muda de identidade, o texto não).
+  const paramsKey = params ? JSON.stringify(params) : "";
   useEffect(() => {
     if (queryType === null) return;
     let cancelled = false;
+    // Params entram na chave de cache: o elenco do clube A não pode servir cache
+    // ao clube B. `queryType` sozinho colidiria entre recortes.
+    const cacheKey = paramsKey ? `${queryType}?${paramsKey}` : queryType;
     const scopeKey = mobileScopeKey(
       session?.subject ?? "anonymous",
       worldId,
@@ -68,7 +75,7 @@ export function useWorldQuery<T = unknown>(
       const cached = await readCachedQuery<T>(
         AsyncStorage,
         scopeKey,
-        queryType,
+        cacheKey,
       );
       if (cancelled) return;
       if (cached !== null) {
@@ -85,14 +92,14 @@ export function useWorldQuery<T = unknown>(
         const env =
           queryType === "world"
             ? await client.query<T>(worldId)
-            : await client.query<T>(worldId, queryType);
+            : await client.query<T>(worldId, queryType, params ? { params } : undefined);
         if (cancelled) return;
         setData(env.data);
         setAsOf(env.asOf);
         setIsStale(false);
         setErrorCode(null);
         setState(looksEmpty(env.data) ? "empty" : "ready");
-        await writeCachedQuery(AsyncStorage, scopeKey, queryType, {
+        await writeCachedQuery(AsyncStorage, scopeKey, cacheKey, {
           data: env.data,
           asOf: env.asOf,
           projectionVersion: env.projectionVersion,
@@ -145,6 +152,7 @@ export function useWorldQuery<T = unknown>(
     client,
     controlScope,
     queryType,
+    paramsKey,
     session,
     sessionStatus,
     setControlScope,

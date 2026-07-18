@@ -343,6 +343,201 @@ Nada disto muda a [Q5](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco
 
 ---
 
+### R-191 — O dinheiro nasce do razão. `Currency` passa a existir, e o saldo é projeção.
+
+C9 começa a ser materializado, e a primeira coisa que ele exige é o que a
+[R-181](#r-181--dinheiro-é-bigint--currencyid-a-model-currency-passa-a-existir)
+já havia decidido e ninguém cumprira: **`model Currency` existe**. Eram 17 colunas
+`currencyId @db.Uuid` apontando para uma tabela inexistente. Nasce o catálogo,
+com uma moeda-base semeada por migração (id canônico fixo).
+
+Não são as 17 FKs de uma vez — isso é o gate DB (#40). Nascem as FKs das tabelas
+que C9 usa AGORA (`FinancialAccount`, `JournalEntry`, `JournalLine`) mais
+`GameWorld.currencyId`. As demais entram quando cada tabela for materializada.
+
+**O saldo do clube NÃO é coluna.** É a soma dos lançamentos POSTADOS na conta de
+caixa dele — projeção reconstruível (R-178). `balanceMinor` no agregado voltaria
+a permitir duas verdades: a coluna e o razão, divergindo. O físico já está certo
+(o plano de contas com faucets e sinks); o domínio o cumpre.
+
+**A dotação inicial é um lançamento de faucet, não um número mágico.** ECO-001
+manda R$ 5.000.000 (`500000000` minor) iguais para todo clube. Isso NÃO é
+`club.cashMinor = 500000000` — é um `JournalEntry` que debita a conta de caixa do
+clube e credita o faucet `SYS_INITIAL_ENDOWMENT`. O dinheiro entra na economia
+por uma torneira contabilizada, e a oferta monetária do mundo continua sendo
+`Σ faucets − Σ sinks` (ECO-003), auditável. Um número solto quebraria a economia
+fechada que o GDD §1 exige — a mesma regra que barrou o salário em C4 (R-189).
+
+**A partida é dobrada, sempre (R-178).** Todo `JournalEntry` tem `Σ débitos =
+Σ créditos por moeda`, e o domínio recusa o desbalanceado antes de gravar.
+`POSTED` é o único status que afeta saldo; reversão cria lançamento novo, nunca
+edita o publicado. `sourceEventId` dá idempotência de projeção: um evento gera um
+lançamento, e reprocessá-lo não duplica dinheiro.
+
+**Consequência que se paga aqui:** com C9, `Player.marketValueMinor` e
+`wageExpectationMinor` deixam de ser nulos por decreto (R-189) — passam a poder
+ser calculados dentro da economia. E o admin para de mockar "dinheiro global
+circulando": ele deriva do razão.
+
+---
+
+### R-192 — A transferência é UM efeito atômico sobre três contextos. Ela paga a dívida da R-189.
+
+A compra de verdade — o técnico contrata um jogador de outro clube — é a primeira
+coisa que amarra C6, C9 e C3 num só ato, e ela fecha a dívida que a
+[R-189](#r-189--playerclubid-morre-a-gênese-materializa-o-elenco-sem-contrato-e-assume-a-dívida)
+deixou aberta: "o primeiro command de transferência TEM que vir com o contrato, ou
+o elenco começa a mentir".
+
+**Uma transferência é UMA transação com três efeitos indivisíveis:**
+
+1. **O dinheiro anda (C9).** Um `JournalEntry` de classe `TRANSFER`: credita o
+   caixa do comprador (ativo cai) e debita o do vendedor (ativo sobe), pelo valor
+   da taxa. `Σ débitos = Σ créditos` — não há faucet nem sink, o dinheiro só troca
+   de mãos, e a oferta monetária do mundo não muda (ECO-003).
+2. **O vínculo nasce (C6).** Um `PlayerContract` ACTIVE para (jogador, comprador)
+   — a fonte AUTORITATIVA do vínculo (Q5). É isto que paga a R-189: o jogador da
+   gênese, que só tinha elenco, ganha contrato.
+3. **A projeção segue (C3).** A `SquadMembership` sai do elenco do vendedor e
+   entra no do comprador. O elenco é PROJEÇÃO do contrato (Q5); mover a membership
+   sem o contrato é o que a R-189 chamou de "elenco mentindo".
+
+Ou os três acontecem, ou nenhum. Meio efeito é um jogador pago e não entregue, ou
+entregue e não pago — corrupção. Um `TransferUnitOfWork` os grava no mesmo commit.
+
+**A taxa respeita a R-26:** entre 40% e 250% do valor de mercado estimado (R-41).
+Abaixo é roubo, acima é lavagem — os dois quebram a economia fechada. O domínio
+recusa fora da faixa antes de gravar.
+
+**Consequência aceita:** o salário do contrato é calibração de primeira passada
+(fração do valor), como o preço da R-41 — até a economia ter a fórmula fina. E a
+transferência ainda NÃO paga salário nem luvas; ela move a TAXA (comprador→vendedor)
+e cria a obrigação futura (o salário, que o ralo `SYS_WAGE_SINK` consome por
+temporada quando o ciclo econômico existir). Pagar a taxa e assinar o contrato é o
+átomo mínimo do mercado; o resto do ciclo (folha, luvas, cláusula) entra depois.
+
+---
+
+### R-193 — O elenco nasce com 23, mas o teto de registro é 30. Sem folga, o mercado nasce travado.
+
+Provar a R-192 por HTTP expôs uma sobre-restrição do código: `SQUAD_SIZE = 23`
+era, ao mesmo tempo, o **preenchimento inicial** da gênese e o **teto rígido** do
+`Squad.assign`. Como a gênese enche cada clube com exatamente 23, **todo elenco
+nascia cheio** — a primeira contratação batia em `SQUAD_CAPACITY_EXCEEDED` e o
+mercado da R-192 morria na largada.
+
+A [R-57](#) fala em "elenco **inicial** com 23 jogadores" — *inicial*, não
+*máximo*. O teto nunca foi ratificado; o código o inventou colando os dois números.
+
+**Separa-se o preenchimento do teto:**
+
+- `SQUAD_SIZE = 23` — quanto a gênese materializa por clube (R-57, o teto comum de
+  largada, GDD §1). Inalterado.
+- `MAX_SQUAD_SIZE = 30` — o teto de **registro**: o elenco recebe reforços até 30.
+  A folga de 7 vagas é o que permite contratar sem primeiro vender. É constante, não
+  coluna — comum a todos os clubes, pela mesma justiça de largada da R-190.
+
+`Squad` (criação e `assign`) passa a medir contra `MAX_SQUAD_SIZE`. A gênese não
+muda: nasce 23, cabe até 30.
+
+**Consequência aceita:** 30 é calibração de primeira passada — um teto de trabalho
+plausível para o elenco sênior; quando as categorias de base (#34) e a janela de
+registro existirem, o número se refina. O que a decisão fixa agora é a *separação*
+entre largada e teto, não o valor exato.
+
+---
+
+### R-194 — A torcida nasce na gênese: um headcount determinístico. Os 8 segmentos vêm depois.
+
+A tela do Clube degradava a torcida ("omite a torcida", herança do extermínio
+R-175): os 16 clubes nasciam com `fanBaseSize = 0`. C10 abre com o mínimo que
+acende essa seção — o **tamanho** da torcida —, deixando a máquina de reação para
+o passo seguinte.
+
+**O que a gênese materializa (C10 vertical A):**
+
+- `fanBaseSize` — determinístico por `(seed, clubIndex)`, o mesmo índice do resto
+  da gênese (R-182). A curva é enviesada para baixo (f²): "todos nascem pequenos"
+  (GDD §1), muitos clubes pequenos e poucos grandes, na faixa [800, 45.000].
+- `boardPatience = 50` e `pressureLevel = 0` — **neutros**. Um mundo recém-nascido
+  não tem histórico; paciência e pressão só ganham valor quando o motor de reação
+  (§2 da spec, R-69) processar partidas e decisões. Materializá-los diferentes de
+  neutro na largada seria inventar um passado que não existe.
+
+**Fronteira aceita (R-183):** a torcida vive em colunas do `Club` (`fanBaseSize`,
+`boardPatience`, `pressureLevel`) que C3 não escreve de propósito — C10 é o dono
+delas. Na gênese, uma escrita única dentro da transação atômica, idempotente por
+clube (`WHERE fanBaseSize = 0`). Ainda **não é agregado versionado**: vira root com
+contenção quando o motor de reação existir (a partida altera a pressão em paralelo
+à edição do técnico).
+
+**O que isto NÃO é (o que falta para fechar C10):** os 8 segmentos da R-68
+(`FanSegment` com share/satisfação/vocalidade), a satisfação contínua e sua
+histerese (R-69), a expectativa (§3), a pressão ponderada por vocalidade, as
+rivalidades (R-70) e a `BoardPromise` (que a reescrita já apontou como três modelos
+incompatíveis — pendência aberta). Aqui a torcida é um número; a segmentação e a
+reação são o próximo passo.
+
+---
+
+### R-195 (C11) — A imprensa narra o fato, no mesmo commit do fato. Nunca inventa.
+
+O doc 11 §10 é enfático: "a imprensa transforma fatos REAIS em narrativas, não
+inventa acusações ou acontecimentos inexistentes". A reescrita expôs por que isso é
+uma decisão de arquitetura, não só de conteúdo: o `DomainEventLog` só guarda 3
+eventos de onboarding — transferências e rodadas não escrevem nele —, então um feed
+"leia o log de eventos" narraria quase nada. A fonte fiel do fato é o **próprio ato
+que o cria**.
+
+**C11 vertical A — a transferência emite a manchete:**
+
+- Quando `SignPlayer` (R-192) fecha uma contratação, ela **acrescenta uma
+  `Narrative`** ao mundo, DENTRO da mesma transação. Fato e narração nascem juntos:
+  não há transferência sem notícia, nem notícia sem transferência. O `TransferUnitOfWork`
+  ganhou um quarto repositório (`narratives`), como o razão e o contrato.
+- A manchete é **factual** — quem assinou, por quanto, por quantas temporadas —, com
+  id determinístico pelo fato (mesmo mundo/jogador/data ⇒ mesma manchete): reprocessar
+  não duplica. A intensidade (1–5) cresce com a taxa: contratação cara é manchete maior.
+- Query `narrative`: as manchetes recentes do mundo, mais nova primeiro.
+
+**O que isto NÃO é:** a máquina de pautas da IA (§10), as narrativas que acumulam
+reputação com a repetição (§11), as 8 posturas de comunicação (R-71), as manchetes de
+resultado/rodada e de torcida. Aqui a imprensa cobre a transferência; as outras fontes
+e a curadoria são os próximos passos.
+
+---
+
+### R-196 (C12) — A caixa de entrada é do CLUBE, e a transferência a preenche no mesmo commit.
+
+A home já lê o RESUMO do inbox (`openNotificationCount`, `timelineCount`) mas a query
+`inbox` nunca voltou do extermínio (R-175) e não havia fonte — o badge ficava mudo.
+C12 abre a fonte: cada fato do mundo deixa uma **pendência** na caixa do clube.
+
+**A `Notification` é PESSOAL do clube; a `Narrative` (R-195) é PÚBLICA.** Nascem do
+mesmo fato (a transferência) mas são coisas diferentes: a imprensa o mundo inteiro lê;
+a pendência é do técnico que gere o clube. Por isso a notificação é **club-scoped**
+(`clubId`, `userId = null`) — o inbox é do CLUBE, e o técnico vê a dos clubes que gere.
+Resolve o "de quem é a notificação" sem depender do ator do command: o clube é dono.
+
+**C12 vertical A — a transferência escreve a notificação:**
+
+- `SignPlayer` (R-192) acrescenta uma `Notification` (TRANSFER_OFFER, "Contratação
+  concluída") DENTRO da transação — o `TransferUnitOfWork` agora tem CINCO repositórios
+  (elenco, contrato, razão, imprensa, inbox). Id determinístico pelo fato: não duplica.
+- Read model `summaryForClubs`: pendências não lidas + total, pelos clubes do técnico.
+
+**Fiação deferida (não é parte deste corte):** a query `inbox` e a tela ficaram de
+FORA porque tocam arquivos sob refatoração paralela (`core.module`, `tokens`,
+`query-registry`, `home`). A decisão de coordenação foi entregar o backend isolado —
+domínio, adapters, teste de integração Postgres, prova por HTTP (a notificação nasce da
+compra) — e ligar a DI/tela quando o trabalho paralelo assentar.
+
+**O que isto NÃO é:** as threads e deep-links da MF-0B, o mark-as-read (um command), a
+prioridade fina, os outros geradores (partida, board, finanças, lesão). Aqui a caixa de
+entrada tem uma fonte (a transferência) e um resumo; o resto do inbox vem depois.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

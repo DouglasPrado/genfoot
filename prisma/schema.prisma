@@ -647,6 +647,27 @@ enum RegistrationSlotType {
 // PLATAFORMA (globais, sem gameWorldId) — §3.1 / §6.3.1
 // =============================================================================
 
+/// Catálogo de moedas — R-181/R-191.
+///
+/// Existia como 17 colunas `currencyId @db.Uuid` apontando para o nada; o próprio
+/// schema admitia "referencia a **futura** entidade Currency". É global (sem
+/// `gameWorldId`): a moeda-base do mundo é escolhida daqui, e o dinheiro é sempre
+/// `BigInt` em unidade mínima nela (R-181). `minorUnits` diz quantas casas
+/// decimais a unidade mínima representa — 2 para o Real (centavos).
+model Currency {
+  id         String   @id @db.Uuid
+  code       String   @unique // ISO-like: "BRL"
+  name       String
+  symbol     String
+  minorUnits Int      @default(2)
+  createdAt  DateTime @default(now())
+
+  worlds           GameWorld[]
+  financialAccounts FinancialAccount[]
+  journalEntries   JournalEntry[]
+  journalLines     JournalLine[]
+}
+
 /// Conta global do usuário. NÃO controla clube diretamente — o controle ocorre
 /// por `ClubControl` dentro de um mundo. Forma canônica granular: UserAccount.
 model UserAccount {
@@ -825,7 +846,7 @@ model GameWorld {
   maxClubs                Int? // pendente: GameRuleConfig (R-182)
   seasonDays              Int? // R-107 · pendente: GameRuleConfig
   initialClubCashMinor    BigInt? // pendente: GameEconomyConfig (R-182)
-  currencyId              String?     @db.Uuid // pendente: a model Currency não existe (R-181)
+  currencyId              String?     @db.Uuid // moeda-base do mundo (R-181/R-191)
   createdAt               DateTime    @default(now())
   // R-182: o contador do mundo morava DENTRO da tabela de eventos
   // (`DomainEventLog.sequence`/`OutboxEvent.sequence`) e não tinha dono. É
@@ -839,6 +860,7 @@ model GameWorld {
   worldSequence           BigInt      @default(0)
   version                 Int         @default(1)
 
+  currency          Currency?          @relation(fields: [currencyId], references: [id])
   seasons           Season[]
   clubs             Club[]
   persons           Person[]
@@ -2490,6 +2512,7 @@ model FinancialAccount {
   status          String               @default("ACTIVE")
   version         Int                  @default(1)
 
+  currency Currency           @relation(fields: [currencyId], references: [id])
   club     Club?              @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id]) // C-05: FK composta world-scoped
   parent   FinancialAccount?  @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
   children FinancialAccount[] @relation("AccountHierarchy")
@@ -2521,7 +2544,8 @@ model JournalEntry {
   postedAt                 DateTime?
   version                  Int                     @default(1)
 
-  lines JournalLine[]
+  currency Currency     @relation(fields: [currencyId], references: [id])
+  lines    JournalLine[]
 
   @@index([gameWorldId, clubId])
   @@index([gameWorldId, status])
@@ -2543,8 +2567,9 @@ model JournalLine {
   referenceType      String?
   referenceId        String?              @db.Uuid
 
-  entry   JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account FinancialAccount @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
+  entry    JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account  FinancialAccount @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
+  currency Currency         @relation(fields: [currencyId], references: [id])
 
   @@unique([journalEntryId, lineNumber])
   @@index([financialAccountId])

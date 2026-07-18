@@ -190,11 +190,16 @@ export class GrintaClient {
   async query<T = unknown>(
     worldId: string,
     queryType?: string,
-    page?: { limit?: number; offset?: number },
+    page?: { limit?: number; offset?: number; params?: Record<string, string> },
   ): Promise<QueryEnvelope<T>> {
     const params = new URLSearchParams();
     if (page?.limit !== undefined) params.set("limit", String(page.limit));
     if (page?.offset !== undefined) params.set("offset", String(page.offset));
+    // Recorte fino da query (ex.: `roster` precisa de `clubId`). É o que leva o
+    // parâmetro de tela à borda sem alargar o caminho world-scoped.
+    for (const [key, value] of Object.entries(page?.params ?? {})) {
+      params.set(key, value);
+    }
     const suffix = params.toString() ? `?${params.toString()}` : "";
     const path = queryType
       ? `/api/v1/worlds/${worldId}/${queryType}${suffix}`

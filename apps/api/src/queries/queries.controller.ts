@@ -1,4 +1,15 @@
-import type { ClubReadModel, WorldReadModel } from "@grinta/core";
+import type {
+  ClubReadModel,
+  CompetitionReadModel,
+  LedgerReadModel,
+  ClubFinanceReadModel,
+  FanbaseReadModel,
+  NarrativeReadModel,
+  MarketReadModel,
+  MatchesReadModel,
+  SquadReadModel,
+  WorldReadModel,
+} from "@grinta/core";
 import {
   Controller,
   Get,
@@ -23,6 +34,14 @@ import {
   GAME_WORLD_REPOSITORY,
   IDENTITY_READ_MODEL,
   CLUB_READ_MODEL,
+  SQUAD_READ_MODEL,
+  LEDGER_READ_MODEL,
+  CLUB_FINANCE_READ_MODEL,
+  COMPETITION_READ_MODEL,
+  MATCHES_READ_MODEL,
+  MARKET_READ_MODEL,
+  FANBASE_READ_MODEL,
+  NARRATIVE_READ_MODEL,
   OBJECT_STORAGE,
   WORLD_READ_MODEL,
 } from "../core/tokens.js";
@@ -60,6 +79,20 @@ function invalidWorldId(messageKey: string): ApiException {
 export class QueriesController {
   constructor(
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
+    @Inject(SQUAD_READ_MODEL) private readonly squadReadModel: SquadReadModel,
+    @Inject(LEDGER_READ_MODEL) private readonly ledgerReadModel: LedgerReadModel,
+    @Inject(CLUB_FINANCE_READ_MODEL)
+    private readonly clubFinanceReadModel: ClubFinanceReadModel,
+    @Inject(COMPETITION_READ_MODEL)
+    private readonly competitionReadModel: CompetitionReadModel,
+    @Inject(MATCHES_READ_MODEL)
+    private readonly matchesReadModel: MatchesReadModel,
+    @Inject(MARKET_READ_MODEL)
+    private readonly marketReadModel: MarketReadModel,
+    @Inject(FANBASE_READ_MODEL)
+    private readonly fanbaseReadModel: FanbaseReadModel,
+    @Inject(NARRATIVE_READ_MODEL)
+    private readonly narrativeReadModel: NarrativeReadModel,
     // C1 lê do Postgres (R-173/R-175); os outros quinze, do JSON. Transitório.
     @Inject(IDENTITY_READ_MODEL)
     private readonly identityReadModel: IdentityReadModel,
@@ -224,8 +257,20 @@ export class QueriesController {
       );
     }
     const result = await handler(
-      { identityReadModel: this.identityReadModel, clubReadModel: this.clubReadModel },
+      {
+        identityReadModel: this.identityReadModel,
+        clubReadModel: this.clubReadModel,
+        squadReadModel: this.squadReadModel,
+        ledgerReadModel: this.ledgerReadModel,
+        clubFinanceReadModel: this.clubFinanceReadModel,
+        competitionReadModel: this.competitionReadModel,
+        matchesReadModel: this.matchesReadModel,
+        marketReadModel: this.marketReadModel,
+        fanbaseReadModel: this.fanbaseReadModel,
+        narrativeReadModel: this.narrativeReadModel,
+      },
       worldId.value,
+      query,
     );
     if (!result.ok) {
       throw new ApiException(

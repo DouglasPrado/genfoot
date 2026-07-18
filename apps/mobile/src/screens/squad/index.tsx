@@ -19,9 +19,9 @@ import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
   selectManagedClub,
-  squadPlayersFromProjections,
+  squadPlayersFromRoster,
   type ClubPortfolioProjection,
-  type PlayerRosterProjection,
+  type MobileRosterProjection,
 } from "@/lib/club-projection";
 import {
   submitTrackedCommand,
@@ -49,7 +49,25 @@ import {
   type FormationKey,
 } from "./formations";
 import { Pitch } from "./pitch";
-import { PlayerCard } from "./player-card";
+import { ReserveCard } from "./reserve-card";
+import {
+  canSubstitute,
+  fitRank,
+  positionFit,
+  type PositionFit,
+} from "./substitution-model";
+import {
+  PlayerSkillCard,
+  type PlayerSkillCardData,
+} from "@/components/player-skill-card";
+
+/** Cor do setor, pro chip de posição do card FC. */
+const GROUP_TINT: Record<string, string> = {
+  GOL: color.warning,
+  DEF: color.info,
+  MEI: color.success,
+  ATA: color.danger,
+};
 
 /** Tela de Elenco: campo tático (formação editável) + modal de substituição. */
 export function Squad() {
@@ -58,7 +76,6 @@ export function Squad() {
   const worldId = useWorldId();
   const { client, session, status, contractVersion } = useSession();
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
-  const rosterQuery = useWorldQuery<PlayerRosterProjection>("player-roster");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const onboarding =
@@ -73,17 +90,15 @@ export function Squad() {
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
   );
+  // O elenco é da query `roster`, recortada pelo clube gerido (R-190). `null`
+  // enquanto o clube não é conhecido — a query só dispara com o clubId em mãos.
+  const rosterQuery = useWorldQuery<MobileRosterProjection>(
+    managedClub === null ? null : "roster",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const officialPlayers = useMemo(
-    () =>
-      managedClub === null
-        ? []
-        : squadPlayersFromProjections(
-            clubQuery.data,
-            rosterQuery.data,
-            managedClub.id,
-            clubQuery.asOf ?? "2026-01-01",
-          ),
-    [clubQuery.data, clubQuery.asOf, rosterQuery.data, managedClub],
+    () => squadPlayersFromRoster(rosterQuery.data),
+    [rosterQuery.data],
   );
   const players = officialPlayers;
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
@@ -100,6 +115,8 @@ export function Squad() {
     players.filter((p) => !p.starter).map((p) => p.id),
   );
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
+  // Reserva aberto no card FC (detalhe). `null` = só a lista.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const slots = FORMATIONS[formation];
   const avgOvr = useMemo(() => {
@@ -121,7 +138,10 @@ export function Squad() {
     [byId],
   );
 
-  const closeSheet = useCallback(() => setActiveSlot(null), []);
+  const closeSheet = useCallback(() => {
+    setActiveSlot(null);
+    setDetailId(null);
+  }, []);
   const focusSheet = useCallback(() => {
     const node = findNodeHandle(sheetRef.current);
     if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
@@ -135,38 +155,73 @@ export function Squad() {
     [clubQuery.data, managedClub?.id],
   );
 
-  // Hidrata uma vez por clube: rascunho salvo (SET_LINEUP_DRAFT) se ainda for
-  // válido para o roster atual, senão a escalação oficial. Refetchs NÃO apagam
-  // mais a edição local — o rascunho sobrevive até salvar ou trocar de clube.
+  // Monta a escalação quando o elenco chega — de forma ROBUSTA.
+  //
+  // O bug anterior: `onPitchIds` inicializava vazio (o elenco ainda não tinha
+  // carregado) e a hidratação rodava UMA vez por clube, numa corrida com o
+  // carregamento assíncrono. Se ela perdia a corrida, o campo e o banco ficavam
+  // vazios — jogadores reais no elenco, "—" em todo slot.
+  //
+  // Agora é auto-curativo: sempre que a escalação atual for inválida (não tem 11
+  // no campo, ou tem um id que não é jogador do elenco), remonta na hora dos
+  // jogadores reais. Isso NÃO apaga edição válida — se os 11 já batem, sai cedo.
   const hydratedClubRef = useRef<string | null>(null);
   useEffect(() => {
     const clubId = managedClub?.id ?? null;
     if (clubId === null || players.length < 11) return;
+    const ids = new Set(players.map((p) => p.id));
+    const onPitchValid =
+      onPitchIds.length === 11 && onPitchIds.every((id) => ids.has(id));
+
+    if (!onPitchValid) {
+      // Escalação inválida (campo vazio no load, ou id que não é mais do elenco):
+      // remonta tudo IMEDIATAMENTE (síncrono) do elenco real.
+      setFormation("4-2-1-3");
+      const starters = assignToFormation(
+        players.filter((p) => p.starter),
+        "4-2-1-3",
+      );
+      const startSet = new Set(starters);
+      setOnPitchIds(starters);
+      setBenchIds(players.filter((p) => !startSet.has(p.id)).map((p) => p.id));
+      setActiveSlot(null);
+    } else {
+      // Os 11 batem — não desfaz a tática. Só reconcilia a RESERVA: um reforço
+      // recém-comprado (que não estava na lista) entra; um vendido sai. Era o
+      // bug: sem isto, contratar não aparecia no elenco até trocar de clube.
+      const onPitch = new Set(onPitchIds);
+      const validBench = benchIds.filter(
+        (id) => ids.has(id) && !onPitch.has(id),
+      );
+      const shown = new Set([...onPitchIds, ...validBench]);
+      const missing = players
+        .filter((p) => !shown.has(p.id))
+        .map((p) => p.id);
+      if (missing.length > 0 || validBench.length !== benchIds.length) {
+        setBenchIds([...validBench, ...missing]);
+      }
+    }
+
+    // Depois, tenta o rascunho salvo (assíncrono) e sobrepõe SE ainda for válido
+    // para este elenco. Uma vez por clube. `players.every(...)` garante que um
+    // rascunho ANTERIOR à compra (sem o reforço) seja rejeitado — senão ele
+    // reesconderia o jogador recém-contratado.
     if (hydratedClubRef.current === clubId) return;
     hydratedClubRef.current = clubId;
-    const ids = new Set(players.map((p) => p.id));
     void readLineupDraft(worldId, clubId).then((draft) => {
-      const valid =
-        draft !== null &&
+      if (draft === null) return;
+      const draftIds = new Set([...draft.onPitchIds, ...draft.benchIds]);
+      const draftValid =
         draft.onPitchIds.length === 11 &&
-        [...draft.onPitchIds, ...draft.benchIds].every((id) => ids.has(id));
-      if (valid) {
+        [...draftIds].every((id) => ids.has(id)) &&
+        players.every((p) => draftIds.has(p.id));
+      if (draftValid) {
         setFormation(draft.formation);
         setOnPitchIds([...draft.onPitchIds]);
         setBenchIds([...draft.benchIds]);
-      } else {
-        setFormation("4-2-1-3");
-        setOnPitchIds(
-          assignToFormation(
-            players.filter((p) => p.starter),
-            "4-2-1-3",
-          ),
-        );
-        setBenchIds(players.filter((p) => !p.starter).map((p) => p.id));
       }
-      setActiveSlot(null);
     });
-  }, [managedClub?.id, players, worldId]);
+  }, [managedClub?.id, players, worldId, onPitchIds, benchIds]);
 
   // Persiste o rascunho a cada edição (pós-hidratação).
   useEffect(() => {
@@ -285,6 +340,10 @@ export function Squad() {
   const substitute = useCallback(
     (benchPlayerId: string) => {
       if (activeSlot === null) return;
+      // Trava temporária: só troca por reserva da mesma posição de origem.
+      if (!canSubstitute(byId.get(onPitchIds[activeSlot] ?? ""), byId.get(benchPlayerId))) {
+        return;
+      }
       const outgoing = onPitchIds[activeSlot];
       setOnPitchIds((prev) => {
         const next = [...prev];
@@ -296,13 +355,35 @@ export function Squad() {
       );
       setActiveSlot(null);
     },
-    [activeSlot, onPitchIds],
+    [activeSlot, onPitchIds, byId],
   );
 
   const outgoing =
     activeSlot !== null ? byId.get(onPitchIds[activeSlot] ?? "") : undefined;
   const outgoingRole =
     activeSlot !== null ? slots[activeSlot]?.role : undefined;
+  // Todas as reservas, com o encaixe na posição do titular (natural/adaptável/
+  // bloqueado) — ordenadas para os ELEGÍVEIS aparecerem primeiro (natural antes
+  // de adaptável, bloqueado por último). Ordem estável dentro de cada faixa.
+  const benchOptions = useMemo(() => {
+    const opts = benchIds
+      .map((id) => byId.get(id))
+      .filter((p): p is SquadPlayer => Boolean(p))
+      .map((p, index) => {
+        const fit: PositionFit = outgoing
+          ? positionFit(outgoing.position, p.position)
+          : "none";
+        return { player: p, fit, eligible: fit !== "none", index };
+      });
+    return opts
+      .sort((a, b) => fitRank(a.fit) - fitRank(b.fit) || a.index - b.index)
+      .map(({ player, fit, eligible }) => ({ player, fit, eligible }));
+  }, [outgoing, benchIds, byId]);
+  const eligibleCount = benchOptions.filter((o) => o.eligible).length;
+
+  const detail = detailId === null ? undefined : byId.get(detailId);
+  const detailFit: PositionFit =
+    detail && outgoing ? positionFit(outgoing.position, detail.position) : "none";
 
   const queryState =
     clubQuery.state === "loading" ||
@@ -477,6 +558,12 @@ export function Squad() {
                   {outgoingRole ? ` (${outgoingRole})` : ""}
                 </Text>
               ) : null}
+              {outgoing ? (
+                <Text style={styles.sheetRule}>
+                  {outgoing.position} e posições que se adaptam · toque para ver o
+                  card
+                </Text>
+              ) : null}
             </View>
             <Pressable
               onPress={closeSheet}
@@ -489,41 +576,130 @@ export function Squad() {
             </Pressable>
           </View>
           <Text style={styles.sheetSection}>
-            ENTRA — RESERVAS ({benchIds.length})
+            ENTRA — RESERVAS ({eligibleCount} de {benchOptions.length})
           </Text>
           <ScrollView
             contentContainerStyle={styles.sheetList}
             showsVerticalScrollIndicator={false}
           >
-            {benchIds.length === 0 ? (
+            {benchOptions.length === 0 ? (
               <Text style={styles.empty}>Sem reservas disponíveis.</Text>
             ) : (
-              benchIds.map((id) => {
-                const p = byId.get(id);
-                if (!p) return null;
-                return (
-                  <Pressable
-                    key={id}
-                    onPress={() => substitute(id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Escalar ${p.name}`}
-                    style={styles.benchRow}
-                  >
-                    <PlayerCard p={p} />
-                    <View style={styles.enterBadge}>
-                      <Icon
-                        name="arrow-up"
-                        size={12}
-                        color={color.primaryContrast}
-                      />
-                      <Text style={styles.enterText}>ENTRAR</Text>
-                    </View>
-                  </Pressable>
-                );
-              })
+              benchOptions.map(({ player: p, fit, eligible }) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setDetailId(p.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    eligible
+                      ? `Ver card de ${p.name}${fit === "adaptable" ? " (adapta)" : ""}`
+                      : `Ver card de ${p.name} — ${p.position} não cobre ${outgoing?.position ?? ""}`
+                  }
+                  style={[styles.benchRow, eligible ? null : styles.benchBlocked]}
+                >
+                  <ReserveCard p={p} outgoing={outgoing} fit={fit} />
+                </Pressable>
+              ))
             )}
           </ScrollView>
         </View>
+
+        {detail ? (
+          <View style={styles.detailOverlay}>
+            <Pressable
+              style={styles.detailBackdrop}
+              onPress={() => setDetailId(null)}
+            />
+            <View style={styles.detailWrap} pointerEvents="box-none">
+              <View style={styles.detailCard}>
+              <PlayerSkillCard
+                data={
+                  {
+                    name: detail.name,
+                    number: detail.number,
+                    position: detail.position,
+                    positionTint: GROUP_TINT[detail.group] ?? color.primary,
+                    age: detail.age,
+                    ovr: detail.ovr,
+                    pot: detail.pot,
+                    fitness: detail.fitness,
+                    morale: detail.morale,
+                    groups: detail.groups,
+                    attributes: detail.attributes,
+                  } satisfies PlayerSkillCardData
+                }
+              />
+
+              {outgoing ? (
+                <View
+                  style={[
+                    styles.detailFitNote,
+                    detailFit === "adaptable"
+                      ? styles.detailFitAdapt
+                      : detailFit === "none"
+                        ? styles.detailFitBlocked
+                        : styles.detailFitNatural,
+                  ]}
+                >
+                  <Icon
+                    name={
+                      detailFit === "none" ? "warning" : "swap-horizontal"
+                    }
+                    size={13}
+                    color={
+                      detailFit === "adaptable"
+                        ? color.warning
+                        : detailFit === "none"
+                          ? color.textMuted
+                          : color.primary
+                    }
+                  />
+                  <Text style={styles.detailFitText}>
+                    {detailFit === "natural"
+                      ? `Posição natural de ${outgoing.position}.`
+                      : detailFit === "adaptable"
+                        ? `Adapta de ${detail.position} para ${outgoing.position}.`
+                        : `${detail.position} não cobre ${outgoing.position}.`}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.detailActions}>
+                <Pressable
+                  onPress={() => setDetailId(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar card"
+                  style={styles.detailClose}
+                >
+                  <Text style={styles.detailCloseText}>FECHAR</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (detailFit === "none") return;
+                    substitute(detail.id);
+                    setDetailId(null);
+                  }}
+                  disabled={detailFit === "none"}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: detailFit === "none" }}
+                  accessibilityLabel={`Escalar ${detail.name}`}
+                  style={[
+                    styles.detailEscalar,
+                    detailFit === "none" ? styles.detailEscalarOff : null,
+                  ]}
+                >
+                  <Icon
+                    name="arrow-up"
+                    size={14}
+                    color={color.primaryContrast}
+                  />
+                  <Text style={styles.detailEscalarText}>ESCALAR</Text>
+                </Pressable>
+              </View>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </Modal>
     </SafeAreaView>
   );
@@ -675,6 +851,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sheetSub: { color: color.textMuted, fontSize: fontSize.xs, marginTop: 1 },
+  sheetRule: { color: color.primary, fontSize: 10, marginTop: 2, letterSpacing: 0.3 },
   sheetOut: { color: color.danger, fontWeight: fontWeight.bold as "700" },
   closeBtn: {
     width: MINIMUM_TOUCH_TARGET,
@@ -702,22 +879,69 @@ const styles = StyleSheet.create({
     paddingVertical: space.xl,
   },
   benchRow: { minHeight: MINIMUM_TOUCH_TARGET },
-  enterBadge: {
-    position: "absolute",
-    right: space.md,
-    top: "50%",
-    marginTop: -11,
+  benchBlocked: { opacity: 0.42 },
+  detailOverlay: { ...StyleSheet.absoluteFillObject },
+  detailBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  detailWrap: {
+    flex: 1,
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  detailCard: {
+    gap: space.md,
+    backgroundColor: color.backgroundElevated,
+    borderColor: color.borderStrong,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: space.md,
+  },
+  detailFitNote: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: color.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
-  enterText: {
+  detailFitNatural: { borderColor: color.primaryDim, backgroundColor: "#151c0e" },
+  detailFitAdapt: { borderColor: color.warning, backgroundColor: "#2a2109" },
+  detailFitBlocked: { borderColor: color.border, backgroundColor: color.surface },
+  detailFitText: { flex: 1, color: color.text, fontSize: fontSize.xs },
+  detailActions: { flexDirection: "row", gap: space.sm },
+  detailClose: {
+    flex: 1,
+    minHeight: MINIMUM_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+  },
+  detailCloseText: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+  },
+  detailEscalar: {
+    flex: 2,
+    minHeight: MINIMUM_TOUCH_TARGET,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    borderRadius: radius.sm,
+    backgroundColor: color.primary,
+  },
+  detailEscalarOff: { opacity: 0.4 },
+  detailEscalarText: {
     color: color.primaryContrast,
-    fontSize: 10,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.black as "800",
     letterSpacing: 0.5,
   },

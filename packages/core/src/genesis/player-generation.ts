@@ -58,12 +58,24 @@ export const SQUAD_POSITION_TEMPLATE: readonly PlayerPosition[] = [
 export const SQUAD_OVERALL_BUDGET = 1380;
 
 /**
- * O tamanho do elenco — R-57: "elenco inicial com **23 jogadores**".
+ * O PREENCHIMENTO inicial do elenco — R-57: "elenco inicial com **23
+ * jogadores**". É quantos a gênese materializa por clube, o teto comum de
+ * largada (GDD §1). NÃO é o máximo: uma compra pode levar o elenco além disto.
  *
- * É constante, não coluna (R-190): gravar capacidade por elenco permitiria dois
- * clubes com tetos diferentes, que é o oposto do "teto comum" do GDD §1.
+ * É constante, não coluna (R-190): gravar por elenco permitiria dois clubes com
+ * largadas diferentes, o oposto do "teto comum" do GDD §1.
  */
 export const SQUAD_SIZE = 23;
+
+/**
+ * O TETO de registro do elenco — R-193. O elenco nasce com 23 (R-57) mas pode
+ * receber reforços até este limite; sem esta folga, todo clube nasceria cheio e
+ * o mercado (R-192) nasceria travado — nenhuma contratação caberia.
+ *
+ * Também constante (não coluna), pela mesma justiça de largada da R-190: o teto
+ * é comum a todos os clubes.
+ */
+export const MAX_SQUAD_SIZE = 30;
 
 /** Os setores entre os quais o GDD manda o teto variar. */
 const Sector = {
