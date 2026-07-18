@@ -97,7 +97,6 @@ export function Home() {
   const competitionQuery =
     useWorldQuery<CompetitionStandingsProjection>("competitions");
   const matchQuery = useWorldQuery<MatchSummaryProjection>("matches");
-  const inboxQuery = useWorldQuery<InboxSummaryProjection>("inbox");
   const automationQuery =
     useWorldQuery<AutomationSummaryProjection>("automation");
 
@@ -109,6 +108,12 @@ export function Home() {
   const club = selectManagedClub(
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
+  );
+  // O inbox é recortado pelo clube gerido (C12): as pendências são do clube.
+  // Sem clubId a query devolve zeros; com ele, as pendências reais aparecem.
+  const inboxQuery = useWorldQuery<InboxSummaryProjection>(
+    club === null ? null : "inbox",
+    club === null ? undefined : { clubId: club.id },
   );
 
   useEffect(() => {
