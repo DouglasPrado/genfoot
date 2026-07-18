@@ -116,37 +116,75 @@ export default function WorldsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
-              {worlds.map((world) => (
-                <Link key={world.id} href={`/worlds/${world.id}`}>
-                  <Card className="transition-colors hover:border-primary/40">
-                    <CardContent className="flex items-center justify-between py-3">
-                      <div>
-                        <div className="font-heading text-base">{world.seed}</div>
-                        <div className="mono text-xs text-muted-foreground">
-                          {world.id}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="mono text-xs text-muted-foreground">
-                          {world.clubCount} clubes
-                        </span>
-                        {/* O status REAL. Antes este selo dizia "ativo" fixo, em
-                            qualquer mundo — inclusive nos que não estavam. */}
-                        <Badge
-                          tone={world.status === "ACTIVE" ? "live" : "neutral"}
-                        >
-                          {world.status === "ACTIVE" ? (
-                            <span className="live-dot h-1.5 w-1.5 rounded-full bg-primary" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {worlds.map((world) => {
+                // Nome quando o mundo tem identidade; senão o seed — nunca some
+                // o que já existia. As iniciais só entram quando não há foto.
+                const title = world.name ?? world.seed;
+                const initials = title.trim().slice(0, 2).toUpperCase();
+                return (
+                  <Link key={world.id} href={`/worlds/${world.id}`}>
+                    <Card className="overflow-hidden transition-colors hover:border-primary/40">
+                      {/* Capa (banner). Sem ela, um degradê discreto no lugar. */}
+                      {world.bannerUrl ? (
+                        <div
+                          className="h-24 w-full bg-cover bg-center"
+                          style={{ backgroundImage: `url(${world.bannerUrl})` }}
+                        />
+                      ) : (
+                        <div className="h-24 w-full bg-gradient-to-br from-primary/15 to-transparent" />
+                      )}
+                      <CardContent className="flex items-start gap-3 py-3">
+                        {/* Foto quadrada sobreposta na capa. Placeholder com
+                            iniciais quando o mundo ainda não tem foto. */}
+                        {world.squarePhotoUrl ? (
+                          <div
+                            className="-mt-10 size-12 shrink-0 rounded-md border-2 border-background bg-cover bg-center"
+                            style={{
+                              backgroundImage: `url(${world.squarePhotoUrl})`,
+                            }}
+                          />
+                        ) : (
+                          <div className="font-heading -mt-10 flex size-12 shrink-0 items-center justify-center rounded-md border-2 border-background bg-primary/10 text-sm text-muted-foreground">
+                            {initials}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-heading truncate text-base">
+                              {title}
+                            </span>
+                            {/* O status REAL. Antes este selo dizia "ativo"
+                                fixo, em qualquer mundo. */}
+                            <Badge
+                              tone={
+                                world.status === "ACTIVE" ? "live" : "neutral"
+                              }
+                            >
+                              {world.status === "ACTIVE" ? (
+                                <span className="live-dot h-1.5 w-1.5 rounded-full bg-primary" />
+                              ) : null}
+                              {world.status}
+                            </Badge>
+                          </div>
+                          {world.description ? (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                              {world.description}
+                            </p>
                           ) : null}
-                          {world.status}
-                        </Badge>
-                        <ArrowRight className="size-4 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+                          <div className="mono mt-1 truncate text-xs text-muted-foreground">
+                            {world.seed} · {world.id}
+                          </div>
+                          <div className="mono mt-0.5 text-xs text-muted-foreground">
+                            {world.clubCount} clubes
+                          </div>
+                        </div>
+                        <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </section>

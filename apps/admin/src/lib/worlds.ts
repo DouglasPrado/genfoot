@@ -10,6 +10,15 @@ export interface KnownWorld {
   readonly status: string;
   readonly currentDate: string;
   readonly clubCount: number;
+  /**
+   * Identidade do mundo, vinda da query oficial de DETALHE (a listagem ainda não
+   * carrega esses campos). `null` = nunca definida — a UI cai no `seed` e num
+   * placeholder, nunca inventa.
+   */
+  readonly name: string | null;
+  readonly description: string | null;
+  readonly bannerUrl: string | null;
+  readonly squarePhotoUrl: string | null;
 }
 
 /**
@@ -38,9 +47,31 @@ export function useKnownWorlds() {
     setLoading(true);
     api
       .worlds()
-      .then((list) => {
+      .then(async (list) => {
+        // Enriquece cada linha com a IDENTIDADE (nome, descrição, foto, capa)
+        // via a query oficial de detalhe — o endpoint de lista não a carrega
+        // ainda. Falha de um detalhe não derruba a lista: aquele mundo só fica
+        // sem identidade (cai no seed/placeholder).
+        const details = await Promise.all(
+          list.map((world) => api.world(world.id).catch(() => null)),
+        );
         if (!alive) return;
-        setWorlds(list);
+        setWorlds(
+          list.map((world, index) => {
+            const detail = details[index];
+            return {
+              id: world.id,
+              seed: world.seed,
+              status: world.status,
+              currentDate: world.currentDate,
+              clubCount: world.clubCount,
+              name: detail?.name ?? null,
+              description: detail?.description ?? null,
+              bannerUrl: detail?.bannerUrl ?? null,
+              squarePhotoUrl: detail?.squarePhotoUrl ?? null,
+            };
+          }),
+        );
         setError(null);
       })
       .catch(() => {

@@ -9,6 +9,7 @@ import {
   type SessionResponse,
   type StandardError,
   type ValidationReport,
+  type WorldDetail,
   type WorldListItem,
 } from "./types.js";
 
@@ -146,6 +147,21 @@ export class GrintaClient {
       await this.request<QueryEnvelope<readonly WorldListItem[]>>(
         "GET",
         "/api/v1/worlds",
+      )
+    ).body.data;
+  }
+
+  /**
+   * O detalhe de um mundo. Usado pela listagem do admin para enriquecer cada
+   * linha com a IDENTIDADE (nome, descrição, foto e capa), que o endpoint de
+   * lista ainda não carrega. O snapshot traz muito mais; aqui só tipamos o que
+   * a UI de listagem consome — os campos extras do envelope são ignorados.
+   */
+  async world(worldId: string): Promise<WorldDetail> {
+    return (
+      await this.request<QueryEnvelope<WorldDetail>>(
+        "GET",
+        `/api/v1/worlds/${worldId}`,
       )
     ).body.data;
   }
