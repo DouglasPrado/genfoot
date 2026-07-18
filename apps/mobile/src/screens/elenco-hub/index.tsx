@@ -32,9 +32,16 @@ interface SoonDestination {
 
 const DESTINATIONS: readonly Destination[] = [
   {
-    key: "tatica",
+    key: "elenco",
     icon: "people",
-    title: "Elenco e Tática",
+    title: "Elenco",
+    note: "Todos os jogadores do time",
+    route: "/elenco/lista",
+  },
+  {
+    key: "tatica",
+    icon: "grid",
+    title: "Formação Tática",
     note: "Campo tático, formação e substituições",
     route: "/elenco/tatica",
   },
