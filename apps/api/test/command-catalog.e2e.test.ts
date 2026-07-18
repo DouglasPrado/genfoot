@@ -105,6 +105,8 @@ describe("API command catalog integrity (e2e)", () => {
       "world:play-round",
       "world:resume",
       "world:set-identity",
+      // C8: desce um profissional (≤21) de volta à base.
+      "youth:demote-player",
       // C8: sobe um jovem da base ao elenco profissional.
       "youth:promote-player",
     ]);
@@ -115,7 +117,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(19);
+    expect(response.body.commandCount).toBe(20);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

@@ -12,6 +12,7 @@ import {
   PlayNextRound,
   SignPlayer,
   PromoteYouthPlayer,
+  DemoteToYouthPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -28,6 +29,7 @@ import {
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
+  type DemoteToYouthUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -87,6 +89,8 @@ export interface CommandContext {
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
   readonly promoteYouthUnitOfWork: PromoteYouthUnitOfWork;
+  /** C8 — desce um profissional (≤21) de volta à base (atômico sobre os dois elencos). */
+  readonly demoteToYouthUnitOfWork: DemoteToYouthUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -491,6 +495,23 @@ const handlers: Record<string, CommandHandler> = {
       gameWorldId: world.value.worldId,
       clubId: parsed.data.clubId,
       playerId: parsed.data.playerId,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  /** C8 — descer à base: profissional ≤ 21 volta ao YOUTH_ACADEMY. */
+  "youth:demote-player": async ({ worlds, demoteToYouthUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new DemoteToYouthPlayer(demoteToYouthUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldDate: world.value.snapshot.currentDate,
       occurredOn: world.value.snapshot.currentDate,
     });
     if (!result.ok) return result;

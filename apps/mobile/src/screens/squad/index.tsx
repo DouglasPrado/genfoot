@@ -256,6 +256,40 @@ export function Squad() {
   const [syncTracking, setSyncTracking] =
     useState<TrackedCommandResult | null>(null);
   const syncing = syncTracking?.status === CommandTrackingStatus.SUBMITTING;
+  const [demotingId, setDemotingId] = useState<string | null>(null);
+
+  /**
+   * Desce um jovem profissional (≤ 21) de volta à base (C8). O servidor valida a
+   * idade e move a membership; ao aplicar, recarrega o elenco e fecha o detalhe.
+   */
+  const demoteToYouth = useCallback(
+    (playerId: string) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const idempotencyKey = `demote:${managedClub.id}:${playerId}`;
+      setDemotingId(playerId);
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "youth:demote-player",
+        worldId,
+        payload: { clubId: managedClub.id, playerId },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setDemotingId(null);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          setDetailId(null);
+          rosterQuery.refetch();
+        }
+      });
+    },
+    [client, contractVersion, managedClub, worldId, rosterQuery],
+  );
 
   const saveLineup = useCallback(() => {
     if (
@@ -732,6 +766,21 @@ export function Squad() {
                   <Text style={styles.detailEscalarText}>ESCALAR</Text>
                 </Pressable>
               </View>
+              {detail.age <= 21 ? (
+                <Pressable
+                  onPress={() => demoteToYouth(detail.id)}
+                  disabled={demotingId !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Descer ${detail.name} à base`}
+                  accessibilityState={{ disabled: demotingId !== null }}
+                  style={styles.detailDemote}
+                >
+                  <Icon name="arrow-down" size={14} color={color.textMuted} />
+                  <Text style={styles.detailDemoteText}>
+                    {demotingId !== null ? "..." : "DESCER À BASE"}
+                  </Text>
+                </Pressable>
+              ) : null}
               </View>
             </View>
           </View>
@@ -979,6 +1028,23 @@ const styles = StyleSheet.create({
     backgroundColor: color.surface,
   },
   detailCloseText: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+  },
+  detailDemote: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    minHeight: MINIMUM_TOUCH_TARGET,
+    marginTop: space.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: color.border,
+  },
+  detailDemoteText: {
     color: color.textMuted,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black as "800",

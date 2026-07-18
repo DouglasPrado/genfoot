@@ -19,6 +19,7 @@ import {
   PrismaMatchPlayRepository,
   PrismaTransferUnitOfWork,
   PrismaPromoteYouthUnitOfWork,
+  PrismaDemoteToYouthUnitOfWork,
   PrismaSeasonFinanceUnitOfWork,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
@@ -48,6 +49,7 @@ import {
   MATCH_PLAY_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
   PROMOTE_YOUTH_UNIT_OF_WORK,
+  DEMOTE_TO_YOUTH_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
@@ -202,6 +204,12 @@ import {
         new PrismaPromoteYouthUnitOfWork(client),
     },
     {
+      provide: DEMOTE_TO_YOUTH_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaDemoteToYouthUnitOfWork =>
+        new PrismaDemoteToYouthUnitOfWork(client),
+    },
+    {
       provide: SEASON_FINANCE_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaSeasonFinanceUnitOfWork =>
@@ -257,6 +265,7 @@ import {
     MATCH_PLAY_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
     PROMOTE_YOUTH_UNIT_OF_WORK,
+    DEMOTE_TO_YOUTH_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,
