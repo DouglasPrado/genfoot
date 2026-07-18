@@ -184,6 +184,9 @@ export function CompetitionAuthoring({
             <ConfigureDialog
               competition={configuring}
               clubs={clubs}
+              others={items.filter(
+                (c) => c.competitionId !== configuring.competitionId,
+              )}
               busy={busy}
               onSave={async (payload) => {
                 const ok = await dispatch("competition:configure", {
@@ -298,14 +301,22 @@ interface PrizeState {
   bestPlayer: string;
 }
 
+interface QualRule {
+  targetCompetitionId: string;
+  criteria: string;
+  slots: string;
+}
+
 function ConfigureDialog({
   competition,
   clubs,
+  others,
   busy,
   onSave,
 }: {
   competition: CompetitionSummary;
   clubs: readonly ClubRow[];
+  others: readonly CompetitionSummary[];
   busy: boolean;
   onSave: (payload: Record<string, unknown>) => Promise<void>;
 }) {
@@ -319,6 +330,7 @@ function ConfigureDialog({
   const [relegation, setRelegation] = useState("4");
   const [groupCount, setGroupCount] = useState("4");
   const [qualifiersPerGroup, setQualifiersPerGroup] = useState("2");
+  const [quals, setQuals] = useState<readonly QualRule[]>([]);
   const [prizes, setPrizes] = useState<PrizeState>({
     participation: "",
     winBonus: "",
@@ -361,7 +373,13 @@ function ConfigureDialog({
         topScorerMinor: toMinor(prizes.topScorer),
         bestPlayerMinor: toMinor(prizes.bestPlayer),
       },
-      qualifications: [],
+      qualifications: quals
+        .filter((q) => q.targetCompetitionId !== "")
+        .map((q) => ({
+          targetCompetitionId: q.targetCompetitionId,
+          criteria: q.criteria,
+          slots: Number(q.slots) || 1,
+        })),
     };
     return { clubIds: [...selected], startsOn, endsOn, config };
   }
@@ -581,6 +599,107 @@ function ConfigureDialog({
             Pagas na homologação, via faucet do razão (C9). Prêmios de jogador
             vão para o clube dele.
           </p>
+        </section>
+
+        {/* Qualificação — top-N → outra competição (R-207). Imutável ao iniciar. */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
+              Qualificação para outro torneio
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={others.length === 0}
+              onClick={() =>
+                setQuals((q) => [
+                  ...q,
+                  {
+                    targetCompetitionId: others[0]?.competitionId ?? "",
+                    criteria: "TOP_POSITIONS",
+                    slots: "4",
+                  },
+                ])
+              }
+            >
+              + regra
+            </Button>
+          </div>
+          {others.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              Crie outra competição primeiro para ligar a classificação a ela.
+            </p>
+          ) : quals.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground">
+              Nenhuma — os classificados desta competição não alimentam outra.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {quals.map((q, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={q.criteria}
+                    onChange={(e) =>
+                      setQuals((prev) =>
+                        prev.map((r, j) =>
+                          j === i ? { ...r, criteria: e.target.value } : r,
+                        ),
+                      )
+                    }
+                    className="h-8 rounded-sm border border-border bg-surface-2 px-2 text-xs"
+                  >
+                    <option value="TOP_POSITIONS">Os primeiros</option>
+                    <option value="CHAMPION">O campeão</option>
+                    <option value="CUP_WINNER">O vencedor da copa</option>
+                  </select>
+                  {q.criteria === "TOP_POSITIONS" ? (
+                    <Input
+                      type="number"
+                      min={1}
+                      value={q.slots}
+                      onChange={(e) =>
+                        setQuals((prev) =>
+                          prev.map((r, j) =>
+                            j === i ? { ...r, slots: e.target.value } : r,
+                          ),
+                        )
+                      }
+                      className="w-16"
+                    />
+                  ) : null}
+                  <span className="text-xs text-muted-foreground">→</span>
+                  <select
+                    value={q.targetCompetitionId}
+                    onChange={(e) =>
+                      setQuals((prev) =>
+                        prev.map((r, j) =>
+                          j === i
+                            ? { ...r, targetCompetitionId: e.target.value }
+                            : r,
+                        ),
+                      )
+                    }
+                    className="h-8 rounded-sm border border-border bg-surface-2 px-2 text-xs"
+                  >
+                    {others.map((o) => (
+                      <option key={o.competitionId} value={o.competitionId}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setQuals((prev) => prev.filter((_, j) => j !== i))
+                    }
+                  >
+                    remover
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
