@@ -51,16 +51,16 @@ describe("WorldGenesisGenerator", () => {
     expect(validated.ok).toBe(true);
     if (!validated.ok) return;
     expect(validated.value.summary).toEqual({
-      clubCount: 16,
-      personCount: 368,
-      playerCount: 368,
-      squadCount: 16,
+      clubCount: 20,
+      personCount: 460,
+      playerCount: 460,
+      squadCount: 20,
       averageOverall: 60,
     });
-    expect(new Set(genesis.players.map(({ id }) => id))).toHaveLength(368);
+    expect(new Set(genesis.players.map(({ id }) => id))).toHaveLength(460);
     expect(
       new Set(genesis.players.map(({ personId }) => personId)),
-    ).toHaveLength(368);
+    ).toHaveLength(460);
     // NÃO se exige 60 por jogador — era o que estava aqui, e contradizia a
     // R-57: "os pontos podem ser distribuídos de formas diferentes entre
     // goleiros, defesa, meio e ataque". Com todo mundo em 60 não há

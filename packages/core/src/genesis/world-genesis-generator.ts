@@ -36,8 +36,12 @@ const CLUB_NAMES = [
   "Nacional da Serra",
   "Operário Unido",
   "Pioneiros",
+  "Quilombo",
   "Real do Vale",
+  "Serrano",
+  "Tempestade",
   "Vanguarda",
+  "Vendaval",
 ] as const;
 
 const FIRST_NAMES = [

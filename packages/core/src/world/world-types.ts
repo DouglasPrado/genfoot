@@ -23,9 +23,9 @@ export interface CreateGameWorldInput {
 }
 
 export interface WorldProvisioningEvidence {
-  readonly generatedClubCount: 16;
-  readonly clubsWithValidSquads: 16;
-  readonly generatedPlayerCount: 368;
+  readonly generatedClubCount: 20;
+  readonly clubsWithValidSquads: 20;
+  readonly generatedPlayerCount: 460;
   readonly playersPerSquad: 23;
   readonly calendarValidated: true;
   readonly rulesetVersion: RulesetVersion;

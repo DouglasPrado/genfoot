@@ -37,9 +37,9 @@ function createWorld(): GameWorld {
 
 function validEvidence(): WorldProvisioningEvidence {
   return {
-    generatedClubCount: 16,
-    clubsWithValidSquads: 16,
-    generatedPlayerCount: 368,
+    generatedClubCount: 20,
+    clubsWithValidSquads: 20,
+    generatedPlayerCount: 460,
     playersPerSquad: 23,
     calendarValidated: true,
     rulesetVersion: ruleset(),

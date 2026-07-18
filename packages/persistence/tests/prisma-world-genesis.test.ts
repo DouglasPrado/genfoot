@@ -61,21 +61,21 @@ describe.skipIf(!hasDatabase)(
       await client.$disconnect();
     });
 
-    it("materializa 16 clubes, 368 jogadores e 16 elencos", async () => {
+    it("materializa 20 clubes, 460 jogadores e 20 elencos", async () => {
       const result = await generate.execute(WORLD_ID as never);
       expect(result.ok).toBe(true);
 
-      expect(await client.club.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
-      // Pessoas: 368 jogadores + 192 da base (16×12, C8) + 112 da comissão = 672.
-      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(672);
-      // Jogadores: 368 profissionais + 192 da base (16 clubes × 12 jovens) = 560.
-      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(560);
-      expect(await client.playerAttributes.count()).toBe(560);
-      // Elencos: 16 primeira-equipe + 16 YOUTH_ACADEMY (base, C8) = 32.
-      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(32);
+      expect(await client.club.count({ where: { gameWorldId: WORLD_ID } })).toBe(20);
+      // Pessoas: 460 jogadores + 240 da base (20×12, C8) + 140 da comissão = 840.
+      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(840);
+      // Jogadores: 460 profissionais + 240 da base (20 clubes × 12 jovens) = 700.
+      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(700);
+      expect(await client.playerAttributes.count()).toBe(700);
+      // Elencos: 20 primeira-equipe + 20 YOUTH_ACADEMY (base, C8) = 40.
+      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(40);
       // C8: a comissão técnica — 7 cargos por clube, cada um com contrato ativo.
-      expect(await client.staffMember.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
-      expect(await client.staffContract.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
+      expect(await client.staffMember.count({ where: { gameWorldId: WORLD_ID } })).toBe(140);
+      expect(await client.staffContract.count({ where: { gameWorldId: WORLD_ID } })).toBe(140);
     });
 
     it("cada elenco tem os 23 jogadores com camisa única", async () => {
@@ -85,7 +85,7 @@ describe.skipIf(!hasDatabase)(
         where: { gameWorldId: WORLD_ID, category: "FIRST_TEAM" },
         include: { memberships: true },
       });
-      expect(squads).toHaveLength(16);
+      expect(squads).toHaveLength(20);
       for (const squad of squads) {
         expect(squad.memberships).toHaveLength(SQUAD_SIZE);
         const shirts = new Set(squad.memberships.map((m) => m.shirtNumber));
@@ -126,8 +126,8 @@ describe.skipIf(!hasDatabase)(
       expect(second.ok).toBe(true);
       if (second.ok) expect(second.value.created).toBe(false);
 
-      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(560);
-      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(32);
+      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(700);
+      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(40);
     });
 
     /**
@@ -159,7 +159,7 @@ describe.skipIf(!hasDatabase)(
      * Economia fechada (ECO-003): a torneira criou exatamente o que os clubes
      * têm. A oferta monetária do mundo é auditável.
      */
-    it("a torneira criou exatamente o que os 16 clubes têm", async () => {
+    it("a torneira criou exatamente o que os 20 clubes têm", async () => {
       await generate.execute(WORLD_ID as never);
 
       const faucetLines = await client.journalLine.findMany({
@@ -173,7 +173,7 @@ describe.skipIf(!hasDatabase)(
         (sum, l) => sum + (l.direction === "CREDIT" ? l.amountMinor : -l.amountMinor),
         0n,
       );
-      expect(created).toBe(INITIAL_ENDOWMENT_MINOR * 16n);
+      expect(created).toBe(INITIAL_ENDOWMENT_MINOR * 20n);
     });
 
     /** Idempotente: reexecutar a gênese não credita a dotação duas vezes. */
@@ -182,7 +182,7 @@ describe.skipIf(!hasDatabase)(
       await generate.execute(WORLD_ID as never);
       expect(
         await client.journalEntry.count({ where: { gameWorldId: WORLD_ID } }),
-      ).toBe(16);
+      ).toBe(20);
     });
 
     it("o mundo nasce SEM competição nem partidas (R-203)", async () => {

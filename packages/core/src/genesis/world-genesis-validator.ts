@@ -28,24 +28,24 @@ export function validateWorldGenesis(
     return invalid("A gênese usa um ruleset diferente do mundo.");
   }
   if (
-    genesis.clubs.length !== 16 ||
-    uniqueSize(genesis.clubs.map(({ id }) => id)) !== 16
+    genesis.clubs.length !== 20 ||
+    uniqueSize(genesis.clubs.map(({ id }) => id)) !== 20
   ) {
-    return invalid("A gênese deve conter exatamente 16 clubes únicos.");
+    return invalid("A gênese deve conter exatamente 20 clubes únicos.");
   }
   if (
-    genesis.persons.length !== 368 ||
-    uniqueSize(genesis.persons.map(({ id }) => id)) !== 368
+    genesis.persons.length !== 460 ||
+    uniqueSize(genesis.persons.map(({ id }) => id)) !== 460
   ) {
-    return invalid("A gênese deve conter exatamente 368 pessoas únicas.");
+    return invalid("A gênese deve conter exatamente 460 pessoas únicas.");
   }
   if (
-    genesis.players.length !== 368 ||
-    uniqueSize(genesis.players.map(({ id }) => id)) !== 368 ||
-    uniqueSize(genesis.players.map(({ personId }) => personId)) !== 368
+    genesis.players.length !== 460 ||
+    uniqueSize(genesis.players.map(({ id }) => id)) !== 460 ||
+    uniqueSize(genesis.players.map(({ personId }) => personId)) !== 460
   ) {
     return invalid(
-      "A gênese deve conter 368 jogadores e relações pessoa-jogador únicas.",
+      "A gênese deve conter 460 jogadores e relações pessoa-jogador únicas.",
     );
   }
 
@@ -67,8 +67,8 @@ export function validateWorldGenesis(
   }
 
   if (
-    genesis.squads.length !== 16 ||
-    uniqueSize(genesis.squads.map(({ clubId }) => clubId)) !== 16
+    genesis.squads.length !== 20 ||
+    uniqueSize(genesis.squads.map(({ clubId }) => clubId)) !== 20
   ) {
     return invalid("Deve existir exatamente um elenco para cada clube.");
   }
@@ -105,7 +105,7 @@ export function validateWorldGenesis(
       return invalid("A força total de cada elenco deve ser exatamente 1.380.");
     }
   }
-  if (assignedPlayers.size !== 368) {
+  if (assignedPlayers.size !== 460) {
     return invalid("Todos os jogadores gerados devem integrar um elenco.");
   }
 
@@ -114,18 +114,18 @@ export function validateWorldGenesis(
 
   return succeed({
     evidence: {
-      generatedClubCount: 16,
-      clubsWithValidSquads: 16,
-      generatedPlayerCount: 368,
+      generatedClubCount: 20,
+      clubsWithValidSquads: 20,
+      generatedPlayerCount: 460,
       playersPerSquad: 23,
       calendarValidated: true,
       rulesetVersion: genesis.rulesetVersion,
     },
     summary: {
-      clubCount: 16,
-      personCount: 368,
-      playerCount: 368,
-      squadCount: 16,
+      clubCount: 20,
+      personCount: 460,
+      playerCount: 460,
+      squadCount: 20,
       averageOverall: 60,
     },
   });
