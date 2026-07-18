@@ -309,8 +309,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     textTransform: "uppercase",
   },
-  tagEstimated: { color: color.warning, backgroundColor: "#3a2f14" },
-  tagContracted: { color: color.success, backgroundColor: "#12321f" },
+  tagEstimated: { color: color.warning, backgroundColor: "#31281199" },
+  tagContracted: { color: color.info, backgroundColor: "#1a254099" },
   costValue: {
     color: color.text,
     fontSize: fontSize.sm,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   totalValue: {
-    color: color.primary,
+    color: color.text,
     fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
