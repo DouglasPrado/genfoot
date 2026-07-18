@@ -103,6 +103,8 @@ describe("API command catalog integrity (e2e)", () => {
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // X-001: o usuário registra presença no mundo (heartbeat).
+      "presence:heartbeat",
       "world:activate",
       // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
       // para reverdejar o gate — o command existe, faltava a linha do catálogo.
@@ -130,7 +132,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(31);
+    expect(response.body.commandCount).toBe(32);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

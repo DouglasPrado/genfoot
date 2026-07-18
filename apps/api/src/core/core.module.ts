@@ -17,6 +17,7 @@ import {
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
+  PrismaPresenceRepository,
   PrismaTransferUnitOfWork,
   PrismaPromoteYouthUnitOfWork,
   PrismaDemoteToYouthUnitOfWork,
@@ -52,6 +53,7 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  PRESENCE_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
   PROMOTE_YOUTH_UNIT_OF_WORK,
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
@@ -202,6 +204,12 @@ import {
         new PrismaMatchPlayRepository(client),
     },
     {
+      provide: PRESENCE_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPresenceRepository =>
+        new PrismaPresenceRepository(client),
+    },
+    {
       provide: TRANSFER_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTransferUnitOfWork =>
@@ -303,6 +311,7 @@ import {
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
+    PRESENCE_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
     PROMOTE_YOUTH_UNIT_OF_WORK,
     DEMOTE_TO_YOUTH_UNIT_OF_WORK,

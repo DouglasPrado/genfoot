@@ -18,6 +18,7 @@ import type {
   GenesisUnitOfWork,
   IdentityUnitOfWork,
   MatchPlayRepository,
+  PresenceRepository,
   SeasonFinanceUnitOfWork,
   TransferUnitOfWork,
   PromoteYouthUnitOfWork,
@@ -43,6 +44,7 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  PRESENCE_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
   PROMOTE_YOUTH_UNIT_OF_WORK,
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
@@ -83,6 +85,8 @@ export class CommandsController {
     private readonly genesisUnitOfWork: GenesisUnitOfWork,
     @Inject(MATCH_PLAY_REPOSITORY)
     private readonly matchPlay: MatchPlayRepository,
+    @Inject(PRESENCE_REPOSITORY)
+    private readonly presence: PresenceRepository,
     @Inject(TRANSFER_UNIT_OF_WORK)
     private readonly transferUnitOfWork: TransferUnitOfWork,
     @Inject(PROMOTE_YOUTH_UNIT_OF_WORK)
@@ -240,6 +244,7 @@ export class CommandsController {
         clubUnitOfWork: this.clubUnitOfWork,
         genesisUnitOfWork: this.genesisUnitOfWork,
         matchPlay: this.matchPlay,
+        presence: this.presence,
         transferUnitOfWork: this.transferUnitOfWork,
         promoteYouthUnitOfWork: this.promoteYouthUnitOfWork,
         demoteToYouthUnitOfWork: this.demoteToYouthUnitOfWork,

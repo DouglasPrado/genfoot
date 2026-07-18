@@ -37,6 +37,7 @@ import {
   type ClubUnitOfWork,
   type GenesisUnitOfWork,
   type MatchPlayRepository,
+  type PresenceRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -105,6 +106,8 @@ export interface CommandContext {
   readonly genesisUnitOfWork: GenesisUnitOfWork;
   /** C5 — joga a próxima rodada da liga (simulação determinística). */
   readonly matchPlay: MatchPlayRepository;
+  /** X-001 — a presença do usuário no mundo (heartbeat). */
+  readonly presence: PresenceRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -327,6 +330,12 @@ const toggleAutomationPayload = z.object({
   clubId: z.string().uuid(),
   ruleId: z.string().uuid(),
   activate: z.boolean(),
+});
+
+// X-001 presença: só diz se está entrando (online) ou saindo. QUEM é o ator vem
+// do token (actorId), nunca do payload.
+const presencePayload = z.object({
+  online: z.boolean().default(true),
 });
 
 const createWorldPayload = z.object({
@@ -881,6 +890,28 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `automation:${parsed.data.ruleId}` });
+  },
+
+  // X-001 — o usuário registra que está (ou deixou de estar) presente no mundo.
+  "presence:heartbeat": async ({ worlds, presence, actorId, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    if (actorId === null) {
+      return fail(
+        new DomainError(
+          "PRESENCE_REQUIRES_USER",
+          "Presença exige uma sessão de usuário (o admin/sistema não tem presença de jogo).",
+        ),
+      );
+    }
+    const parsed = presencePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    if (parsed.data.online) {
+      await presence.recordOnline(world.value.worldId, actorId);
+    } else {
+      await presence.recordOffline(world.value.worldId, actorId);
+    }
+    return succeed({ resource: `presence:${actorId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

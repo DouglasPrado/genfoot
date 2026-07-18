@@ -38,6 +38,7 @@ export const SELL_UNIT_OF_WORK = "SELL_UNIT_OF_WORK";
 export const LIST_UNIT_OF_WORK = "LIST_UNIT_OF_WORK";
 export const COMPETITION_UNIT_OF_WORK = "COMPETITION_UNIT_OF_WORK";
 export const AUTOMATION_UNIT_OF_WORK = "AUTOMATION_UNIT_OF_WORK";
+export const PRESENCE_REPOSITORY = "PRESENCE_REPOSITORY";
 export const SEASON_FINANCE_UNIT_OF_WORK = "SEASON_FINANCE_UNIT_OF_WORK";
 /** C1 leitura fora do UoW: "alguém está jogando este mundo?" antes de apagá-lo. */
 export const CLUB_CONTROL_REPOSITORY = "CLUB_CONTROL_REPOSITORY";

@@ -24,6 +24,7 @@ export * from "./prisma-competition-unit-of-work.js";
 export * from "./prisma-club-ai-profile-repository.js";
 export * from "./prisma-automation-rule-repository.js";
 export * from "./prisma-automation-unit-of-work.js";
+export * from "./prisma-presence-repository.js";
 export * from "./prisma-fanbase-repository.js";
 export * from "./prisma-fanbase-read-model.js";
 export * from "./prisma-narrative-repository.js";
