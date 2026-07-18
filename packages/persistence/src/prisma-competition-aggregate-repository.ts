@@ -201,6 +201,21 @@ export class PrismaCompetitionAggregateRepository
         scheduledAt: new Date(`${draw.scheduledOn}T00:00:00.000Z`),
       })),
     });
+
+    // Fase de grupos: grava o grupo de cada clube (a classificação por grupo lê
+    // daqui). Ambos os clubes de um jogo de grupo estão no mesmo grupo.
+    const groupOfClub = new Map<string, string>();
+    for (const draw of draws) {
+      if (draw.group === null) continue;
+      groupOfClub.set(draw.homeClubId, draw.group);
+      groupOfClub.set(draw.awayClubId, draw.group);
+    }
+    for (const [clubId, group] of groupOfClub) {
+      await this.client.competitionClub.updateMany({
+        where: { competitionSeasonId: edition.id, clubId },
+        data: { groupName: group },
+      });
+    }
   }
 
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 /**
@@ -41,9 +42,17 @@ const LIFECYCLE_LABEL: Record<
   FINISHED: { label: "encerrada", tone: "ok" },
 };
 
-const FORMAT_OF_TYPE: Record<string, string> = {
-  LEAGUE: "DOUBLE_ROUND_ROBIN",
-  CUP: "KNOCKOUT",
+const COMPETITION_KIND: Record<
+  string,
+  { type: string; format: string; isLeague: boolean }
+> = {
+  LEAGUE: { type: "LEAGUE", format: "DOUBLE_ROUND_ROBIN", isLeague: true },
+  CUP_KO: { type: "CUP", format: "KNOCKOUT", isLeague: false },
+  CUP_GROUPS: {
+    type: "CUP",
+    format: "GROUPS_AND_KNOCKOUT",
+    isLeague: false,
+  },
 };
 
 const TIEBREAKERS = [
@@ -73,9 +82,9 @@ export function CompetitionAuthoring({
   clubs: readonly ClubRow[];
 }) {
   const { api, session } = useSession();
+  const { error: showError } = useToast();
   const [items, setItems] = useState<readonly CompetitionSummary[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [configuring, setConfiguring] = useState<CompetitionSummary | null>(
     null,
   );
@@ -88,8 +97,11 @@ export function CompetitionAuthoring({
         "competitions-list",
       )
       .then((e) => setItems(e.data.competitions ?? []))
-      .catch(() => setItems([]));
-  }, [api, session, worldId]);
+      .catch(() => {
+        setItems([]);
+        showError("Falha ao carregar competições.");
+      });
+  }, [api, session, worldId, showError]);
 
   useEffect(() => {
     load();
@@ -98,7 +110,6 @@ export function CompetitionAuthoring({
   const dispatch = useCallback(
     async (commandType: string, payload: Record<string, unknown>) => {
       setBusy(true);
-      setError(null);
       try {
         const response = await api.command({
           commandType,
@@ -107,19 +118,19 @@ export function CompetitionAuthoring({
           idempotencyKey: crypto.randomUUID(),
         });
         if (response.status === "REJECTED") {
-          setError(response.error?.code ?? "comando recusado");
+          showError(response.error?.code ?? "comando recusado");
           return false;
         }
         load();
         return true;
       } catch {
-        setError("falha na API");
+        showError("falha na API");
         return false;
       } finally {
         setBusy(false);
       }
     },
-    [api, worldId, load],
+    [api, worldId, load, showError],
   );
 
   return (
@@ -130,10 +141,6 @@ export function CompetitionAuthoring({
           autoradas no admin · R-202
         </span>
       </div>
-
-      {error ? (
-        <p className="text-[11px] text-[color:var(--danger)]">Erro: {error}</p>
-      ) : null}
 
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
@@ -152,7 +159,9 @@ export function CompetitionAuthoring({
                 dispatch("competition:lock", { competitionId: c.competitionId })
               }
               onStart={() =>
-                dispatch("competition:start", { competitionId: c.competitionId })
+                dispatch("competition:start", {
+                  competitionId: c.competitionId,
+                })
               }
             />
           ))}
@@ -300,12 +309,16 @@ function ConfigureDialog({
   busy: boolean;
   onSave: (payload: Record<string, unknown>) => Promise<void>;
 }) {
+  const { error: showError } = useToast();
   const league = isLeagueFormat(competition.format);
+  const groups = competition.format === "GROUPS_AND_KNOCKOUT";
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [startsOn, setStartsOn] = useState(competition.startsOn ?? "");
   const [endsOn, setEndsOn] = useState(competition.endsOn ?? "");
   const [promotion, setPromotion] = useState("4");
   const [relegation, setRelegation] = useState("4");
+  const [groupCount, setGroupCount] = useState("4");
+  const [qualifiersPerGroup, setQualifiersPerGroup] = useState("2");
   const [prizes, setPrizes] = useState<PrizeState>({
     participation: "",
     winBonus: "",
@@ -327,9 +340,6 @@ function ConfigureDialog({
   const setPrize = (k: keyof PrizeState, v: string) =>
     setPrizes((p) => ({ ...p, [k]: v }));
 
-  const datesOk = startsOn !== "" && endsOn !== "" && startsOn < endsOn;
-  const canSave = selected.size >= 2 && datesOk;
-
   function build(): Record<string, unknown> {
     const config = {
       rules: {
@@ -339,8 +349,8 @@ function ConfigureDialog({
         promotionSlots: league ? Number(promotion) || 0 : 0,
         relegationSlots: league ? Number(relegation) || 0 : 0,
         tiebreakers: [...TIEBREAKERS],
-        groupCount: null,
-        qualifiersPerGroup: null,
+        groupCount: groups ? Number(groupCount) || null : null,
+        qualifiersPerGroup: groups ? Number(qualifiersPerGroup) || null : null,
       },
       prizes: {
         participationMinor: toMinor(prizes.participation),
@@ -354,6 +364,22 @@ function ConfigureDialog({
       qualifications: [],
     };
     return { clubIds: [...selected], startsOn, endsOn, config };
+  }
+
+  function save() {
+    if (selected.size < 2) {
+      showError("Escolha pelo menos dois clubes.");
+      return;
+    }
+    if (startsOn === "" || endsOn === "") {
+      showError("Informe as datas de início e término.");
+      return;
+    }
+    if (startsOn >= endsOn) {
+      showError("O término tem que ser depois do início.");
+      return;
+    }
+    void onSave(build());
   }
 
   return (
@@ -387,11 +413,6 @@ function ConfigureDialog({
                 onChange={(e) => setEndsOn(e.target.value)}
               />
             </div>
-            {startsOn !== "" && endsOn !== "" && startsOn >= endsOn ? (
-              <span className="text-[11px] text-[color:var(--danger)]">
-                o término tem que ser depois do início
-              </span>
-            ) : null}
           </div>
         </section>
 
@@ -475,6 +496,43 @@ function ConfigureDialog({
           </section>
         ) : null}
 
+        {/* Grupos (só grupos + mata-mata) */}
+        {groups ? (
+          <section className="space-y-2">
+            <h4 className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
+              Fase de grupos
+            </h4>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="cfg-groups">Nº de grupos</Label>
+                <Input
+                  id="cfg-groups"
+                  type="number"
+                  min={1}
+                  value={groupCount}
+                  onChange={(e) => setGroupCount(e.target.value)}
+                  className="w-24"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cfg-qual">Classificados por grupo</Label>
+                <Input
+                  id="cfg-qual"
+                  type="number"
+                  min={1}
+                  value={qualifiersPerGroup}
+                  onChange={(e) => setQualifiersPerGroup(e.target.value)}
+                  className="w-24"
+                />
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                sorteio em potes; os classificados formam o mata-mata (potência
+                de 2)
+              </span>
+            </div>
+          </section>
+        ) : null}
+
         {/* Premiações — clubes e jogadores (R-205) */}
         <section className="space-y-3">
           <h4 className="font-heading text-xs uppercase tracking-wide text-muted-foreground">
@@ -527,17 +585,10 @@ function ConfigureDialog({
       </div>
 
       <div className="mt-2 flex items-center justify-end gap-3 border-t border-border pt-3">
-        {!canSave ? (
-          <span className="text-[11px] text-muted-foreground">
-            escolha ≥ 2 clubes e uma janela válida
-          </span>
-        ) : null}
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy || !canSave}
-          onClick={() => void onSave(build())}
-        >
+        <span className="text-[11px] text-muted-foreground">
+          escolha ≥ 2 clubes e uma janela válida
+        </span>
+        <Button variant="outline" size="sm" disabled={busy} onClick={save}>
           Salvar configuração
         </Button>
       </div>
@@ -576,8 +627,9 @@ function CreateCompetitionForm({
   onCreate: (payload: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
-  const [type, setType] = useState("LEAGUE");
+  const [kind, setKind] = useState("LEAGUE");
   const [tier, setTier] = useState("1");
+  const spec = COMPETITION_KIND[kind]!;
 
   return (
     <div className="flex flex-wrap items-end gap-3 border-t border-border pt-4">
@@ -592,28 +644,31 @@ function CreateCompetitionForm({
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="new-comp-type">Tipo</Label>
+        <Label htmlFor="new-comp-kind">Formato</Label>
         <select
-          id="new-comp-type"
-          value={type}
-          onChange={(e) => setType(e.target.value)}
+          id="new-comp-kind"
+          value={kind}
+          onChange={(e) => setKind(e.target.value)}
           className="h-9 rounded-sm border border-border bg-surface-2 px-2 text-sm"
         >
           <option value="LEAGUE">Liga (pontos corridos)</option>
-          <option value="CUP">Copa (mata-mata)</option>
+          <option value="CUP_KO">Copa (mata-mata)</option>
+          <option value="CUP_GROUPS">Copa (grupos + mata-mata)</option>
         </select>
       </div>
-      <div className="space-y-1">
-        <Label htmlFor="new-comp-tier">Divisão</Label>
-        <Input
-          id="new-comp-tier"
-          type="number"
-          min={1}
-          value={tier}
-          onChange={(e) => setTier(e.target.value)}
-          className="w-20"
-        />
-      </div>
+      {spec.isLeague ? (
+        <div className="space-y-1">
+          <Label htmlFor="new-comp-tier">Divisão</Label>
+          <Input
+            id="new-comp-tier"
+            type="number"
+            min={1}
+            value={tier}
+            onChange={(e) => setTier(e.target.value)}
+            className="w-20"
+          />
+        </div>
+      ) : null}
       <Button
         variant="outline"
         size="sm"
@@ -621,9 +676,9 @@ function CreateCompetitionForm({
         onClick={() => {
           void onCreate({
             name: name.trim(),
-            type,
-            format: FORMAT_OF_TYPE[type] ?? "DOUBLE_ROUND_ROBIN",
-            tier: type === "LEAGUE" ? Number(tier) : null,
+            type: spec.type,
+            format: spec.format,
+            tier: spec.isLeague ? Number(tier) : null,
           }).then((ok) => {
             if (ok) setName("");
           });

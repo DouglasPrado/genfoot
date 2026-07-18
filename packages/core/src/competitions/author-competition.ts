@@ -203,6 +203,8 @@ export class LockCompetition {
         clubIds: next.clubIds,
         startsOn: next.startsOn ?? "",
         endsOn: next.endsOn ?? "",
+        legs: next.config.rules.legs,
+        groupCount: next.config.rules.groupCount,
       });
       await repos.competitions.materializeSchedule(
         input.gameWorldId,

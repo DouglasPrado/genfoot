@@ -73,14 +73,29 @@ describe("generateSchedule — sorteio + calendário (C7, R-206)", () => {
     expect(draws[7]).toMatchObject({ homeClubId: "club-8", awayClubId: "club-9" });
   });
 
-  it("recusa liga ímpar e formatos ainda não materializados", () => {
-    expect(
-      generateSchedule({
-        format: CompetitionFormat.ROUND_ROBIN,
-        clubIds: clubs(15),
-        ...WINDOW,
-      }),
-    ).toHaveLength(0);
+  it("grupos+mata-mata: 4 grupos de 4 (turno único) = 24 jogos, rotulados A–D", () => {
+    const draws = generateSchedule({
+      format: CompetitionFormat.GROUPS_AND_KNOCKOUT,
+      clubIds: clubs(16),
+      groupCount: 4,
+      legs: 1,
+      ...WINDOW,
+    });
+    // 4 grupos × (4 clubes → 6 jogos no round-robin) = 24.
+    expect(draws).toHaveLength(24);
+    expect(new Set(draws.map((d) => d.group))).toEqual(
+      new Set(["A", "B", "C", "D"]),
+    );
+    // Sorteio em potes: o grupo A leva os clubes de índice 0, 4, 8, 12.
+    const groupA = new Set(
+      draws.filter((d) => d.group === "A").flatMap((d) => [d.homeClubId, d.awayClubId]),
+    );
+    expect(groupA).toEqual(
+      new Set(["club-1", "club-5", "club-9", "club-13"]),
+    );
+  });
+
+  it("grupos+mata-mata sem nº de grupos não materializa (retorna vazio)", () => {
     expect(
       generateSchedule({
         format: CompetitionFormat.GROUPS_AND_KNOCKOUT,
