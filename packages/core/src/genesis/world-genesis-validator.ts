@@ -109,8 +109,8 @@ export function validateWorldGenesis(
     return invalid("Todos os jogadores gerados devem integrar um elenco.");
   }
 
-  const calendarValidation = validateCalendar(genesis, clubIds);
-  if (!calendarValidation.ok) return calendarValidation;
+  // Sem calendário na gênese (R-203): o mundo nasce sem competição. As ligas e
+  // copas — e seu calendário — são autoradas no admin (R-202).
 
   return succeed({
     evidence: {
@@ -126,94 +126,9 @@ export function validateWorldGenesis(
       personCount: 368,
       playerCount: 368,
       squadCount: 16,
-      fixtureCount: 240,
-      roundCount: 30,
       averageOverall: 60,
     },
   });
-}
-
-function validateCalendar(
-  genesis: WorldGenesisSnapshot,
-  clubIds: ReadonlySet<ClubId>,
-): Result<void, DomainError> {
-  if (
-    genesis.competition.rounds !== 30 ||
-    genesis.competition.clubIds.length !== 16 ||
-    genesis.fixtures.length !== 240
-  ) {
-    return invalid(
-      "A Liga Inicial deve conter 16 clubes, 30 rodadas e 240 partidas.",
-    );
-  }
-
-  const fixturesByRound = new Map<
-    number,
-    (typeof genesis.fixtures)[number][]
-  >();
-  const pairings = new Map<string, (typeof genesis.fixtures)[number][]>();
-  const matchesByClub = new Map<ClubId, number>();
-
-  for (const fixture of genesis.fixtures) {
-    if (
-      !clubIds.has(fixture.homeClubId) ||
-      !clubIds.has(fixture.awayClubId) ||
-      fixture.homeClubId === fixture.awayClubId ||
-      fixture.round < 1 ||
-      fixture.round > 30
-    ) {
-      return invalid("O calendário contém uma partida inválida.");
-    }
-    const round = fixturesByRound.get(fixture.round) ?? [];
-    round.push(fixture);
-    fixturesByRound.set(fixture.round, round);
-
-    const pairKey = [fixture.homeClubId, fixture.awayClubId].sort().join(":");
-    const pair = pairings.get(pairKey) ?? [];
-    pair.push(fixture);
-    pairings.set(pairKey, pair);
-
-    matchesByClub.set(
-      fixture.homeClubId,
-      (matchesByClub.get(fixture.homeClubId) ?? 0) + 1,
-    );
-    matchesByClub.set(
-      fixture.awayClubId,
-      (matchesByClub.get(fixture.awayClubId) ?? 0) + 1,
-    );
-  }
-
-  for (let roundNumber = 1; roundNumber <= 30; roundNumber += 1) {
-    const round = fixturesByRound.get(roundNumber);
-    if (round?.length !== 8)
-      return invalid("Cada rodada deve conter exatamente 8 partidas.");
-    const participants = round.flatMap(({ homeClubId, awayClubId }) => [
-      homeClubId,
-      awayClubId,
-    ]);
-    if (uniqueSize(participants) !== 16) {
-      return invalid("Um clube não pode jogar duas vezes na mesma rodada.");
-    }
-  }
-
-  if (pairings.size !== 120)
-    return invalid("Todos os pares de clubes devem se enfrentar.");
-  for (const pair of pairings.values()) {
-    if (
-      pair.length !== 2 ||
-      pair[0]!.homeClubId !== pair[1]!.awayClubId ||
-      pair[0]!.awayClubId !== pair[1]!.homeClubId
-    ) {
-      return invalid(
-        "Cada confronto deve possuir ida e volta com mandos invertidos.",
-      );
-    }
-  }
-  if ([...clubIds].some((clubId) => matchesByClub.get(clubId) !== 30)) {
-    return invalid("Cada clube deve disputar exatamente 30 partidas.");
-  }
-
-  return succeed(undefined);
 }
 
 function uniqueSize(values: readonly (string | number)[]): number {
