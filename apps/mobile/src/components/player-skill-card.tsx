@@ -185,16 +185,12 @@ export function PlayerSkillCard({ data }: { data: PlayerSkillCardData }) {
           <PlayerAvatar
             photoUrl={data.photoUrl}
             crest={data.crest}
+            ovr={data.ovr}
             size={76}
             radius={radius.md}
             crestSize={28}
             style={styles.avatar}
           />
-          <View style={styles.ovrBadgeWrap} pointerEvents="none">
-            <View style={styles.ovrPill}>
-              <Text style={styles.ovrValue}>{data.ovr}</Text>
-            </View>
-          </View>
         </View>
         <View style={styles.heroInfo}>
           <View style={styles.nameRow}>
@@ -364,29 +360,6 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { width: 76, alignItems: "center", justifyContent: "center" },
   avatar: { borderWidth: 1, borderColor: color.border },
-  ovrBadgeWrap: {
-    position: "absolute",
-    top: -13,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  ovrPill: {
-    minWidth: 38,
-    alignItems: "center",
-    paddingHorizontal: space.sm,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-    backgroundColor: color.primary,
-    borderWidth: 2,
-    borderColor: color.backgroundElevated,
-  },
-  ovrValue: {
-    color: color.primaryContrast,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
-  },
   heroInfo: { flex: 1, gap: 4 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   name: {

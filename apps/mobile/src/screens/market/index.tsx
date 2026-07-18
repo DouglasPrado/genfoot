@@ -324,7 +324,12 @@ export function Market() {
                     accessibilityLabel={`Ver card de ${p.name}`}
                     style={styles.identity}
                   >
-                    <PlayerAvatar crest={crestOf(p)} size={44} crestSize={19} />
+                    <PlayerAvatar
+                      crest={crestOf(p)}
+                      ovr={p.overall}
+                      size={44}
+                      crestSize={19}
+                    />
                     <View style={styles.info}>
                       <View style={styles.nameRow}>
                         <PositionBadge
@@ -336,7 +341,7 @@ export function Market() {
                         </Text>
                       </View>
                       <Text style={styles.club} numberOfLines={1}>
-                        {p.clubName} · {p.age} anos · OVR {p.overall}
+                        {p.clubName} · {p.age} anos
                       </Text>
                     </View>
                   </Pressable>

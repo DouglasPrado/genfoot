@@ -607,6 +607,107 @@ export function Club() {
           )}
         </Card>
 
+        <Card>
+          <SectionHeader
+            title="INFRAESTRUTURA"
+            trailing={
+              <Icon name="construct" size={16} color={color.textMuted} />
+            }
+          />
+          <View style={styles.infraList}>
+            {vm.infrastructure.map((infra) => (
+              <View key={infra.id} style={styles.infraRow}>
+                <View style={styles.infraIcon}>
+                  <Icon
+                    name={infra.icon as IoniconName}
+                    size={18}
+                    color={color.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infraName}>{infra.name}</Text>
+                  <Text style={styles.infraNote}>{infra.note}</Text>
+                </View>
+                <View style={styles.levels}>
+                  {Array.from({ length: infra.maxLevel }).map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.pip,
+                        {
+                          backgroundColor:
+                            i < infra.level
+                              ? color.primary
+                              : color.surfaceRaised,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="ESTÁDIO"
+            trailing={
+              <Icon name="business" size={16} color={color.textMuted} />
+            }
+          />
+          <View style={styles.stadiumRow}>
+            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
+            <Text style={styles.stadiumCap}>
+              {formatAmount(vm.stadiumCapacity)} lugares
+            </Text>
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="TORCIDA"
+            trailing={<Icon name="people" size={16} color={color.textMuted} />}
+          />
+          {fanbaseQuery.state === "ready" && fanbase !== null ? (
+            <View style={styles.financeContent}>
+              <View style={styles.finBalance}>
+                <Text style={styles.finBoxLabel}>TAMANHO DA TORCIDA</Text>
+                <Text style={styles.finBalanceValue}>
+                  {formatAmount(fanbase.headcount)}
+                </Text>
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PACIÊNCIA DA DIRETORIA</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.boardPatience}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.boardPatience / 100} height={6} />
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PRESSÃO</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.pressureLevel}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.pressureLevel / 100} height={6} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.financeUnavailable}>
+              <Icon name="people" size={18} color={color.textMuted} />
+              <Text style={styles.financeUnavailableText}>
+                {fanbaseQuery.state === "loading"
+                  ? "Sincronizando a torcida…"
+                  : "A torcida ainda não existe neste mundo."}
+              </Text>
+            </View>
+          )}
+        </Card>
+
         {controlStep.kind === "complete" ? (
           <Card>
             <SectionHeader
@@ -694,63 +795,6 @@ export function Club() {
             )}
           </Card>
         ) : null}
-
-        <Card>
-          <SectionHeader
-            title="INFRAESTRUTURA"
-            trailing={
-              <Icon name="construct" size={16} color={color.textMuted} />
-            }
-          />
-          <View style={styles.infraList}>
-            {vm.infrastructure.map((infra) => (
-              <View key={infra.id} style={styles.infraRow}>
-                <View style={styles.infraIcon}>
-                  <Icon
-                    name={infra.icon as IoniconName}
-                    size={18}
-                    color={color.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.infraName}>{infra.name}</Text>
-                  <Text style={styles.infraNote}>{infra.note}</Text>
-                </View>
-                <View style={styles.levels}>
-                  {Array.from({ length: infra.maxLevel }).map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.pip,
-                        {
-                          backgroundColor:
-                            i < infra.level
-                              ? color.primary
-                              : color.surfaceRaised,
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        <Card>
-          <SectionHeader
-            title="ESTÁDIO"
-            trailing={
-              <Icon name="business" size={16} color={color.textMuted} />
-            }
-          />
-          <View style={styles.stadiumRow}>
-            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
-            <Text style={styles.stadiumCap}>
-              {formatAmount(vm.stadiumCapacity)} lugares
-            </Text>
-          </View>
-        </Card>
       </ScrollView>
 
       {managedClub !== null ? (
