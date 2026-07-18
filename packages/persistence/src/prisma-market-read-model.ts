@@ -32,50 +32,83 @@ export class PrismaMarketReadModel implements MarketReadModel {
     });
     const asOf = world?.currentDate ?? new Date();
 
-    // Os melhores por overall, com o elenco (para achar o clube) e a pessoa (nome,
-    // idade). O vínculo jogador→clube é o elenco (R-189).
-    const players = await this.client.player.findMany({
-      where: {
-        gameWorldId,
-        squadMemberships: {
-          some: { squad: { category: "FIRST_TEAM" } },
-        },
-      },
-      orderBy: { currentAbility: "desc" },
-      take: SCOUT_LIMIT * 2, // folga: filtramos o próprio clube depois
-      include: {
-        attributes: true,
-        person: { select: { firstName: true, lastName: true, birthDate: true } },
-        squadMemberships: {
-          where: { squad: { category: "FIRST_TEAM" } },
-          take: 1,
-          include: { squad: { select: { clubId: true } } },
-        },
-      },
+    // Os anúncios ativos (C6): um LISTED aparece no mercado — inclusive o do
+    // próprio clube — com o preço pedido.
+    const listings = await this.client.transferListing.findMany({
+      where: { gameWorldId, status: "LISTED" },
+      select: { playerId: true, askingPriceMinor: true },
     });
+    const asking = new Map<string, bigint>(
+      listings.map((l) => [l.playerId, l.askingPriceMinor]),
+    );
+
+    const include = {
+      attributes: true,
+      person: { select: { firstName: true, lastName: true, birthDate: true } },
+      squadMemberships: {
+        where: { squad: { category: "FIRST_TEAM" } },
+        take: 1,
+        include: { squad: { select: { clubId: true } } },
+      },
+    } as const;
+
+    // Três grupos, unidos: o scout (melhores de OUTROS clubes), os agentes livres
+    // (dispensados, sem elenco — R-200) e os listados (sempre visíveis, por id).
+    const [scout, freeAgents, listedRows] = await Promise.all([
+      this.client.player.findMany({
+        where: {
+          gameWorldId,
+          squadMemberships: { some: { squad: { category: "FIRST_TEAM" } } },
+        },
+        orderBy: { currentAbility: "desc" },
+        take: SCOUT_LIMIT * 2,
+        include,
+      }),
+      this.client.player.findMany({
+        where: { gameWorldId, squadMemberships: { none: {} } },
+        orderBy: { currentAbility: "desc" },
+        take: SCOUT_LIMIT,
+        include,
+      }),
+      asking.size === 0
+        ? Promise.resolve([])
+        : this.client.player.findMany({
+            where: { gameWorldId, id: { in: [...asking.keys()] } },
+            include,
+          }),
+    ]);
+
+    const byId = new Map<string, (typeof scout)[number]>();
+    for (const p of [...scout, ...freeAgents, ...listedRows]) byId.set(p.id, p);
+    const rows = [...byId.values()];
 
     const clubIds = new Set<string>();
-    for (const p of players) {
+    for (const p of rows) {
       const clubId = p.squadMemberships[0]?.squad.clubId;
       if (clubId != null) clubIds.add(clubId);
     }
     const names = await this.clubNames(gameWorldId, [...clubIds]);
 
     const items: MarketPlayerView[] = [];
-    for (const p of players) {
-      const clubId = p.squadMemberships[0]?.squad.clubId;
-      if (clubId == null || clubId === excludeClubId) continue;
-      // Sem grid de atributos não há card de habilidades — e overall/valor
-      // dependem do grid. Pula (como o roster faz), em vez de mostrar meio card.
+    for (const p of rows) {
       if (p.attributes === null) continue;
+      const clubId = p.squadMemberships[0]?.squad.clubId ?? null;
+      const freeAgent = clubId === null;
+      const listed = asking.has(p.id);
+      // O próprio clube some do scout, MENOS quando anunciado. Agente livre sempre.
+      if (clubId !== null && clubId === excludeClubId && !listed) continue;
       const age = ageOn(p.person.birthDate, asOf);
       const grid = readGrid(p.attributes);
-      const identity = names.get(clubId);
+      const identity = clubId === null ? undefined : names.get(clubId);
+      const fullValue = estimatePlayerValueMinor(p.currentAbility, age);
+      // Agente livre: valor cai 30% (R-200).
+      const valueMinor = freeAgent ? (fullValue * 70n) / 100n : fullValue;
       items.push({
         playerId: p.id,
         name: `${p.person.firstName} ${p.person.lastName}`,
         clubId,
-        clubName: identity?.name ?? "—",
+        clubName: freeAgent ? "Sem clube" : (identity?.name ?? "—"),
+        freeAgent,
         clubPrimaryColor: identity?.primaryColor ?? null,
         clubSecondaryColor: identity?.secondaryColor ?? null,
         clubCrestTemplateId: identity?.crestTemplateId ?? null,
@@ -85,11 +118,13 @@ export class PrismaMarketReadModel implements MarketReadModel {
         potential: p.potentialAbility,
         groups: rollupAttributes(grid),
         attributes: grid,
-        valueMinor: estimatePlayerValueMinor(p.currentAbility, age).toString(),
+        valueMinor: valueMinor.toString(),
+        listed,
+        askingPriceMinor: asking.get(p.id)?.toString() ?? null,
       });
-      if (items.length >= SCOUT_LIMIT) break;
     }
 
+    items.sort((a, b) => b.overall - a.overall);
     return { players: items };
   }
 

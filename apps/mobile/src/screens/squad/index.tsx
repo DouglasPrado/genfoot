@@ -917,7 +917,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.6)",
   },
   sheet: {
@@ -985,9 +985,9 @@ const styles = StyleSheet.create({
   },
   benchRow: { minHeight: MINIMUM_TOUCH_TARGET },
   benchBlocked: { opacity: 0.42 },
-  detailOverlay: { ...StyleSheet.absoluteFillObject },
+  detailOverlay: { ...StyleSheet.absoluteFill },
   detailBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.72)",
   },
   detailWrap: {

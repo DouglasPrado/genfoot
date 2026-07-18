@@ -17,8 +17,11 @@ import type {
 export interface MarketPlayerView {
   readonly playerId: string;
   readonly name: string;
-  readonly clubId: string;
+  /** `null` quando o jogador é agente livre (dispensado, sem clube). */
+  readonly clubId: string | null;
   readonly clubName: string;
+  /** Agente livre: sem clube, valor com deságio (R-200). */
+  readonly freeAgent: boolean;
   /** Identidade visual do clube (C3) — pro escudo na vitrine. `null` sem período. */
   readonly clubPrimaryColor: string | null;
   readonly clubSecondaryColor: string | null;
@@ -36,6 +39,10 @@ export interface MarketPlayerView {
   readonly attributes: PlayerAttributes;
   /** Valor de mercado estimado, em unidade mínima (R-41). Exibição. */
   readonly valueMinor: string;
+  /** O jogador está anunciado à venda (TransferListing LISTED)? (C6). */
+  readonly listed: boolean;
+  /** Preço pedido do anúncio, em unidade mínima; `null` se não listado. */
+  readonly askingPriceMinor: string | null;
 }
 
 export interface MarketView {

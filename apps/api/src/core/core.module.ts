@@ -22,6 +22,7 @@ import {
   PrismaDemoteToYouthUnitOfWork,
   PrismaReleaseUnitOfWork,
   PrismaSellUnitOfWork,
+  PrismaListUnitOfWork,
   PrismaSeasonFinanceUnitOfWork,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
@@ -54,6 +55,7 @@ import {
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
   RELEASE_UNIT_OF_WORK,
   SELL_UNIT_OF_WORK,
+  LIST_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
@@ -226,6 +228,12 @@ import {
         new PrismaSellUnitOfWork(client),
     },
     {
+      provide: LIST_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaListUnitOfWork =>
+        new PrismaListUnitOfWork(client),
+    },
+    {
       provide: SEASON_FINANCE_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaSeasonFinanceUnitOfWork =>
@@ -284,6 +292,7 @@ import {
     DEMOTE_TO_YOUTH_UNIT_OF_WORK,
     RELEASE_UNIT_OF_WORK,
     SELL_UNIT_OF_WORK,
+    LIST_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,

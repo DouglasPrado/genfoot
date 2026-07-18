@@ -68,7 +68,7 @@ export function WorldLoading({ steps }: { steps: readonly BootStep[] }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.background },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10,11,13,0.55)" },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(10,11,13,0.55)" },
   content: {
     flex: 1,
     justifyContent: "flex-end",

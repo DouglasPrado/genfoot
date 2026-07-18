@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
   },
   inspectRoot: { flex: 1 },
   inspectBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.6)",
   },
   inspectWrap: {

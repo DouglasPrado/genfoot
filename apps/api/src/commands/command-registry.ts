@@ -15,6 +15,7 @@ import {
   DemoteToYouthPlayer,
   ReleasePlayer,
   SellPlayer,
+  ListPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -34,6 +35,7 @@ import {
   type DemoteToYouthUnitOfWork,
   type ReleaseUnitOfWork,
   type SellUnitOfWork,
+  type ListUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -99,6 +101,8 @@ export interface CommandContext {
   readonly releaseUnitOfWork: ReleaseUnitOfWork;
   /** C6/C9 — vende um jogador ao mercado (crédito do valor via faucet, R-199). */
   readonly sellUnitOfWork: SellUnitOfWork;
+  /** C6 — coloca um jogador à venda (cria a TransferListing). */
+  readonly listUnitOfWork: ListUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -512,6 +516,24 @@ const handlers: Record<string, CommandHandler> = {
   /** C8 — descer à base: profissional ≤ 21 volta ao YOUTH_ACADEMY. */
   /** C6 — dispensar: o clube encerra o vínculo e o jogador deixa o elenco. */
   /** C6/C9 — vender: o clube recebe o valor estimado, o jogador sai (R-199). */
+  /** C6 — colocar à venda: anuncia o jogador no mercado (não move ninguém). */
+  "market:list-player": async ({ worlds, listUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ListPlayer(listUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
   "market:sell-player": async ({ worlds, sellUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

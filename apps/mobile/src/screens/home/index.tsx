@@ -432,7 +432,7 @@ function InlineUnavailable({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.background },
   fieldScrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(6,8,10,0.62)",
   },
   safe: { flex: 1, backgroundColor: "transparent" },

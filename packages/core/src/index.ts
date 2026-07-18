@@ -130,3 +130,4 @@ export * from "./contracts/contract-types.js";
 export * from "./contracts/transfer-player.js";
 export * from "./contracts/release-player.js";
 export * from "./contracts/sell-player.js";
+export * from "./contracts/list-player.js";

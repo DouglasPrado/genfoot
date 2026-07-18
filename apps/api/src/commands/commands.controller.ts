@@ -24,6 +24,7 @@ import type {
   DemoteToYouthUnitOfWork,
   ReleaseUnitOfWork,
   SellUnitOfWork,
+  ListUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
 import type { Request } from "express";
@@ -45,6 +46,7 @@ import {
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
   RELEASE_UNIT_OF_WORK,
   SELL_UNIT_OF_WORK,
+  LIST_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
@@ -87,6 +89,8 @@ export class CommandsController {
     private readonly releaseUnitOfWork: ReleaseUnitOfWork,
     @Inject(SELL_UNIT_OF_WORK)
     private readonly sellUnitOfWork: SellUnitOfWork,
+    @Inject(LIST_UNIT_OF_WORK)
+    private readonly listUnitOfWork: ListUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
     private readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork,
     @Inject(CLUB_READ_MODEL) private readonly clubReadModel: ClubReadModel,
@@ -233,6 +237,7 @@ export class CommandsController {
         demoteToYouthUnitOfWork: this.demoteToYouthUnitOfWork,
         releaseUnitOfWork: this.releaseUnitOfWork,
         sellUnitOfWork: this.sellUnitOfWork,
+        listUnitOfWork: this.listUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,
         // Quem agiu vem do TOKEN, não do corpo. O evento grava isso.
