@@ -22,6 +22,8 @@ import {
   StartCompetition,
   FinishCompetition,
   SetOfflinePlan,
+  SaveAutomation,
+  ToggleAutomation,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -306,6 +308,25 @@ const setOfflinePlanPayload = z.object({
     canSellKeyPlayers: z.boolean(),
     canChangeIdentity: z.boolean(),
   }),
+});
+
+const saveAutomationPayload = z.object({
+  clubId: z.string().uuid(),
+  ruleId: z.string().uuid().optional(),
+  activate: z.boolean().default(false),
+  name: z.string().min(1),
+  level: z.enum(["MANUAL", "ASSISTED", "SEMI_AUTOMATED", "FULLY_AUTOMATED"]),
+  triggerEvent: z.string().min(1),
+  condition: z.unknown().optional(),
+  action: z.unknown().optional(),
+  risk: z.number().int(),
+  priority: z.number().int(),
+});
+
+const toggleAutomationPayload = z.object({
+  clubId: z.string().uuid(),
+  ruleId: z.string().uuid(),
+  activate: z.boolean(),
 });
 
 const createWorldPayload = z.object({
@@ -810,6 +831,56 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `club:${clubId}` });
+  },
+
+  // X-001 — regra "se gatilho então ação". Cada save congela uma versão.
+  "automation:save-automation": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = saveAutomationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const d = parsed.data;
+    const result = await new SaveAutomation(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: d.clubId,
+      ...(d.ruleId !== undefined ? { ruleId: d.ruleId } : {}),
+      newRuleId: d.ruleId ?? randomUUID(),
+      activate: d.activate,
+      config: {
+        name: d.name,
+        level: d.level,
+        triggerEvent: d.triggerEvent,
+        condition: d.condition ?? null,
+        action: d.action ?? null,
+        risk: d.risk,
+        priority: d.priority,
+      },
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `automation:${result.value.ruleId}` });
+  },
+
+  "automation:toggle-automation": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = toggleAutomationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ToggleAutomation(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      ruleId: parsed.data.ruleId,
+      activate: parsed.data.activate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `automation:${parsed.data.ruleId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

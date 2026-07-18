@@ -1,7 +1,11 @@
 import { fail, succeed, type DomainError, type Result } from "@grinta/shared";
 
 import { ClubAIProfile } from "./club-ai-profile.js";
-import type { ClubAIProfileSnapshot, OfflinePlan } from "./automation-types.js";
+import type {
+  AutomationRepositories,
+  AutomationUnitOfWork,
+} from "./automation-ports.js";
+import type { OfflinePlan } from "./automation-types.js";
 
 /**
  * SetOfflinePlan (X-001) — o clube define o que a IA pode decidir na sua
@@ -9,22 +13,6 @@ import type { ClubAIProfileSnapshot, OfflinePlan } from "./automation-types.js";
  * recebe o plano; se existe, atualiza. Todo clube é "IA por ausência" (R-180),
  * então o perfil é opcional até alguém autorar o plano.
  */
-export interface ClubAIProfileRepository {
-  findByClub(
-    gameWorldId: string,
-    clubId: string,
-  ): Promise<ClubAIProfileSnapshot | null>;
-  saveProfile(snapshot: ClubAIProfileSnapshot): Promise<void>;
-}
-
-export interface AutomationRepositories {
-  readonly profiles: ClubAIProfileRepository;
-}
-
-export interface AutomationUnitOfWork {
-  run<T>(work: (repositories: AutomationRepositories) => Promise<T>): Promise<T>;
-}
-
 export interface SetOfflinePlanInput {
   readonly gameWorldId: string;
   readonly clubId: string;

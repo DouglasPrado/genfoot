@@ -6,6 +6,7 @@ import type {
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
 import { PrismaClubAIProfileRepository } from "./prisma-club-ai-profile-repository.js";
+import { PrismaAutomationRuleRepository } from "./prisma-automation-rule-repository.js";
 
 /**
  * A transação do plano offline (X-001): o perfil de IA do clube num commit.
@@ -25,5 +26,8 @@ export class PrismaAutomationUnitOfWork implements AutomationUnitOfWork {
 }
 
 function bind(tx: Prisma.TransactionClient): AutomationRepositories {
-  return { profiles: new PrismaClubAIProfileRepository(tx) };
+  return {
+    profiles: new PrismaClubAIProfileRepository(tx),
+    rules: new PrismaAutomationRuleRepository(tx),
+  };
 }

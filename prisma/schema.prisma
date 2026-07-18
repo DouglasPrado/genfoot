@@ -2331,11 +2331,35 @@ model AutomationRule {
   triggerJson   Json?
   conditionJson Json?
   actionJson    Json?
+  risk          Int                  @default(1) // 1..5; alto risco (≥4) não é delegável (X-001)
+  priority      Int                  @default(0) // desempata precedência entre regras do mesmo gatilho
   version       Int                  @default(1)
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  club     Club                    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  versions AutomationRuleVersion[]
 
   @@index([gameWorldId, clubId])
+}
+
+// O histórico IMUTÁVEL de uma regra (X-001, canon: AutomationRuleVersion). Cada
+// SaveAutomation congela uma versão; a regra aponta para a mais nova (`version`).
+model AutomationRuleVersion {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  ruleId        String               @db.Uuid
+  version       Int
+  name          String
+  level         AutomationLevel
+  status        AutomationRuleStatus
+  triggerJson   Json?
+  conditionJson Json?
+  actionJson    Json?
+  risk          Int
+  priority      Int
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, version])
+  @@index([ruleId])
 }
 
 // =============================================================================
