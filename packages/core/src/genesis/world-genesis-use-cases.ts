@@ -13,6 +13,7 @@ import { Squad } from "../clubs/squad.js";
 import { buildCompetitionGenesis } from "../competitions/competition-bootstrap.js";
 import { buildFanbaseGenesis } from "../fanbase/fanbase-bootstrap.js";
 import { buildStaffGenesis } from "../staff/staff-bootstrap.js";
+import { buildYouthGenesis } from "../youth/youth-bootstrap.js";
 import { buildLedgerGenesis } from "../finance/ledger-bootstrap.js";
 import { Player } from "../players/player.js";
 import {
@@ -118,6 +119,7 @@ export class GenerateWorldGenesis {
     const competition = buildCompetitionGenesis(world, genesis);
     const fanbases = buildFanbaseGenesis(world, genesis);
     const staff = buildStaffGenesis(world, genesis);
+    const youth = buildYouthGenesis(world, genesis);
 
     // Reidrata tudo ANTES de abrir a transação: um snapshot inválido é erro de
     // gênese, não de banco, e não deve deixar uma transação meio aberta.
@@ -133,6 +135,15 @@ export class GenerateWorldGenesis {
       const loaded = Squad.fromSnapshot(squad);
       if (!loaded.ok) return loaded;
     }
+    // A base (C8) valida junto: jovem é jogador, base é elenco.
+    for (const { player } of youth.players) {
+      const loaded = Player.fromSnapshot(player);
+      if (!loaded.ok) return loaded;
+    }
+    for (const squad of youth.squads) {
+      const loaded = Squad.fromSnapshot(squad);
+      if (!loaded.ok) return loaded;
+    }
 
     const created = await this.unitOfWork.run(async (repositories) => {
       let any = false;
@@ -145,6 +156,10 @@ export class GenerateWorldGenesis {
       // A comissão técnica depois dos clubes: o contrato do staff aponta para o
       // clube (FK). Idempotente por staffId — reexecutar não duplica.
       await repositories.staff.seedStaff(world.id, staff);
+      // A base (C8): jovens + elenco YOUTH_ACADEMY, pelos MESMOS repos de
+      // jogador/elenco. Jogadores antes da squad (FK do membro → jogador).
+      any = (await materializePlayers(repositories, world, youth.players)) || any;
+      any = (await materializeYouthSquads(repositories, youth.squads)) || any;
       // O razão por último: a conta de caixa e a dotação de cada clube dependem
       // de o clube já existir (a FK da conta aponta para o clube).
       any = (await materializeLedger(repositories, ledger)) || any;
@@ -225,6 +240,29 @@ async function materializeSquads(
     const existing = await repositories.squads.findFirstTeamSquad(
       squad.gameWorldId,
       squad.clubId,
+    );
+    if (existing !== null) continue;
+    await repositories.squads.saveSquad(squad, null);
+    created = true;
+  }
+  return created;
+}
+
+/**
+ * Materializa os elencos de BASE (C8). Ao contrário da primeira equipe, a
+ * idempotência é por ID do elenco (`findSquadById`), não por clube: a base
+ * convive com o profissional no mesmo clube, então checar "o clube já tem
+ * elenco" pularia a base por engano.
+ */
+async function materializeYouthSquads(
+  repositories: GenesisRepositories,
+  squads: readonly Awaited<ReturnType<typeof buildSquadsFromGenesis>>[number][],
+): Promise<boolean> {
+  let created = false;
+  for (const squad of squads) {
+    const existing = await repositories.squads.findSquadById(
+      squad.gameWorldId,
+      squad.id,
     );
     if (existing !== null) continue;
     await repositories.squads.saveSquad(squad, null);

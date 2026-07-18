@@ -66,11 +66,13 @@ describe.skipIf(!hasDatabase)(
       expect(result.ok).toBe(true);
 
       expect(await client.club.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
-      // 368 jogadores + 112 da comissão técnica (16 clubes × 7 cargos, C8) = 480 pessoas.
-      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(480);
-      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(368);
-      expect(await client.playerAttributes.count()).toBe(368);
-      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
+      // Pessoas: 368 jogadores + 192 da base (16×12, C8) + 112 da comissão = 672.
+      expect(await client.person.count({ where: { gameWorldId: WORLD_ID } })).toBe(672);
+      // Jogadores: 368 profissionais + 192 da base (16 clubes × 12 jovens) = 560.
+      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(560);
+      expect(await client.playerAttributes.count()).toBe(560);
+      // Elencos: 16 primeira-equipe + 16 YOUTH_ACADEMY (base, C8) = 32.
+      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(32);
       // C8: a comissão técnica — 7 cargos por clube, cada um com contrato ativo.
       expect(await client.staffMember.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
       expect(await client.staffContract.count({ where: { gameWorldId: WORLD_ID } })).toBe(112);
@@ -78,10 +80,12 @@ describe.skipIf(!hasDatabase)(
 
     it("cada elenco tem os 23 jogadores com camisa única", async () => {
       await generate.execute(WORLD_ID as never);
+      // Só a primeira equipe: a base (YOUTH_ACADEMY, C8) tem 12, não 23.
       const squads = await client.squad.findMany({
-        where: { gameWorldId: WORLD_ID },
+        where: { gameWorldId: WORLD_ID, category: "FIRST_TEAM" },
         include: { memberships: true },
       });
+      expect(squads).toHaveLength(16);
       for (const squad of squads) {
         expect(squad.memberships).toHaveLength(SQUAD_SIZE);
         const shirts = new Set(squad.memberships.map((m) => m.shirtNumber));
@@ -122,8 +126,8 @@ describe.skipIf(!hasDatabase)(
       expect(second.ok).toBe(true);
       if (second.ok) expect(second.value.created).toBe(false);
 
-      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(368);
-      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(16);
+      expect(await client.player.count({ where: { gameWorldId: WORLD_ID } })).toBe(560);
+      expect(await client.squad.count({ where: { gameWorldId: WORLD_ID } })).toBe(32);
     });
 
     /**
@@ -218,8 +222,9 @@ describe.skipIf(!hasDatabase)(
     /** A soma dos overalls de cada elenco é o teto comum de 1.380 (R-57). */
     it("cada elenco soma o teto de 1.380", async () => {
       await generate.execute(WORLD_ID as never);
+      // O teto de 1.380 é da primeira equipe; a base (C8) soma bem menos.
       const squads = await client.squad.findMany({
-        where: { gameWorldId: WORLD_ID },
+        where: { gameWorldId: WORLD_ID, category: "FIRST_TEAM" },
         include: { memberships: { include: { player: true } } },
       });
       for (const squad of squads) {
