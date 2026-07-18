@@ -45,15 +45,23 @@ const DESTINATIONS: readonly Destination[] = [
     note: "Contratações, vendas e observados",
     route: "/mercado",
   },
-];
-
-const SOON: readonly SoonDestination[] = [
+  {
+    key: "comissao",
+    icon: "people",
+    title: "Comissão Técnica",
+    note: "Técnico, olheiros, médico e mais",
+    route: "/elenco/comissao",
+  },
   {
     key: "base",
     icon: "school",
     title: "Base",
-    note: "Categorias de base e promessas",
+    note: "Jovens em formação e potencial",
+    route: "/elenco/base",
   },
+];
+
+const SOON: readonly SoonDestination[] = [
   {
     key: "medico",
     icon: "medkit",
