@@ -72,17 +72,27 @@ interface NarrativeFeedProjection {
   }[];
 }
 
-interface LedgerSummaryProjection {
-  readonly accountCount: number;
-  readonly transactionCount: number;
-  readonly activeReservationCount: number;
-  readonly activeDebtCount: number;
-  readonly closedPeriodCount: number;
-  readonly residualMinor: number;
-  readonly clubBalances: readonly {
-    readonly clubId: string;
-    readonly balanceMinor: number;
-  }[];
+/**
+ * `finance-snapshot` (C9): a visão financeira REAL do clube gerido. Caixa é o
+ * saldo derivado do razão (INV-8), folha é o custo de temporada do elenco +
+ * estrutura (modelo puro do core). `financialHealth.value` é `null` enquanto
+ * faltam sub-índices (receita/dívida sem fonte) — degrada dizendo "parcial", não
+ * inventa nota. Substitui a query `ledger`, que morreu no extermínio (R-175) e
+ * respondia 404.
+ */
+interface FinanceSnapshotProjection {
+  readonly clubId: string;
+  readonly currencyId: string;
+  readonly cashMinor: number;
+  readonly seasonCost: {
+    readonly totalMinor: number;
+    readonly contractedPlayerCount: number;
+    readonly estimatedPlayerCount: number;
+  };
+  readonly financialHealth: {
+    readonly value: number | null;
+  };
+  readonly provenanceNotes: readonly string[];
 }
 
 /** Tela de Clube: identidade, finanças e infraestrutura. */
@@ -93,16 +103,11 @@ export function Club() {
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
-  const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
   /**
-   * `ledger` (C9) e `narrative` (C11) foram apagados no extermínio (R-175) e
-   * respondem 404. As duas queries FICAM, e a tela já fazia a coisa certa:
-   * degrada dizendo "Nenhum saldo estimado será exibido" e omite a torcida em
-   * vez de inventar número.
-   *
-   * Não mockei dinheiro aqui, e a diferença para o admin é deliberada: lá o mock
-   * leva selo e o operador sabe ler; aqui o jogador contrataria em cima de um
-   * número inventado. Volta com C9 — e aí a tela liga sozinha.
+   * `narrative` (C11) ainda responde 404 no extermínio (R-175): a tela degrada
+   * omitindo as manchetes em vez de inventar. O financeiro NÃO degrada mais — a
+   * query `finance-snapshot` (C9) voltou e é lida abaixo (`financeQuery`),
+   * recortada pelo clube gerido.
    */
   const narrativeQuery = useWorldQuery<NarrativeFeedProjection>("narrative");
   const identityQuery =
@@ -121,6 +126,12 @@ export function Club() {
   // clube gerido. Só dispara com o clubId em mãos.
   const fanbaseQuery = useWorldQuery<FanbaseProjection>(
     managedClub === null ? null : "fanbase",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  // O financeiro real (C9), recortado pelo clube gerido. Só dispara com o
+  // clubId em mãos, como a torcida.
+  const financeQuery = useWorldQuery<FinanceSnapshotProjection>(
+    managedClub === null ? null : "finance-snapshot",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const vm =
@@ -322,14 +333,14 @@ export function Club() {
     worldQuery.refetch();
     // O financeiro é query própria (C9). Sem isto, puxar pra atualizar mexia em
     // tudo menos no caixa — o saldo ficava colado no valor da última montagem.
-    ledgerQuery.refetch();
+    financeQuery.refetch();
     narrativeQuery.refetch();
     fanbaseQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
     worldQuery.refetch,
-    ledgerQuery.refetch,
+    financeQuery.refetch,
     narrativeQuery.refetch,
     fanbaseQuery.refetch,
   ]);
@@ -433,30 +444,41 @@ export function Club() {
               </View>
             }
           />
-          {ledgerQuery.state === "ready" && ledgerQuery.data !== null ? (
+          {financeQuery.state === "ready" && financeQuery.data !== null ? (
             <View style={styles.financeContent}>
               <View style={styles.finBalance}>
-                <Text style={styles.finBoxLabel}>CAIXA DISPONÍVEL</Text>
-                <Text style={styles.finBalanceValue}>
-                  R${" "}
-                  {formatAmount(
-                    (ledgerQuery.data.clubBalances.find(
-                      ({ clubId }) => clubId === managedClub?.id,
-                    )?.balanceMinor ?? 0) / 100,
-                  )}
-                </Text>
+                <View style={styles.finBalanceIcon}>
+                  <Icon name="wallet" size={18} color={color.primary} />
+                </View>
+                <View style={styles.finBalanceText}>
+                  <Text style={styles.finBoxLabel}>CAIXA DISPONÍVEL</Text>
+                  <Text
+                    style={[
+                      styles.finBalanceValue,
+                      financeQuery.data.cashMinor < 0 && styles.finBalanceNegative,
+                    ]}
+                  >
+                    R$ {formatAmount(Math.round(financeQuery.data.cashMinor / 100))}
+                  </Text>
+                </View>
               </View>
               <View style={styles.finGrid}>
                 <View style={styles.finBox}>
-                  <Text style={styles.finBoxLabel}>CONTAS CONTÁBEIS</Text>
+                  <Text style={styles.finBoxLabel}>FOLHA (TEMPORADA)</Text>
                   <Text style={styles.finBoxValue}>
-                    {ledgerQuery.data.accountCount}
+                    R${" "}
+                    {formatAmount(
+                      financeQuery.data.seasonCost.totalMinor / 100,
+                    )}
                   </Text>
                 </View>
                 <View style={styles.finBox}>
-                  <Text style={styles.finBoxLabel}>LANÇAMENTOS</Text>
+                  <Text style={styles.finBoxLabel}>SAÚDE FINANCEIRA</Text>
+                  {/* `value` null enquanto faltam sub-índices (R-42): a barra é
+                      "parcial", não um número inventado. Detalhe vive no
+                      M-FINANCE (/financas). */}
                   <Text style={styles.finBoxValue}>
-                    {ledgerQuery.data.transactionCount}
+                    {financeQuery.data.financialHealth.value ?? "parcial"}
                   </Text>
                 </View>
               </View>
@@ -465,8 +487,8 @@ export function Club() {
             <View style={styles.financeUnavailable}>
               <Icon name="shield" size={18} color={color.warning} />
               <Text style={styles.financeUnavailableText}>
-                {ledgerQuery.state === "loading"
-                  ? "Sincronizando o livro financeiro…"
+                {financeQuery.state === "loading"
+                  ? "Sincronizando o financeiro…"
                   : "O financeiro ainda não existe neste mundo. Nenhum saldo estimado será exibido."}
               </Text>
             </View>
@@ -820,17 +842,31 @@ const styles = StyleSheet.create({
   },
   pressDesc: { color: color.textMuted, fontSize: fontSize.xs },
   finBalance: {
-    backgroundColor: color.primaryDim,
-    borderRadius: radius.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.md,
     padding: space.md,
-    gap: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: color.primary,
   },
+  finBalanceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: color.surfaceRaised,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  finBalanceText: { flex: 1, gap: 2 },
   finBalanceValue: {
     color: color.primary,
     fontSize: fontSize.xl2,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
+  finBalanceNegative: { color: color.danger },
   finBox: {
     flex: 1,
     backgroundColor: color.backgroundElevated,
