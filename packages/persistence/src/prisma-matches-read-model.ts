@@ -32,7 +32,12 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
 
     const [finished, scheduled] = await Promise.all([
       this.client.match.findMany({
-        where: { gameWorldId, runtimeStatus: "FINISHED", ...clubFilter },
+        // FINISHED (jogada) e PROCESSED (já homologada, C5-V3) — ambas têm placar.
+        where: {
+          gameWorldId,
+          runtimeStatus: { in: ["FINISHED", "PROCESSED"] },
+          ...clubFilter,
+        },
         orderBy: [{ finishedAt: "desc" }, { roundNumber: "desc" }],
         take: RESULTS_LIMIT,
       }),

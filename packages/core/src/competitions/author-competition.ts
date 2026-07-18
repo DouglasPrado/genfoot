@@ -66,6 +66,14 @@ export interface CompetitionAggregateRepository {
     gameWorldId: string,
     competitionId: string,
   ): Promise<EditionResults | null>;
+  /**
+   * Torna oficiais as partidas terminadas da edição (C5-V3): FINISHED →
+   * PROCESSED + homologationStatus HOMOLOGATED. Devolve quantas homologou.
+   */
+  homologateEditionMatches(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<number>;
 }
 
 export interface CompetitionRepositories {
@@ -303,6 +311,12 @@ export class FinishCompetition {
         const paid = await payPrizes(repos, input, snap, results);
         if (!paid.ok) return paid;
       }
+      // As partidas terminadas viram oficiais (C5-V3): sem homologação, a
+      // competição encerra mas os jogos ficam "só simulados", não confirmados.
+      await repos.competitions.homologateEditionMatches(
+        input.gameWorldId,
+        input.competitionId,
+      );
       return succeed({ competitionId: input.competitionId });
     });
   }

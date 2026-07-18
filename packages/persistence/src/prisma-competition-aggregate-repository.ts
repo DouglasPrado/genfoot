@@ -281,6 +281,32 @@ export class PrismaCompetitionAggregateRepository
     };
   }
 
+  public async homologateEditionMatches(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<number> {
+    const edition = await this.client.competitionSeason.findFirst({
+      where: { competitionId },
+      orderBy: { startsAt: "desc" },
+      select: { id: true },
+    });
+    if (edition === null) return 0;
+    // Só as terminadas viram oficiais; agendadas que ninguém jogou não são
+    // homologadas (não há resultado a confirmar).
+    const { count } = await this.client.match.updateMany({
+      where: {
+        gameWorldId,
+        competitionSeasonId: edition.id,
+        runtimeStatus: "FINISHED",
+      },
+      data: {
+        runtimeStatus: "PROCESSED",
+        homologationStatus: "HOMOLOGATED",
+      },
+    });
+    return count;
+  }
+
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */
   private async ensureSeasonId(gameWorldId: string): Promise<string> {
     const existing = await this.client.season.findFirst({
