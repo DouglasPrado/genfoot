@@ -139,6 +139,8 @@ describe("API command catalog integrity (e2e)", () => {
       // O elenco (M-03): recorte fino por clubId. Faltava aqui — eu registrei o
       // handler e não atualizei esta lista, o mesmo descuido do club:apply-identity.
       "roster",
+      // A comissão técnica (C8, M-25): recorte por clubId.
+      "staff",
     ]);
   });
 

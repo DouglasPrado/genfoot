@@ -9,6 +9,7 @@ import type {
   MarketReadModel,
   FanbaseReadModel,
   NarrativeReadModel,
+  StaffReadModel,
 } from "@grinta/core";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
@@ -37,6 +38,7 @@ export interface QueryContext {
   readonly marketReadModel: MarketReadModel;
   readonly fanbaseReadModel: FanbaseReadModel;
   readonly narrativeReadModel: NarrativeReadModel;
+  readonly staffReadModel: StaffReadModel;
 }
 
 /**
@@ -110,6 +112,19 @@ const handlers: Record<string, QueryHandler> = {
       );
     }
     return succeed(await fanbaseReadModel.fanbaseForClub(worldId, clubId));
+  },
+  staff: async ({ staffReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "staff exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await staffReadModel.staffForClub(worldId, clubId));
   },
   narrative: async ({ narrativeReadModel }, worldId, params) => {
     const limit =

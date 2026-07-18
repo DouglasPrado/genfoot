@@ -24,6 +24,7 @@ export const MATCHES_READ_MODEL = "MATCHES_READ_MODEL";
 export const MARKET_READ_MODEL = "MARKET_READ_MODEL";
 export const FANBASE_READ_MODEL = "FANBASE_READ_MODEL";
 export const NARRATIVE_READ_MODEL = "NARRATIVE_READ_MODEL";
+export const STAFF_READ_MODEL = "STAFF_READ_MODEL";
 /** Escopo transacional de C3 (Decisão 19.10): clube + evento no mesmo commit. */
 export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
 export const GENESIS_UNIT_OF_WORK = "GENESIS_UNIT_OF_WORK";
