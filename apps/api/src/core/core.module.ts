@@ -12,6 +12,7 @@ import {
   PrismaFanbaseReadModel,
   PrismaNarrativeReadModel,
   PrismaStaffReadModel,
+  PrismaInboxReadModel,
   PrismaClubRepository,
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
@@ -39,6 +40,7 @@ import {
   FANBASE_READ_MODEL,
   NARRATIVE_READ_MODEL,
   STAFF_READ_MODEL,
+  INBOX_READ_MODEL,
   CLUB_REPOSITORY,
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
@@ -162,6 +164,12 @@ import {
         new PrismaStaffReadModel(client),
     },
     {
+      provide: INBOX_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaInboxReadModel =>
+        new PrismaInboxReadModel(client),
+    },
+    {
       provide: CLUB_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubUnitOfWork =>
@@ -235,6 +243,7 @@ import {
     FANBASE_READ_MODEL,
     NARRATIVE_READ_MODEL,
     STAFF_READ_MODEL,
+    INBOX_READ_MODEL,
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,

@@ -128,6 +128,8 @@ describe("API command catalog integrity (e2e)", () => {
       "finance-snapshot",
       "identity",
       "identity-detail",
+      // A caixa de entrada (C12, M-HOME): pendências do clube.
+      "inbox",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
       // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.

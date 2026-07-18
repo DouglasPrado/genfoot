@@ -10,6 +10,7 @@ import type {
   FanbaseReadModel,
   NarrativeReadModel,
   StaffReadModel,
+  InboxReadModel,
 } from "@grinta/core";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
@@ -39,6 +40,7 @@ export interface QueryContext {
   readonly fanbaseReadModel: FanbaseReadModel;
   readonly narrativeReadModel: NarrativeReadModel;
   readonly staffReadModel: StaffReadModel;
+  readonly inboxReadModel: InboxReadModel;
 }
 
 /**
@@ -125,6 +127,14 @@ const handlers: Record<string, QueryHandler> = {
       );
     }
     return succeed(await staffReadModel.staffForClub(worldId, clubId));
+  },
+  inbox: async ({ inboxReadModel }, worldId, params) => {
+    // clubId opcional: com ele, o inbox do clube; sem ele, zeros (degradação
+    // segura — a home ainda chama sem recorte enquanto a tela não é atualizada).
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    return succeed(
+      await inboxReadModel.summaryForClubs(worldId, clubId === null ? [] : [clubId]),
+    );
   },
   youth: async ({ squadReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
