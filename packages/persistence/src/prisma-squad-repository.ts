@@ -46,6 +46,17 @@ export class PrismaSquadRepository implements SquadRepository {
     return row === null ? null : toSnapshot(row);
   }
 
+  public async findYouthSquad(
+    gameWorldId: GameWorldId,
+    clubId: ClubId,
+  ): Promise<SquadSnapshot | null> {
+    const row = await this.client.squad.findFirst({
+      where: { gameWorldId, clubId, category: SquadCategory.YOUTH_ACADEMY },
+      include: { memberships: { orderBy: { shirtNumber: "asc" } } },
+    });
+    return row === null ? null : toSnapshot(row);
+  }
+
   public async saveSquad(
     snapshot: SquadSnapshot,
     expectedVersion: number | null,

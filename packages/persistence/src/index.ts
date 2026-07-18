@@ -27,6 +27,7 @@ export * from "./prisma-narrative-read-model.js";
 export * from "./prisma-notification-repository.js";
 export * from "./prisma-staff-repository.js";
 export * from "./prisma-staff-read-model.js";
+export * from "./prisma-promote-youth-unit-of-work.js";
 export * from "./prisma-inbox-read-model.js";
 export * from "./prisma-match-play-repository.js";
 export * from "./prisma-matches-read-model.js";

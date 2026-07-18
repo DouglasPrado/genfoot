@@ -433,8 +433,8 @@ A [R-57](#) fala em "elenco **inicial** com 23 jogadores" — *inicial*, não
 
 - `SQUAD_SIZE = 23` — quanto a gênese materializa por clube (R-57, o teto comum de
   largada, GDD §1). Inalterado.
-- `MAX_SQUAD_SIZE = 30` — o teto de **registro**: o elenco recebe reforços até 30.
-  A folga de 7 vagas é o que permite contratar sem primeiro vender. É constante, não
+- `MAX_SQUAD_SIZE = 250` — o teto de **registro**: o elenco recebe reforços até 250.
+  A folga ampla é o que permite contratar sem primeiro vender. É constante, não
   coluna — comum a todos os clubes, pela mesma justiça de largada da R-190.
 
 `Squad` (criação e `assign`) passa a medir contra `MAX_SQUAD_SIZE`. A gênese não

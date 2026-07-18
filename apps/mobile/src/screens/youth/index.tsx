@@ -16,9 +16,15 @@ import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
+import { CommandTrackingStatus } from "@grinta/core";
+
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldQuery } from "@/lib/world";
+import { useWorldId, useWorldQuery } from "@/lib/world";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -57,8 +63,11 @@ const sectorOf = (code: string): PositionGroup => SECTOR[code] ?? "MEI";
 
 /** Base (C8) — os jovens em formação; toca no jogador pra ver o card completo. */
 export function Youth() {
-  const { session, status } = useSession();
+  const { session, status, client, contractVersion } = useSession();
+  const worldId = useWorldId();
   const [inspect, setInspect] = useState<YouthPlayer | null>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -83,6 +92,40 @@ export function Youth() {
     clubQuery.refetch();
     youthQuery.refetch();
   }, [clubQuery.refetch, youthQuery.refetch]);
+
+  /**
+   * Sobe o jovem ao elenco profissional (C8). O servidor move a membership entre
+   * os dois elencos, atômico; ao aplicar, a base encolhe e o profissional cresce.
+   */
+  const promote = useCallback(
+    (p: YouthPlayer) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const idempotencyKey = `promote:${managedClub.id}:${p.playerId}`;
+      setPromotingId(p.playerId);
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "youth:promote-player",
+        worldId,
+        payload: { clubId: managedClub.id, playerId: p.playerId },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setTracking(result);
+        setPromotingId(null);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          setInspect(null);
+          youthQuery.refetch();
+        }
+      });
+    },
+    [client, contractVersion, managedClub, worldId, youthQuery],
+  );
 
   const players = useMemo(
     () =>
@@ -205,15 +248,39 @@ export function Youth() {
                       } satisfies PlayerSkillCardData
                     }
                   />
-                  <Pressable
-                    onPress={() => setInspect(null)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Fechar card"
-                    accessibilityState={{}}
-                    style={styles.inspectClose}
-                  >
-                    <Text style={styles.inspectCloseText}>FECHAR</Text>
-                  </Pressable>
+                  <View style={styles.inspectActions}>
+                    <Pressable
+                      onPress={() => setInspect(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Fechar card"
+                      accessibilityState={{}}
+                      style={styles.inspectClose}
+                    >
+                      <Text style={styles.inspectCloseText}>FECHAR</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => promote(inspect)}
+                      disabled={promotingId !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Subir ${inspect.name} ao profissional`}
+                      accessibilityState={{ disabled: promotingId !== null }}
+                      style={styles.inspectPromote}
+                    >
+                      <Icon
+                        name="arrow-up"
+                        size={14}
+                        color={color.background}
+                      />
+                      <Text style={styles.inspectPromoteText}>
+                        {promotingId !== null ? "..." : "SUBIR AO PROFISSIONAL"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {tracking?.status === CommandTrackingStatus.REJECTED && (
+                    <Text style={styles.inspectError}>
+                      Recusado: {tracking.errorCode ?? "erro"}.
+                    </Text>
+                  )}
                 </>
               )}
             </View>
@@ -282,9 +349,14 @@ const styles = StyleSheet.create({
     padding: space.lg,
   },
   inspectCard: { width: "100%", maxWidth: 400, gap: space.md },
+  inspectActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: space.sm,
+  },
   inspectClose: {
-    alignSelf: "center",
-    paddingHorizontal: space.xl,
+    paddingHorizontal: space.lg,
     paddingVertical: space.sm,
     borderRadius: radius.pill,
     backgroundColor: color.surface,
@@ -293,5 +365,25 @@ const styles = StyleSheet.create({
     color: color.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
+  },
+  inspectPromote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  inspectPromoteText: {
+    color: color.background,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  inspectError: {
+    color: color.danger,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+    textAlign: "center",
   },
 });

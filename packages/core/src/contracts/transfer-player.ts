@@ -8,6 +8,7 @@ import {
 } from "../finance/ledger-types.js";
 import type { LedgerRepository } from "../finance/ledger-repository.js";
 import { BASE_CURRENCY_ID } from "../finance/ledger-bootstrap.js";
+import { MAX_SQUAD_SIZE } from "../genesis/player-generation.js";
 import { assertCashAvailable } from "../finance/spend-guard.js";
 import { deterministicUuidV7, timestampOf } from "../foundation/deterministic-uuid.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
@@ -305,11 +306,11 @@ function uuid(input: SignPlayerInput, context: string): string {
   });
 }
 
-/** O menor número de camisa livre (1..99) no elenco do comprador. */
+/** O menor número de camisa livre (1..MAX_SQUAD_SIZE) no elenco do comprador. */
 function nextFreeShirt(taken: readonly number[]): number {
   const used = new Set(taken);
-  for (let n = 1; n <= 99; n += 1) if (!used.has(n)) return n;
-  return 99;
+  for (let n = 1; n <= MAX_SQUAD_SIZE; n += 1) if (!used.has(n)) return n;
+  return MAX_SQUAD_SIZE;
 }
 
 function ageOn(birthDate: string, on: string): number {

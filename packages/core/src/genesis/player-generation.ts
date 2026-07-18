@@ -75,7 +75,7 @@ export const SQUAD_SIZE = 23;
  * Também constante (não coluna), pela mesma justiça de largada da R-190: o teto
  * é comum a todos os clubes.
  */
-export const MAX_SQUAD_SIZE = 30;
+export const MAX_SQUAD_SIZE = 250;
 
 /** Os setores entre os quais o GDD manda o teto variar. */
 const Sector = {

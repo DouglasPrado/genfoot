@@ -27,6 +27,12 @@ export interface SquadRepository {
     squadId: SquadId,
   ): Promise<SquadSnapshot | null>;
 
+  /** A base (YOUTH_ACADEMY) de um clube — para a promoção base→profissional (C8). */
+  findYouthSquad(
+    gameWorldId: GameWorldId,
+    clubId: ClubId,
+  ): Promise<SquadSnapshot | null>;
+
   /**
    * `expectedVersion === null` = criação. Qualquer outro valor é concorrência
    * otimista por agregado (R-175): a escrita reescreve os membros por completo

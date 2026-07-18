@@ -118,6 +118,7 @@ export * from "./staff/staff-generation.js";
 export * from "./staff/staff-bootstrap.js";
 export * from "./youth/youth-generation.js";
 export * from "./youth/youth-bootstrap.js";
+export * from "./youth/promote-youth.js";
 export * from "./matches/match-simulation.js";
 export * from "./matches/match-play-repository.js";
 export * from "./matches/play-next-round.js";

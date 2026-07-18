@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SquadSnapshot } from "../clubs/club-types.js";
 import { SquadCategory } from "../clubs/club-types.js";
+import { MAX_SQUAD_SIZE } from "../genesis/player-generation.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
 import type { LedgerRepository } from "../finance/ledger-repository.js";
 import {
@@ -88,6 +89,7 @@ function fakeSquads(world: FakeWorld): SquadRepository {
     findFirstTeamSquad: (_w, clubId) =>
       Promise.resolve(world.squads.get(clubId) ?? null),
     findSquadById: () => Promise.resolve(null),
+    findYouthSquad: () => Promise.resolve(null),
     saveSquad: (snapshot) => {
       world.squads.set(snapshot.clubId, snapshot);
       return Promise.resolve();
@@ -374,14 +376,14 @@ describe("SignPlayer — a compra de verdade (R-192)", () => {
     if (!result.ok) expect(result.error.code).toBe("PLAYER_NOT_IN_SELLER_SQUAD");
   });
 
-  it("elenco cheio no teto de registro (30, R-193) recusa a contratação", async () => {
+  it("elenco cheio no teto de registro (R-193) recusa a contratação", async () => {
     const { world, targetId, valueMinor } = arrange(3);
-    // Enche o comprador até o teto: 30 jogadores, sem vaga.
+    // Enche o comprador até o teto (MAX_SQUAD_SIZE), sem vaga.
     world.squads.set(
       BUYER,
       squadOf(
         BUYER,
-        Array.from({ length: 30 }, (_v, i) => `p-buyer-full-${i}`),
+        Array.from({ length: MAX_SQUAD_SIZE }, (_v, i) => `p-buyer-full-${i}`),
       ),
     );
     const result = await new SignPlayer(fakeUnitOfWork(world)).execute(

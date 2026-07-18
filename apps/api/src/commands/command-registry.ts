@@ -11,6 +11,7 @@ import {
   GenerateWorldGenesis,
   PlayNextRound,
   SignPlayer,
+  PromoteYouthPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -26,6 +27,7 @@ import {
   type MatchPlayRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
+  type PromoteYouthUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -83,6 +85,8 @@ export interface CommandContext {
   readonly matchPlay: MatchPlayRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
+  /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
+  readonly promoteYouthUnitOfWork: PromoteYouthUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -150,6 +154,11 @@ const applyClubIdentityPayload = z.object({
       crestTemplateId: z.string(),
     })
     .optional(),
+});
+
+const promoteYouthPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
 });
 
 const signPlayerPayload = z.object({
@@ -466,6 +475,22 @@ const handlers: Record<string, CommandHandler> = {
       feeMinor: parsed.data.feeMinor,
       currentSeason: parsed.data.currentSeason,
       worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  /** C8 — a promoção base→profissional. Move a membership entre os dois elencos. */
+  "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new PromoteYouthPlayer(promoteYouthUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
       occurredOn: world.value.snapshot.currentDate,
     });
     if (!result.ok) return result;

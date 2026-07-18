@@ -31,6 +31,7 @@ export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
 export const GENESIS_UNIT_OF_WORK = "GENESIS_UNIT_OF_WORK";
 export const MATCH_PLAY_REPOSITORY = "MATCH_PLAY_REPOSITORY";
 export const TRANSFER_UNIT_OF_WORK = "TRANSFER_UNIT_OF_WORK";
+export const PROMOTE_YOUTH_UNIT_OF_WORK = "PROMOTE_YOUTH_UNIT_OF_WORK";
 export const SEASON_FINANCE_UNIT_OF_WORK = "SEASON_FINANCE_UNIT_OF_WORK";
 /** C1 leitura fora do UoW: "alguém está jogando este mundo?" antes de apagá-lo. */
 export const CLUB_CONTROL_REPOSITORY = "CLUB_CONTROL_REPOSITORY";
