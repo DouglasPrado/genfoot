@@ -186,24 +186,37 @@ export function Youth() {
             onPress={() => setInspect(null)}
           />
           <View style={styles.inspectWrap} pointerEvents="box-none">
-            {inspect !== null && (
-              <PlayerSkillCard
-                data={
-                  {
-                    name: inspect.name,
-                    position: inspect.primaryPosition,
-                    positionTint: positionGroupTint(
-                      sectorOf(inspect.primaryPosition),
-                    ),
-                    age: inspect.age,
-                    ovr: inspect.overall,
-                    pot: inspect.potential,
-                    groups: inspect.groups ?? null,
-                    attributes: inspect.attributes ?? null,
-                  } satisfies PlayerSkillCardData
-                }
-              />
-            )}
+            <View style={styles.inspectCard}>
+              {inspect !== null && (
+                <>
+                  <PlayerSkillCard
+                    data={
+                      {
+                        name: inspect.name,
+                        position: inspect.primaryPosition,
+                        positionTint: positionGroupTint(
+                          sectorOf(inspect.primaryPosition),
+                        ),
+                        age: inspect.age,
+                        ovr: inspect.overall,
+                        pot: inspect.potential,
+                        groups: inspect.groups ?? null,
+                        attributes: inspect.attributes ?? null,
+                      } satisfies PlayerSkillCardData
+                    }
+                  />
+                  <Pressable
+                    onPress={() => setInspect(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Fechar card"
+                    accessibilityState={{}}
+                    style={styles.inspectClose}
+                  >
+                    <Text style={styles.inspectCloseText}>FECHAR</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
           </View>
         </View>
       </Modal>
@@ -257,14 +270,28 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     paddingVertical: space.sm,
   },
-  inspectRoot: { flex: 1, justifyContent: "center" },
+  inspectRoot: { flex: 1 },
   inspectBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   inspectWrap: {
-    paddingHorizontal: space.lg,
+    flex: 1,
     alignItems: "center",
-    gap: space.md,
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  inspectCard: { width: "100%", maxWidth: 400, gap: space.md },
+  inspectClose: {
+    alignSelf: "center",
+    paddingHorizontal: space.xl,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+  },
+  inspectCloseText: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
 });
