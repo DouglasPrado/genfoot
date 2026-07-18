@@ -104,6 +104,7 @@ export * from "./finance/club-finance-read-model.js";
 export * from "./competitions/competition-types.js";
 export * from "./competitions/competition-config.js";
 export * from "./competitions/competition.js";
+export * from "./competitions/competition-schedule.js";
 export * from "./competitions/author-competition.js";
 export * from "./competitions/competition-bootstrap.js";
 export * from "./competitions/competition-repository.js";

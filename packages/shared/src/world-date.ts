@@ -54,6 +54,14 @@ export class WorldDate {
     return this.#epochMilliseconds === other.#epochMilliseconds;
   }
 
+  /** Dias de `this` até `other` (positivo se `other` é depois). */
+  public differenceInDays(other: WorldDate): number {
+    return Math.round(
+      (other.#epochMilliseconds - this.#epochMilliseconds) /
+        MILLISECONDS_PER_DAY,
+    );
+  }
+
   public toString(): string {
     const date = new Date(this.#epochMilliseconds);
     const year = date.getUTCFullYear().toString().padStart(4, "0");

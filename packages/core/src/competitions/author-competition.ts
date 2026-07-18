@@ -1,5 +1,9 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
+import {
+  generateSchedule,
+  type ScheduledMatchDraw,
+} from "./competition-schedule.js";
 import { Competition, type ConfigureCompetitionPatch } from "./competition.js";
 import {
   defaultKnockoutConfig,
@@ -27,6 +31,12 @@ export interface CompetitionAggregateRepository {
   saveCompetition(
     snapshot: CompetitionAggregateSnapshot,
     expectedVersion: number,
+  ): Promise<void>;
+  /** Reescreve as partidas da edição — o sorteio materializado no lock (R-206). */
+  materializeSchedule(
+    gameWorldId: string,
+    competitionId: string,
+    draws: readonly ScheduledMatchDraw[],
   ): Promise<void>;
 }
 
@@ -159,11 +169,48 @@ function applyTransition(
   });
 }
 
-/** Trava a competição (RASCUNHO→AGENDADA), congelando a config (R-202). */
+/**
+ * Trava a competição (RASCUNHO→AGENDADA) e, no mesmo commit, materializa o
+ * sorteio + o calendário (R-206). Congelar a config sem gerar os jogos deixaria
+ * uma competição agendada e vazia; por isso os dois efeitos são atômicos.
+ */
 export class LockCompetition {
   public constructor(private readonly unitOfWork: CompetitionUnitOfWork) {}
-  public execute(input: CompetitionTransitionInput) {
-    return applyTransition(this.unitOfWork, input, "lock");
+
+  public execute(
+    input: CompetitionTransitionInput,
+  ): Promise<Result<{ competitionId: string }, DomainError>> {
+    return run(this.unitOfWork, async (repos) => {
+      const snap = await repos.competitions.findCompetitionById(
+        input.gameWorldId,
+        input.competitionId,
+      );
+      if (snap === null) {
+        return fail(
+          new DomainError("COMPETITION_NOT_FOUND", "Competição não encontrada."),
+        );
+      }
+      const agg = Competition.fromSnapshot(snap);
+      if (!agg.ok) return agg;
+      const locked = agg.value.lock();
+      if (!locked.ok) return locked;
+      const next = agg.value.snapshot();
+      await repos.competitions.saveCompetition(next, snap.version);
+
+      // A janela é garantida não-nula pelo lock (validateForLock).
+      const draws = generateSchedule({
+        format: next.format,
+        clubIds: next.clubIds,
+        startsOn: next.startsOn ?? "",
+        endsOn: next.endsOn ?? "",
+      });
+      await repos.competitions.materializeSchedule(
+        input.gameWorldId,
+        input.competitionId,
+        draws,
+      );
+      return succeed({ competitionId: input.competitionId });
+    });
   }
 }
 

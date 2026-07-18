@@ -5,6 +5,7 @@ import {
   type CompetitionAggregateSnapshot,
   type CompetitionConfig,
   type CompetitionId,
+  type ScheduledMatchDraw,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -171,6 +172,35 @@ export class PrismaCompetitionAggregateRepository
         })),
       });
     }
+  }
+
+  public async materializeSchedule(
+    gameWorldId: string,
+    competitionId: string,
+    draws: readonly ScheduledMatchDraw[],
+  ): Promise<void> {
+    const edition = await this.client.competitionSeason.findFirst({
+      where: { competitionId },
+      orderBy: { startsAt: "desc" },
+      select: { id: true },
+    });
+    if (edition === null) return;
+    // O sorteio é reescrito (não somado): re-travar geraria os mesmos jogos.
+    await this.client.match.deleteMany({
+      where: { competitionSeasonId: edition.id },
+    });
+    if (draws.length === 0) return;
+    await this.client.match.createMany({
+      data: draws.map((draw) => ({
+        gameWorldId,
+        competitionSeasonId: edition.id,
+        homeClubId: draw.homeClubId,
+        awayClubId: draw.awayClubId,
+        seasonNumber: 1,
+        roundNumber: draw.round,
+        scheduledAt: new Date(`${draw.scheduledOn}T00:00:00.000Z`),
+      })),
+    });
   }
 
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */
