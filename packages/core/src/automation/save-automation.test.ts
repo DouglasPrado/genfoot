@@ -32,6 +32,16 @@ class FakeRules {
         })),
     );
   }
+  public activeRulesForTrigger(_w: string, clubId: string, trigger: string) {
+    return Promise.resolve(
+      [...this.byId.values()].filter(
+        (r) =>
+          r.clubId === clubId &&
+          r.status === AutomationRuleStatus.ACTIVE &&
+          r.triggerEvent === trigger,
+      ),
+    );
+  }
   public saveRuleWithVersion(snapshot: AutomationRuleSnapshot) {
     this.byId.set(snapshot.id, snapshot);
     return Promise.resolve();
@@ -45,6 +55,8 @@ function uow(rules: FakeRules): AutomationUnitOfWork {
       findByClub: () => Promise.resolve(null),
       saveProfile: () => Promise.resolve(),
     },
+    attendance: { isClubAttended: () => Promise.resolve(false) },
+    notifications: { append: () => Promise.resolve() },
   };
   return { run: (work) => work(repos) };
 }

@@ -58,6 +58,36 @@ export class PrismaAutomationRuleRepository
     }));
   }
 
+  public async activeRulesForTrigger(
+    gameWorldId: string,
+    clubId: string,
+    triggerEvent: string,
+  ): Promise<readonly AutomationRuleSnapshot[]> {
+    const rows = await this.client.automationRule.findMany({
+      where: {
+        gameWorldId,
+        clubId,
+        status: AutomationRuleStatus.ACTIVE,
+        triggerJson: { path: ["event"], equals: triggerEvent },
+      },
+      orderBy: { priority: "desc" },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      gameWorldId: row.gameWorldId,
+      clubId: row.clubId,
+      name: row.name,
+      level: row.level,
+      status: row.status,
+      triggerEvent: readEvent(row.triggerJson),
+      condition: row.conditionJson ?? null,
+      action: row.actionJson ?? null,
+      risk: row.risk,
+      priority: row.priority,
+      version: row.version,
+    }));
+  }
+
   public async saveRuleWithVersion(
     snapshot: AutomationRuleSnapshot,
   ): Promise<void> {

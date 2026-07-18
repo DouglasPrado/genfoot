@@ -140,5 +140,6 @@ export * from "./automation/club-ai-profile.js";
 export * from "./automation/automation-rule.js";
 export * from "./automation/set-offline-plan.js";
 export * from "./automation/save-automation.js";
+export * from "./automation/run-autopilot.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";

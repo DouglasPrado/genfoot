@@ -77,7 +77,8 @@ describe("API command catalog integrity (e2e)", () => {
    */
   it("o catálogo é exatamente o que a vertical viva exige", () => {
     expect([...registeredCommandTypes()].sort()).toEqual([
-      // X-001: regras de automação e o plano offline do clube.
+      // X-001: regras de automação, executor (autopilot) e o plano offline.
+      "automation:run-autopilot",
       "automation:save-automation",
       "automation:set-offline-plan",
       "automation:toggle-automation",
@@ -132,7 +133,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(32);
+    expect(response.body.commandCount).toBe(33);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

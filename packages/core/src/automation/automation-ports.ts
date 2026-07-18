@@ -1,3 +1,5 @@
+import type { NotificationRepository } from "../notifications/notification-types.js";
+
 import type { AutomationRuleSnapshot } from "./automation-rule.js";
 import type { ClubAIProfileSnapshot } from "./automation-types.js";
 
@@ -30,13 +32,34 @@ export interface AutomationRuleRepository {
     gameWorldId: string,
     clubId: string,
   ): Promise<readonly ActiveRuleKey[]>;
+  /** As regras ATIVAS do clube que disparam num gatilho — o executor as roda. */
+  activeRulesForTrigger(
+    gameWorldId: string,
+    clubId: string,
+    triggerEvent: string,
+  ): Promise<readonly AutomationRuleSnapshot[]>;
   /** Grava a regra e congela uma nova versão no histórico (imutável). */
   saveRuleWithVersion(snapshot: AutomationRuleSnapshot): Promise<void>;
+}
+
+/**
+ * Se o clube está ATENDIDO por um humano presente (X-001). "Não atendido" =
+ * sem controle humano ativo (R-180) OU o controlador está ausente. É o que o
+ * executor lê para aplicar a precedência: humano presente manda, IA se cala.
+ */
+export interface ClubAttendanceRepository {
+  isClubAttended(
+    gameWorldId: string,
+    clubId: string,
+    nowIso: string,
+  ): Promise<boolean>;
 }
 
 export interface AutomationRepositories {
   readonly profiles: ClubAIProfileRepository;
   readonly rules: AutomationRuleRepository;
+  readonly attendance: ClubAttendanceRepository;
+  readonly notifications: NotificationRepository;
 }
 
 export interface AutomationUnitOfWork {

@@ -24,6 +24,7 @@ import {
   SetOfflinePlan,
   SaveAutomation,
   ToggleAutomation,
+  RunClubAutopilot,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -336,6 +337,11 @@ const toggleAutomationPayload = z.object({
 // do token (actorId), nunca do payload.
 const presencePayload = z.object({
   online: z.boolean().default(true),
+});
+
+const runAutopilotPayload = z.object({
+  clubId: z.string().uuid(),
+  triggerEvent: z.string().min(1),
 });
 
 const createWorldPayload = z.object({
@@ -912,6 +918,30 @@ const handlers: Record<string, CommandHandler> = {
       await presence.recordOffline(world.value.worldId, actorId);
     }
     return succeed({ resource: `presence:${actorId}` });
+  },
+
+  // X-001 — o executor: roda a automação do clube num gatilho. A precedência
+  // (humano presente → IA se cala) decide dentro do caso de uso.
+  "automation:run-autopilot": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = runAutopilotPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new RunClubAutopilot(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      triggerEvent: parsed.data.triggerEvent,
+      // Presença é tempo real: o "agora" é o relógio de parede, na borda.
+      nowIso: new Date().toISOString(),
+      occurredOn: world.value.snapshot.currentDate,
+      worldSeed: world.value.snapshot.seed,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {
