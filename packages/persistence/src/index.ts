@@ -20,6 +20,8 @@ export * from "./prisma-ledger-read-model.js";
 export * from "./prisma-club-finance-read-model.js";
 export * from "./prisma-competition-repository.js";
 export * from "./prisma-competition-read-model.js";
+export * from "./prisma-competition-aggregate-repository.js";
+export * from "./prisma-competition-unit-of-work.js";
 export * from "./prisma-fanbase-repository.js";
 export * from "./prisma-fanbase-read-model.js";
 export * from "./prisma-narrative-repository.js";

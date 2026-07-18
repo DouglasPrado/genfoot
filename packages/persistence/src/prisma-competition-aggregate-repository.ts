@@ -1,0 +1,230 @@
+import {
+  CompetitionLifecycle,
+  type ClubId,
+  type CompetitionAggregateRepository,
+  type CompetitionAggregateSnapshot,
+  type CompetitionConfig,
+  type CompetitionId,
+} from "@grinta/core";
+import type { GameWorldId } from "@grinta/shared";
+
+import type { Prisma } from "./generated/prisma/client.js";
+
+/**
+ * Adapter do agregado de competição autorado (C7, R-202).
+ *
+ * O agregado mora em DUAS tabelas: `Competition` (o guarda-chuva: nome, tipo,
+ * formato, divisão) e a edição `CompetitionSeason` (o ciclo de vida, a janela, a
+ * config, os participantes). São gravados no MESMO commit; a concorrência
+ * otimista é guardada na versão do `Competition` (a raiz). Os participantes
+ * (`CompetitionClub`) são REESCRITOS, não somados — o array do domínio é a
+ * verdade. Por isso o `TransactionClient` no construtor.
+ *
+ * Para uma competição existir é preciso uma `Season` (FK obrigatória). Enquanto
+ * a virada de temporada não cria temporadas (V6), a primeira competição de um
+ * mundo cria/reusa a "Temporada 1".
+ */
+export class PrismaCompetitionAggregateRepository
+  implements CompetitionAggregateRepository
+{
+  public constructor(private readonly client: Prisma.TransactionClient) {}
+
+  public async findCompetitionById(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<CompetitionAggregateSnapshot | null> {
+    const comp = await this.client.competition.findFirst({
+      where: { id: competitionId, gameWorldId },
+      include: {
+        seasons: {
+          orderBy: { startsAt: "desc" },
+          take: 1,
+          include: { clubs: { orderBy: { seed: "asc" } } },
+        },
+      },
+    });
+    if (comp === null) return null;
+    const edition = comp.seasons[0];
+    if (edition === undefined) return null;
+
+    const config = readConfig(edition.rulesJson, edition.prizeJson);
+    return {
+      id: comp.id as CompetitionId,
+      gameWorldId: comp.gameWorldId as GameWorldId,
+      name: comp.name,
+      type: comp.type,
+      format: comp.format,
+      tier: comp.tier ?? null,
+      reputation: comp.reputation,
+      lifecycle: edition.lifecycle,
+      startsOn: dateToIso(edition.startsAt),
+      endsOn: dateToIso(edition.endsAt),
+      clubIds: edition.clubs.map((c) => c.clubId as ClubId),
+      config,
+      version: comp.version,
+    };
+  }
+
+  public async saveCompetition(
+    snapshot: CompetitionAggregateSnapshot,
+    expectedVersion: number,
+  ): Promise<void> {
+    const rulesJson = {
+      rules: snapshot.config.rules,
+      qualifications: snapshot.config.qualifications,
+    } as unknown as Prisma.InputJsonValue;
+    const prizeJson = snapshot.config
+      .prizes as unknown as Prisma.InputJsonValue;
+    const startsAt = isoToDate(snapshot.startsOn);
+    const endsAt = isoToDate(snapshot.endsOn);
+    const status = seasonStatusFor(snapshot.lifecycle);
+
+    let editionId: string;
+
+    if (expectedVersion === 0) {
+      const seasonId = await this.ensureSeasonId(snapshot.gameWorldId);
+      await this.client.competition.create({
+        data: {
+          id: snapshot.id,
+          gameWorldId: snapshot.gameWorldId,
+          name: snapshot.name,
+          type: snapshot.type,
+          format: snapshot.format,
+          tier: snapshot.tier,
+          reputation: snapshot.reputation,
+          version: snapshot.version,
+        },
+      });
+      const edition = await this.client.competitionSeason.create({
+        data: {
+          competitionId: snapshot.id,
+          seasonId,
+          name: snapshot.name,
+          status,
+          lifecycle: snapshot.lifecycle,
+          startsAt,
+          endsAt,
+          rulesJson,
+          prizeJson,
+          version: snapshot.version,
+        },
+      });
+      editionId = edition.id;
+    } else {
+      const { count } = await this.client.competition.updateMany({
+        where: {
+          id: snapshot.id,
+          gameWorldId: snapshot.gameWorldId,
+          version: expectedVersion,
+        },
+        data: {
+          name: snapshot.name,
+          type: snapshot.type,
+          format: snapshot.format,
+          tier: snapshot.tier,
+          reputation: snapshot.reputation,
+          version: snapshot.version,
+        },
+      });
+      if (count === 0) {
+        throw new Error(
+          `AGGREGATE_VERSION_CONFLICT: competição ${snapshot.id} mudou por baixo (esperava ${expectedVersion}).`,
+        );
+      }
+      const edition = await this.client.competitionSeason.findFirst({
+        where: { competitionId: snapshot.id },
+        orderBy: { startsAt: "desc" },
+        select: { id: true },
+      });
+      if (edition === null) {
+        throw new Error(
+          `COMPETITION_EDITION_MISSING: competição ${snapshot.id} sem edição.`,
+        );
+      }
+      editionId = edition.id;
+      await this.client.competitionSeason.update({
+        where: { id: editionId },
+        data: {
+          name: snapshot.name,
+          status,
+          lifecycle: snapshot.lifecycle,
+          startsAt,
+          endsAt,
+          rulesJson,
+          prizeJson,
+          version: snapshot.version,
+        },
+      });
+    }
+
+    // Participantes: reescritos (o array do domínio é a verdade). A ordem vira
+    // a semente (seed) — no mata-mata é o chaveamento; na liga é só a ordem.
+    await this.client.competitionClub.deleteMany({
+      where: { competitionSeasonId: editionId },
+    });
+    if (snapshot.clubIds.length > 0) {
+      await this.client.competitionClub.createMany({
+        data: snapshot.clubIds.map((clubId, index) => ({
+          competitionSeasonId: editionId,
+          clubId,
+          seed: index + 1,
+        })),
+      });
+    }
+  }
+
+  /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */
+  private async ensureSeasonId(gameWorldId: string): Promise<string> {
+    const existing = await this.client.season.findFirst({
+      where: { gameWorldId, number: 1 },
+      select: { id: true },
+    });
+    if (existing !== null) return existing.id;
+    const world = await this.client.gameWorld.findUnique({
+      where: { id: gameWorldId },
+      select: { currentDate: true },
+    });
+    const created = await this.client.season.create({
+      data: {
+        gameWorldId,
+        number: 1,
+        name: "Temporada 1",
+        startsAt: world?.currentDate ?? new Date(),
+      },
+      select: { id: true },
+    });
+    return created.id;
+  }
+}
+
+/** SeasonStatus derivado do ciclo de vida autoral (mantém read models antigos sãos). */
+function seasonStatusFor(
+  lifecycle: CompetitionLifecycle,
+): "PLANNED" | "ACTIVE" | "FINISHED" {
+  if (lifecycle === CompetitionLifecycle.RUNNING) return "ACTIVE";
+  if (lifecycle === CompetitionLifecycle.FINISHED) return "FINISHED";
+  return "PLANNED";
+}
+
+function readConfig(
+  rulesJson: unknown,
+  prizeJson: unknown,
+): CompetitionConfig {
+  const parsed = (rulesJson ?? {}) as {
+    rules?: CompetitionConfig["rules"];
+    qualifications?: CompetitionConfig["qualifications"];
+  };
+  return {
+    rules: parsed.rules as CompetitionConfig["rules"],
+    qualifications: parsed.qualifications ?? [],
+    prizes: (prizeJson ?? {}) as CompetitionConfig["prizes"],
+  };
+}
+
+function dateToIso(value: Date | null): string | null {
+  return value === null ? null : value.toISOString().slice(0, 10);
+}
+
+function isoToDate(value: string | null): Date | null {
+  return value === null ? null : new Date(`${value}T00:00:00.000Z`);
+}

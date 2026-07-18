@@ -134,6 +134,15 @@ enum SeasonStatus {
   ARCHIVED
 }
 
+// Ciclo de vida do agregado de competição AUTORADO (C7, R-202): rascunho
+// editável → agendada (config congelada, sorteio feito) → em andamento → homologada.
+enum CompetitionLifecycle {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  FINISHED
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -1882,12 +1891,13 @@ model CompetitionSeason {
   competitionId String       @db.Uuid
   seasonId      String       @db.Uuid
   name          String
-  status        SeasonStatus @default(PLANNED)
-  startsAt      DateTime
-  endsAt        DateTime?
-  prizeJson     Json?
-  rulesJson     Json? // regras flexíveis por competição
-  version       Int          @default(1) // concorrência otimista (agregado C7 · edição)
+  status        SeasonStatus         @default(PLANNED)
+  lifecycle     CompetitionLifecycle @default(DRAFT) // ciclo autoral (R-202)
+  startsAt      DateTime?            @db.Date // janela: data, não relógio (R-177)
+  endsAt        DateTime?            @db.Date
+  prizeJson     Json? // premiação (R-205)
+  rulesJson     Json? // regras + qualificação (R-207)
+  version       Int                  @default(1) // concorrência otimista (agregado C7 · edição)
 
   competition       Competition               @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   clubs             CompetitionClub[]

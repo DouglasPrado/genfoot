@@ -16,6 +16,11 @@ import {
   ReleasePlayer,
   SellPlayer,
   ListPlayer,
+  CreateCompetition,
+  ConfigureCompetition,
+  LockCompetition,
+  StartCompetition,
+  FinishCompetition,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -36,6 +41,8 @@ import {
   type ReleaseUnitOfWork,
   type SellUnitOfWork,
   type ListUnitOfWork,
+  type CompetitionUnitOfWork,
+  type ConfigureCompetitionPatch,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -51,6 +58,8 @@ import {
   succeed,
   type Result,
 } from "@grinta/shared";
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
@@ -103,6 +112,8 @@ export interface CommandContext {
   readonly sellUnitOfWork: SellUnitOfWork;
   /** C6 — coloca um jogador à venda (cria a TransferListing). */
   readonly listUnitOfWork: ListUnitOfWork;
+  /** C7 — competição autorada: criar, configurar, travar, iniciar, homologar (R-202). */
+  readonly competitionUnitOfWork: CompetitionUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -183,6 +194,89 @@ const signPlayerPayload = z.object({
   playerId: z.string().uuid(),
   feeMinor: z.union([z.string(), z.number()]).transform((v) => BigInt(v)),
   currentSeason: z.number().int().positive().default(1),
+});
+
+// ── Competição autorada (C7, R-202..R-207) ──────────────────────────────────
+// O zod garante só a FORMA; as regras (nº par de clubes, potência de 2, janela
+// coerente) são do agregado — duplicar aqui seria dois donos para a mesma regra.
+const competitionTypeEnum = z.enum([
+  "LEAGUE",
+  "CUP",
+  "SUPER_CUP",
+  "INTERNATIONAL_CUP",
+  "FRIENDLY",
+]);
+const competitionFormatEnum = z.enum([
+  "ROUND_ROBIN",
+  "DOUBLE_ROUND_ROBIN",
+  "KNOCKOUT",
+  "GROUPS_AND_KNOCKOUT",
+  "SWISS",
+]);
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const minor = z.string().regex(/^\d+$/u);
+
+const createCompetitionPayload = z.object({
+  name: z.string().min(1),
+  type: competitionTypeEnum,
+  format: competitionFormatEnum,
+  tier: z.number().int().positive().nullable().default(null),
+  reputation: z.number().int().min(0).max(100).optional(),
+});
+
+const competitionRulesSchema = z.object({
+  pointsWin: z.number().int(),
+  pointsDraw: z.number().int(),
+  legs: z.union([z.literal(1), z.literal(2)]),
+  promotionSlots: z.number().int().min(0),
+  relegationSlots: z.number().int().min(0),
+  tiebreakers: z
+    .array(
+      z.enum([
+        "POINTS",
+        "WINS",
+        "GOAL_DIFFERENCE",
+        "GOALS_FOR",
+        "HEAD_TO_HEAD",
+        "FAIR_PLAY",
+        "DRAW",
+      ]),
+    )
+    .min(1),
+  groupCount: z.number().int().positive().nullable(),
+  qualifiersPerGroup: z.number().int().positive().nullable(),
+});
+const competitionPrizesSchema = z.object({
+  participationMinor: minor,
+  winBonusMinor: minor,
+  positionMinor: z.array(minor),
+  topScorerMinor: minor,
+  bestPlayerMinor: minor,
+});
+const competitionConfigSchema = z.object({
+  rules: competitionRulesSchema,
+  prizes: competitionPrizesSchema,
+  qualifications: z.array(
+    z.object({
+      targetCompetitionId: z.string().uuid(),
+      criteria: z.enum(["TOP_POSITIONS", "CHAMPION", "CUP_WINNER"]),
+      slots: z.number().int().positive(),
+    }),
+  ),
+});
+const configureCompetitionPayload = z.object({
+  competitionId: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  type: competitionTypeEnum.optional(),
+  format: competitionFormatEnum.optional(),
+  tier: z.number().int().positive().nullable().optional(),
+  clubIds: z.array(z.string().uuid()).optional(),
+  startsOn: dateOnly.nullable().optional(),
+  endsOn: dateOnly.nullable().optional(),
+  config: competitionConfigSchema.optional(),
+});
+const competitionTransitionPayload = z.object({
+  competitionId: z.string().uuid(),
 });
 
 const createWorldPayload = z.object({
@@ -581,6 +675,90 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  // ── Competição autorada (C7, R-202) ──────────────────────────────────────
+  "competition:create": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = createCompetitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    // O id é autorado (não é artefato determinístico da gênese): a idempotência
+    // vem do barramento (fingerprint do pedido), não de um seed de mundo.
+    const id = randomUUID();
+    const result = await new CreateCompetition(competitionUnitOfWork).execute({
+      id,
+      gameWorldId: world.value.worldId,
+      name: parsed.data.name,
+      type: parsed.data.type,
+      format: parsed.data.format,
+      tier: parsed.data.tier,
+      ...(parsed.data.reputation !== undefined
+        ? { reputation: parsed.data.reputation }
+        : {}),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${id}` });
+  },
+
+  "competition:configure": async ({
+    worlds,
+    competitionUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = configureCompetitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const { competitionId, ...patch } = parsed.data;
+    const result = await new ConfigureCompetition(
+      competitionUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      competitionId,
+      patch: patch as ConfigureCompetitionPatch,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${competitionId}` });
+  },
+
+  "competition:lock": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new LockCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  "competition:start": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new StartCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  "competition:finish": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new FinishCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

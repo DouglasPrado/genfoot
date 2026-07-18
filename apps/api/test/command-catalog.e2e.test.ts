@@ -82,6 +82,12 @@ describe("API command catalog integrity (e2e)", () => {
       // nesse commit, e eu não vi porque rodei a suíte sem `DATABASE_URL` e
       // tomei o erro dos e2e por ambiental.
       "club:apply-identity",
+      // C7: competição autorada no admin (R-202..R-207).
+      "competition:configure",
+      "competition:create",
+      "competition:finish",
+      "competition:lock",
+      "competition:start",
       "identity:confirm-onboarding",
       "identity:end-club-control",
       "identity:join-world",
@@ -120,7 +126,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(23);
+    expect(response.body.commandCount).toBe(28);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
