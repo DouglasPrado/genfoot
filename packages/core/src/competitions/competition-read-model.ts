@@ -27,9 +27,31 @@ export interface CompetitionStandingsView {
   readonly table: readonly StandingViewRow[];
 }
 
+/**
+ * Uma competição na lista do admin (C7, R-202): o essencial para gerir o ciclo
+ * de vida — nome, formato, em que fase está, quantos clubes, a janela.
+ */
+export interface CompetitionSummaryView {
+  readonly competitionId: string;
+  readonly name: string;
+  readonly type: string;
+  readonly format: string;
+  readonly tier: number | null;
+  readonly lifecycle: string;
+  readonly clubCount: number;
+  readonly matchCount: number;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+}
+
 export interface CompetitionReadModel {
   /** A competição principal do mundo (a Liga Inicial), com a tabela atual. */
   leagueStandings(
     gameWorldId: GameWorldId,
   ): Promise<CompetitionStandingsView | null>;
+
+  /** Todas as competições do mundo, para o admin gerir (R-202). */
+  listCompetitions(
+    gameWorldId: GameWorldId,
+  ): Promise<readonly CompetitionSummaryView[]>;
 }

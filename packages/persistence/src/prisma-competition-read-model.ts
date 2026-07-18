@@ -2,6 +2,7 @@ import {
   buildStandings,
   type CompetitionReadModel,
   type CompetitionStandingsView,
+  type CompetitionSummaryView,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -81,6 +82,43 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
         shortCode: names.get(row.clubId)?.shortCode ?? "",
       })),
     };
+  }
+
+  public async listCompetitions(
+    gameWorldId: GameWorldId,
+  ): Promise<readonly CompetitionSummaryView[]> {
+    const competitions = await this.client.competition.findMany({
+      where: { gameWorldId },
+      orderBy: [{ tier: "asc" }, { reputation: "desc" }, { name: "asc" }],
+      include: {
+        seasons: {
+          orderBy: { startsAt: "desc" },
+          take: 1,
+          include: {
+            _count: { select: { clubs: true, matches: true } },
+          },
+        },
+      },
+    });
+    return competitions.map((c) => {
+      const edition = c.seasons[0];
+      return {
+        competitionId: c.id,
+        name: c.name,
+        type: c.type,
+        format: c.format,
+        tier: c.tier ?? null,
+        lifecycle: edition?.lifecycle ?? "DRAFT",
+        clubCount: edition?._count.clubs ?? 0,
+        matchCount: edition?._count.matches ?? 0,
+        startsOn: edition?.startsAt
+          ? edition.startsAt.toISOString().slice(0, 10)
+          : null,
+        endsOn: edition?.endsAt
+          ? edition.endsAt.toISOString().slice(0, 10)
+          : null,
+      };
+    });
   }
 
   /** O nome vigente de cada clube (BC-003: o período com `effectiveThrough` nulo). */

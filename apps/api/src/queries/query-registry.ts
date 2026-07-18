@@ -68,6 +68,8 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await ledgerReadModel.summary(worldId)),
   competitions: async ({ competitionReadModel }, worldId) =>
     succeed(await competitionReadModel.leagueStandings(worldId)),
+  "competitions-list": async ({ competitionReadModel }, worldId) =>
+    succeed({ competitions: await competitionReadModel.listCompetitions(worldId) }),
   matches: async ({ matchesReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     return succeed(await matchesReadModel.recentAndUpcoming(worldId, clubId));

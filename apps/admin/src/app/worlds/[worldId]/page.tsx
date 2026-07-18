@@ -12,6 +12,7 @@ import {
   type ClubFinanceRow,
 } from "@/components/clubs-table";
 import { CommandConsole } from "@/components/command-console";
+import { CompetitionAuthoring } from "@/components/competition-authoring";
 import { CompetitionsPanel } from "@/components/competitions-panel";
 import { DeleteWorldDialog } from "@/components/delete-world-dialog";
 import { Mock, MockNotice } from "@/components/mock";
@@ -385,9 +386,12 @@ export default function WorldDetailPage() {
                 <CardTitle>
                   Competições · temporada {competicoes.temporada}
                 </CardTitle>
-                <Mock contexto="C7 + C5 + C4" />
               </CardHeader>
               <CardContent>
+                {/* Autoria REAL (C7, R-202): criar/configurar/travar/iniciar. */}
+                <CompetitionAuthoring worldId={worldId} clubs={clubs} />
+                {/* Acompanhamento (tabela/artilharia/chave) ainda mockado até V5. */}
+                <Mock contexto="acompanhamento: C7-V5 + C5" />
                 <CompetitionsPanel
                   worldId={worldId}
                   clubs={clubs}

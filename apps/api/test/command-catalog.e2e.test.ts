@@ -135,6 +135,8 @@ describe("API command catalog integrity (e2e)", () => {
       "club-detail",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
+      // A lista de competições do mundo para o admin gerir (C7, R-202).
+      "competitions-list",
       // A torcida (C10, M-25): headcount, paciência da diretoria, pressão.
       "fanbase",
       // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
