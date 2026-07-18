@@ -13,6 +13,7 @@ import {
   SignPlayer,
   PromoteYouthPlayer,
   DemoteToYouthPlayer,
+  ReleasePlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -30,6 +31,7 @@ import {
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
   type DemoteToYouthUnitOfWork,
+  type ReleaseUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -91,6 +93,8 @@ export interface CommandContext {
   readonly promoteYouthUnitOfWork: PromoteYouthUnitOfWork;
   /** C8 — desce um profissional (≤21) de volta à base (atômico sobre os dois elencos). */
   readonly demoteToYouthUnitOfWork: DemoteToYouthUnitOfWork;
+  /** C6 — dispensa um jogador (tira do elenco + encerra contrato). */
+  readonly releaseUnitOfWork: ReleaseUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -502,6 +506,22 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   /** C8 — descer à base: profissional ≤ 21 volta ao YOUTH_ACADEMY. */
+  /** C6 — dispensar: o clube encerra o vínculo e o jogador deixa o elenco. */
+  "market:release-player": async ({ worlds, releaseUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ReleasePlayer(releaseUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
   "youth:demote-player": async ({ worlds, demoteToYouthUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

@@ -3,11 +3,14 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
+import { CommandTrackingStatus } from "@grinta/core";
+
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
 import { PositionBadge, positionGroupTint } from "@/components/position-badge";
 import {
   PlayerSkillCard,
+  type PlayerCardCrest,
   type PlayerSkillCardData,
 } from "@/components/player-skill-card";
 import { Refresh } from "@/components/refresh";
@@ -16,9 +19,14 @@ import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldQuery } from "@/lib/world";
+import { useWorldId, useWorldQuery } from "@/lib/world";
+import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -61,9 +69,12 @@ type Filter = (typeof FILTERS)[number];
 
 /** Elenco — a lista de TODOS os jogadores do time (separada da formação tática). */
 export function RosterList() {
-  const { session, status } = useSession();
+  const { session, status, client, contractVersion } = useSession();
+  const worldId = useWorldId();
   const [inspect, setInspect] = useState<RosterPlayer | null>(null);
   const [filter, setFilter] = useState<Filter>("TODOS");
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -84,10 +95,56 @@ export function RosterList() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
 
+  // O crest do clube gerido — a "foto" do avatar do card (o domínio não tem foto
+  // de jogador; o avatar mostra o escudo, como no Mercado e na escalação).
+  const crest = useMemo<PlayerCardCrest | null>(
+    () =>
+      managedClub === null
+        ? null
+        : clubCrestData(
+            managedClub.name,
+            managedClub.primaryColor,
+            managedClub.secondaryColor,
+            managedClub.crestTemplateId,
+          ),
+    [managedClub],
+  );
+
   const refresh = useCallback(() => {
     clubQuery.refetch();
     rosterQuery.refetch();
   }, [clubQuery.refetch, rosterQuery.refetch]);
+
+  /** Despacha uma ação de elenco (dispensar/descer). Fecha o card ao aplicar. */
+  const act = useCallback(
+    (commandType: string, playerId: string) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const idempotencyKey = `${commandType}:${managedClub.id}:${playerId}`;
+      setActingId(playerId);
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType,
+        worldId,
+        payload: { clubId: managedClub.id, playerId },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setTracking(result);
+        setActingId(null);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          setInspect(null);
+          rosterQuery.refetch();
+        }
+      });
+    },
+    [client, contractVersion, managedClub, worldId, rosterQuery],
+  );
 
   const players = useMemo(() => {
     const all = [...(rosterQuery.data?.players ?? [])].sort(
@@ -223,9 +280,46 @@ export function RosterList() {
                         pot: inspect.potential,
                         groups: inspect.groups ?? null,
                         attributes: inspect.attributes ?? null,
+                        crest,
                       } satisfies PlayerSkillCardData
                     }
                   />
+                  <View style={styles.actions}>
+                    {inspect.age <= 21 ? (
+                      <Pressable
+                        onPress={() =>
+                          act("youth:demote-player", inspect.playerId)
+                        }
+                        disabled={actingId !== null}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Descer ${inspect.name} à base`}
+                        accessibilityState={{ disabled: actingId !== null }}
+                        style={styles.actionGhost}
+                      >
+                        <Icon name="arrow-down" size={14} color={color.textMuted} />
+                        <Text style={styles.actionGhostText}>À BASE</Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      onPress={() =>
+                        act("market:release-player", inspect.playerId)
+                      }
+                      disabled={actingId !== null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Dispensar ${inspect.name}`}
+                      accessibilityState={{ disabled: actingId !== null }}
+                      style={styles.actionDanger}
+                    >
+                      <Text style={styles.actionDangerText}>
+                        {actingId !== null ? "..." : "DISPENSAR"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                  {tracking?.status === CommandTrackingStatus.REJECTED && (
+                    <Text style={styles.actionError}>
+                      Recusado: {tracking.errorCode ?? "erro"}.
+                    </Text>
+                  )}
                   <Pressable
                     onPress={() => setInspect(null)}
                     accessibilityRole="button"
@@ -323,6 +417,44 @@ const styles = StyleSheet.create({
     padding: space.lg,
   },
   inspectCard: { width: "100%", maxWidth: 400, gap: space.md },
+  actions: { flexDirection: "row", justifyContent: "center", gap: space.sm },
+  actionGhost: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.border,
+  },
+  actionGhostText: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
+  actionDanger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.danger,
+  },
+  actionDangerText: {
+    color: color.danger,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
+  actionError: {
+    color: color.danger,
+    fontSize: fontSize.sm,
+    textAlign: "center",
+  },
   inspectClose: {
     alignSelf: "center",
     paddingHorizontal: space.xl,
