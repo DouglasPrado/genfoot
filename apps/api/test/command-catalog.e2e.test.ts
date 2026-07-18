@@ -91,6 +91,9 @@ describe("API command catalog integrity (e2e)", () => {
       // C6: a compra de verdade — dinheiro, contrato e elenco num só commit (R-192).
       "market:sign-player",
       "world:activate",
+      // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
+      // para reverdejar o gate — o command existe, faltava a linha do catálogo.
+      "world:advance-days",
       // O ciclo de vida operacional: a aba de Configurações do admin os despacha.
       // Sobem aqui porque uma tela viva os exige — que é a regra desta lista.
       "world:archive",
@@ -110,7 +113,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(17);
+    expect(response.body.commandCount).toBe(18);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -121,6 +124,8 @@ describe("API command catalog integrity (e2e)", () => {
       "competitions",
       // A torcida (C10, M-25): headcount, paciência da diretoria, pressão.
       "fanbase",
+      // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
+      "finance-snapshot",
       "identity",
       "identity-detail",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
