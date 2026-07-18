@@ -1917,7 +1917,7 @@ model CompetitionClub {
   seed                Int?
   groupName           String?
 
-  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
 
   @@unique([competitionSeasonId, clubId])
 }
@@ -1932,7 +1932,7 @@ model CompetitionStage {
   endsAt              DateTime?
   version             Int               @default(1) // concorrência otimista (agregado C7 · estágio)
 
-  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
   matches           Match[]
 
   @@index([competitionSeasonId])
@@ -1965,8 +1965,8 @@ model Match {
   simulatedOffline    Boolean            @default(false) // + MatchControlSource
   version             Int                @default(1)
 
-  competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id])
-  stage             CompetitionStage?    @relation(fields: [stageId], references: [id])
+  competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
+  stage             CompetitionStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
   homeClub          Club                 @relation("HomeClubMatches", fields: [homeClubId], references: [id], onDelete: Cascade)
   awayClub          Club                 @relation("AwayClubMatches", fields: [awayClubId], references: [id], onDelete: Cascade)
   teamStates        MatchTeamState[]
@@ -2218,7 +2218,7 @@ model ClubSeasonStats {
   fanMood             MoodLevel @default(NEUTRAL)
 
   club              Club               @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
 
   @@unique([clubId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
@@ -2240,7 +2240,7 @@ model PlayerSeasonStats {
   injuriesCount       Int     @default(0)
 
   player            Player             @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
 
   @@unique([playerId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
@@ -2632,7 +2632,7 @@ model CompetitionRegistration {
   approvedAt          DateTime?
   version             Int                @default(1)
 
-  competitionSeason CompetitionSeason    @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason    @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
   players           PlayerRegistration[]
 
   @@unique([competitionSeasonId, clubId]) // 1 inscrição por clube/edição
