@@ -23,6 +23,10 @@ import type {
   NarrativeItemSnapshot,
   NarrativeRepository,
 } from "../narrative/narrative-types.js";
+import type {
+  NotificationItemSnapshot,
+  NotificationRepository,
+} from "../notifications/notification-types.js";
 
 import {
   ContractStatus,
@@ -53,6 +57,7 @@ class FakeWorld {
   public journal: JournalEntrySnapshot[] = [];
   public contracts: PlayerContractSnapshot[] = [];
   public narratives: NarrativeItemSnapshot[] = [];
+  public notifications: NotificationItemSnapshot[] = [];
   public cashByClub = new Map<string, bigint>();
 
   public checkpoint(): () => void {
@@ -60,11 +65,13 @@ class FakeWorld {
     const journal = [...this.journal];
     const contracts = [...this.contracts];
     const narratives = [...this.narratives];
+    const notifications = [...this.notifications];
     return () => {
       this.squads = squads;
       this.journal = journal;
       this.contracts = contracts;
       this.narratives = narratives;
+      this.notifications = notifications;
     };
   }
 }
@@ -132,6 +139,15 @@ function fakeNarratives(world: FakeWorld): NarrativeRepository {
   };
 }
 
+function fakeNotifications(world: FakeWorld): NotificationRepository {
+  return {
+    append: (item) => {
+      world.notifications.push(item);
+      return Promise.resolve();
+    },
+  };
+}
+
 /** UnitOfWork que desfaz por exceção — o mesmo contrato do `$transaction`. */
 function fakeUnitOfWork(world: FakeWorld): TransferUnitOfWork {
   const repos: TransferRepositories = {
@@ -140,6 +156,7 @@ function fakeUnitOfWork(world: FakeWorld): TransferUnitOfWork {
     ledger: fakeLedger(world),
     contracts: fakeContracts(world),
     narratives: fakeNarratives(world),
+    notifications: fakeNotifications(world),
   };
   return {
     run: async (work) => {
@@ -305,6 +322,11 @@ describe("SignPlayer — a compra de verdade (R-192)", () => {
     expect(world.narratives).toHaveLength(1);
     expect(world.narratives[0]!.playerId).toBe(targetId);
     expect(world.narratives[0]!.clubId).toBe(BUYER);
+
+    // Efeito 5 (C12) — a caixa de entrada do clube comprador ganha a pendência.
+    expect(world.notifications).toHaveLength(1);
+    expect(world.notifications[0]!.clubId).toBe(BUYER);
+    expect(world.notifications[0]!.userId).toBeNull();
   });
 
   it("recusa a taxa fora da faixa da R-26 sem gravar nada", async () => {

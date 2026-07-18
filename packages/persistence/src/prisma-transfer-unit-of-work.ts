@@ -5,6 +5,7 @@ import type { PrismaClient } from "./prisma-connection.js";
 import { PrismaContractRepository } from "./prisma-contract-repository.js";
 import { PrismaLedgerRepository } from "./prisma-ledger-repository.js";
 import { PrismaNarrativeRepository } from "./prisma-narrative-repository.js";
+import { PrismaNotificationRepository } from "./prisma-notification-repository.js";
 import { PrismaPlayerRepository } from "./prisma-player-repository.js";
 import { PrismaSquadRepository } from "./prisma-squad-repository.js";
 
@@ -37,5 +38,6 @@ function bind(tx: Prisma.TransactionClient): TransferRepositories {
     ledger: new PrismaLedgerRepository(tx),
     contracts: new PrismaContractRepository(tx),
     narratives: new PrismaNarrativeRepository(tx),
+    notifications: new PrismaNotificationRepository(tx),
   };
 }

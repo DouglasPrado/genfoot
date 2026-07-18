@@ -16,6 +16,8 @@ import type { PlayerRepository } from "../players/player-repository.js";
 import { derivePlayerOverall } from "../players/player-attributes.js";
 import type { NarrativeRepository } from "../narrative/narrative-types.js";
 import { buildTransferNarrative } from "../narrative/transfer-narrative.js";
+import type { NotificationRepository } from "../notifications/notification-types.js";
+import { buildTransferNotification } from "../notifications/transfer-notification.js";
 import {
   estimatePlayerValueMinor,
   estimateSalaryPerSeasonMinor,
@@ -39,6 +41,8 @@ export interface TransferRepositories {
   readonly contracts: ContractRepository;
   /** C11 — a imprensa narra a contratação no mesmo commit do fato. */
   readonly narratives: NarrativeRepository;
+  /** C12 — a caixa de entrada do clube recebe a pendência, no mesmo commit. */
+  readonly notifications: NotificationRepository;
 }
 
 export interface TransferUnitOfWork {
@@ -263,6 +267,21 @@ export class SignPlayer {
             `${aggregate.person.firstName} ${aggregate.person.lastName}`.trim(),
           feeMinor: input.feeMinor,
           currencyId: BASE_CURRENCY_ID,
+          occurredOn: input.occurredOn,
+        }),
+      );
+
+      // ── C12: a caixa de entrada do clube ganha a pendência, no MESMO commit.
+      // Também idempotente por id determinístico.
+      await repos.notifications.append(
+        buildTransferNotification({
+          gameWorldId: input.gameWorldId,
+          worldSeed: input.worldSeed,
+          buyingClubId: input.buyingClubId,
+          playerId: input.playerId,
+          playerName:
+            `${aggregate.person.firstName} ${aggregate.person.lastName}`.trim(),
+          feeMinor: input.feeMinor,
           occurredOn: input.occurredOn,
         }),
       );

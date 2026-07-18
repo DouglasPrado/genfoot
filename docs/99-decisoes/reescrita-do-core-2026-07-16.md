@@ -507,6 +507,37 @@ e a curadoria são os próximos passos.
 
 ---
 
+### R-196 (C12) — A caixa de entrada é do CLUBE, e a transferência a preenche no mesmo commit.
+
+A home já lê o RESUMO do inbox (`openNotificationCount`, `timelineCount`) mas a query
+`inbox` nunca voltou do extermínio (R-175) e não havia fonte — o badge ficava mudo.
+C12 abre a fonte: cada fato do mundo deixa uma **pendência** na caixa do clube.
+
+**A `Notification` é PESSOAL do clube; a `Narrative` (R-195) é PÚBLICA.** Nascem do
+mesmo fato (a transferência) mas são coisas diferentes: a imprensa o mundo inteiro lê;
+a pendência é do técnico que gere o clube. Por isso a notificação é **club-scoped**
+(`clubId`, `userId = null`) — o inbox é do CLUBE, e o técnico vê a dos clubes que gere.
+Resolve o "de quem é a notificação" sem depender do ator do command: o clube é dono.
+
+**C12 vertical A — a transferência escreve a notificação:**
+
+- `SignPlayer` (R-192) acrescenta uma `Notification` (TRANSFER_OFFER, "Contratação
+  concluída") DENTRO da transação — o `TransferUnitOfWork` agora tem CINCO repositórios
+  (elenco, contrato, razão, imprensa, inbox). Id determinístico pelo fato: não duplica.
+- Read model `summaryForClubs`: pendências não lidas + total, pelos clubes do técnico.
+
+**Fiação deferida (não é parte deste corte):** a query `inbox` e a tela ficaram de
+FORA porque tocam arquivos sob refatoração paralela (`core.module`, `tokens`,
+`query-registry`, `home`). A decisão de coordenação foi entregar o backend isolado —
+domínio, adapters, teste de integração Postgres, prova por HTTP (a notificação nasce da
+compra) — e ligar a DI/tela quando o trabalho paralelo assentar.
+
+**O que isto NÃO é:** as threads e deep-links da MF-0B, o mark-as-read (um command), a
+prioridade fina, os outros geradores (partida, board, finanças, lesão). Aqui a caixa de
+entrada tem uma fonte (a transferência) e um resumo; o resto do inbox vem depois.
+
+---
+
 ## Pendências abertas — decisões de produto que a reescrita expôs e não resolve
 
 Nenhuma bloqueia o piloto (C1). Todas bloqueiam o contexto onde moram.

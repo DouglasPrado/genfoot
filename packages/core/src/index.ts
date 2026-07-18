@@ -111,6 +111,8 @@ export * from "./fanbase/fanbase-repository.js";
 export * from "./fanbase/fanbase-bootstrap.js";
 export * from "./narrative/narrative-types.js";
 export * from "./narrative/transfer-narrative.js";
+export * from "./notifications/notification-types.js";
+export * from "./notifications/transfer-notification.js";
 export * from "./matches/match-simulation.js";
 export * from "./matches/match-play-repository.js";
 export * from "./matches/play-next-round.js";
