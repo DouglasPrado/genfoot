@@ -158,6 +158,8 @@ describe("API command catalog integrity (e2e)", () => {
       "roster",
       // A comissão técnica (C8, M-25): recorte por clubId.
       "staff",
+      // Os artilheiros do mundo (C7-V5): projeção dos PlayerMatchStats.
+      "top-scorers",
       // A base (C8): os jovens em formação, recorte por clubId.
       "youth",
     ]);

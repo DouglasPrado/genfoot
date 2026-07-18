@@ -44,6 +44,14 @@ export interface CompetitionSummaryView {
   readonly endsOn: string | null;
 }
 
+/** Um artilheiro (C7-V5): gols somados dos `PlayerMatchStats` do mundo. */
+export interface TopScorerView {
+  readonly playerId: string;
+  readonly name: string;
+  readonly clubName: string;
+  readonly goals: number;
+}
+
 export interface CompetitionReadModel {
   /** A competição principal do mundo (a Liga Inicial), com a tabela atual. */
   leagueStandings(
@@ -54,4 +62,7 @@ export interface CompetitionReadModel {
   listCompetitions(
     gameWorldId: GameWorldId,
   ): Promise<readonly CompetitionSummaryView[]>;
+
+  /** Os artilheiros do mundo (C7-V5), do maior para o menor. */
+  topScorers(gameWorldId: GameWorldId): Promise<readonly TopScorerView[]>;
 }

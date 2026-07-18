@@ -1,3 +1,8 @@
+import {
+  attributeGoals,
+  type Scorer,
+  type ScorerCandidate,
+} from "./goal-attribution.js";
 import { simulateMatch } from "./match-kernel.js";
 import { stableHash } from "./match-kernel.js";
 
@@ -23,6 +28,9 @@ export interface ScheduledMatchInput {
   /** Força do elenco (overall médio). O placar emerge disto, não é definido por isto. */
   readonly homeStrength: number;
   readonly awayStrength: number;
+  /** Candidatos a goleador (C7-V5). Vazio = não atribui gols (mundo legado). */
+  readonly homeScorers?: readonly ScorerCandidate[];
+  readonly awayScorers?: readonly ScorerCandidate[];
 }
 
 export interface SimulatedMatchResult {
@@ -33,6 +41,9 @@ export interface SimulatedMatchResult {
   readonly awayShots: number;
   readonly homePossession: number;
   readonly resultHash: string;
+  /** Quem marcou de cada lado (C7-V5). */
+  readonly homeScorers: readonly Scorer[];
+  readonly awayScorers: readonly Scorer[];
 }
 
 /**
@@ -66,5 +77,19 @@ export function simulateScheduledMatch(
     awayShots: output.awayShots,
     homePossession: output.homePossession,
     resultHash: output.resultHash,
+    homeScorers: attributeGoals(
+      worldSeed,
+      match.matchId,
+      "home",
+      match.homeScorers ?? [],
+      output.homeGoals,
+    ),
+    awayScorers: attributeGoals(
+      worldSeed,
+      match.matchId,
+      "away",
+      match.awayScorers ?? [],
+      output.awayGoals,
+    ),
   };
 }

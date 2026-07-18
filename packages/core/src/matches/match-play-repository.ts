@@ -1,5 +1,6 @@
 import type { GameWorldId } from "@grinta/shared";
 
+import type { ScorerCandidate } from "./goal-attribution.js";
 import type { SimulatedMatchResult } from "./match-simulation.js";
 
 /**
@@ -16,6 +17,9 @@ export interface ScheduledMatchWithStrength {
   readonly awayClubId: string;
   readonly homeStrength: number;
   readonly awayStrength: number;
+  /** Candidatos a goleador de cada lado (C7-V5): jogadores + posição + nota. */
+  readonly homeScorers: readonly ScorerCandidate[];
+  readonly awayScorers: readonly ScorerCandidate[];
 }
 
 /**

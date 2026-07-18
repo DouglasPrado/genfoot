@@ -3,6 +3,7 @@ import {
   type CompetitionReadModel,
   type CompetitionStandingsView,
   type CompetitionSummaryView,
+  type TopScorerView,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -117,6 +118,61 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
         endsOn: edition?.endsAt
           ? edition.endsAt.toISOString().slice(0, 10)
           : null,
+      };
+    });
+  }
+
+  public async topScorers(
+    gameWorldId: GameWorldId,
+  ): Promise<readonly TopScorerView[]> {
+    // Gols somados por jogador (só as partidas deste mundo). Artilharia é
+    // projeção dos PlayerMatchStats — não há coluna de "gols na carreira".
+    const totals = await this.client.$queryRaw<
+      { playerId: string; goals: number }[]
+    >`
+      SELECT pms."playerId" AS "playerId", SUM(pms.goals)::int AS goals
+      FROM "PlayerMatchStats" pms
+      JOIN "Match" m ON m.id = pms."matchId"
+      WHERE m."gameWorldId" = ${gameWorldId}::uuid AND pms.goals > 0
+      GROUP BY pms."playerId"
+      ORDER BY goals DESC
+      LIMIT 30
+    `;
+    if (totals.length === 0) return [];
+
+    const ids = totals.map((t) => t.playerId);
+    const players = await this.client.player.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        person: { select: { firstName: true, lastName: true } },
+        squadMemberships: {
+          where: { squad: { category: "FIRST_TEAM" } },
+          take: 1,
+          select: { squad: { select: { clubId: true } } },
+        },
+      },
+    });
+    const clubIds = [
+      ...new Set(
+        players.flatMap((p) =>
+          p.squadMemberships[0] ? [p.squadMemberships[0].squad.clubId] : [],
+        ),
+      ),
+    ];
+    const clubNames = await this.clubNames(gameWorldId, clubIds);
+    const byId = new Map(players.map((p) => [p.id, p]));
+
+    return totals.map((t) => {
+      const player = byId.get(t.playerId);
+      const clubId = player?.squadMemberships[0]?.squad.clubId;
+      return {
+        playerId: t.playerId,
+        name: player
+          ? `${player.person.firstName} ${player.person.lastName}`
+          : "—",
+        clubName: clubId ? (clubNames.get(clubId)?.name ?? "Sem clube") : "Sem clube",
+        goals: t.goals,
       };
     });
   }
