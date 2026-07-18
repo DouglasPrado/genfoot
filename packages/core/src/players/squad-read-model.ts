@@ -1,7 +1,10 @@
 import type { GameWorldId } from "@grinta/shared";
 
 import type { PlayerPosition } from "../genesis/genesis-types.js";
-import type { PlayerAttributeRollup } from "./player-attributes.js";
+import type {
+  PlayerAttributeRollup,
+  PlayerAttributes,
+} from "./player-attributes.js";
 
 /**
  * A visão do elenco para a tela M-03.
@@ -26,6 +29,8 @@ export interface RosterPlayerView {
   readonly fitness: number;
   /** Os 4 grupos, derivados dos 39 (R-179) — para exibição. */
   readonly groups: PlayerAttributeRollup;
+  /** Os 39 atributos finos (R-188) — o card de habilidades detalhado. */
+  readonly attributes: PlayerAttributes;
 }
 
 export interface RosterView {

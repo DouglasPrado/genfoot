@@ -49,8 +49,25 @@ import {
   type FormationKey,
 } from "./formations";
 import { Pitch } from "./pitch";
-import { PlayerCard } from "./player-card";
-import { canSubstitute } from "./substitution-model";
+import { ReserveCard } from "./reserve-card";
+import {
+  canSubstitute,
+  fitRank,
+  positionFit,
+  type PositionFit,
+} from "./substitution-model";
+import {
+  PlayerSkillCard,
+  type PlayerSkillCardData,
+} from "@/components/player-skill-card";
+
+/** Cor do setor, pro chip de posição do card FC. */
+const GROUP_TINT: Record<string, string> = {
+  GOL: color.warning,
+  DEF: color.info,
+  MEI: color.success,
+  ATA: color.danger,
+};
 
 /** Tela de Elenco: campo tático (formação editável) + modal de substituição. */
 export function Squad() {
@@ -98,6 +115,8 @@ export function Squad() {
     players.filter((p) => !p.starter).map((p) => p.id),
   );
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
+  // Reserva aberto no card FC (detalhe). `null` = só a lista.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const slots = FORMATIONS[formation];
   const avgOvr = useMemo(() => {
@@ -119,7 +138,10 @@ export function Squad() {
     [byId],
   );
 
-  const closeSheet = useCallback(() => setActiveSlot(null), []);
+  const closeSheet = useCallback(() => {
+    setActiveSlot(null);
+    setDetailId(null);
+  }, []);
   const focusSheet = useCallback(() => {
     const node = findNodeHandle(sheetRef.current);
     if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
@@ -340,17 +362,28 @@ export function Squad() {
     activeSlot !== null ? byId.get(onPitchIds[activeSlot] ?? "") : undefined;
   const outgoingRole =
     activeSlot !== null ? slots[activeSlot]?.role : undefined;
-  // Todas as reservas do elenco, na ordem, com a flag de elegibilidade: quem
-  // não é da posição de origem aparece escurecido e bloqueado (por ora).
-  const benchOptions = useMemo(
-    () =>
-      benchIds
-        .map((id) => byId.get(id))
-        .filter((p): p is SquadPlayer => Boolean(p))
-        .map((p) => ({ player: p, eligible: canSubstitute(outgoing, p) })),
-    [outgoing, benchIds, byId],
-  );
+  // Todas as reservas, com o encaixe na posição do titular (natural/adaptável/
+  // bloqueado) — ordenadas para os ELEGÍVEIS aparecerem primeiro (natural antes
+  // de adaptável, bloqueado por último). Ordem estável dentro de cada faixa.
+  const benchOptions = useMemo(() => {
+    const opts = benchIds
+      .map((id) => byId.get(id))
+      .filter((p): p is SquadPlayer => Boolean(p))
+      .map((p, index) => {
+        const fit: PositionFit = outgoing
+          ? positionFit(outgoing.position, p.position)
+          : "none";
+        return { player: p, fit, eligible: fit !== "none", index };
+      });
+    return opts
+      .sort((a, b) => fitRank(a.fit) - fitRank(b.fit) || a.index - b.index)
+      .map(({ player, fit, eligible }) => ({ player, fit, eligible }));
+  }, [outgoing, benchIds, byId]);
   const eligibleCount = benchOptions.filter((o) => o.eligible).length;
+
+  const detail = detailId === null ? undefined : byId.get(detailId);
+  const detailFit: PositionFit =
+    detail && outgoing ? positionFit(outgoing.position, detail.position) : "none";
 
   const queryState =
     clubQuery.state === "loading" ||
@@ -527,7 +560,8 @@ export function Squad() {
               ) : null}
               {outgoing ? (
                 <Text style={styles.sheetRule}>
-                  Só reservas de {outgoing.position} — mesma posição de origem
+                  {outgoing.position} e posições que se adaptam · toque para ver o
+                  card
                 </Text>
               ) : null}
             </View>
@@ -551,41 +585,121 @@ export function Squad() {
             {benchOptions.length === 0 ? (
               <Text style={styles.empty}>Sem reservas disponíveis.</Text>
             ) : (
-              benchOptions.map(({ player: p, eligible }) => (
+              benchOptions.map(({ player: p, fit, eligible }) => (
                 <Pressable
                   key={p.id}
-                  onPress={() => (eligible ? substitute(p.id) : undefined)}
-                  disabled={!eligible}
+                  onPress={() => setDetailId(p.id)}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: !eligible }}
                   accessibilityLabel={
                     eligible
-                      ? `Escalar ${p.name}`
-                      : `${p.name} bloqueado — ${p.position} não substitui ${outgoing?.position ?? ""}`
+                      ? `Ver card de ${p.name}${fit === "adaptable" ? " (adapta)" : ""}`
+                      : `Ver card de ${p.name} — ${p.position} não cobre ${outgoing?.position ?? ""}`
                   }
                   style={[styles.benchRow, eligible ? null : styles.benchBlocked]}
                 >
-                  <PlayerCard p={p} />
-                  {eligible ? (
-                    <View style={styles.enterBadge}>
-                      <Icon
-                        name="arrow-up"
-                        size={12}
-                        color={color.primaryContrast}
-                      />
-                      <Text style={styles.enterText}>ENTRAR</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.blockedBadge}>
-                      <Icon name="warning" size={11} color={color.textMuted} />
-                      <Text style={styles.blockedText}>{p.position}</Text>
-                    </View>
-                  )}
+                  <ReserveCard p={p} outgoing={outgoing} fit={fit} />
                 </Pressable>
               ))
             )}
           </ScrollView>
         </View>
+
+        {detail ? (
+          <View style={styles.detailOverlay}>
+            <Pressable
+              style={styles.detailBackdrop}
+              onPress={() => setDetailId(null)}
+            />
+            <View style={styles.detailWrap} pointerEvents="box-none">
+              <View style={styles.detailCard}>
+              <PlayerSkillCard
+                data={
+                  {
+                    name: detail.name,
+                    number: detail.number,
+                    position: detail.position,
+                    positionTint: GROUP_TINT[detail.group] ?? color.primary,
+                    age: detail.age,
+                    ovr: detail.ovr,
+                    pot: detail.pot,
+                    fitness: detail.fitness,
+                    morale: detail.morale,
+                    groups: detail.groups,
+                    attributes: detail.attributes,
+                  } satisfies PlayerSkillCardData
+                }
+              />
+
+              {outgoing ? (
+                <View
+                  style={[
+                    styles.detailFitNote,
+                    detailFit === "adaptable"
+                      ? styles.detailFitAdapt
+                      : detailFit === "none"
+                        ? styles.detailFitBlocked
+                        : styles.detailFitNatural,
+                  ]}
+                >
+                  <Icon
+                    name={
+                      detailFit === "none" ? "warning" : "swap-horizontal"
+                    }
+                    size={13}
+                    color={
+                      detailFit === "adaptable"
+                        ? color.warning
+                        : detailFit === "none"
+                          ? color.textMuted
+                          : color.primary
+                    }
+                  />
+                  <Text style={styles.detailFitText}>
+                    {detailFit === "natural"
+                      ? `Posição natural de ${outgoing.position}.`
+                      : detailFit === "adaptable"
+                        ? `Adapta de ${detail.position} para ${outgoing.position}.`
+                        : `${detail.position} não cobre ${outgoing.position}.`}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.detailActions}>
+                <Pressable
+                  onPress={() => setDetailId(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar card"
+                  style={styles.detailClose}
+                >
+                  <Text style={styles.detailCloseText}>FECHAR</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    if (detailFit === "none") return;
+                    substitute(detail.id);
+                    setDetailId(null);
+                  }}
+                  disabled={detailFit === "none"}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: detailFit === "none" }}
+                  accessibilityLabel={`Escalar ${detail.name}`}
+                  style={[
+                    styles.detailEscalar,
+                    detailFit === "none" ? styles.detailEscalarOff : null,
+                  ]}
+                >
+                  <Icon
+                    name="arrow-up"
+                    size={14}
+                    color={color.primaryContrast}
+                  />
+                  <Text style={styles.detailEscalarText}>ESCALAR</Text>
+                </Pressable>
+              </View>
+              </View>
+            </View>
+          </View>
+        ) : null}
       </Modal>
     </SafeAreaView>
   );
@@ -765,44 +879,69 @@ const styles = StyleSheet.create({
     paddingVertical: space.xl,
   },
   benchRow: { minHeight: MINIMUM_TOUCH_TARGET },
-  benchBlocked: { opacity: 0.38 },
-  blockedBadge: {
-    position: "absolute",
-    right: space.md,
-    top: "50%",
-    marginTop: -11,
+  benchBlocked: { opacity: 0.42 },
+  detailOverlay: { ...StyleSheet.absoluteFillObject },
+  detailBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.72)",
+  },
+  detailWrap: {
+    flex: 1,
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  detailCard: {
+    gap: space.md,
+    backgroundColor: color.backgroundElevated,
+    borderColor: color.borderStrong,
+    borderWidth: 1,
+    borderRadius: radius.xl,
+    padding: space.md,
+  },
+  detailFitNote: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: color.surface,
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+  },
+  detailFitNatural: { borderColor: color.primaryDim, backgroundColor: "#151c0e" },
+  detailFitAdapt: { borderColor: color.warning, backgroundColor: "#2a2109" },
+  detailFitBlocked: { borderColor: color.border, backgroundColor: color.surface },
+  detailFitText: { flex: 1, color: color.text, fontSize: fontSize.xs },
+  detailActions: { flexDirection: "row", gap: space.sm },
+  detailClose: {
+    flex: 1,
+    minHeight: MINIMUM_TOUCH_TARGET,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: color.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
+    backgroundColor: color.surface,
   },
-  blockedText: {
+  detailCloseText: {
     color: color.textMuted,
-    fontSize: 10,
-    fontWeight: fontWeight.bold as "700",
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
     letterSpacing: 0.5,
   },
-  enterBadge: {
-    position: "absolute",
-    right: space.md,
-    top: "50%",
-    marginTop: -11,
+  detailEscalar: {
+    flex: 2,
+    minHeight: MINIMUM_TOUCH_TARGET,
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
+    justifyContent: "center",
+    gap: space.sm,
+    borderRadius: radius.sm,
     backgroundColor: color.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    paddingVertical: 4,
   },
-  enterText: {
+  detailEscalarOff: { opacity: 0.4 },
+  detailEscalarText: {
     color: color.primaryContrast,
-    fontSize: 10,
+    fontSize: fontSize.sm,
     fontWeight: fontWeight.black as "800",
     letterSpacing: 0.5,
   },

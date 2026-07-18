@@ -1,6 +1,10 @@
 import type { GameWorldId } from "@grinta/shared";
 
 import type { PlayerPosition } from "../genesis/genesis-types.js";
+import type {
+  PlayerAttributeRollup,
+  PlayerAttributes,
+} from "./player-attributes.js";
 
 /**
  * A visão do mercado (M-06) — o scout dos jogadores do mundo.
@@ -19,6 +23,13 @@ export interface MarketPlayerView {
   readonly age: number;
   readonly overall: number;
   readonly potential: number;
+  /**
+   * Rollup de 4 grupos (mesma derivação do elenco, R-179): alimenta o card de
+   * habilidades do jogador na vitrine. `goalkeeping` é `null` fora do gol.
+   */
+  readonly groups: PlayerAttributeRollup;
+  /** Os 39 atributos finos (R-188) — o card de habilidades detalhado. */
+  readonly attributes: PlayerAttributes;
   /** Valor de mercado estimado, em unidade mínima (R-41). Exibição. */
   readonly valueMinor: string;
 }

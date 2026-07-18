@@ -31,6 +31,11 @@ import {
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
 import { color, fontSize, fontWeight, formatAmount, radius, space } from "@/theme";
+import {
+  PlayerSkillCard,
+  type PlayerSkillCardData,
+} from "@/components/player-skill-card";
+import { Icon } from "@/components/icon";
 
 interface MarketPlayer {
   readonly playerId: string;
@@ -42,6 +47,15 @@ interface MarketPlayer {
   readonly overall: number;
   readonly potential: number;
   readonly valueMinor: string;
+  /** Rollup de 4 grupos (MarketPlayerView.groups). Alimenta o card FC. */
+  readonly groups?: {
+    readonly technical: number;
+    readonly physical: number;
+    readonly mental: number;
+    readonly goalkeeping: number | null;
+  };
+  /** Os 39 atributos finos (MarketPlayerView.attributes) — card detalhado. */
+  readonly attributes?: Record<string, number | null>;
 }
 
 interface MarketProjection {
@@ -106,6 +120,8 @@ export function Market() {
   // O jogador que o técnico quer contratar: abre o modal de confirmação com os
   // detalhes do contrato ANTES de fechar. `null` = modal fechado.
   const [pending, setPending] = useState<MarketPlayer | null>(null);
+  // O jogador cujo card FC está aberto (ao tocar na linha). `null` = fechado.
+  const [inspect, setInspect] = useState<MarketPlayer | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
   const identityQuery =
@@ -288,24 +304,31 @@ export function Market() {
               };
               return (
                 <View key={p.playerId} style={styles.row}>
-                  <View style={[styles.avatar, { backgroundColor: pos.tint }]}>
-                    <Text style={styles.avatarText}>{initialsOf(p.name)}</Text>
-                  </View>
-                  <View style={styles.info}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {p.name}
-                    </Text>
-                    <View style={styles.metaRow}>
-                      <View
-                        style={[styles.posBadge, { backgroundColor: pos.tint }]}
-                      >
-                        <Text style={styles.posText}>{pos.label}</Text>
-                      </View>
-                      <Text style={styles.club} numberOfLines={1}>
-                        {p.clubName} · {p.age} anos · OVR {p.overall}
-                      </Text>
+                  <Pressable
+                    onPress={() => setInspect(p)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver card de ${p.name}`}
+                    style={styles.identity}
+                  >
+                    <View style={[styles.avatar, { backgroundColor: pos.tint }]}>
+                      <Text style={styles.avatarText}>{initialsOf(p.name)}</Text>
                     </View>
-                  </View>
+                    <View style={styles.info}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <View style={styles.metaRow}>
+                        <View
+                          style={[styles.posBadge, { backgroundColor: pos.tint }]}
+                        >
+                          <Text style={styles.posText}>{pos.label}</Text>
+                        </View>
+                        <Text style={styles.club} numberOfLines={1}>
+                          {p.clubName} · {p.age} anos · OVR {p.overall}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
                   <View style={styles.action}>
                     <Text style={styles.value}>{reais(p.valueMinor)}</Text>
                     <Pressable
@@ -430,6 +453,74 @@ export function Market() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={inspect !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInspect(null)}
+      >
+        <View style={styles.inspectRoot}>
+          <Pressable
+            style={styles.inspectBackdrop}
+            onPress={() => setInspect(null)}
+          />
+          <View style={styles.inspectWrap} pointerEvents="box-none">
+            <View style={styles.inspectCard}>
+              {inspect !== null ? (
+                <>
+                <PlayerSkillCard
+                  data={
+                    {
+                      name: inspect.name,
+                      position:
+                        POSITION[inspect.primaryPosition]?.label ??
+                        inspect.primaryPosition,
+                      positionTint:
+                        POSITION[inspect.primaryPosition]?.tint ?? color.primary,
+                      age: inspect.age,
+                      ovr: inspect.overall,
+                      pot: inspect.potential,
+                      groups: inspect.groups ?? null,
+                      attributes: inspect.attributes ?? null,
+                    } satisfies PlayerSkillCardData
+                  }
+                />
+                <Text style={styles.inspectValue}>
+                  Valor estimado {reais(inspect.valueMinor)}
+                </Text>
+                <View style={styles.inspectActions}>
+                  <Pressable
+                    onPress={() => setInspect(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Fechar card"
+                    style={styles.inspectClose}
+                  >
+                    <Text style={styles.inspectCloseText}>FECHAR</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      const p = inspect;
+                      setInspect(null);
+                      setTracking(null);
+                      setPending(p);
+                    }}
+                    disabled={signingId !== null}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Contratar ${inspect.name}`}
+                    accessibilityState={{ disabled: signingId !== null }}
+                    style={styles.inspectSign}
+                  >
+                    <Icon name="cart" size={14} color={color.background} />
+                    <Text style={styles.inspectSignText}>CONTRATAR</Text>
+                  </Pressable>
+                </View>
+                </>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -485,6 +576,12 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: color.border,
+  },
+  identity: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
   },
   avatar: {
     width: 44,
@@ -626,6 +723,59 @@ const styles = StyleSheet.create({
   },
   modalBtnDisabled: { opacity: 0.5 },
   modalBtnText: {
+    color: color.background,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  inspectRoot: { flex: 1 },
+  inspectBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  inspectWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  inspectCard: {
+    width: "100%",
+    maxWidth: 400,
+    gap: space.md,
+  },
+  inspectValue: {
+    color: color.primary,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+    textAlign: "center",
+  },
+  inspectActions: { flexDirection: "row", gap: space.sm },
+  inspectClose: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surface,
+  },
+  inspectCloseText: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  inspectSign: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.sm,
+    paddingVertical: space.md,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  inspectSignText: {
     color: color.background,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",

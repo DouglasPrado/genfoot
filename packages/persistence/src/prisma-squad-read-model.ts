@@ -64,6 +64,7 @@ export class PrismaSquadReadModel implements SquadReadModel {
             morale: m.player.morale,
             fitness: 100 - m.player.fatigue,
             groups: rollupAttributes(grid),
+            attributes: grid,
           };
         }),
     };

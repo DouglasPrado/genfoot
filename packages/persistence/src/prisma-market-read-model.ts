@@ -1,8 +1,10 @@
 import {
   estimatePlayerValueMinor,
+  rollupAttributes,
   type MarketPlayerView,
   type MarketReadModel,
   type MarketView,
+  type PlayerAttributes,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -42,6 +44,7 @@ export class PrismaMarketReadModel implements MarketReadModel {
       orderBy: { currentAbility: "desc" },
       take: SCOUT_LIMIT * 2, // folga: filtramos o próprio clube depois
       include: {
+        attributes: true,
         person: { select: { firstName: true, lastName: true, birthDate: true } },
         squadMemberships: {
           where: { squad: { category: "FIRST_TEAM" } },
@@ -62,7 +65,11 @@ export class PrismaMarketReadModel implements MarketReadModel {
     for (const p of players) {
       const clubId = p.squadMemberships[0]?.squad.clubId;
       if (clubId == null || clubId === excludeClubId) continue;
+      // Sem grid de atributos não há card de habilidades — e overall/valor
+      // dependem do grid. Pula (como o roster faz), em vez de mostrar meio card.
+      if (p.attributes === null) continue;
       const age = ageOn(p.person.birthDate, asOf);
+      const grid = readGrid(p.attributes);
       items.push({
         playerId: p.id,
         name: `${p.person.firstName} ${p.person.lastName}`,
@@ -72,6 +79,8 @@ export class PrismaMarketReadModel implements MarketReadModel {
         age,
         overall: p.currentAbility,
         potential: p.potentialAbility,
+        groups: rollupAttributes(grid),
+        attributes: grid,
         valueMinor: estimatePlayerValueMinor(p.currentAbility, age).toString(),
       });
       if (items.length >= SCOUT_LIMIT) break;
@@ -90,6 +99,16 @@ export class PrismaMarketReadModel implements MarketReadModel {
     });
     return new Map(periods.map((p) => [p.clubId, { name: p.name }]));
   }
+}
+
+/** Lê a linha de atributos do Prisma para o grid do domínio (menos `playerId`). */
+function readGrid(row: Record<string, unknown>): PlayerAttributes {
+  const grid: Record<string, number | null> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (key === "playerId") continue;
+    grid[key] = value as number | null;
+  }
+  return grid as PlayerAttributes;
 }
 
 function ageOn(birthDate: Date, asOf: Date): number {

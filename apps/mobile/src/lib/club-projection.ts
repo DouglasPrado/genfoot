@@ -171,6 +171,15 @@ export interface MobileRosterProjection {
     readonly age: number;
     readonly morale: number;
     readonly fitness: number;
+    /** Rollup de 4 grupos (RosterView.groups). `goalkeeping` null fora do gol. */
+    readonly groups?: {
+      readonly technical: number;
+      readonly physical: number;
+      readonly mental: number;
+      readonly goalkeeping: number | null;
+    };
+    /** Os 39 atributos finos (RosterView.attributes) — card detalhado. */
+    readonly attributes?: Record<string, number | null>;
   }[];
 }
 
@@ -209,6 +218,8 @@ export function squadPlayersFromRoster(
         morale: player.morale,
         contractYears: 0,
         starter: player.shirtNumber <= 11,
+        groups: player.groups ?? null,
+        attributes: player.attributes ?? null,
       } satisfies SquadPlayer,
     ];
   });
