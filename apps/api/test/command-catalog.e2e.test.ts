@@ -88,7 +88,15 @@ describe("API command catalog integrity (e2e)", () => {
       "identity:release-club-reservation",
       "identity:request-switch",
       "identity:reserve-club",
+      // C6: a compra de verdade — dinheiro, contrato e elenco num só commit (R-192).
+      "market:list-player",
+      "market:release-player",
+      "market:sell-player",
+      "market:sign-player",
       "world:activate",
+      // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
+      // para reverdejar o gate — o command existe, faltava a linha do catálogo.
+      "world:advance-days",
       // O ciclo de vida operacional: a aba de Configurações do admin os despacha.
       // Sobem aqui porque uma tela viva os exige — que é a regra desta lista.
       "world:archive",
@@ -96,8 +104,14 @@ describe("API command catalog integrity (e2e)", () => {
       "world:delete",
       "world:genesis",
       "world:pause",
+      // C5: joga a próxima rodada da liga (simulação determinística).
+      "world:play-round",
       "world:resume",
       "world:set-identity",
+      // C8: desce um profissional (≤21) de volta à base.
+      "youth:demote-player",
+      // C8: sobe um jovem da base ao elenco profissional.
+      "youth:promote-player",
     ]);
   });
 
@@ -106,15 +120,38 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(15);
+    expect(response.body.commandCount).toBe(23);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // A tabela da liga (C7): derivada dos jogos terminados.
+      "competitions",
+      // A torcida (C10, M-25): headcount, paciência da diretoria, pressão.
+      "fanbase",
+      // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
+      "finance-snapshot",
       "identity",
       "identity-detail",
+      // A caixa de entrada (C12, M-HOME): pendências do clube.
+      "inbox",
+      // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
+      "ledger",
+      // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.
+      "market",
+      // O calendário e os resultados (M-05, lista).
+      "matches",
+      // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
+      "narrative",
+      // O elenco (M-03): recorte fino por clubId. Faltava aqui — eu registrei o
+      // handler e não atualizei esta lista, o mesmo descuido do club:apply-identity.
+      "roster",
+      // A comissão técnica (C8, M-25): recorte por clubId.
+      "staff",
+      // A base (C8): os jovens em formação, recorte por clubId.
+      "youth",
     ]);
   });
 

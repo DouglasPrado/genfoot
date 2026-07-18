@@ -63,6 +63,20 @@ export interface WorldListItem {
   readonly clubCount: number;
 }
 
+/**
+ * A identidade de um mundo, do detalhe (`GET /api/v1/worlds/:id`). O snapshot
+ * completo tem muito mais; este recorte é só o que a listagem do admin usa para
+ * enriquecer cada linha. `null` = nunca definido (cai no `seed`/placeholder).
+ */
+export interface WorldDetail {
+  readonly id: string;
+  readonly seed: string;
+  readonly name: string | null;
+  readonly description: string | null;
+  readonly bannerUrl: string | null;
+  readonly squarePhotoUrl: string | null;
+}
+
 export interface Catalog {
   readonly commands: readonly string[];
   readonly queries: readonly string[];

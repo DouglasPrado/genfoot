@@ -9,6 +9,7 @@ import {
   type SessionResponse,
   type StandardError,
   type ValidationReport,
+  type WorldDetail,
   type WorldListItem,
 } from "./types.js";
 
@@ -150,6 +151,21 @@ export class GrintaClient {
     ).body.data;
   }
 
+  /**
+   * O detalhe de um mundo. Usado pela listagem do admin para enriquecer cada
+   * linha com a IDENTIDADE (nome, descrição, foto e capa), que o endpoint de
+   * lista ainda não carrega. O snapshot traz muito mais; aqui só tipamos o que
+   * a UI de listagem consome — os campos extras do envelope são ignorados.
+   */
+  async world(worldId: string): Promise<WorldDetail> {
+    return (
+      await this.request<QueryEnvelope<WorldDetail>>(
+        "GET",
+        `/api/v1/worlds/${worldId}`,
+      )
+    ).body.data;
+  }
+
   /** Roda a calibração (VAL-001) e devolve o relatório com bandas e gate. */
   async validation(manifest?: unknown): Promise<ValidationReport> {
     return (
@@ -190,11 +206,16 @@ export class GrintaClient {
   async query<T = unknown>(
     worldId: string,
     queryType?: string,
-    page?: { limit?: number; offset?: number },
+    page?: { limit?: number; offset?: number; params?: Record<string, string> },
   ): Promise<QueryEnvelope<T>> {
     const params = new URLSearchParams();
     if (page?.limit !== undefined) params.set("limit", String(page.limit));
     if (page?.offset !== undefined) params.set("offset", String(page.offset));
+    // Recorte fino da query (ex.: `roster` precisa de `clubId`). É o que leva o
+    // parâmetro de tela à borda sem alargar o caminho world-scoped.
+    for (const [key, value] of Object.entries(page?.params ?? {})) {
+      params.set(key, value);
+    }
     const suffix = params.toString() ? `?${params.toString()}` : "";
     const path = queryType
       ? `/api/v1/worlds/${worldId}/${queryType}${suffix}`

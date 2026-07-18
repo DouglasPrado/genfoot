@@ -1,6 +1,6 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
-import { SQUAD_SIZE } from "../genesis/player-generation.js";
+import { MAX_SQUAD_SIZE } from "../genesis/player-generation.js";
 
 import type { SquadMembershipSnapshot, SquadSnapshot } from "./club-types.js";
 
@@ -17,9 +17,9 @@ export class Squad {
     const shirts = new Set(snapshot.memberships.map(({ shirtNumber }) => shirtNumber));
     if (
       snapshot.version < 1 ||
-      // O teto é REGRA (R-57), não coluna: gravá-lo por elenco permitiria dois
+      // O teto é REGRA (R-193), não coluna: gravá-lo por elenco permitiria dois
       // clubes com tetos diferentes — o oposto do "teto comum" do GDD §1.
-      snapshot.memberships.length > SQUAD_SIZE ||
+      snapshot.memberships.length > MAX_SQUAD_SIZE ||
       snapshot.seasonNumber < 1 ||
       players.size !== snapshot.memberships.length ||
       shirts.size !== snapshot.memberships.length
@@ -32,7 +32,7 @@ export class Squad {
   public assign(
     membership: SquadMembershipSnapshot,
   ): Result<void, DomainError> {
-    if (this.state.memberships.length >= SQUAD_SIZE) {
+    if (this.state.memberships.length >= MAX_SQUAD_SIZE) {
       return fail(
         new DomainError(
           "SQUAD_CAPACITY_EXCEEDED",

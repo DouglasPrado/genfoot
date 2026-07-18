@@ -19,6 +19,14 @@ import {
 } from "./world-types.js";
 
 /**
+ * Dias por temporada. Constante declarada — sua casa canônica é
+ * `GameRuleConfig`/R-182 (`seasonDays`), que ainda não existe (mesma dívida
+ * assumida do `COOLDOWN_DAYS` no mobile). Não é número mágico escondido: é o
+ * único ponto que decide quando o relógio vira a temporada.
+ */
+export const SEASON_DAYS = 365;
+
+/**
  * Apara e decide entre texto e ausência. Só-espaço vira `null`: sem isto, `"   "`
  * seria um nome que a tela renderiza vazio, e ninguém entende por que o mundo
  * perdeu o título.
@@ -393,15 +401,38 @@ export class GameWorld {
     }
 
     for (let index = 0; index < days; index += 1) {
+      const seasonBefore = this.seasonNumberOn(this.#currentDate);
       this.#currentDate = this.#currentDate.addDays(1);
       this.record("WorldDayAdvanced", {
         gameWorldId: this.#id,
         gameDate: this.#currentDate.toString(),
         worldSequence: this.#worldSequence + 1,
       });
+      // Cruzou a fronteira da temporada: a que ACABOU é `seasonBefore`, e é a que
+      // o encerramento vai debitar. Um evento por virada, no dia exato.
+      const seasonAfter = this.seasonNumberOn(this.#currentDate);
+      if (seasonAfter > seasonBefore) {
+        this.record("SeasonRolledOver", {
+          gameWorldId: this.#id,
+          seasonNumber: seasonBefore,
+          gameDate: this.#currentDate.toString(),
+        });
+      }
     }
 
     return succeed(undefined);
+  }
+
+  /**
+   * A temporada de uma data: `floor(dias desde o início / SEASON_DAYS) + 1`. A
+   * temporada 1 começa no `startDate`. `Date.parse` de string ISO fixa é
+   * determinístico (o razão da gênese usa o mesmo) — não é o `Date.now` proibido.
+   */
+  private seasonNumberOn(date: WorldDate): number {
+    const startMs = Date.parse(`${this.#startDate.toString()}T00:00:00.000Z`);
+    const currentMs = Date.parse(`${date.toString()}T00:00:00.000Z`);
+    const daysSinceStart = Math.floor((currentMs - startMs) / 86_400_000);
+    return Math.floor(daysSinceStart / SEASON_DAYS) + 1;
   }
 
   public snapshot(): GameWorldSnapshot {

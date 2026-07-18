@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,10 +17,12 @@ import { ScreenStatePanel } from "@/components/screen-state-panel";
 import {
   buildClubInfrastructure,
   selectManagedClub,
+  squadPlayersFromRoster,
   type ClubPortfolioProjection,
-  type NarrativeProjection,
+  type MobileRosterProjection,
 } from "@/lib/club-projection";
 import { ClubCrest } from "@/screens/club/customization/crest";
+import { PlayerAvatar } from "@/components/player-avatar";
 import { CustomizeClubModal, normalizeClubName } from "@/screens/club/customization/customize-modal";
 import {
   defaultVisualIdentity,
@@ -53,17 +55,47 @@ import {
 
 type IoniconName = IconName;
 
-interface LedgerSummaryProjection {
-  readonly accountCount: number;
-  readonly transactionCount: number;
-  readonly activeReservationCount: number;
-  readonly activeDebtCount: number;
-  readonly closedPeriodCount: number;
-  readonly residualMinor: number;
-  readonly clubBalances: readonly {
-    readonly clubId: string;
-    readonly balanceMinor: number;
+interface FanbaseProjection {
+  readonly clubId: string;
+  readonly headcount: number;
+  readonly boardPatience: number;
+  readonly pressureLevel: number;
+}
+
+/** O feed de imprensa (C11): manchetes dos fatos reais do mundo. */
+interface NarrativeFeedProjection {
+  readonly items: readonly {
+    readonly id: string;
+    readonly clubId: string | null;
+    readonly type: string;
+    readonly title: string;
+    readonly description: string;
+    readonly intensity: number;
+    readonly occurredOn: string;
   }[];
+}
+
+/**
+ * `finance-snapshot` (C9): a visão financeira REAL do clube gerido. Caixa é o
+ * saldo derivado do razão (INV-8), folha é o custo de temporada do elenco +
+ * estrutura (modelo puro do core). `financialHealth.value` é `null` enquanto
+ * faltam sub-índices (receita/dívida sem fonte) — degrada dizendo "parcial", não
+ * inventa nota. Substitui a query `ledger`, que morreu no extermínio (R-175) e
+ * respondia 404.
+ */
+interface FinanceSnapshotProjection {
+  readonly clubId: string;
+  readonly currencyId: string;
+  readonly cashMinor: number;
+  readonly seasonCost: {
+    readonly totalMinor: number;
+    readonly contractedPlayerCount: number;
+    readonly estimatedPlayerCount: number;
+  };
+  readonly financialHealth: {
+    readonly value: number | null;
+  };
+  readonly provenanceNotes: readonly string[];
 }
 
 /** Tela de Clube: identidade, finanças e infraestrutura. */
@@ -74,18 +106,13 @@ export function Club() {
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
-  const ledgerQuery = useWorldQuery<LedgerSummaryProjection>("ledger");
   /**
-   * `ledger` (C9) e `narrative` (C11) foram apagados no extermínio (R-175) e
-   * respondem 404. As duas queries FICAM, e a tela já fazia a coisa certa:
-   * degrada dizendo "Nenhum saldo estimado será exibido" e omite a torcida em
-   * vez de inventar número.
-   *
-   * Não mockei dinheiro aqui, e a diferença para o admin é deliberada: lá o mock
-   * leva selo e o operador sabe ler; aqui o jogador contrataria em cima de um
-   * número inventado. Volta com C9 — e aí a tela liga sozinha.
+   * `narrative` (C11) ainda responde 404 no extermínio (R-175): a tela degrada
+   * omitindo as manchetes em vez de inventar. O financeiro NÃO degrada mais — a
+   * query `finance-snapshot` (C9) voltou e é lida abaixo (`financeQuery`),
+   * recortada pelo clube gerido.
    */
-  const narrativeQuery = useWorldQuery<NarrativeProjection>("narrative");
+  const narrativeQuery = useWorldQuery<NarrativeFeedProjection>("narrative");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const identity = identityQuery.state === "empty" ? null : identityQuery.data;
@@ -98,6 +125,35 @@ export function Club() {
     clubQuery.data,
     controlStep.kind === "complete" ? controlStep.clubId : null,
   );
+  // A torcida (C10): headcount, paciência da diretoria e pressão, recortados pelo
+  // clube gerido. Só dispara com o clubId em mãos.
+  const fanbaseQuery = useWorldQuery<FanbaseProjection>(
+    managedClub === null ? null : "fanbase",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  // O financeiro real (C9), recortado pelo clube gerido. Só dispara com o
+  // clubId em mãos, como a torcida.
+  const financeQuery = useWorldQuery<FinanceSnapshotProjection>(
+    managedClub === null ? null : "finance-snapshot",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  // O elenco (R-190), recortado pelo clube gerido — alimenta a PRÉVIA do card
+  // ELENCO (contagem + média do XI). O elenco editável de fato mora na tela
+  // empilhada /elenco; aqui é só o resumo com o gancho pra abrir.
+  const rosterQuery = useWorldQuery<MobileRosterProjection>(
+    managedClub === null ? null : "roster",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const squadPreview = useMemo(() => {
+    const players = squadPlayersFromRoster(rosterQuery.data);
+    if (players.length === 0) return null;
+    const byOvr = [...players].sort((a, b) => b.ovr - a.ovr);
+    const topXi = byOvr.slice(0, 11);
+    const avgXi = Math.round(
+      topXi.reduce((sum, p) => sum + p.ovr, 0) / (topXi.length || 1),
+    );
+    return { count: players.length, avgXi, top: byOvr.slice(0, 5) };
+  }, [rosterQuery.data]);
   const vm =
     managedClub === null
       ? null
@@ -137,10 +193,11 @@ export function Club() {
             crestTemplateId: managedClub.crestTemplateId,
           }
         : defaultVisualIdentity(managedClub.name);
-  const fanbaseSize =
-    narrativeQuery.data?.clubs?.find(
-      (entry) => entry.clubId === managedClub?.id,
-    )?.fanbaseSize ?? null;
+  // A torcida vem de C10 agora (query `fanbase`), não mais do projeção de
+  // narrativa que devolvia 0. `headcount` é o tamanho; a paciência e a pressão
+  // ganham o card próprio abaixo.
+  const fanbase = fanbaseQuery.data;
+  const fanbaseSize = fanbase?.headcount ?? null;
   const takenNames = (clubQuery.data?.clubs ?? [])
     .filter((club) => club.id !== managedClub?.id)
     .map((club) => normalizeClubName(club.name));
@@ -294,10 +351,20 @@ export function Club() {
     clubQuery.refetch();
     identityQuery.refetch();
     worldQuery.refetch();
+    // O financeiro é query própria (C9). Sem isto, puxar pra atualizar mexia em
+    // tudo menos no caixa — o saldo ficava colado no valor da última montagem.
+    financeQuery.refetch();
+    narrativeQuery.refetch();
+    fanbaseQuery.refetch();
+    rosterQuery.refetch();
   }, [
     clubQuery.refetch,
     identityQuery.refetch,
     worldQuery.refetch,
+    financeQuery.refetch,
+    narrativeQuery.refetch,
+    fanbaseQuery.refetch,
+    rosterQuery.refetch,
   ]);
   const screenState = deriveScreenState({
     session: status,
@@ -318,6 +385,15 @@ export function Club() {
     return (
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.content}>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar ao início"
+            style={styles.backRow}
+          >
+            <Icon name="arrow-back" size={22} color={color.text} />
+            <Text style={styles.backText}>INÍCIO</Text>
+          </Pressable>
           <ScreenStatePanel
             state={screenState === "success" ? "empty" : screenState}
             title={vm === null ? "CLUBE NÃO DISPONÍVEL" : undefined}
@@ -339,6 +415,16 @@ export function Club() {
         showsVerticalScrollIndicator={false}
         refreshControl={<Refresh onRefresh={refresh} />}
       >
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar ao início"
+          style={styles.backRow}
+        >
+          <Icon name="arrow-back" size={22} color={color.text} />
+          <Text style={styles.backText}>INÍCIO</Text>
+        </Pressable>
+
         <Pressable
           style={styles.hero}
           onPress={() => setCustomizeOpen(true)}
@@ -384,35 +470,111 @@ export function Club() {
           </View>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.push("/elenco")}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir elenco"
+        >
+          <Card>
+            <SectionHeader
+              title="ELENCO"
+              trailing={
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Text style={styles.openHint}>ABRIR</Text>
+                  <Icon name="chevron-forward" size={16} color={color.textMuted} />
+                </View>
+              }
+            />
+            {squadPreview !== null ? (
+              <View style={styles.squadContent}>
+                <View style={styles.squadStats}>
+                  <View style={styles.squadStat}>
+                    <Text style={styles.squadStatValue}>
+                      {squadPreview.count}
+                    </Text>
+                    <Text style={styles.finBoxLabel}>JOGADORES</Text>
+                  </View>
+                  <View style={styles.squadDivider} />
+                  <View style={styles.squadStat}>
+                    <Text style={styles.squadStatValue}>
+                      {squadPreview.avgXi}
+                    </Text>
+                    <Text style={styles.finBoxLabel}>MÉDIA XI</Text>
+                  </View>
+                </View>
+                <View style={styles.squadAvatars}>
+                  {squadPreview.top.map((p, i) => (
+                    <PlayerAvatar
+                      key={p.id}
+                      size={38}
+                      style={[styles.squadAvatar, i === 0 ? null : styles.squadAvatarStacked]}
+                    />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.financeUnavailable}>
+                <Icon name="people" size={18} color={color.textMuted} />
+                <Text style={styles.financeUnavailableText}>
+                  {rosterQuery.state === "loading"
+                    ? "Sincronizando o elenco…"
+                    : "O elenco ainda não existe neste mundo."}
+                </Text>
+              </View>
+            )}
+          </Card>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push("/financas")}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir finanças"
+        >
         <Card>
           <SectionHeader
             title="FINANÇAS"
-            trailing={<Icon name="wallet" size={16} color={color.textMuted} />}
+            trailing={
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text style={styles.openHint}>ABRIR</Text>
+                <Icon name="chevron-forward" size={16} color={color.textMuted} />
+              </View>
+            }
           />
-          {ledgerQuery.state === "ready" && ledgerQuery.data !== null ? (
+          {financeQuery.state === "ready" && financeQuery.data !== null ? (
             <View style={styles.financeContent}>
               <View style={styles.finBalance}>
-                <Text style={styles.finBoxLabel}>CAIXA DISPONÍVEL</Text>
-                <Text style={styles.finBalanceValue}>
-                  R${" "}
-                  {formatAmount(
-                    (ledgerQuery.data.clubBalances.find(
-                      ({ clubId }) => clubId === managedClub?.id,
-                    )?.balanceMinor ?? 0) / 100,
-                  )}
-                </Text>
+                <View style={styles.finBalanceIcon}>
+                  <Icon name="wallet" size={18} color={color.primary} />
+                </View>
+                <View style={styles.finBalanceText}>
+                  <Text style={styles.finBoxLabel}>CAIXA DISPONÍVEL</Text>
+                  <Text
+                    style={[
+                      styles.finBalanceValue,
+                      financeQuery.data.cashMinor < 0 && styles.finBalanceNegative,
+                    ]}
+                  >
+                    R$ {formatAmount(Math.round(financeQuery.data.cashMinor / 100))}
+                  </Text>
+                </View>
               </View>
               <View style={styles.finGrid}>
                 <View style={styles.finBox}>
-                  <Text style={styles.finBoxLabel}>CONTAS CONTÁBEIS</Text>
+                  <Text style={styles.finBoxLabel}>FOLHA (TEMPORADA)</Text>
                   <Text style={styles.finBoxValue}>
-                    {ledgerQuery.data.accountCount}
+                    R${" "}
+                    {formatAmount(
+                      financeQuery.data.seasonCost.totalMinor / 100,
+                    )}
                   </Text>
                 </View>
                 <View style={styles.finBox}>
-                  <Text style={styles.finBoxLabel}>LANÇAMENTOS</Text>
+                  <Text style={styles.finBoxLabel}>SAÚDE FINANCEIRA</Text>
+                  {/* `value` null enquanto faltam sub-índices (R-42): a barra é
+                      "parcial", não um número inventado. Detalhe vive no
+                      M-FINANCE (/financas). */}
                   <Text style={styles.finBoxValue}>
-                    {ledgerQuery.data.transactionCount}
+                    {financeQuery.data.financialHealth.value ?? "parcial"}
                   </Text>
                 </View>
               </View>
@@ -421,9 +583,145 @@ export function Club() {
             <View style={styles.financeUnavailable}>
               <Icon name="shield" size={18} color={color.warning} />
               <Text style={styles.financeUnavailableText}>
-                {ledgerQuery.state === "loading"
-                  ? "Sincronizando o livro financeiro…"
+                {financeQuery.state === "loading"
+                  ? "Sincronizando o financeiro…"
                   : "O financeiro ainda não existe neste mundo. Nenhum saldo estimado será exibido."}
+              </Text>
+            </View>
+          )}
+        </Card>
+        </Pressable>
+
+        <Card>
+          <SectionHeader
+            title="IMPRENSA"
+            trailing={
+              <Icon
+                name="notifications-outline"
+                size={16}
+                color={color.textMuted}
+              />
+            }
+          />
+          {(narrativeQuery.data?.items?.length ?? 0) === 0 ? (
+            <Text style={styles.pressEmpty}>
+              {narrativeQuery.state === "loading"
+                ? "Buscando as manchetes…"
+                : "Sem manchetes ainda. Contrate um reforço e a imprensa comenta."}
+            </Text>
+          ) : (
+            (narrativeQuery.data?.items ?? []).slice(0, 6).map((item) => (
+              <View key={item.id} style={styles.pressItem}>
+                <View style={styles.pressDot} />
+                <View style={styles.pressBody}>
+                  <Text style={styles.pressTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.pressDesc} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="INFRAESTRUTURA"
+            trailing={
+              <Icon name="construct" size={16} color={color.textMuted} />
+            }
+          />
+          <View style={styles.infraList}>
+            {vm.infrastructure.map((infra) => (
+              <View key={infra.id} style={styles.infraRow}>
+                <View style={styles.infraIcon}>
+                  <Icon
+                    name={infra.icon as IoniconName}
+                    size={18}
+                    color={color.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infraName}>{infra.name}</Text>
+                  <Text style={styles.infraNote}>{infra.note}</Text>
+                </View>
+                <View style={styles.levels}>
+                  {Array.from({ length: infra.maxLevel }).map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.pip,
+                        {
+                          backgroundColor:
+                            i < infra.level
+                              ? color.primary
+                              : color.surfaceRaised,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="ESTÁDIO"
+            trailing={
+              <Icon name="business" size={16} color={color.textMuted} />
+            }
+          />
+          <View style={styles.stadiumRow}>
+            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
+            <Text style={styles.stadiumCap}>
+              {formatAmount(vm.stadiumCapacity)} lugares
+            </Text>
+          </View>
+        </Card>
+
+        <Card>
+          <SectionHeader
+            title="TORCIDA"
+            trailing={<Icon name="people" size={16} color={color.textMuted} />}
+          />
+          {fanbaseQuery.state === "ready" && fanbase !== null ? (
+            <View style={styles.financeContent}>
+              <View style={styles.finBalance}>
+                <Text style={styles.finBoxLabel}>TAMANHO DA TORCIDA</Text>
+                <Text style={styles.finBalanceValue}>
+                  {formatAmount(fanbase.headcount)}
+                </Text>
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PACIÊNCIA DA DIRETORIA</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.boardPatience}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.boardPatience / 100} height={6} />
+              </View>
+              <View style={styles.fanMeter}>
+                <View style={styles.fanMeterHead}>
+                  <Text style={styles.finBoxLabel}>PRESSÃO</Text>
+                  <Text style={styles.fanMeterValue}>
+                    {fanbase.pressureLevel}
+                  </Text>
+                </View>
+                <ProgressBar value={fanbase.pressureLevel / 100} height={6} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.financeUnavailable}>
+              <Icon name="people" size={18} color={color.textMuted} />
+              <Text style={styles.financeUnavailableText}>
+                {fanbaseQuery.state === "loading"
+                  ? "Sincronizando a torcida…"
+                  : "A torcida ainda não existe neste mundo."}
               </Text>
             </View>
           )}
@@ -516,63 +814,6 @@ export function Club() {
             )}
           </Card>
         ) : null}
-
-        <Card>
-          <SectionHeader
-            title="INFRAESTRUTURA"
-            trailing={
-              <Icon name="construct" size={16} color={color.textMuted} />
-            }
-          />
-          <View style={styles.infraList}>
-            {vm.infrastructure.map((infra) => (
-              <View key={infra.id} style={styles.infraRow}>
-                <View style={styles.infraIcon}>
-                  <Icon
-                    name={infra.icon as IoniconName}
-                    size={18}
-                    color={color.primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.infraName}>{infra.name}</Text>
-                  <Text style={styles.infraNote}>{infra.note}</Text>
-                </View>
-                <View style={styles.levels}>
-                  {Array.from({ length: infra.maxLevel }).map((_, i) => (
-                    <View
-                      key={i}
-                      style={[
-                        styles.pip,
-                        {
-                          backgroundColor:
-                            i < infra.level
-                              ? color.primary
-                              : color.surfaceRaised,
-                        },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        <Card>
-          <SectionHeader
-            title="ESTÁDIO"
-            trailing={
-              <Icon name="business" size={16} color={color.textMuted} />
-            }
-          />
-          <View style={styles.stadiumRow}>
-            <Text style={styles.stadiumName}>{vm.stadiumName}</Text>
-            <Text style={styles.stadiumCap}>
-              {formatAmount(vm.stadiumCapacity)} lugares
-            </Text>
-          </View>
-        </Card>
       </ScrollView>
 
       {managedClub !== null ? (
@@ -605,6 +846,18 @@ const COOLDOWN_DAYS = 30;
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
+  backRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+  },
+  backText: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
   crest: {
     width: 60,
@@ -646,20 +899,111 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   repBar: { flex: 1 },
+  openHint: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
   financeContent: { gap: space.sm },
+  squadContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
+  squadStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+  },
+  squadStat: { alignItems: "flex-start", gap: 2 },
+  squadStatValue: {
+    color: color.primary,
+    fontSize: fontSize.xl2,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  squadDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: "stretch",
+    backgroundColor: color.border,
+  },
+  squadAvatars: { flexDirection: "row", alignItems: "center" },
+  squadAvatar: {
+    borderWidth: 2,
+    borderColor: color.backgroundElevated,
+  },
+  squadAvatarStacked: { marginLeft: -13 },
   finGrid: { flexDirection: "row", gap: space.sm },
-  finBalance: {
-    backgroundColor: color.primaryDim,
+  fanMeter: {
+    backgroundColor: color.backgroundElevated,
     borderRadius: radius.sm,
     padding: space.md,
-    gap: 2,
+    gap: space.xs,
   },
+  fanMeterHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  fanMeterValue: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  pressEmpty: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    paddingVertical: space.sm,
+  },
+  pressItem: {
+    flexDirection: "row",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  pressDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 6,
+    backgroundColor: color.primary,
+  },
+  pressBody: { flex: 1, gap: 2 },
+  pressTitle: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  pressDesc: { color: color.textMuted, fontSize: fontSize.xs },
+  finBalance: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.md,
+    padding: space.md,
+    borderLeftWidth: 3,
+    borderLeftColor: color.primary,
+  },
+  finBalanceIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    backgroundColor: color.surfaceRaised,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  finBalanceText: { flex: 1, gap: 2 },
   finBalanceValue: {
     color: color.primary,
     fontSize: fontSize.xl2,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
+  finBalanceNegative: { color: color.danger },
   finBox: {
     flex: 1,
     backgroundColor: color.backgroundElevated,

@@ -116,6 +116,22 @@ export type WorldDayAdvancedEvent = DomainEvent<
 >;
 
 /**
+ * A temporada virou — o relógio cruzou a fronteira de `SEASON_DAYS` (game-world).
+ * `seasonNumber` é a temporada que ACABOU (a debitar no encerramento). É o
+ * gatilho que a saga de virada consome para rodar os custos por clube (passo 14
+ * do motor de virada). Substitui o `Season` órfão como sinal de fim de temporada
+ * até `GameRuleConfig`/R-182 existir.
+ */
+export type WorldSeasonRolledOverEvent = DomainEvent<
+  "SeasonRolledOver",
+  Readonly<{
+    gameWorldId: GameWorldId;
+    seasonNumber: number;
+    gameDate: string;
+  }>
+>;
+
+/**
  * Congelado: o mundo existe, é lido, e o relógio não anda (`advanceDays` exige
  * ACTIVE). Reversível — é a diferença para `WorldArchived`.
  */
@@ -154,6 +170,7 @@ export type WorldDomainEvent =
   | WorldCreatedEvent
   | WorldActivatedEvent
   | WorldDayAdvancedEvent
+  | WorldSeasonRolledOverEvent
   | WorldPausedEvent
   | WorldResumedEvent
   | WorldArchivedEvent

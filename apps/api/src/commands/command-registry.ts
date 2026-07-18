@@ -1,12 +1,21 @@
 import {
   ActivateProvisionedWorld,
+  AdvanceWorldDays,
   ApplyClubIdentity,
   ArchiveWorld,
+  CloseSeasonFinances,
   ConfirmOnboarding,
   CreateWorld,
   DeleteWorld,
   EndClubControl,
   GenerateWorldGenesis,
+  PlayNextRound,
+  SignPlayer,
+  PromoteYouthPlayer,
+  DemoteToYouthPlayer,
+  ReleasePlayer,
+  SellPlayer,
+  ListPlayer,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -16,9 +25,20 @@ import {
   ResumeWorld,
   SetWorldIdentity,
   type ClubControlRepository,
+  type ClubReadModel,
   type ClubUnitOfWork,
+  type GenesisUnitOfWork,
+  type MatchPlayRepository,
+  type SeasonFinanceUnitOfWork,
+  type TransferUnitOfWork,
+  type PromoteYouthUnitOfWork,
+  type DemoteToYouthUnitOfWork,
+  type ReleaseUnitOfWork,
+  type SellUnitOfWork,
+  type ListUnitOfWork,
   type ClubRepository,
   type IdentityUnitOfWork,
+  type WorldDomainEvent,
   type WorldMutationResult,
   type WorldRepository,
 } from "@grinta/core";
@@ -67,6 +87,26 @@ export interface CommandContext {
   readonly controls: ClubControlRepository;
   /** Escopo transacional de C3: clube + evento no mesmo commit (Decisão 19.10). */
   readonly clubUnitOfWork: ClubUnitOfWork;
+  /** A gênese é atômica: 16 clubes + 368 jogadores + 16 elencos numa transação. */
+  readonly genesisUnitOfWork: GenesisUnitOfWork;
+  /** C5 — joga a próxima rodada da liga (simulação determinística). */
+  readonly matchPlay: MatchPlayRepository;
+  /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
+  readonly transferUnitOfWork: TransferUnitOfWork;
+  /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
+  readonly promoteYouthUnitOfWork: PromoteYouthUnitOfWork;
+  /** C8 — desce um profissional (≤21) de volta à base (atômico sobre os dois elencos). */
+  readonly demoteToYouthUnitOfWork: DemoteToYouthUnitOfWork;
+  /** C6 — dispensa um jogador (tira do elenco + encerra contrato). */
+  readonly releaseUnitOfWork: ReleaseUnitOfWork;
+  /** C6/C9 — vende um jogador ao mercado (crédito do valor via faucet, R-199). */
+  readonly sellUnitOfWork: SellUnitOfWork;
+  /** C6 — coloca um jogador à venda (cria a TransferListing). */
+  readonly listUnitOfWork: ListUnitOfWork;
+  /** C9 — o débito de custos de UM clube no encerramento de temporada. */
+  readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
+  /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
+  readonly clubReadModel: ClubReadModel;
   /**
    * Quem agiu — a conta do JOGO, vinda da SESSÃO.
    *
@@ -132,10 +172,27 @@ const applyClubIdentityPayload = z.object({
     .optional(),
 });
 
+const promoteYouthPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+});
+
+const signPlayerPayload = z.object({
+  buyingClubId: z.string().uuid(),
+  sellerClubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  feeMinor: z.union([z.string(), z.number()]).transform((v) => BigInt(v)),
+  currentSeason: z.number().int().positive().default(1),
+});
+
 const createWorldPayload = z.object({
   seed: z.string().min(1),
   startDate: z.string(),
   rulesetVersion: z.string().default("1.0.0"),
+});
+
+const advanceDaysPayload = z.object({
+  days: z.number().int().positive(),
 });
 
 /**
@@ -335,16 +392,195 @@ const handlers: Record<string, CommandHandler> = {
    * A gênese não é guardada (R-185): é função pura do `seed`, que R-182 tornou
    * coluna. O que este command persiste é o EFEITO dela — as linhas de `Club`.
    */
-  "world:genesis": async ({ worlds, clubs, envelope }) => {
+  "world:genesis": async ({ worlds, genesisUnitOfWork, envelope }) => {
     const raw = requireWorldId(envelope.worldId);
     if (!raw.ok) return raw;
     const worldId = parseGameWorldId(raw.value);
     if (!worldId.ok) return worldId;
-    const result = await new GenerateWorldGenesis(worlds, clubs).execute(
-      worldId.value,
-    );
+    const result = await new GenerateWorldGenesis(
+      worlds,
+      genesisUnitOfWork,
+    ).execute(worldId.value);
     if (!result.ok) return result;
     return succeed({ resource: `world:${worldId.value}` });
+  },
+
+  /**
+   * Joga a próxima rodada não disputada da liga (C5). O placar emerge do kernel
+   * determinístico a partir da força dos elencos — não é definido por ninguém.
+   * A tabela (projeção, R-178) se preenche sozinha depois.
+   */
+  /**
+   * Avança o relógio do mundo N dias (dev/admin). Ao cruzar a fronteira de
+   * temporada (`SeasonRolledOver`), roda o ENCERRAMENTO por clube: debita os
+   * custos da temporada que acabou no caixa de cada um (passo 14 do motor de
+   * virada). Cada débito é idempotente por (clube, temporada) — reavançar não
+   * cobra duas vezes. Sem receita materializada ainda, isso só drena o caixa: a
+   * insolvência progressiva é o comportamento assumido (R-45), não um bug.
+   */
+  "world:advance-days": async ({
+    worlds,
+    clubReadModel,
+    seasonFinanceUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = advanceDaysPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const advanced = await new AdvanceWorldDays(worlds).execute(
+      world.value.worldId,
+      parsed.data.days,
+    );
+    if (!advanced.ok) return advanced;
+
+    const rollovers = advanced.value.events.filter(
+      (event): event is Extract<WorldDomainEvent, { type: "SeasonRolledOver" }> =>
+        event.type === "SeasonRolledOver",
+    );
+    if (rollovers.length > 0) {
+      const worldView = await clubReadModel.worldView(world.value.worldId);
+      const closer = new CloseSeasonFinances(seasonFinanceUnitOfWork);
+      for (const rollover of rollovers) {
+        for (const club of worldView.clubs) {
+          // Uma falha num clube não derruba a virada dos outros — o débito é
+          // por clube e idempotente; o que faltar reprocessa no próximo avanço.
+          await closer.execute({
+            gameWorldId: world.value.worldId,
+            clubId: club.id,
+            seasonNumber: rollover.payload.seasonNumber,
+            worldSeed: advanced.value.world.seed,
+            occurredOn: advanced.value.world.currentDate,
+          });
+        }
+      }
+    }
+
+    return succeed({
+      resource: `world:${world.value.worldId}`,
+      mutation: advanced.value,
+    });
+  },
+
+  "world:play-round": async ({ worlds, matchPlay, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const result = await new PlayNextRound(
+      world.value.snapshot.seed,
+      matchPlay,
+    ).execute(world.value.worldId);
+    if (!result.ok) return result;
+    return succeed({ resource: `round:${result.value.roundNumber}` });
+  },
+
+  /**
+   * A compra de verdade (C6/R-192). Dinheiro, contrato e elenco num só commit —
+   * ou os três, ou nenhum. A taxa é validada na faixa da R-26 dentro do domínio.
+   */
+  "market:sign-player": async ({ worlds, transferUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = signPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SignPlayer(transferUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      buyingClubId: parsed.data.buyingClubId,
+      sellerClubId: parsed.data.sellerClubId,
+      playerId: parsed.data.playerId,
+      feeMinor: parsed.data.feeMinor,
+      currentSeason: parsed.data.currentSeason,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  /** C8 — a promoção base→profissional. Move a membership entre os dois elencos. */
+  "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new PromoteYouthPlayer(promoteYouthUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  /** C8 — descer à base: profissional ≤ 21 volta ao YOUTH_ACADEMY. */
+  /** C6 — dispensar: o clube encerra o vínculo e o jogador deixa o elenco. */
+  /** C6/C9 — vender: o clube recebe o valor estimado, o jogador sai (R-199). */
+  /** C6 — colocar à venda: anuncia o jogador no mercado (não move ninguém). */
+  "market:list-player": async ({ worlds, listUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ListPlayer(listUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  "market:sell-player": async ({ worlds, sellUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SellPlayer(sellUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      currentSeason: 1,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  "market:release-player": async ({ worlds, releaseUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ReleasePlayer(releaseUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  "youth:demote-player": async ({ worlds, demoteToYouthUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = promoteYouthPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new DemoteToYouthPlayer(demoteToYouthUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldDate: world.value.snapshot.currentDate,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `player:${parsed.data.playerId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

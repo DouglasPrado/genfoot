@@ -1,7 +1,16 @@
 import { useCallback, useEffect } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
+import {
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from "react-native";
+import { router, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 import { Card, SectionHeader } from "@/components/card";
 import { Icon } from "@/components/icon";
@@ -14,24 +23,42 @@ import {
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { useWorldQuery, type QueryState } from "@/lib/world";
+import { ClubCrest } from "@/screens/club/customization/crest";
+import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 
-interface CompetitionSummaryProjection {
-  readonly editionCount: number;
-  readonly participantCount: number;
-  readonly fixtureCount: number;
-  readonly finalFixtureCount: number;
-  readonly homologatedEditionCount: number;
-  readonly nextKickoffOn: string | null;
-  readonly competitions: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly status: string;
-    readonly startOn: string;
+/**
+ * Arte gerada (higgsfield, estilo do protótipo): o fundo de campo da Home e as
+ * fotos dos cards de jogo. O domínio não entrega arte, então são estáticas do
+ * bundle — decorativas, não representam dado de mundo.
+ */
+const FIELD_BG = require("../../../assets/home-field-bg.jpg") as ImageSourcePropType;
+const CARD_PARTIDAS = require("../../../assets/card-partidas.jpg") as ImageSourcePropType;
+const CARD_CLUBE = require("../../../assets/card-clube.jpg") as ImageSourcePropType;
+
+/**
+ * A tabela da liga como a query `competitions` a entrega (C7). Antes esta tela
+ * esperava um resumo do mega-agregado (`editionCount`, `fixtureCount`) que a
+ * R-175 matou; agora lê a classificação real, derivada dos jogos (R-178).
+ */
+interface CompetitionStandingsProjection {
+  readonly competitionName: string;
+  readonly totalMatches: number;
+  readonly playedMatches: number;
+  readonly table: readonly {
+    readonly clubId: string;
+    readonly clubName: string;
+    readonly shortCode: string;
+    readonly points: number;
+    readonly played: number;
+    readonly won: number;
+    readonly drawn: number;
+    readonly lost: number;
+    readonly goalDifference: number;
   }[];
 }
 
@@ -68,9 +95,8 @@ export function Home() {
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const competitionQuery =
-    useWorldQuery<CompetitionSummaryProjection>("competitions");
+    useWorldQuery<CompetitionStandingsProjection>("competitions");
   const matchQuery = useWorldQuery<MatchSummaryProjection>("matches");
-  const inboxQuery = useWorldQuery<InboxSummaryProjection>("inbox");
   const automationQuery =
     useWorldQuery<AutomationSummaryProjection>("automation");
 
@@ -82,6 +108,12 @@ export function Home() {
   const club = selectManagedClub(
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
+  );
+  // O inbox é recortado pelo clube gerido (C12): as pendências são do clube.
+  // Sem clubId a query devolve zeros; com ele, as pendências reais aparecem.
+  const inboxQuery = useWorldQuery<InboxSummaryProjection>(
+    club === null ? null : "inbox",
+    club === null ? undefined : { clubId: club.id },
   );
 
   useEffect(() => {
@@ -120,7 +152,14 @@ export function Home() {
   });
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.root}>
+      <ImageBackground
+        source={FIELD_BG}
+        style={StyleSheet.absoluteFill}
+        resizeMode="cover"
+      />
+      <View style={styles.fieldScrim} pointerEvents="none" />
+      <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -141,9 +180,15 @@ export function Home() {
           <>
             <View style={styles.hero}>
               <View style={styles.crest}>
-                <Text style={styles.crestText}>
-                  {club.shortCode.slice(0, 3)}
-                </Text>
+                <ClubCrest
+                  {...clubCrestData(
+                    club.name,
+                    club.primaryColor,
+                    club.secondaryColor,
+                    club.crestTemplateId,
+                  )}
+                  size={64}
+                />
               </View>
               <View style={styles.heroText}>
                 <Text style={styles.eyebrow}>SEU CLUBE</Text>
@@ -153,6 +198,23 @@ export function Home() {
                   {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                 </Text>
               </View>
+            </View>
+
+            <View style={styles.featured}>
+              <GameCard
+                image={CARD_CLUBE}
+                eyebrow="GERIR"
+                title="CLUBE"
+                subtitle="Elenco e finanças"
+                to="/clube"
+              />
+              <GameCard
+                image={CARD_PARTIDAS}
+                eyebrow="JOGAR"
+                title="PARTIDAS"
+                subtitle="Calendário e resultados"
+                to="/partidas"
+              />
             </View>
 
             <Card>
@@ -199,27 +261,27 @@ export function Home() {
               {competitionQuery.state === "ready" &&
               competitionQuery.data !== null ? (
                 <>
-                  <View style={styles.metrics}>
-                    <Metric
-                      value={competitionQuery.data.editionCount}
-                      label="COMPETIÇÕES"
-                    />
-                    <Metric
-                      value={competitionQuery.data.fixtureCount}
-                      label="PARTIDAS MARCADAS"
-                    />
-                    <Metric
-                      value={competitionQuery.data.finalFixtureCount}
-                      label="ENCERRADAS"
-                    />
-                  </View>
-                  {competitionQuery.data.competitions[0] ? (
-                    <Text style={styles.competitionNote}>
-                      {competitionQuery.data.competitions[0].name} · estreia em{" "}
-                      {competitionQuery.data.nextKickoffOn ??
-                        competitionQuery.data.competitions[0].startOn}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.competitionNote}>
+                    {competitionQuery.data.competitionName} ·{" "}
+                    {competitionQuery.data.playedMatches}/
+                    {competitionQuery.data.totalMatches} partidas
+                  </Text>
+                  {competitionQuery.data.table.slice(0, 5).map((row, index) => (
+                    <View key={row.clubId} style={styles.standingRow}>
+                      <Text style={styles.standingPos}>{index + 1}</Text>
+                      <Text style={styles.standingName} numberOfLines={1}>
+                        {row.clubName}
+                      </Text>
+                      <Text style={styles.standingStat}>{row.played}</Text>
+                      <Text style={styles.standingStat}>
+                        {row.goalDifference > 0 ? "+" : ""}
+                        {row.goalDifference}
+                      </Text>
+                      <Text style={styles.standingPoints}>{row.points}</Text>
+                    </View>
+                  ))}
+                  {/* A tabela é derivada dos jogos (R-178): no início da
+                      temporada todos zerados; a cada rodada jogada, ela move. */}
                 </>
               ) : (
                 <InlineUnavailable
@@ -274,7 +336,60 @@ export function Home() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+/**
+ * Card de jogo destacável: a foto (higgsfield) com um escurecimento pra baixo
+ * pra legibilidade do título, e navegação pra rota empilhada. É o lançador que
+ * substituiu a barra de menu inferior.
+ */
+function GameCard({
+  image,
+  eyebrow,
+  title,
+  subtitle,
+  to,
+}: {
+  readonly image: ImageSourcePropType;
+  readonly eyebrow: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly to: Href;
+}) {
+  const gradId = `scrim-${title}`;
+  return (
+    <Pressable
+      onPress={() => router.push(to)}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir ${title}`}
+      style={({ pressed }) => [styles.gameCard, pressed ? styles.gameCardPressed : null]}
+    >
+      <ImageBackground
+        source={image}
+        style={styles.gameCardImage}
+        imageStyle={styles.gameCardImageRadius}
+        resizeMode="cover"
+      >
+        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#06080A" stopOpacity={0} />
+              <Stop offset="0.5" stopColor="#06080A" stopOpacity={0.3} />
+              <Stop offset="1" stopColor="#06080A" stopOpacity={0.92} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradId})`} />
+        </Svg>
+        <View style={styles.gameCardContent}>
+          <Text style={styles.gameCardEyebrow}>{eyebrow}</Text>
+          <Text style={styles.gameCardTitle}>{title}</Text>
+          <Text style={styles.gameCardSubtitle}>{subtitle}</Text>
+        </View>
+      </ImageBackground>
+    </Pressable>
   );
 }
 
@@ -315,30 +430,92 @@ function InlineUnavailable({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: color.background },
+  root: { flex: 1, backgroundColor: color.background },
+  fieldScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(6,8,10,0.62)",
+  },
+  safe: { flex: 1, backgroundColor: "transparent" },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
+  featured: { flexDirection: "row", gap: space.md },
+  gameCard: {
+    flex: 1,
+    height: 190,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: color.primaryDim,
+    overflow: "hidden",
+  },
+  gameCardPressed: { opacity: 0.9 },
+  gameCardImage: { flex: 1, justifyContent: "flex-end" },
+  gameCardImageRadius: { borderRadius: radius.xl },
+  gameCardContent: {
+    padding: space.md,
+  },
+  gameCardEyebrow: {
+    color: color.primary,
+    fontSize: 10,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  gameCardTitle: {
+    color: color.text,
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
+  gameCardSubtitle: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.semibold as "600",
+    marginTop: 1,
+  },
   competitionNote: {
     marginTop: space.sm,
     color: color.primary,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
+  standingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  standingPos: {
+    width: 18,
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  standingName: {
+    flex: 1,
+    color: color.text,
+    fontSize: fontSize.sm,
+  },
+  standingStat: {
+    width: 28,
+    textAlign: "right",
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+  },
+  standingPoints: {
+    width: 32,
+    textAlign: "right",
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
   hero: { flexDirection: "row", alignItems: "center", gap: space.md },
   crest: {
-    width: 68,
-    height: 68,
-    borderRadius: radius.md,
-    borderWidth: 2,
-    borderColor: color.primary,
-    backgroundColor: color.surface,
+    width: 64,
+    height: 64,
     alignItems: "center",
     justifyContent: "center",
-  },
-  crestText: {
-    color: color.primary,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.black as "800",
-    fontStyle: "italic",
   },
   heroText: { flex: 1 },
   eyebrow: {

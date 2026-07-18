@@ -1,5 +1,18 @@
-import type { ClubReadModel, IdentityReadModel } from "@grinta/core";
-import { DomainError, succeed, type GameWorldId, type Result } from "@grinta/shared";
+import type {
+  ClubReadModel,
+  ClubFinanceReadModel,
+  IdentityReadModel,
+  SquadReadModel,
+  LedgerReadModel,
+  CompetitionReadModel,
+  MatchesReadModel,
+  MarketReadModel,
+  FanbaseReadModel,
+  NarrativeReadModel,
+  StaffReadModel,
+  InboxReadModel,
+} from "@grinta/core";
+import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
  * Registry de queries, depois do extermínio da arquitetura morta (R-175).
@@ -18,11 +31,28 @@ import { DomainError, succeed, type GameWorldId, type Result } from "@grinta/sha
 export interface QueryContext {
   readonly identityReadModel: IdentityReadModel;
   readonly clubReadModel: ClubReadModel;
+  readonly squadReadModel: SquadReadModel;
+  readonly ledgerReadModel: LedgerReadModel;
+  readonly clubFinanceReadModel: ClubFinanceReadModel;
+  readonly competitionReadModel: CompetitionReadModel;
+  readonly matchesReadModel: MatchesReadModel;
+  readonly marketReadModel: MarketReadModel;
+  readonly fanbaseReadModel: FanbaseReadModel;
+  readonly narrativeReadModel: NarrativeReadModel;
+  readonly staffReadModel: StaffReadModel;
+  readonly inboxReadModel: InboxReadModel;
 }
 
+/**
+ * `params` são os query-string da requisição. A maioria das queries é
+ * world-scoped e os ignora; algumas — como `roster` — precisam de um recorte
+ * fino (o clube), e é por aqui que ele chega. É o primeiro passo da
+ * granularidade que o doc 23 pede (#37).
+ */
 export type QueryHandler = (
   context: QueryContext,
   worldId: GameWorldId,
+  params: Record<string, unknown>,
 ) => Promise<Result<unknown, DomainError>>;
 
 const handlers: Record<string, QueryHandler> = {
@@ -34,6 +64,101 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await identityReadModel.summary(worldId)),
   "identity-detail": async ({ identityReadModel }, worldId) =>
     succeed(await identityReadModel.worldView(worldId)),
+  ledger: async ({ ledgerReadModel }, worldId) =>
+    succeed(await ledgerReadModel.summary(worldId)),
+  competitions: async ({ competitionReadModel }, worldId) =>
+    succeed(await competitionReadModel.leagueStandings(worldId)),
+  matches: async ({ matchesReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    return succeed(await matchesReadModel.recentAndUpcoming(worldId, clubId));
+  },
+  market: async ({ marketReadModel }, worldId, params) => {
+    const excludeClubId = typeof params.clubId === "string" ? params.clubId : null;
+    return succeed(await marketReadModel.scoutablePlayers(worldId, excludeClubId));
+  },
+  roster: async ({ squadReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "roster exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await squadReadModel.roster(worldId, clubId));
+  },
+  "finance-snapshot": async ({ clubFinanceReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "finance-snapshot exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await clubFinanceReadModel.snapshot(worldId, clubId));
+  },
+  fanbase: async ({ fanbaseReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "fanbase exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await fanbaseReadModel.fanbaseForClub(worldId, clubId));
+  },
+  staff: async ({ staffReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "staff exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await staffReadModel.staffForClub(worldId, clubId));
+  },
+  inbox: async ({ inboxReadModel }, worldId, params) => {
+    // clubId opcional: com ele, o inbox do clube; sem ele, zeros (degradação
+    // segura — a home ainda chama sem recorte enquanto a tela não é atualizada).
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    return succeed(
+      await inboxReadModel.summaryForClubs(worldId, clubId === null ? [] : [clubId]),
+    );
+  },
+  youth: async ({ squadReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "youth exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await squadReadModel.youthRoster(worldId, clubId));
+  },
+  narrative: async ({ narrativeReadModel }, worldId, params) => {
+    const limit =
+      typeof params.limit === "string" ? Number(params.limit) : 30;
+    return succeed(
+      await narrativeReadModel.recentForWorld(
+        worldId,
+        Number.isFinite(limit) && limit > 0 ? Math.min(limit, 100) : 30,
+      ),
+    );
+  },
 };
 
 export function resolveQueryHandler(name: string): QueryHandler | undefined {

@@ -16,8 +16,27 @@ export const CLUB_REPOSITORY = "CLUB_REPOSITORY";
  * outra é o defeito que o e2e pegou com um 500.
  */
 export const CLUB_READ_MODEL = "CLUB_READ_MODEL";
+export const SQUAD_READ_MODEL = "SQUAD_READ_MODEL";
+export const LEDGER_READ_MODEL = "LEDGER_READ_MODEL";
+export const CLUB_FINANCE_READ_MODEL = "CLUB_FINANCE_READ_MODEL";
+export const COMPETITION_READ_MODEL = "COMPETITION_READ_MODEL";
+export const MATCHES_READ_MODEL = "MATCHES_READ_MODEL";
+export const MARKET_READ_MODEL = "MARKET_READ_MODEL";
+export const FANBASE_READ_MODEL = "FANBASE_READ_MODEL";
+export const NARRATIVE_READ_MODEL = "NARRATIVE_READ_MODEL";
+export const STAFF_READ_MODEL = "STAFF_READ_MODEL";
+export const INBOX_READ_MODEL = "INBOX_READ_MODEL";
 /** Escopo transacional de C3 (Decisão 19.10): clube + evento no mesmo commit. */
 export const CLUB_UNIT_OF_WORK = "CLUB_UNIT_OF_WORK";
+export const GENESIS_UNIT_OF_WORK = "GENESIS_UNIT_OF_WORK";
+export const MATCH_PLAY_REPOSITORY = "MATCH_PLAY_REPOSITORY";
+export const TRANSFER_UNIT_OF_WORK = "TRANSFER_UNIT_OF_WORK";
+export const PROMOTE_YOUTH_UNIT_OF_WORK = "PROMOTE_YOUTH_UNIT_OF_WORK";
+export const DEMOTE_TO_YOUTH_UNIT_OF_WORK = "DEMOTE_TO_YOUTH_UNIT_OF_WORK";
+export const RELEASE_UNIT_OF_WORK = "RELEASE_UNIT_OF_WORK";
+export const SELL_UNIT_OF_WORK = "SELL_UNIT_OF_WORK";
+export const LIST_UNIT_OF_WORK = "LIST_UNIT_OF_WORK";
+export const SEASON_FINANCE_UNIT_OF_WORK = "SEASON_FINANCE_UNIT_OF_WORK";
 /** C1 leitura fora do UoW: "alguém está jogando este mundo?" antes de apagá-lo. */
 export const CLUB_CONTROL_REPOSITORY = "CLUB_CONTROL_REPOSITORY";
 /** C2 leitura: a LISTA dos mundos. Sem ela o admin só via o que o navegador lembrava. */
