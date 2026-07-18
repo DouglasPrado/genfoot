@@ -20,6 +20,15 @@ export interface Scorer {
   readonly goals: number;
 }
 
+/** Um gol individual, com o minuto em que caiu (C5-V1). */
+export interface TimedGoal {
+  readonly playerId: string;
+  readonly minute: number;
+}
+
+/** Duração regulamentar de uma partida, em minutos (C5). */
+export const MATCH_MINUTES = 90;
+
 /** Quanto cada posição puxa para o gol. Calibração de 1ª passada. */
 const POSITION_FACTOR: Readonly<Record<string, number>> = {
   ST: 1.0,
@@ -79,4 +88,35 @@ export function attributeGoals(
     tally.set(chosen, (tally.get(chosen) ?? 0) + 1);
   }
   return [...tally].map(([playerId, count]) => ({ playerId, goals: count }));
+}
+
+/**
+ * Expande os gols de um lado em eventos individuais com o MINUTO em que caíram
+ * (C5-V1), ordenados. O minuto é sorteado por `SeededRandom` (R-182): o mesmo
+ * jogo dá sempre os mesmos minutos.
+ *
+ * Calibração de 1ª passada: o minuto é uniforme em [1, MATCH_MINUTES]. Quando o
+ * motor evoluir para ticks (o kernel já suporta `simulateUpTo`), o minuto virá
+ * do tick real do gol, não deste sorteio.
+ */
+export function timeGoals(
+  worldSeed: string,
+  matchId: string,
+  side: "home" | "away",
+  scorers: readonly Scorer[],
+): TimedGoal[] {
+  const random = new SeededRandom({
+    worldSeed,
+    context: `goal-minutes:${matchId}:${side}`,
+  });
+  const goals: TimedGoal[] = [];
+  for (const scorer of scorers) {
+    for (let g = 0; g < scorer.goals; g += 1) {
+      goals.push({
+        playerId: scorer.playerId,
+        minute: random.nextInt(1, MATCH_MINUTES + 1),
+      });
+    }
+  }
+  return goals.sort((a, b) => a.minute - b.minute);
 }

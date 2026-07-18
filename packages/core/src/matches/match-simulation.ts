@@ -1,10 +1,18 @@
 import {
   attributeGoals,
+  timeGoals,
   type Scorer,
   type ScorerCandidate,
 } from "./goal-attribution.js";
 import { simulateMatch } from "./match-kernel.js";
 import { stableHash } from "./match-kernel.js";
+
+/** Um gol como evento de partida (C5-V1): quem, quando, de que lado. */
+export interface GoalEvent {
+  readonly playerId: string;
+  readonly minute: number;
+  readonly side: "home" | "away";
+}
 
 /**
  * Quantas chances uma partida resolve — C5.
@@ -44,6 +52,8 @@ export interface SimulatedMatchResult {
   /** Quem marcou de cada lado (C7-V5). */
   readonly homeScorers: readonly Scorer[];
   readonly awayScorers: readonly Scorer[];
+  /** O feed de gols com minuto, ordenado (C5-V1). */
+  readonly goalEvents: readonly GoalEvent[];
 }
 
 /**
@@ -69,6 +79,33 @@ export function simulateScheduledMatch(
     awayStrength: match.awayStrength,
     inputHash,
   });
+  const homeScorers = attributeGoals(
+    worldSeed,
+    match.matchId,
+    "home",
+    match.homeScorers ?? [],
+    output.homeGoals,
+  );
+  const awayScorers = attributeGoals(
+    worldSeed,
+    match.matchId,
+    "away",
+    match.awayScorers ?? [],
+    output.awayGoals,
+  );
+  // Os gols viram feed: cada um ganha um minuto, e os dois lados se intercalam
+  // na ordem do relógio (o eventSequence sai daqui).
+  const goalEvents: GoalEvent[] = [
+    ...timeGoals(worldSeed, match.matchId, "home", homeScorers).map((g) => ({
+      ...g,
+      side: "home" as const,
+    })),
+    ...timeGoals(worldSeed, match.matchId, "away", awayScorers).map((g) => ({
+      ...g,
+      side: "away" as const,
+    })),
+  ].sort((a, b) => a.minute - b.minute);
+
   return {
     matchId: match.matchId,
     homeGoals: output.homeGoals,
@@ -77,19 +114,8 @@ export function simulateScheduledMatch(
     awayShots: output.awayShots,
     homePossession: output.homePossession,
     resultHash: output.resultHash,
-    homeScorers: attributeGoals(
-      worldSeed,
-      match.matchId,
-      "home",
-      match.homeScorers ?? [],
-      output.homeGoals,
-    ),
-    awayScorers: attributeGoals(
-      worldSeed,
-      match.matchId,
-      "away",
-      match.awayScorers ?? [],
-      output.awayGoals,
-    ),
+    homeScorers,
+    awayScorers,
+    goalEvents,
   };
 }

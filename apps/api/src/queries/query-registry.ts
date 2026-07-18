@@ -76,6 +76,19 @@ const handlers: Record<string, QueryHandler> = {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     return succeed(await matchesReadModel.recentAndUpcoming(worldId, clubId));
   },
+  "match-detail": async ({ matchesReadModel }, worldId, params) => {
+    const matchId = typeof params.matchId === "string" ? params.matchId : null;
+    if (matchId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "match-detail exige o parâmetro matchId.",
+          { param: "matchId" },
+        ),
+      );
+    }
+    return succeed(await matchesReadModel.matchDetail(worldId, matchId));
+  },
   market: async ({ marketReadModel }, worldId, params) => {
     const excludeClubId = typeof params.clubId === "string" ? params.clubId : null;
     return succeed(await marketReadModel.scoutablePlayers(worldId, excludeClubId));

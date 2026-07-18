@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { attributeGoals, type ScorerCandidate } from "./goal-attribution.js";
+import {
+  attributeGoals,
+  timeGoals,
+  MATCH_MINUTES,
+  type ScorerCandidate,
+} from "./goal-attribution.js";
 
 const SEED = "seed-artilharia";
 const MATCH = "019f0000-0000-7000-8000-000000000abc";
@@ -55,5 +60,34 @@ describe("attributeGoals — quem marcou (C7-V5)", () => {
       (byPlayer.get("cb2") ?? 0) +
       (byPlayer.get("gk") ?? 0);
     expect(attackers).toBeGreaterThan(defenders * 3);
+  });
+});
+
+describe("timeGoals — o minuto de cada gol (C5-V1)", () => {
+  const scorers = [
+    { playerId: "st1", goals: 2 },
+    { playerId: "st2", goals: 1 },
+  ];
+
+  it("expande cada gol num evento com minuto em [1, 90], ordenado", () => {
+    const goals = timeGoals(SEED, MATCH, "home", scorers);
+    expect(goals).toHaveLength(3); // 2 + 1
+    for (const g of goals) {
+      expect(g.minute).toBeGreaterThanOrEqual(1);
+      expect(g.minute).toBeLessThanOrEqual(MATCH_MINUTES);
+    }
+    // Ordenado por minuto.
+    const minutes = goals.map((g) => g.minute);
+    expect([...minutes].sort((a, b) => a - b)).toEqual(minutes);
+  });
+
+  it("é determinístico: mesmo jogo, mesmos minutos", () => {
+    expect(timeGoals(SEED, MATCH, "home", scorers)).toEqual(
+      timeGoals(SEED, MATCH, "home", scorers),
+    );
+  });
+
+  it("sem gols, sem eventos", () => {
+    expect(timeGoals(SEED, MATCH, "home", [])).toHaveLength(0);
   });
 });

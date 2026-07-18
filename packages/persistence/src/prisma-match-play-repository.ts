@@ -110,6 +110,30 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
           fatigueEnd: 0,
         })),
       });
+
+      // O feed da partida (C5-V1): um MatchEvent GOAL por gol, já com minuto e
+      // ordem total (eventSequence). O clube vem do lado. Reescrito, não somado.
+      if (result.goalEvents.length === 0) continue;
+      const match = await this.client.match.findUnique({
+        where: { id: result.matchId },
+        select: { homeClubId: true, awayClubId: true },
+      });
+      if (match === null) continue;
+      await this.client.matchEvent.deleteMany({
+        where: { matchId: result.matchId },
+      });
+      await this.client.matchEvent.createMany({
+        data: result.goalEvents.map((goal, index) => ({
+          matchId: result.matchId,
+          clubId: goal.side === "home" ? match.homeClubId : match.awayClubId,
+          playerId: goal.playerId,
+          type: "GOAL" as const,
+          minute: goal.minute,
+          eventSequence: index + 1,
+          description: "Gol",
+          importance: 3,
+        })),
+      });
     }
   }
 

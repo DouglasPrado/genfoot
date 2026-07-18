@@ -149,6 +149,8 @@ describe("API command catalog integrity (e2e)", () => {
       "ledger",
       // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.
       "market",
+      // O detalhe de uma partida (C5-V1): placar + feed de eventos, por matchId.
+      "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
