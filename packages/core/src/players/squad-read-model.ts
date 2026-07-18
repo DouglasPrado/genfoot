@@ -46,4 +46,13 @@ export interface SquadReadModel {
    * materializado (mundo ainda em gênese, ou clube sem plantel).
    */
   roster(gameWorldId: GameWorldId, clubId: string): Promise<RosterView | null>;
+
+  /**
+   * A base (YOUTH_ACADEMY) de um clube — os jovens em formação (C8). `null` = o
+   * clube não tem base materializada.
+   */
+  youthRoster(
+    gameWorldId: GameWorldId,
+    clubId: string,
+  ): Promise<RosterView | null>;
 }

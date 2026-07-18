@@ -19,12 +19,36 @@ import type { PrismaClient } from "./prisma-connection.js";
 export class PrismaSquadReadModel implements SquadReadModel {
   public constructor(private readonly client: PrismaClient) {}
 
-  public async roster(
+  public roster(
     gameWorldId: GameWorldId,
     clubId: string,
   ): Promise<RosterView | null> {
+    return this.rosterForCategory(
+      gameWorldId,
+      clubId,
+      SquadCategory.FIRST_TEAM,
+    );
+  }
+
+  /** A base (C8): mesmo formato do elenco, recortado por YOUTH_ACADEMY. */
+  public youthRoster(
+    gameWorldId: GameWorldId,
+    clubId: string,
+  ): Promise<RosterView | null> {
+    return this.rosterForCategory(
+      gameWorldId,
+      clubId,
+      SquadCategory.YOUTH_ACADEMY,
+    );
+  }
+
+  private async rosterForCategory(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    category: SquadCategory,
+  ): Promise<RosterView | null> {
     const squad = await this.client.squad.findFirst({
-      where: { gameWorldId, clubId, category: SquadCategory.FIRST_TEAM },
+      where: { gameWorldId, clubId, category },
       include: {
         memberships: {
           orderBy: { shirtNumber: "asc" },

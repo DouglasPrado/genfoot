@@ -126,6 +126,19 @@ const handlers: Record<string, QueryHandler> = {
     }
     return succeed(await staffReadModel.staffForClub(worldId, clubId));
   },
+  youth: async ({ squadReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "youth exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await squadReadModel.youthRoster(worldId, clubId));
+  },
   narrative: async ({ narrativeReadModel }, worldId, params) => {
     const limit =
       typeof params.limit === "string" ? Number(params.limit) : 30;
