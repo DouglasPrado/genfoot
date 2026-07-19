@@ -559,6 +559,14 @@ A R-217 aposenta; faltava a fonte da reposição (R-114 já dá o ritmo). O dono
 
 A definição completa vive em [`captacao-como-fonte-de-safra-2026-07-19.md`](captacao-como-fonte-de-safra-2026-07-19.md).
 
+### R-219 — A Season é entidade do mundo; virada automática no fim da janela · RATIFICADA em 2026-07-19
+
+Investigação da trava B-08 revelou que a `Season` não é do mundo — é artefato da competição (criada por `ensureSeasonId` na autoria, status derivado do ciclo da competição), e pela R-203 o mundo nasce sem competição, logo sem temporada. O dono escolheu tornar a Season entidade de primeira classe do mundo (refatorando o C7).
+
+- **R-219 — A Season nasce ACTIVE com o mundo; a competição anexa-se a ela; a virada é automática.** Temporada 1 criada na gênese/activate (`startsAt`/`endsAt` por `SEASON_DAYS=365`), `currentSeasonId` populado. `ensureSeasonId` passa a reusar; `seasonStatusFor` vale só para a edição. No `advance-day`, quando `currentDate` cruza `endsAt`, dispara a virada (passo 7, R-113): aplica treino + envelhecimento da temporada que fecha, marca FINISHED, cria a próxima ACTIVE. Destrava B-08 para treino+envelhecimento (captação/contrato seguem). Discrepância a resolver: `SEASON_DAYS=365` vs `06-temporada §4` (~63 dias).
+
+A definição completa vive em [`ciclo-de-vida-de-temporada-2026-07-19.md`](ciclo-de-vida-de-temporada-2026-07-19.md).
+
 ### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
 
 Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
@@ -571,4 +579,4 @@ Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis
 
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-218 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-219 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
