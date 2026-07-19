@@ -34,12 +34,17 @@ describe("worldTitle", () => {
     );
   });
 
-  it("cai no seed encurtado quando o mundo nasceu sem nome", () => {
-    expect(worldTitle(world({ name: null }))).toBe("Mundo abcdef12");
+  it("usa o seed cru como nome, sem prefixo", () => {
+    // "Mundo grinta-d" (corte fixo em 8) parecia nome truncado por bug.
+    expect(worldTitle(world({ name: null, seed: "grinta-demo" }))).toBe("grinta-demo");
+  });
+
+  it("encurta só seed longo, e marca o corte", () => {
+    expect(worldTitle(world({ name: null, seed: "a".repeat(40) }))).toBe("aaaaaaaa…");
   });
 
   it("trata nome só de espaços como ausente", () => {
-    expect(worldTitle(world({ name: "   " }))).toBe("Mundo abcdef12");
+    expect(worldTitle(world({ name: "   ", seed: "brasil" }))).toBe("brasil");
   });
 });
 

@@ -342,7 +342,13 @@ export function Onboarding() {
   if (!worldSelection.loading && worldSelection.worldId === null) {
     return (
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <View style={styles.content}>
+        {/*
+          `flex: 1` obrigatório: `styles.content` é contentContainerStyle de
+          ScrollView (só padding/gap). Num View comum ele encolhe para o
+          conteúdo, e a ScrollView da lista, com `flex: 1` dentro de um pai sem
+          altura, renderiza com altura ZERO — a tela aparecia vazia.
+        */}
+        <View style={[styles.content, styles.listaCheia]}>
           <View style={styles.brand}>
             <View style={styles.brandIcon}>
               <Icon name="shield" size={28} color={color.primary} />
@@ -524,6 +530,8 @@ export function Onboarding() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl2 },
+  /** Ocupa a tela: a lista de mundos rola dentro, em vez de colapsar em zero. */
+  listaCheia: { flex: 1 },
   brand: { flexDirection: "row", alignItems: "center", gap: space.md },
   brandIcon: {
     width: 56,

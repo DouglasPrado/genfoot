@@ -18,6 +18,14 @@
 export interface WorldListItemView {
   readonly id: string;
   readonly seed: string;
+  /**
+   * O nome definido no admin (`world:set-identity`), ou `null`.
+   *
+   * Mundo semeado nasce sem nome — quem escolhe mundo então lê o `seed`, que é
+   * identificador técnico, não nome. A tela decide o fallback; o read model
+   * entrega o fato.
+   */
+  readonly name: string | null;
   readonly status: string;
   readonly currentDate: string;
   readonly startDate: string;

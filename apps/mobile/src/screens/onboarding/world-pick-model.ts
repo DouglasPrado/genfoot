@@ -70,7 +70,12 @@ const OPEN_STATUS = "ACTIVE";
 export function worldTitle(world: WorldListSource): string {
   const name = world.name?.trim();
   if (name !== undefined && name !== "") return name;
-  return `Mundo ${world.seed.slice(0, 8)}`;
+  // Sem prefixo "Mundo": o card já está numa tela que diz onde você vai jogar,
+  // e repetir a palavra em toda linha só rouba espaço do que distingue um
+  // mundo do outro. Seed cru serve de nome quando não há nome — só hash longo
+  // é encurtado, com reticências para o corte ser óbvio em vez de parecer bug.
+  const seed = world.seed.trim();
+  return seed.length <= 24 ? seed : `${seed.slice(0, 8)}…`;
 }
 
 /**
