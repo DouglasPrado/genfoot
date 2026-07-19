@@ -50,6 +50,40 @@ describe("geração do elenco inicial (GDD §1 · teto comum de pontos)", () => 
   });
 
   /**
+   * **E é 1.380 para QUALQUER seed, não só a `grinta-demo`.** O argumento do teto
+   * exato ignorava o clamp: `shiftToTarget` prende cada atributo em [1, 99], e
+   * quando um alvo alto empurra um atributo além de 99 o clamp come pontos e a
+   * soma vaza ±1. Era raro (varrendo seeds, só `seed-v6b-alive` clube 1 dava
+   * 1.381), mas raro não é nunca: `world:genesis` recusava esses seeds, e criar
+   * um mundo com o nome "errado" falhava sem o dono entender por quê. O passo de
+   * correção redistribui o resíduo do clamp para jogadores com folga.
+   */
+  it("é 1.380 para qualquer seed — o clamp não vaza mais", () => {
+    const seeds = [
+      "grinta-demo",
+      "seed-v6b-alive",
+      "outra-seed",
+      "alpha",
+      "zzz-9",
+      "clube-forte",
+      "beta-1",
+      "world-42",
+    ];
+    for (const seed of seeds) {
+      for (let clubIndex = 0; clubIndex < 20; clubIndex += 1) {
+        const squad = elenco(seed, clubIndex);
+        const total = squad.reduce(
+          (sum, p) => sum + derivePlayerOverall(p.position, p.attributes),
+          0,
+        );
+        expect(`${seed}#${clubIndex}: ${total}`).toBe(
+          `${seed}#${clubIndex}: ${SQUAD_OVERALL_BUDGET}`,
+        );
+      }
+    }
+  });
+
+  /**
    * R-57: "A média-alvo é 60 e a geração deve permanecer em **58–60**, jamais
    * acima de 62". A R-57 é mais estreita que o §1 do GDD, e é ela que vale.
    */

@@ -305,7 +305,7 @@ export function generateSquadAttributes(
   input: GenerateSquadInput,
 ): readonly GeneratedSquadPlayer[] {
   const targets = perSlotTargets(input);
-  return SQUAD_POSITION_TEMPLATE.map((position, slot) => {
+  const players = SQUAD_POSITION_TEMPLATE.map((position, slot) => {
     const random = new SeededRandom({
       worldSeed: input.worldSeed,
       context: `player:${input.clubIndex}:${slot}`,
@@ -327,6 +327,88 @@ export function generateSquadAttributes(
       ),
     };
   });
+  return correctClampResidual(players);
+}
+
+/**
+ * Fecha o teto em 1.380 EXATOS quando a geração vazou por poucos pontos.
+ *
+ * O vazamento tem duas causas, e a segunda é a sutil: (1) o clamp de
+ * `shiftToTarget` em [1, 99] come pontos quando um alvo alto estoura 99; (2) a
+ * nota é `Math.round` de uma soma ponderada em ponto flutuante, então perto de
+ * um `.5` o erro de representação (63,4999…) faz um deslocamento de ±1 no grid
+ * mover a nota em 0 ou 2, não em 1. Por isso NÃO se pode assumir "somei 1 ⇒ nota
+ * +1": é preciso MEDIR.
+ *
+ * A correção move ±1 no grid inteiro de um jogador COM FOLGA (sem atributo em 99
+ * para subir, nem em 1 para descer) e só ACEITA o movimento se a nota mudou em
+ * exatamente ±1 na direção certa — descartando os que, pelo arredondamento,
+ * moveriam 0 ou 2 e estragariam a conta. Como o resíduo é ínfimo (±1–2) e a
+ * maioria dos jogadores move exatamente 1, converge. Preserva o arquétipo (a
+ * mesma constante em todos mantém as diferenças) e a média.
+ */
+function correctClampResidual(
+  players: readonly GeneratedSquadPlayer[],
+): readonly GeneratedSquadPlayer[] {
+  const overall = (p: GeneratedSquadPlayer) =>
+    derivePlayerOverall(p.position, p.attributes);
+  const squad = [...players];
+  let residual =
+    SQUAD_OVERALL_BUDGET - squad.reduce((sum, p) => sum + overall(p), 0);
+  if (residual === 0) return players;
+
+  // Teto de voltas: folga de sobra para um resíduo ínfimo, e trava contra laço
+  // infinito se — por absurdo — nenhum jogador puder mover exatamente 1.
+  let guard = squad.length * 4;
+  while (residual !== 0 && guard > 0) {
+    guard -= 1;
+    const dir: 1 | -1 = residual > 0 ? 1 : -1;
+    let moved = false;
+    for (let i = 0; i < squad.length; i += 1) {
+      const player = squad[i]!;
+      if (!hasHeadroom(player.attributes, dir)) continue;
+      const attributes = shiftAllAttributes(player.attributes, dir);
+      const nextOverall = derivePlayerOverall(player.position, attributes);
+      // Só aceita quem moveu EXATAMENTE `dir` — o arredondamento FP faz alguns
+      // moverem 0 ou 2, e esses não fecham a conta.
+      if (nextOverall - overall(player) !== dir) continue;
+      squad[i] = {
+        ...player,
+        attributes,
+        // O potencial nunca fica abaixo da nota (R-57) e não passa do teto 85.
+        potentialAbility: Math.min(
+          85,
+          Math.max(player.potentialAbility, nextOverall),
+        ),
+      };
+      residual -= dir;
+      moved = true;
+      break;
+    }
+    if (!moved) break; // nada a fazer nesta direção; sai em vez de girar à toa
+  }
+  return squad;
+}
+
+/** Todo atributo não-nulo tem folga para mover `dir` (±1) sem clampar em [1,99]? */
+function hasHeadroom(attributes: PlayerAttributes, dir: 1 | -1): boolean {
+  for (const value of Object.values(attributes)) {
+    if (value === null) continue;
+    if (dir > 0 ? value >= 99 : value <= 1) return false;
+  }
+  return true;
+}
+
+/** Soma `dir` a todo atributo não-nulo do grid. */
+function shiftAllAttributes(
+  attributes: PlayerAttributes,
+  dir: 1 | -1,
+): PlayerAttributes {
+  const shifted: Record<string, number | null> = {};
+  for (const [code, value] of Object.entries(attributes)) {
+    shifted[code] = value === null ? null : value + dir;
+  }
+  return shifted as PlayerAttributes;
 }
 
 /**
