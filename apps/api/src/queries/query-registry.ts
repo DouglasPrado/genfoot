@@ -14,7 +14,7 @@ import type {
   InboxReadModel,
   TrainingPlanRepository,
 } from "@grinta/core";
-import type { PlayerDevelopmentReadModel } from "@grinta/persistence";
+import type { PlayerDevelopmentReadModel, YouthIntakeReadModel } from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
@@ -49,6 +49,7 @@ export interface QueryContext {
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
+  readonly youthIntakeReadModel: YouthIntakeReadModel;
 }
 
 /**
@@ -126,6 +127,8 @@ const handlers: Record<string, QueryHandler> = {
       development: await playerDevelopmentReadModel.view(worldId, playerId, seasonId),
     });
   },
+  "youth-intake": async ({ youthIntakeReadModel }, worldId) =>
+    succeed({ candidates: await youthIntakeReadModel.candidates(worldId) }),
   "match-detail": async ({ matchesReadModel }, worldId, params) => {
     const matchId = typeof params.matchId === "string" ? params.matchId : null;
     if (matchId === null) {

@@ -40,6 +40,7 @@ import {
   AccrueClubTraining,
   ApplySeasonAccruals,
   ApplySeasonAging,
+  generateYouthClass,
   TrainingFocus,
   type ClubControlRepository,
   type ClubReadModel,
@@ -55,6 +56,7 @@ import {
   type AccrualBufferWriter,
   type SeasonAccrualUnitOfWork,
   type SeasonAgingUnitOfWork,
+  type PlayerRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -135,6 +137,7 @@ export interface CommandContext {
   readonly accrualBufferWriter: AccrualBufferWriter;
   readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork;
   readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork;
+  readonly playerRepository: PlayerRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -435,6 +438,11 @@ const worldLifecyclePayload = z.object({
  * e um número duplicado na borda vira dois números que divergem. O zod só
  * garante o tipo.
  */
+const generateIntakePayload = z.object({
+  seasonId: z.string().uuid(),
+  size: z.number().int().positive().optional(),
+});
+
 const applySeasonPayload = z.object({
   seasonId: z.string().uuid(),
 });
@@ -828,6 +836,34 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `season:${parsed.data.seasonId}` });
+  },
+
+  /** Captação — gera a safra anual de candidatos soltos (R-218). Idempotente. */
+  "youth:generate-intake": async ({ worlds, playerRepository, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = generateIntakePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const cls = generateYouthClass({
+      worldSeed: world.value.snapshot.seed,
+      gameWorldId: world.value.worldId,
+      seasonId: parsed.data.seasonId,
+      worldStartDate: world.value.snapshot.startDate,
+      ...(parsed.data.size === undefined ? {} : { size: parsed.data.size }),
+    });
+    let created = 0;
+    for (const candidate of cls.candidates) {
+      // Idempotência por id determinístico: se o candidato já existe, a safra já
+      // foi gerada nesta temporada — não duplica.
+      const existing = await playerRepository.findPlayerById(
+        world.value.worldId as never,
+        candidate.player.id as never,
+      );
+      if (existing !== null) continue;
+      await playerRepository.savePlayer(candidate, null);
+      created += 1;
+    }
+    return succeed({ resource: `intake:${parsed.data.seasonId}`, created } as never);
   },
 
   "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {

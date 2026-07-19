@@ -35,6 +35,7 @@ import type {
   AccrualBufferWriter,
   SeasonAccrualUnitOfWork,
   SeasonAgingUnitOfWork,
+  PlayerRepository,
   AutomationUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -68,6 +69,7 @@ import {
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
   SEASON_AGING_UNIT_OF_WORK,
+  PLAYER_REPOSITORY,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
@@ -133,6 +135,8 @@ export class CommandsController {
     private readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork,
     @Inject(SEASON_AGING_UNIT_OF_WORK)
     private readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork,
+    @Inject(PLAYER_REPOSITORY)
+    private readonly playerRepository: PlayerRepository,
     @Inject(AUTOMATION_UNIT_OF_WORK)
     private readonly automationUnitOfWork: AutomationUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
@@ -292,6 +296,7 @@ export class CommandsController {
         accrualBufferWriter: this.accrualBufferWriter,
         seasonAccrualUnitOfWork: this.seasonAccrualUnitOfWork,
         seasonAgingUnitOfWork: this.seasonAgingUnitOfWork,
+        playerRepository: this.playerRepository,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,
