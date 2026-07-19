@@ -153,3 +153,5 @@ export * from "./presence/presence-repository.js";
 
 // Treino — a fórmula de evolução do §6 (R-212).
 export * from "./training/development-gain.js";
+export * from "./training/training-types.js";
+export * from "./training/set-training-plan.js";
