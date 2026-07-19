@@ -23,6 +23,7 @@ import {
   defaultKnockoutConfig,
   defaultLeagueConfig,
   type CompetitionConfig,
+  type CompetitionLifecycle,
 } from "./competition-config.js";
 import {
   CompetitionFormat,
@@ -76,17 +77,42 @@ export interface CompetitionAggregateRepository {
   ): Promise<number>;
   /**
    * Abre a PRÓXIMA edição da liga (rollover, R-204): cria a temporada seguinte e
-   * uma edição EM RASCUNHO com os mesmos clubes e a mesma config da edição atual,
-   * na janela `[startsOn, endsOn]`. A edição nova passa a ser a corrente (a de
-   * início mais recente). Idempotente: se já existe edição começando em
-   * `startsOn` ou depois, não faz nada. Devolve `true` se abriu.
+   * uma edição EM RASCUNHO na janela `[startsOn, endsOn]`, herdando a config da
+   * edição atual. Os participantes são `clubIds` quando dado (troca de divisão
+   * por acesso/rebaixamento) ou os mesmos da edição atual quando omitido (liga
+   * avulsa que se repete). A edição nova passa a ser a corrente (início mais
+   * recente). Idempotente: se já existe edição começando em `startsOn` ou depois,
+   * não faz nada. Devolve `true` se abriu.
    */
   openNextEdition(input: {
     gameWorldId: string;
     competitionId: string;
     startsOn: string;
     endsOn: string;
+    clubIds?: readonly string[];
   }): Promise<boolean>;
+  /**
+   * As divisões de um campeonato (R-204), cada uma com a classificação FINAL da
+   * edição corrente (derivada dos jogos, R-178) e as vagas de acesso/rebaixamento
+   * da config. É o que o rollover do campeonato lê para trocar os clubes de
+   * divisão. Ordenadas por `tier` (1 = topo).
+   */
+  findChampionshipDivisions(
+    gameWorldId: string,
+    championshipId: string,
+  ): Promise<readonly ChampionshipDivisionResult[]>;
+}
+
+export interface ChampionshipDivisionResult {
+  readonly competitionId: string;
+  readonly tier: number;
+  readonly lifecycle: CompetitionLifecycle;
+  readonly startsOn: string | null;
+  readonly endsOn: string | null;
+  /** Classificação final da edição corrente (1º primeiro). */
+  readonly orderedClubIds: readonly string[];
+  readonly promotionSlots: number;
+  readonly relegationSlots: number;
 }
 
 export interface CompetitionRepositories {
@@ -117,6 +143,8 @@ export interface CreateCompetitionInput {
   readonly format: CompetitionFormat;
   readonly tier: number | null;
   readonly reputation?: number;
+  /** Campeonato (pirâmide) da divisão (R-204); null/omitido = liga avulsa. */
+  readonly championshipId?: string | null;
   readonly config?: CompetitionConfig;
 }
 
@@ -145,6 +173,7 @@ export class CreateCompetition {
           format: input.format,
           tier: input.tier,
           reputation: input.reputation ?? 50,
+          championshipId: input.championshipId ?? null,
         },
         input.config ?? defaultConfigForFormat(input.format),
       );

@@ -1883,6 +1883,10 @@ model Competition {
   country     String?
   tier        Int?
   reputation  Int               @default(1)
+  // As divisões de um mesmo campeonato compartilham este id e diferem pelo
+  // `tier` (R-204): é o que liga a pirâmide para o acesso/rebaixamento na virada
+  // de temporada. `null` = liga avulsa, sem divisão de cima nem de baixo.
+  championshipId String?        @db.Uuid
   version     Int               @default(1) // concorrência otimista (agregado C7)
 
   gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
@@ -1890,6 +1894,7 @@ model Competition {
 
   @@unique([gameWorldId, id])
   @@index([gameWorldId])
+  @@index([gameWorldId, championshipId])
 }
 
 model CompetitionSeason {

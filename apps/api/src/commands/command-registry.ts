@@ -241,6 +241,8 @@ const createCompetitionPayload = z.object({
   format: competitionFormatEnum,
   tier: z.number().int().positive().nullable().default(null),
   reputation: z.number().int().min(0).max(100).optional(),
+  /** Pirâmide (R-204): divisões do mesmo campeonato compartilham este id. */
+  championshipId: z.string().uuid().nullable().optional(),
 });
 
 const competitionRulesSchema = z.object({
@@ -774,6 +776,9 @@ const handlers: Record<string, CommandHandler> = {
       tier: parsed.data.tier,
       ...(parsed.data.reputation !== undefined
         ? { reputation: parsed.data.reputation }
+        : {}),
+      ...(parsed.data.championshipId !== undefined
+        ? { championshipId: parsed.data.championshipId }
         : {}),
     });
     if (!result.ok) return result;

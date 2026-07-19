@@ -22,6 +22,8 @@ export interface CompetitionAggregateSnapshot {
   readonly format: CompetitionFormat;
   /** Divisão/nível (1 = topo) para liga; null para copa. */
   readonly tier: number | null;
+  /** Campeonato (pirâmide) a que a divisão pertence (R-204); null = liga avulsa. */
+  readonly championshipId: string | null;
   readonly reputation: number;
   readonly lifecycle: CompetitionLifecycle;
   /** Janela da competição (R-177: data, não relógio). null enquanto rascunho. */
@@ -61,6 +63,7 @@ export class Competition {
       readonly format: CompetitionFormat;
       readonly tier: number | null;
       readonly reputation: number;
+      readonly championshipId?: string | null;
     },
     config: CompetitionConfig,
   ): Result<Competition, DomainError> {
@@ -75,6 +78,7 @@ export class Competition {
         type: input.type,
         format: input.format,
         tier: input.tier,
+        championshipId: input.championshipId ?? null,
         reputation: input.reputation,
         lifecycle: CompetitionLifecycle.DRAFT,
         startsOn: null,

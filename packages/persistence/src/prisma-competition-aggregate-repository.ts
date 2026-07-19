@@ -1,5 +1,7 @@
 import {
   CompetitionLifecycle,
+  buildStandings,
+  type ChampionshipDivisionResult,
   type ClubId,
   type CompetitionAggregateRepository,
   type CompetitionAggregateSnapshot,
@@ -57,6 +59,7 @@ export class PrismaCompetitionAggregateRepository
       type: comp.type,
       format: comp.format,
       tier: comp.tier ?? null,
+      championshipId: comp.championshipId ?? null,
       reputation: comp.reputation,
       lifecycle: edition.lifecycle,
       startsOn: dateToIso(edition.startsAt),
@@ -93,6 +96,7 @@ export class PrismaCompetitionAggregateRepository
           type: snapshot.type,
           format: snapshot.format,
           tier: snapshot.tier,
+          championshipId: snapshot.championshipId,
           reputation: snapshot.reputation,
           version: snapshot.version,
         },
@@ -312,6 +316,7 @@ export class PrismaCompetitionAggregateRepository
     competitionId: string;
     startsOn: string;
     endsOn: string;
+    clubIds?: readonly string[];
   }): Promise<boolean> {
     const nextStart = new Date(`${input.startsOn}T00:00:00.000Z`);
     // Idempotência: se já existe edição começando nesta janela (ou depois), o
@@ -373,18 +378,82 @@ export class PrismaCompetitionAggregateRepository
       select: { id: true },
     });
 
-    // Mesmos clubes (uma divisão que se repete; mover entre divisões é o passo
-    // do acesso/rebaixamento estrutural, ainda por vir).
-    if (finished.clubs.length > 0) {
+    // Participantes: o elenco dado (troca de divisão por acesso/rebaixamento) ou
+    // os mesmos da edição anterior (liga avulsa que se repete).
+    const roster = input.clubIds ?? finished.clubs.map((c) => c.clubId);
+    if (roster.length > 0) {
       await this.client.competitionClub.createMany({
-        data: finished.clubs.map((c, index) => ({
+        data: roster.map((clubId, index) => ({
           competitionSeasonId: edition.id,
-          clubId: c.clubId,
+          clubId,
           seed: index + 1,
         })),
       });
     }
     return true;
+  }
+
+  public async findChampionshipDivisions(
+    gameWorldId: string,
+    championshipId: string,
+  ): Promise<readonly ChampionshipDivisionResult[]> {
+    const comps = await this.client.competition.findMany({
+      where: { gameWorldId, championshipId },
+      orderBy: { tier: "asc" },
+      include: {
+        seasons: {
+          orderBy: { startsAt: "desc" },
+          take: 1,
+          include: { clubs: { select: { clubId: true } } },
+        },
+      },
+    });
+
+    const divisions: ChampionshipDivisionResult[] = [];
+    for (const comp of comps) {
+      const edition = comp.seasons[0];
+      if (edition === undefined) continue;
+      const rules = (edition.rulesJson ?? {}) as {
+        rules?: { promotionSlots?: number; relegationSlots?: number };
+      };
+      const matches = await this.client.match.findMany({
+        where: { competitionSeasonId: edition.id },
+        select: {
+          homeClubId: true,
+          awayClubId: true,
+          homeGoals: true,
+          awayGoals: true,
+          runtimeStatus: true,
+          resultStatus: true,
+        },
+      });
+      const finished = matches.filter(
+        (m) =>
+          (m.runtimeStatus === "FINISHED" || m.runtimeStatus === "PROCESSED") &&
+          m.resultStatus === "NORMAL",
+      );
+      // A classificação FINAL é derivada dos jogos (R-178), como em toda parte.
+      const table = buildStandings(
+        edition.clubs.map((c) => c.clubId),
+        finished.map((m) => ({
+          homeClubId: m.homeClubId,
+          awayClubId: m.awayClubId,
+          homeGoals: m.homeGoals,
+          awayGoals: m.awayGoals,
+        })),
+      );
+      divisions.push({
+        competitionId: comp.id,
+        tier: comp.tier ?? 1,
+        lifecycle: edition.lifecycle,
+        startsOn: dateToIso(edition.startsAt),
+        endsOn: dateToIso(edition.endsAt),
+        orderedClubIds: table.map((r) => r.clubId),
+        promotionSlots: rules.rules?.promotionSlots ?? 0,
+        relegationSlots: rules.rules?.relegationSlots ?? 0,
+      });
+    }
+    return divisions;
   }
 
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */

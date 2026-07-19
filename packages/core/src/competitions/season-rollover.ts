@@ -12,16 +12,17 @@ import {
 } from "./author-competition.js";
 import { CompetitionLifecycle } from "./competition-config.js";
 import { CompetitionType } from "./competition-types.js";
+import { applyPromotionRelegation } from "./promotion-relegation.js";
 
 /**
  * Rollover automático de temporada (R-52/R-204): quando uma LIGA encerra, a
- * próxima temporada abre SOZINHA — mesmos clubes, mesma config, janela nova. É o
- * que faz o mundo não parar depois de um título; sem isto a liga acabava e o
- * mundo ficava sem calendário.
+ * próxima temporada abre SOZINHA. É o que faz o mundo não parar depois de um
+ * título; sem isto a liga acabava e o mundo ficava sem calendário.
  *
- * Aqui é a temporada de UMA divisão que se repete. Mover clubes ENTRE divisões
- * (acesso/rebaixamento aplicado) depende de haver várias divisões e é o próximo
- * passo — o desfecho já é calculado (`season-outcome.ts`), falta a estrutura.
+ * Duas formas: a liga AVULSA (`championshipId` nulo) repete os mesmos clubes; a
+ * divisão de um CAMPEONATO espera todas as divisões encerrarem e então aplica o
+ * acesso/rebaixamento — os clubes trocam de divisão (`promotion-relegation.ts`)
+ * antes de abrir a temporada seguinte.
  */
 
 export interface SeasonWindow {
@@ -31,8 +32,8 @@ export interface SeasonWindow {
 
 /**
  * A janela da próxima temporada: começa no dia seguinte à homologação e dura o
- * MESMO tanto de dias que a temporada encerrada — a duração é uma decisão do
- * mundo, e repeti-la mantém o ritmo. Puro: as datas entram por parâmetro.
+ * MESMO tanto de dias que a temporada encerrada. Puro: as datas entram por
+ * parâmetro.
  */
 export function nextSeasonWindow(
   finishedStartsOn: string,
@@ -71,13 +72,13 @@ export interface RolloverLeagueInput {
 }
 
 /**
- * Abre a próxima edição da liga e a deixa AGENDADA (rascunho → lock → sorteio),
- * pronta para o motor do dia (MUNDO-V2) iniciá-la quando a data chegar.
+ * Abre a próxima temporada de uma liga que encerrou e a deixa AGENDADA (rascunho
+ * → lock → sorteio), pronta para o motor do dia (MUNDO-V2) iniciá-la.
  *
- * Idempotente por construção: só rola quando a edição CORRENTE está ENCERRADA —
- * depois de rolar, a corrente vira a nova edição (rascunho/agendada), então uma
- * reexecução no mesmo dia não abre uma segunda. `openNextEdition` ainda guarda a
- * mesma condição no banco (não abre se já existe edição na janela nova).
+ * Idempotente: liga avulsa só rola a partir da edição ENCERRADA (depois de
+ * rolar, a corrente vira rascunho/agendada); campeonato só rola quando TODAS as
+ * divisões encerraram (depois de rolar, nenhuma está encerrada). Uma reexecução
+ * no mesmo dia não abre uma segunda temporada.
  */
 export class RolloverLeague {
   public constructor(private readonly unitOfWork: CompetitionUnitOfWork) {}
@@ -85,46 +86,126 @@ export class RolloverLeague {
   public async execute(
     input: RolloverLeagueInput,
   ): Promise<Result<{ opened: boolean }, DomainError>> {
-    const decision = await this.unitOfWork.run(async (repos) => {
-      const snap = await repos.competitions.findCompetitionById(
+    const snap = await this.unitOfWork.run((repos) =>
+      repos.competitions.findCompetitionById(
         input.gameWorldId,
         input.competitionId,
-      );
-      if (snap === null) return { opened: false as const };
-      // Só liga rola assim (a copa é eliminação, o rollover dela é outro). E só
-      // a partir da edição ENCERRADA — se a corrente já é rascunho/agendada, já
-      // rolou.
-      if (
-        snap.type !== CompetitionType.LEAGUE ||
-        snap.lifecycle !== CompetitionLifecycle.FINISHED ||
-        snap.startsOn === null ||
-        snap.endsOn === null
-      ) {
-        return { opened: false as const };
-      }
-      const window = nextSeasonWindow(
-        snap.startsOn,
-        snap.endsOn,
-        input.occurredOn,
-      );
-      if (!window.ok) return { error: window.error };
-      const opened = await repos.competitions.openNextEdition({
+      ),
+    );
+    if (
+      snap === null ||
+      snap.type !== CompetitionType.LEAGUE ||
+      snap.lifecycle !== CompetitionLifecycle.FINISHED
+    ) {
+      return succeed({ opened: false });
+    }
+
+    return snap.championshipId === null
+      ? this.rolloverStandalone(input, snap.startsOn, snap.endsOn)
+      : this.rolloverChampionship(input, snap.championshipId);
+  }
+
+  /** Liga avulsa: repete os mesmos clubes na temporada seguinte. */
+  private async rolloverStandalone(
+    input: RolloverLeagueInput,
+    startsOn: string | null,
+    endsOn: string | null,
+  ): Promise<Result<{ opened: boolean }, DomainError>> {
+    if (startsOn === null || endsOn === null) return succeed({ opened: false });
+    const window = nextSeasonWindow(startsOn, endsOn, input.occurredOn);
+    if (!window.ok) return window;
+
+    const opened = await this.unitOfWork.run((repos) =>
+      repos.competitions.openNextEdition({
         gameWorldId: input.gameWorldId,
         competitionId: input.competitionId,
         startsOn: window.value.startsOn,
         endsOn: window.value.endsOn,
-      });
-      return { opened };
-    });
+      }),
+    );
+    if (!opened) return succeed({ opened: false });
+    return this.lockOne(input.gameWorldId, input.competitionId);
+  }
 
-    if ("error" in decision) return fail(decision.error);
-    if (!decision.opened) return succeed({ opened: false });
+  /**
+   * Campeonato: só rola quando TODAS as divisões encerraram; aplica o
+   * acesso/rebaixamento (os clubes trocam de divisão) e abre a temporada
+   * seguinte de cada divisão com o elenco novo.
+   */
+  private async rolloverChampionship(
+    input: RolloverLeagueInput,
+    championshipId: string,
+  ): Promise<Result<{ opened: boolean }, DomainError>> {
+    const outcome = await this.unitOfWork.run(
+      async (
+        repos,
+      ): Promise<{ openedIds: string[]; error?: DomainError }> => {
+        const divisions = await repos.competitions.findChampionshipDivisions(
+          input.gameWorldId,
+          championshipId,
+        );
+        // As divisões correm em paralelo; espera-se que todas fechem para saber
+        // quem sobe e quem desce entre elas.
+        if (
+          divisions.length === 0 ||
+          !divisions.every(
+            (d) => d.lifecycle === CompetitionLifecycle.FINISHED,
+          )
+        ) {
+          return { openedIds: [] };
+        }
 
-    // A nova edição é a corrente (rascunho); travá-la materializa o sorteio e a
-    // deixa AGENDADA — daí o motor do dia a inicia quando `startsOn` chega.
+        const rosters = applyPromotionRelegation(
+          divisions.map((d) => ({
+            tier: d.tier,
+            orderedClubIds: d.orderedClubIds,
+            promotionSlots: d.promotionSlots,
+            relegationSlots: d.relegationSlots,
+          })),
+        );
+        const rosterByTier = new Map(rosters.map((r) => [r.tier, r.clubIds]));
+
+        const openedIds: string[] = [];
+        for (const d of divisions) {
+          if (d.startsOn === null || d.endsOn === null) continue;
+          const window = nextSeasonWindow(
+            d.startsOn,
+            d.endsOn,
+            input.occurredOn,
+          );
+          if (!window.ok) return { openedIds, error: window.error };
+          const roster = rosterByTier.get(d.tier);
+          const ok = await repos.competitions.openNextEdition({
+            gameWorldId: input.gameWorldId,
+            competitionId: d.competitionId,
+            startsOn: window.value.startsOn,
+            endsOn: window.value.endsOn,
+            ...(roster !== undefined ? { clubIds: roster } : {}),
+          });
+          if (ok) openedIds.push(d.competitionId);
+        }
+        return { openedIds };
+      },
+    );
+
+    if (outcome.error) return fail(outcome.error);
+    if (outcome.openedIds.length === 0) return succeed({ opened: false });
+
+    // Trava (materializa o sorteio de) cada divisão nova.
+    for (const competitionId of outcome.openedIds) {
+      const locked = await this.lockOne(input.gameWorldId, competitionId);
+      if (!locked.ok) return locked;
+    }
+    return succeed({ opened: true });
+  }
+
+  private async lockOne(
+    gameWorldId: string,
+    competitionId: string,
+  ): Promise<Result<{ opened: boolean }, DomainError>> {
     const locked = await new LockCompetition(this.unitOfWork).execute({
-      gameWorldId: input.gameWorldId,
-      competitionId: input.competitionId,
+      gameWorldId,
+      competitionId,
     });
     if (!locked.ok) return locked;
     return succeed({ opened: true });
