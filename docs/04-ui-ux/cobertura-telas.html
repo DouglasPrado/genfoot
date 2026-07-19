@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-18</b> · commit <b>5ad35c7</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-19</b> · commit <b>880bca7</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -459,14 +459,14 @@
         <span class="arch-id">L-M01</span>
         <span class="arch-name">Wizard — autenticação, onboarding, entrada</span>
         <span class="risk medium">Risco médio</span>
-        <span class="arch-count"><b>7</b> parciais / 14</span>
+        <span class="arch-count"><b>8</b> parciais / 14</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-SPLASH</span><span class="chip-d">Checa contrato e roteia (sem conta → login, MF-00). Carregamento do mundo com etapas e progresso reais. Não fecha: falta link à store e WebSocket/deep link</span><span class="tag">falta store + deep link</span></div>
         <div class="chip partial"><span class="chip-id">M-LOGIN</span><span class="chip-d">Entrar por e-mail/senha via Clerk, com Google, criar conta e esqueci a senha. Fluxo verificado por uma pessoa no simulador. Não fecha: falta Apple, e a API ainda não verifica o token</span><span class="tag">falta Apple</span></div>
         <div class="chip partial"><span class="chip-id">M-SIGNUP</span><span class="chip-d">Cadastro via Clerk: e-mail, senha, aceite de termos e código por e-mail — verificados no simulador com conta real criada. Não fecha: falta Apple, e Google segue sem teste</span><span class="tag">falta Apple</span></div>
         <div class="chip partial"><span class="chip-id">M-RECOVER</span><span class="chip-d">Redefinir senha via Clerk: e-mail → código → nova senha, com confirmação neutra que não revela se a conta existe. Redefinição real feita por uma pessoa. Não fecha: o doc pede "enviar link" e o Clerk faz por código</span><span class="tag">código, não link</span></div>
-        <div class="chip missing"><span class="chip-id">M-WORLD-PICK</span><span class="chip-d">Seleção de mundo — o mundo é uma constante</span></div>
+        <div class="chip partial"><span class="chip-id">M-WORLD-PICK</span><span class="chip-d">Lista de mundos real (R-208): nome, temporada, clubes e vagas, servidos por <code>GET /worlds</code> — que virou público (R-209). O mundo deixou de ser constante de build; a escolha persiste. Não fecha: falta o <b>filtro por tipo de liga</b> que o doc pede, e o tipo não tem de onde sair — ele vive em <code>Competition</code>, e pela R-203 o mundo nasce sem competição</span><span class="tag">falta filtro por tipo de liga</span></div>
         <div class="chip partial"><span class="chip-id">M-CLUB-PICK</span><span class="chip-d">Escolher clube — lista real, sem filtro nem região</span><span class="tag">parcial</span></div>
         <div class="chip missing"><span class="chip-id">M-CLUB-CREATE</span><span class="chip-d">Criar clube de expansão</span></div>
         <div class="chip missing"><span class="chip-id">M-REGION-PICK</span><span class="chip-d">Escolha de região / cidade</span></div>
@@ -700,7 +700,11 @@
       </div>
       <div class="blocker">
         <h3>O lado da leitura é grosso demais</h3>
-        <p>Os docs especificam <span class="num">78</span> queries finas por tela (<code>GetFinanceSnapshot</code>, <code>GetBudget</code>, <code>GetCreditCapacity</code>, <code>GetBoardMessage</code>…). A API expõe <span class="num">15</span> queries grossas, uma por contexto — <code>club</code>, <code>ledger</code>, <code>market</code>. Commands não são o gargalo: existem 148. Cada tela nova ou deriva no cliente, como o <code>club-projection.ts</code> já faz, ou ganha projeção própria no servidor.</p>
+        <p>Os docs especificam <span class="num">78</span> queries finas por tela (<code>GetFinanceSnapshot</code>, <code>GetBudget</code>, <code>GetCreditCapacity</code>, <code>GetBoardMessage</code>…). A API expõe <span class="num">15</span> queries grossas, uma por contexto — <code>club</code>, <code>ledger</code>, <code>market</code>. Commands não são o gargalo — mas o número que estava aqui era falso: são <span class="num">36</span>, não 148. O 148 era anterior à R-175, que removeu 12 contextos. Cada tela nova ou deriva no cliente, como o <code>club-projection.ts</code> já faz, ou ganha projeção própria no servidor.</p>
+      </div>
+      <div class="blocker">
+        <h3>O desenvolvimento de jogador não tem linha de base — a estrutura do clube não limita nada</h3>
+        <p><b>Trava nova (B-07).</b> A R-12 diz que o núcleo de formação define quanto do potencial se aproveita (40/55/70/85/95% por nível), e a tabela de <code>04-estrutura-do-clube-e-staff.md:258-264</code> publica o efeito: potencial 85 chega a 55–65 numa estrutura nível 1, a 80–88 no nível 5. <code>derivePotentialLayers</code> (<code>packages/core/src/players/potential-layers.ts</code>) implementa isso e o teste valida contra esses números — mas <b>não está ligado</b> ao clamp de <code>Player.applyAttributeChange</code> (<code>packages/core/src/players/player.ts:184</code>), que segue usando o potencial <em>natural</em>.<br><br>Ligá-lo seria teatro: o aproveitável é <code>habilidade + margem × rendimento</code>, e a habilidade sobe a cada ganho — o teto subiria junto e convergiria para o natural, parecendo cumprir a R-12 sem travar nada. A tabela só fecha medindo a margem <b>uma vez</b>, de uma linha de base estável, e <b>essa coluna não existe</b>: nem <code>Player</code> nem <code>PlayerDevelopment</code> (<code>prisma/schema.prisma:1512-1526</code>) guardam a habilidade de entrada. Enquanto isso, clube nível 1 e nível 5 desenvolvem igual. Bloqueia <code>M-PLAYER-DEV</code> (que precisa explicar "por que estagnou"), <code>M-TRAINING</code> e toda a base. <b>Depende de decisão do dono:</b> a base é fixada na entrada no clube (a estrutura <em>limita de vez</em>) ou na virada de temporada (ela <em>atrasa</em>)?</p>
       </div>
       <div class="blocker">
         <h3>Nada disso é verificável hoje</h3>
@@ -718,6 +722,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-19</span>
+        <span class="log-text"><b>M-WORLD-PICK entra amarela</b> (<code>b7a3b27</code>) — 17 → 18 parciais, e a primeira tela nova desde 16/07. O mundo <b>deixou de ser constante de build</b>: <code>EXPO_PUBLIC_WORLD_ID</code> e o UUID hardcoded de fallback em <code>config.ts:27</code> morreram (R-208). Eles apontavam para um mundo que havia muito não existia — quando o mundo do env sumia do banco, o app consultava o fantasma em silêncio e a tela quebrava sem dizer por quê. Agora a lista vem de <code>GET /worlds</code>, que virou <b>público</b> (R-209): a vitrine responde sem token, e <code>myParticipation</code> sai <code>null</code> para todos os deslogados — provado com <code>curl</code> sem Authorization (200 na lista, 401 na rota escopada, que é o contraste que valida o 200). A escolha persiste em <code>AsyncStorage</code>. <b>Não é verde:</b> falta o filtro por tipo de liga que o doc pede, e o tipo não tem de onde sair — vive em <code>Competition</code>, e pela R-203 o mundo nasce sem competição. <b>Não provado:</b> o selo de elegibilidade preenchido (R-210) — token de admin não tem conta de jogo, então <code>myParticipation</code> vem <code>null</code> também autenticado.<br><br>No caminho, dois furos que a tela expôs: <b>o clube gerado nascia sem cara</b> — 0 de 20 com escudo ou cor no banco — e a gênese passou a atribuir identidade visual determinística por seed (R-211, <code>b057474</code>); e <b>a lista de mundos não devolvia o nome</b>, mostrando o <code>seed</code> ao jogador — <code>WorldListItemView</code> nunca teve <code>name</code>, e a listagem do admin fazia N+1 requisições contornando isso (<code>3d01dd1</code>). Duas correções de <b>dado</b>, não de UI. <b>Trava nova B-07</b> (linha de base do potencial) e uma <b>afirmação falsa derrubada</b>: a API expõe 36 commands, não 148 — o número era anterior à R-175.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-18</span>
         <span class="log-text"><b>O mundo passou a andar sozinho — e nenhuma tela mobile mudou de cor.</b> Entrega de <b>back-end + admin</b>, provada por HTTP, não por navegador: o relógio do mundo (MUNDO V1–V4, commits até <code>64c71fa</code>) avança a data lógica automaticamente num intervalo configurável por mundo (segundos/minutos/horas), com o scheduler abrindo competições, jogando as rodadas vencidas e homologando as encerradas; o admin liga/pausa e ajusta o tempo. E o <b>desfecho da temporada</b> (C7-V6b, <code>5ad35c7</code>): a query <code>competition-outcome</code> projeta campeão, acesso e rebaixamento da classificação final — provada ponta a ponta (mundo novo → liga de 6 clubes → 15 jogos → campeão Serrano, 1 sobe, 2 descem). <b>Continua 0/114:</b> isto destrava a <em>premissa</em> das telas de rodada e competição (<code>M-ROUND</code>, tabela, artilharia, chaveamento) — dá o dado real que elas vão consumir —, mas nenhuma dessas telas foi construída nem exercitada no simulador. O painel de relógio do admin e a exibição do desfecho <b>aguardam o teste do dono no navegador</b> (§5.1) antes de contar como algo. As queries que faltavam para essas telas (<code>competitions</code>, <code>top-scorers</code>, <code>competition-outcome</code>, <code>world-clock</code>) deixaram de ser trava: existem.</span>
