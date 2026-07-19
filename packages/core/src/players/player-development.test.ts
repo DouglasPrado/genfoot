@@ -142,3 +142,23 @@ describe("applyAttributeChange — teto pelo APROVEITÁVEL (R-213)", () => {
     if (!resultado.ok) expect(resultado.error.code).toBe("ATTRIBUTE_NOT_APPLICABLE");
   });
 });
+
+describe("Player.retire — fim de carreira (R-217)", () => {
+  it("marca RETIRED e incrementa a versão", () => {
+    const p = carregar(jogador());
+    const antes = p.snapshot().version;
+    p.retire();
+    expect(p.snapshot().careerStatus).toBe(PlayerCareerStatus.RETIRED);
+    expect(p.snapshot().version).toBe(antes + 1);
+  });
+
+  it("aposentar de novo é idempotente — segue RETIRED", () => {
+    const p = carregar(jogador());
+    p.retire();
+    const v = p.snapshot().version;
+    p.retire();
+    expect(p.snapshot().careerStatus).toBe(PlayerCareerStatus.RETIRED);
+    // não incrementa versão à toa: já estava aposentado
+    expect(p.snapshot().version).toBe(v);
+  });
+});

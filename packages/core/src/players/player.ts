@@ -243,6 +243,23 @@ export class Player {
     };
   }
 
+  /**
+   * Encerra a carreira (R-217): `careerStatus` → `RETIRED`.
+   *
+   * Idempotente: aposentar quem já está aposentado é no-op, não incrementa
+   * versão à toa. Chamado na virada de temporada quando o roll de aposentadoria
+   * decide. A "pessoa persistente vira funcionário" (§17/PLY-018) é outro passo,
+   * fora daqui.
+   */
+  public retire(): void {
+    if (this.state.careerStatus === PlayerCareerStatus.RETIRED) return;
+    this.state = {
+      ...this.state,
+      careerStatus: PlayerCareerStatus.RETIRED,
+      version: this.state.version + 1,
+    };
+  }
+
   public snapshot(): PlayerLifecycleSnapshot {
     return this.state;
   }
