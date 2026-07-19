@@ -144,6 +144,8 @@ describe("API command catalog integrity (e2e)", () => {
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // O desfecho da temporada (C7-V6b): campeão, acesso e rebaixamento.
+      "competition-outcome",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
       // A lista de competições do mundo para o admin gerir (C7, R-202).

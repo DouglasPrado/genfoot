@@ -73,6 +73,8 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await competitionReadModel.leagueStandings(worldId)),
   "competitions-list": async ({ competitionReadModel }, worldId) =>
     succeed({ competitions: await competitionReadModel.listCompetitions(worldId) }),
+  "competition-outcome": async ({ competitionReadModel }, worldId) =>
+    succeed(await competitionReadModel.competitionOutcome(worldId)),
   "top-scorers": async ({ competitionReadModel }, worldId) =>
     succeed({ scorers: await competitionReadModel.topScorers(worldId) }),
   matches: async ({ matchesReadModel }, worldId, params) => {

@@ -1,8 +1,10 @@
 import {
   buildStandings,
+  resolveSeasonOutcome,
   type CompetitionReadModel,
   type CompetitionStandingsView,
   type CompetitionSummaryView,
+  type SeasonOutcomeView,
   type TopScorerView,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
@@ -120,6 +122,105 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
           : null,
       };
     });
+  }
+
+  public async competitionOutcome(
+    gameWorldId: GameWorldId,
+  ): Promise<SeasonOutcomeView | null> {
+    // A liga principal do mundo — mesma escolha de `leagueStandings`.
+    const competition = await this.client.competition.findFirst({
+      where: { gameWorldId, type: "LEAGUE" },
+      orderBy: [{ tier: "asc" }, { reputation: "desc" }],
+      include: {
+        seasons: {
+          orderBy: { startsAt: "desc" },
+          take: 1,
+          include: { clubs: { select: { clubId: true } } },
+        },
+      },
+    });
+    if (competition === null || competition === undefined) return null;
+    const edition = competition.seasons[0];
+    if (edition === undefined) return null;
+
+    // As vagas de acesso/rebaixamento vêm da config imutável (R-52), gravada em
+    // `rulesJson.rules`. Sem elas, o mundo de divisão única (0/0) é o padrão
+    // honesto — não inventamos rebaixamento onde não há para onde descer.
+    const rules = (edition.rulesJson ?? {}) as {
+      rules?: { promotionSlots?: number; relegationSlots?: number };
+    };
+    const promotionSlots = rules.rules?.promotionSlots ?? 0;
+    const relegationSlots = rules.rules?.relegationSlots ?? 0;
+
+    const matches = await this.client.match.findMany({
+      where: { competitionSeasonId: edition.id },
+      select: {
+        homeClubId: true,
+        awayClubId: true,
+        homeGoals: true,
+        awayGoals: true,
+        runtimeStatus: true,
+        resultStatus: true,
+      },
+    });
+    const finished = matches.filter(
+      (m) =>
+        (m.runtimeStatus === "FINISHED" || m.runtimeStatus === "PROCESSED") &&
+        m.resultStatus === "NORMAL",
+    );
+
+    const clubIds = edition.clubs.map((c) => c.clubId);
+    const names = await this.clubNames(gameWorldId, clubIds);
+    const table = buildStandings(
+      clubIds,
+      finished.map((m) => ({
+        homeClubId: m.homeClubId,
+        awayClubId: m.awayClubId,
+        homeGoals: m.homeGoals,
+        awayGoals: m.awayGoals,
+      })),
+    );
+
+    // A ordem da tabela É a classificação; o desfecho rotula por posição.
+    const outcome = resolveSeasonOutcome(
+      table.map((r) => r.clubId),
+      promotionSlots,
+      relegationSlots,
+    );
+    const outcomeByClub = new Map(outcome.map((o) => [o.clubId, o]));
+
+    const rows = table.map((row) => {
+      const o = outcomeByClub.get(row.clubId)!;
+      return {
+        ...row,
+        clubName: names.get(row.clubId)?.name ?? "—",
+        shortCode: names.get(row.clubId)?.shortCode ?? "",
+        rank: o.rank,
+        outcome: o.outcome,
+      };
+    });
+
+    const finishedEdition = edition.lifecycle === "FINISHED";
+    // Campeão só é oficial quando a edição está homologada. Antes disso, o líder
+    // da tabela é uma prévia, não um título — não afirmamos campeão de uma liga
+    // que ainda corre.
+    const leader = rows[0];
+    const champion =
+      finishedEdition && leader !== undefined
+        ? { clubId: leader.clubId, clubName: leader.clubName }
+        : null;
+
+    return {
+      competitionId: competition.id,
+      competitionName: competition.name,
+      seasonNumber: 1,
+      lifecycle: edition.lifecycle,
+      finished: finishedEdition,
+      champion,
+      promotionSlots,
+      relegationSlots,
+      rows,
+    };
   }
 
   public async topScorers(

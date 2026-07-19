@@ -109,6 +109,7 @@ export * from "./competitions/competition.js";
 export * from "./competitions/competition-schedule.js";
 export * from "./competitions/author-competition.js";
 export * from "./competitions/standings.js";
+export * from "./competitions/season-outcome.js";
 export * from "./competitions/competition-read-model.js";
 export * from "./fanbase/fanbase-model.js";
 export * from "./fanbase/fanbase-repository.js";
