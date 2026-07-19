@@ -163,3 +163,5 @@ export * from "./players/player-development-view.js";
 export * from "./players/age-decline.js";
 export * from "./players/retirement-decision.js";
 export * from "./players/apply-season-aging.js";
+export * from "./youth/youth-class.js";
+export * from "./youth/scout-report.js";
