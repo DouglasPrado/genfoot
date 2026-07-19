@@ -530,6 +530,17 @@ O mobile nunca selecionou mundo: `useWorldId()` (`apps/mobile/src/lib/world.ts:1
 
 A definição completa e as pendências vivem em [`selecao-de-mundo-2026-07-19.md`](selecao-de-mundo-2026-07-19.md).
 
+### R-212..R-215 — Treino e base: o schema cede à doc · RATIFICADAS em 2026-07-19
+
+Treino está integralmente especificado (fórmula em `02-sistema-de-jogadores.md:307-322`, R-02/R-12/R-13/R-113) e integralmente **não implementado** — zero linhas. Base está em ~20%. Ao começar, quatro pontos onde o schema contradiz a doc; quem cede é o schema.
+
+- **R-212 — Accrual é por `attributeCode`, não por grupo.** As colunas `technicalGain`/`physicalGain`/`mentalGain` de `TrainingPlayerEntry` contradizem R-188/R-179 ("com 4 grupos, treino não tem sobre o que operar"). Viram **projeção de leitura** derivada do accrual por `rollupAttributes`; desenvolvimento nunca se escreve nelas.
+- **R-213 — Potencial em três camadas.** `Player.potentialAbility` (Int único) vira o **natural**; **aproveitável** e **funcional** são derivados (§4:203-213). O clamp de `applyAttributeChange` passa a comparar contra o aproveitável — é ele que a R-12 limita (40/55/70/85/95%).
+- **R-214 — `TrainingPlan` ganha `version`.** A rastreabilidade exige `expectedVersion` e a INV-31 o cobre, mas a coluna não existia: concorrência otimista declarada e não implementável.
+- **R-215 — Nomes de command do golden path se alinham ao registry real.** `golden-path-registry.ts:43,49` declarava `player:set-training`/`player:generate-youth`/`player:promote-youth` — nenhum existe. Passa a `training:set-plan`, `youth:generate-class`, `youth:promote-player`, e o registry **não cita command que não existe**.
+
+A definição completa e as pendências vivem em [`treino-e-base-2026-07-19.md`](treino-e-base-2026-07-19.md).
+
 ### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
 
 Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
@@ -542,4 +553,4 @@ Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis
 
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-211 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-215 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-215 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
