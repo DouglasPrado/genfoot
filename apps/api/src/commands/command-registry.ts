@@ -991,10 +991,7 @@ const handlers: Record<string, CommandHandler> = {
       competitionUnitOfWork,
       competitionReadModel,
       matchPlay,
-    }).execute({
-      gameWorldId: world.value.worldId,
-      worldSeed: world.value.snapshot.seed,
-    });
+    }).execute({ gameWorldId: world.value.worldId });
     if (!result.ok) return result;
     return succeed({ resource: `world:${world.value.worldId}` });
   },

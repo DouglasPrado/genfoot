@@ -80,6 +80,18 @@ export class PrismaWorldClockRepository implements WorldClockRepository {
     });
     return rows.map(toSnapshot);
   }
+
+  public async setNextTick(
+    gameWorldId: string,
+    nextTickAtIso: string,
+  ): Promise<void> {
+    // Cursor de scheduling: sem guarda de versão (baixa contenção, e o advance
+    // do dia já bumpou a versão do agregado).
+    await this.client.gameWorld.updateMany({
+      where: { id: gameWorldId },
+      data: { nextTickAt: new Date(nextTickAtIso) },
+    });
+  }
 }
 
 type ClockRow = {

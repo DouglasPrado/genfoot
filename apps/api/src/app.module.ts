@@ -13,10 +13,11 @@ import { R2Storage } from "./uploads/r2-storage.js";
 import { OBJECT_STORAGE } from "./core/tokens.js";
 import { QueriesController } from "./queries/queries.controller.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { SchedulerModule } from "./scheduler/scheduler.module.js";
 import { ValidationController } from "./validation/validation.controller.js";
 
 @Module({
-  imports: [CoreModule, RealtimeModule, AuthModule],
+  imports: [CoreModule, RealtimeModule, AuthModule, SchedulerModule],
   controllers: [
     HealthController,
     CommandsController,

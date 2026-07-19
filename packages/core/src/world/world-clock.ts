@@ -76,6 +76,8 @@ export interface WorldClockRepository {
   ): Promise<void>;
   /** Os mundos ATIVOS com o relógio rodando e vencido (para o scheduler, V3). */
   dueWorlds(nowIso: string, limit: number): Promise<readonly WorldClockState[]>;
+  /** Reagenda só o próximo tick (cursor de scheduling, sem guarda de versão). */
+  setNextTick(gameWorldId: string, nextTickAtIso: string): Promise<void>;
 }
 
 /**

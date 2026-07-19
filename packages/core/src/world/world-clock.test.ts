@@ -54,6 +54,9 @@ class FakeClockRepo implements WorldClockRepository {
   public dueWorlds() {
     return Promise.resolve([]);
   }
+  public setNextTick() {
+    return Promise.resolve();
+  }
 }
 
 function clock(): WorldClockState {

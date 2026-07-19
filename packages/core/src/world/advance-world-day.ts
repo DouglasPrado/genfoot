@@ -34,7 +34,6 @@ export interface AdvanceWorldDayDeps {
 
 export interface AdvanceWorldDayInput {
   readonly gameWorldId: string;
-  readonly worldSeed: string;
 }
 
 export interface AdvanceWorldDayResult {
@@ -59,6 +58,8 @@ export class AdvanceWorldOneDay {
     );
     if (!advanced.ok) return advanced;
     const newDate = advanced.value.world.currentDate;
+    // O seed é o do próprio mundo — sempre, não um parâmetro (determinismo R-182).
+    const worldSeed = advanced.value.world.seed;
 
     // 2. Abrir as competições que chegaram na data de início.
     const all = await this.deps.competitionReadModel.listCompetitions(worldId);
@@ -80,7 +81,7 @@ export class AdvanceWorldOneDay {
     const due = await this.deps.matchPlay.matchesDueBy(worldId, newDate);
     if (due.length > 0) {
       const results = due.map((m) =>
-        simulateScheduledMatch(input.worldSeed, {
+        simulateScheduledMatch(worldSeed, {
           matchId: m.matchId,
           homeClubId: m.homeClubId,
           awayClubId: m.awayClubId,
@@ -108,7 +109,7 @@ export class AdvanceWorldOneDay {
         ).execute({
           gameWorldId: worldId,
           competitionId: c.competitionId,
-          worldSeed: input.worldSeed,
+          worldSeed: worldSeed,
           occurredOn: newDate,
         });
         if (r.ok) homologated += 1;
