@@ -164,16 +164,30 @@ export class Player {
       previousValue - 6,
       Math.min(previousValue + 6, input.requestedValue),
     );
-    if (
-      nextValue > previousValue &&
-      this.state.currentAbility >= this.state.potentialAbility
-    ) {
+    /**
+     * O teto AINDA é o natural — e isso é dívida conhecida (R-213, trava B-07).
+     *
+     * A R-213 manda travar no potencial APROVEITÁVEL, e `derivePotentialLayers`
+     * já o calcula corretamente. Mas ligá-lo aqui seria teatro: o aproveitável
+     * é `habilidade + margem × rendimento`, e a habilidade sobe a cada ganho —
+     * o teto subiria junto, convergindo para o natural. O clamp pareceria
+     * cumprir a R-12 sem travar nada.
+     *
+     * A tabela de `04-estrutura-do-clube-e-staff.md:258-264` (potencial 85 →
+     * 55–65 em estrutura nível 1) só fecha medindo a margem UMA VEZ, de uma
+     * linha de base estável. Essa linha de base não existe no schema: nem
+     * `Player` nem `PlayerDevelopment` guardam a habilidade de entrada.
+     *
+     * Enquanto a coluna não existir, o teto segue o natural. Preferir o erro
+     * antigo e visível ao erro novo disfarçado de regra cumprida.
+     */
+    const ceiling = this.state.potentialAbility;
+    if (nextValue > previousValue && this.state.currentAbility >= ceiling) {
       nextValue = previousValue;
     }
     while (
       nextValue > previousValue &&
-      this.overallWith(input.attributeCode, nextValue) >
-        this.state.potentialAbility
+      this.overallWith(input.attributeCode, nextValue) > ceiling
     ) {
       nextValue -= 1;
     }

@@ -62,9 +62,32 @@ que explicar.
 recalculados a partir de estrutura/comissão/compatibilidade/posição — não colunas
 escritas à mão, para não criar duas fontes da verdade sobre o mesmo teto.
 
-O clamp de `Player.applyAttributeChange` (`player.ts:128-175`) passa a comparar contra o
+O clamp de `Player.applyAttributeChange` (`player.ts:128-175`) deve comparar contra o
 **aproveitável**, não o natural: é ele que a R-12 limita, e é ele que faz um jovem de
 potencial 85 parar em 55–65 numa estrutura nível 1 (`04-estrutura-do-clube-e-staff.md:258-264`).
+
+### Bloqueio descoberto na implementação: falta a linha de base (trava B-07)
+
+Ao ligar o clamp, o defeito apareceu: o aproveitável é
+`habilidade + margem × rendimento`, e a **habilidade sobe a cada ganho**. Recalculado a
+cada aplicação, o teto sobe junto — 71 → teto 77 → ganha → teto 79 — e converge para o
+natural. O clamp *pareceria* cumprir a R-12 e **não travaria nada**.
+
+A tabela do doc só fecha se a margem for medida **uma vez**, a partir de uma linha de base
+estável (a habilidade de entrada no clube ou no início da temporada). **Essa linha de base
+não existe no schema**: nem `Player` nem `PlayerDevelopment` (`schema.prisma:1512-1526`)
+guardam a habilidade de entrada.
+
+**Estado:** `derivePotentialLayers` está implementado e testado (15 testes, incluindo a
+validação cruzada contra a tabela do doc), mas **não está ligado ao clamp**. O teto segue
+o natural, como antes. Preferiu-se o erro antigo e visível ao erro novo disfarçado de
+regra cumprida.
+
+**Para destravar:** uma coluna de linha de base — candidata natural é
+`PlayerDevelopment.baselineAbility`, junto de `lastDevelopmentAt`, que já existe e também
+nunca foi escrita. Exige decisão sobre quando ela é fixada (entrada no clube? virada de
+temporada?), e isso muda o significado da R-12: se for por temporada, a estrutura ruim
+atrasa; se for por passagem no clube, ela limita de vez.
 
 ## R-214 — `TrainingPlan` ganha `version`
 
