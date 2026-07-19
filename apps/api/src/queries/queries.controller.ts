@@ -10,6 +10,7 @@ import type {
   MarketReadModel,
   MatchesReadModel,
   WorldClockRepository,
+  TrainingPlanRepository,
   SquadReadModel,
   WorldReadModel,
 } from "@grinta/core";
@@ -44,6 +45,7 @@ import {
   COMPETITION_READ_MODEL,
   MATCHES_READ_MODEL,
   WORLD_CLOCK_REPOSITORY,
+  TRAINING_PLAN_REPOSITORY,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
   NARRATIVE_READ_MODEL,
@@ -96,6 +98,8 @@ export class QueriesController {
     private readonly matchesReadModel: MatchesReadModel,
     @Inject(WORLD_CLOCK_REPOSITORY)
     private readonly worldClock: WorldClockRepository,
+    @Inject(TRAINING_PLAN_REPOSITORY)
+    private readonly trainingPlanRepository: TrainingPlanRepository,
     @Inject(MARKET_READ_MODEL)
     private readonly marketReadModel: MarketReadModel,
     @Inject(FANBASE_READ_MODEL)
@@ -292,6 +296,7 @@ export class QueriesController {
         competitionReadModel: this.competitionReadModel,
         matchesReadModel: this.matchesReadModel,
         worldClock: this.worldClock,
+        trainingPlanRepository: this.trainingPlanRepository,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,
         narrativeReadModel: this.narrativeReadModel,
