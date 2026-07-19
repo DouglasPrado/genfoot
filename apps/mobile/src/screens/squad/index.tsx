@@ -30,7 +30,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import {
   clearLineupDraft,
   readLineupDraft,
@@ -69,7 +69,7 @@ import { clubCrestData } from "@/screens/club/customization/visual-identity";
 export function Squad() {
   const reducedMotion = useReducedMotion();
   const sheetRef = useRef<View>(null);
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const { client, session, status, contractVersion } = useSession();
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =

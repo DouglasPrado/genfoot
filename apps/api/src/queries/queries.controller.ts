@@ -32,6 +32,7 @@ import { parseGameWorldId } from "@grinta/shared";
 import type { Request } from "express";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import { Public } from "../auth/public.decorator.js";
 import { ApiException } from "../common/standard-error.js";
 import {
   GAME_WORLD_REPOSITORY,
@@ -129,7 +130,20 @@ export class QueriesController {
    * Vem ANTES de `@Get(":worldId")` de propósito: o Nest casa na ordem de
    * declaração, e depois dela "worlds" seria lido como um `worldId` inválido.
    */
-  @ApiOperation({ summary: "Lista os mundos existentes" })
+  /**
+   * PÚBLICA (R-209): a vitrine de mundos responde sem token. Quem abre o app
+   * pela primeira vez vê o jogo existindo antes de criar conta.
+   *
+   * Seguro porque nada aqui deriva de identidade: `listWorlds` recebe
+   * `accountId` da SESSÃO, que sem token é `null`, e `myParticipation` sai
+   * `null` para todos. A elegibilidade continua exigindo login (R-210).
+   *
+   * Esta rota não é world-scoped, então não perde autorização de escopo ao
+   * virar pública — `enforceWorldScope` é no-op sem sessão, e replicar
+   * `@Public()` numa rota `:worldId` abriria os dados de um mundo a qualquer um.
+   */
+  @ApiOperation({ summary: "Lista os mundos existentes (público)" })
+  @Public()
   @Get()
   async list(
     @Req() request: Request & AuthenticatedRequest,

@@ -25,7 +25,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { previewDeal } from "@/screens/market/market-model";
 import {
   deriveOnboardingStep,
@@ -128,7 +128,7 @@ function reais(valueMinor: string | number | bigint): string {
 /** Mercado: a vitrine de jogadores do mundo, com valor estimado (R-41). */
 export function Market() {
   const { session, status, client, contractVersion } = useSession();
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const [filter, setFilter] = useState<Filter>("TODOS");
   const [signingId, setSigningId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);

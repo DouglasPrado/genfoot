@@ -56,11 +56,25 @@ export interface QueryEnvelope<T = unknown> {
 export interface WorldListItem {
   readonly id: string;
   readonly seed: string;
+  /** Anulável no schema: mundo semeado nasce sem nome e cai no `seed`. */
+  readonly name?: string | null;
   readonly status: string;
   readonly currentDate: string;
   readonly startDate: string;
   readonly rulesetVersion: string;
   readonly clubCount: number;
+  /**
+   * Clubes sem gestor — as vagas (R-180: vaga é a AUSÊNCIA de `ClubControl`
+   * ativo). O read model já os entregava; este tipo é que não os declarava, e a
+   * `M-WORLD-PICK` precisa deles para o jogador decidir onde cabe.
+   */
+  readonly openSlots: number;
+  /** A participação de QUEM PEDIU, quando autenticado — `null` se nunca entrou. */
+  readonly myParticipation: {
+    readonly status: string;
+    readonly hasActiveControl: boolean;
+    readonly cooldownUntilOn: string | null;
+  } | null;
 }
 
 /**

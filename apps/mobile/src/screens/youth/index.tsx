@@ -24,7 +24,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -64,7 +64,7 @@ const sectorOf = (code: string): PositionGroup => SECTOR[code] ?? "MEI";
 /** Base (C8) — os jovens em formação; toca no jogador pra ver o card completo. */
 export function Youth() {
   const { session, status, client, contractVersion } = useSession();
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const [inspect, setInspect] = useState<YouthPlayer | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);

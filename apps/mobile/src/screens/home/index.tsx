@@ -482,13 +482,35 @@ function HomeCalendar({
             </Text>
           </View>
           <View style={styles.nextMatchTeams}>
-            <Text style={styles.nextMatchTeam} numberOfLines={1}>
-              {nextMatch.homeClubName}
-            </Text>
+            <View style={[styles.nextMatchClub, styles.nextMatchClubHome]}>
+              <Text style={styles.nextMatchTeam} numberOfLines={1}>
+                {nextMatch.homeClubName}
+              </Text>
+              <ClubCrest
+                {...clubCrestData(
+                  nextMatch.homeClubName,
+                  nextMatch.homeClubPrimaryColor,
+                  nextMatch.homeClubSecondaryColor,
+                  nextMatch.homeClubCrestTemplateId,
+                )}
+                size={36}
+              />
+            </View>
             <Text style={styles.nextMatchVersus}>×</Text>
-            <Text style={styles.nextMatchTeamRight} numberOfLines={1}>
-              {nextMatch.awayClubName}
-            </Text>
+            <View style={styles.nextMatchClub}>
+              <ClubCrest
+                {...clubCrestData(
+                  nextMatch.awayClubName,
+                  nextMatch.awayClubPrimaryColor,
+                  nextMatch.awayClubSecondaryColor,
+                  nextMatch.awayClubCrestTemplateId,
+                )}
+                size={36}
+              />
+              <Text style={styles.nextMatchTeamRight} numberOfLines={1}>
+                {nextMatch.awayClubName}
+              </Text>
+            </View>
           </View>
           <View style={styles.nextMatchFooter}>
             <Text style={styles.nextMatchDate}>{nextMatch.dateLabel}</Text>
@@ -737,16 +759,24 @@ const styles = StyleSheet.create({
     color: color.textMuted,
     fontSize: 9,
   },
-  nextMatchTeams: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  nextMatchTeam: {
+  nextMatchTeams: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  nextMatchClub: {
+    minWidth: 0,
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  nextMatchClubHome: { justifyContent: "flex-end" },
+  nextMatchTeam: {
+    flexShrink: 1,
     textAlign: "right",
     color: color.text,
     fontSize: fontSize.md,
     fontWeight: fontWeight.black as "800",
   },
   nextMatchTeamRight: {
-    flex: 1,
+    flexShrink: 1,
     color: color.text,
     fontSize: fontSize.md,
     fontWeight: fontWeight.black as "800",

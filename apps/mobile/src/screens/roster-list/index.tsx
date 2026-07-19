@@ -25,7 +25,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
   deriveOnboardingStep,
@@ -70,7 +70,7 @@ type Filter = (typeof FILTERS)[number];
 /** Elenco — a lista de TODOS os jogadores do time (separada da formação tática). */
 export function RosterList() {
   const { session, status, client, contractVersion } = useSession();
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const [inspect, setInspect] = useState<RosterPlayer | null>(null);
   const [filter, setFilter] = useState<Filter>("TODOS");
   const [actingId, setActingId] = useState<string | null>(null);

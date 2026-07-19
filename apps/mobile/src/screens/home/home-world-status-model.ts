@@ -16,6 +16,12 @@ export interface HomeMatchProjection {
   readonly awayClubId: string;
   readonly homeClubName: string;
   readonly awayClubName: string;
+  readonly homeClubPrimaryColor?: string | null;
+  readonly homeClubSecondaryColor?: string | null;
+  readonly homeClubCrestTemplateId?: string | null;
+  readonly awayClubPrimaryColor?: string | null;
+  readonly awayClubSecondaryColor?: string | null;
+  readonly awayClubCrestTemplateId?: string | null;
   readonly scheduledOn: string;
 }
 
@@ -26,6 +32,12 @@ export interface HomeNextMatch {
   readonly competitionLabel: string;
   readonly homeClubName: string;
   readonly awayClubName: string;
+  readonly homeClubPrimaryColor: string | null;
+  readonly homeClubSecondaryColor: string | null;
+  readonly homeClubCrestTemplateId: string | null;
+  readonly awayClubPrimaryColor: string | null;
+  readonly awayClubSecondaryColor: string | null;
+  readonly awayClubCrestTemplateId: string | null;
   readonly venueLabel: "EM CASA" | "FORA DE CASA";
 }
 
@@ -90,6 +102,12 @@ export function deriveHomeNextMatch(
     competitionLabel: competitionName?.trim() || "COMPETIÇÃO",
     homeClubName: match.homeClubName,
     awayClubName: match.awayClubName,
+    homeClubPrimaryColor: match.homeClubPrimaryColor ?? null,
+    homeClubSecondaryColor: match.homeClubSecondaryColor ?? null,
+    homeClubCrestTemplateId: match.homeClubCrestTemplateId ?? null,
+    awayClubPrimaryColor: match.awayClubPrimaryColor ?? null,
+    awayClubSecondaryColor: match.awayClubSecondaryColor ?? null,
+    awayClubCrestTemplateId: match.awayClubCrestTemplateId ?? null,
     venueLabel: match.homeClubId === managedClubId ? "EM CASA" : "FORA DE CASA",
   };
 }

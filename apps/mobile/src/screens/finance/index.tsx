@@ -13,7 +13,7 @@ import {
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
 import { deriveScreenState } from "@/lib/screen-state";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { useSession } from "@/lib/session";
 import {
   deriveOnboardingStep,
@@ -37,7 +37,7 @@ const HEALTH_COLORS: Record<HealthTone, string> = {
 
 /** M-FINANCE — a tela de Finanças (custos da temporada, caixa, saúde). */
 export function Finance() {
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const { session, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");

@@ -31,7 +31,7 @@ import {
 import { deriveScreenState } from "@/lib/screen-state";
 import { useAuth, useUser } from "@clerk/expo";
 import { useWorldQuery } from "@/lib/world";
-import { useWorldId } from "@/lib/world";
+import { useRequiredWorldId } from "@/lib/world";
 import { useSession } from "@/lib/session";
 import {
   submitTrackedCommand,
@@ -102,7 +102,7 @@ interface FinanceSnapshotProjection {
 export function Club() {
   const { isLoaded, isSignedIn, signOut } = useAuth();
   const { user } = useUser();
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const { client, session, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ currentDate: string }>("world");
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");

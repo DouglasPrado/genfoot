@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider } from "@/lib/session";
+import { WorldSelectionProvider } from "@/lib/world-selection";
 import { color } from "@/theme";
 
 /**
@@ -28,14 +29,16 @@ export default function RootLayout() {
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <SafeAreaProvider>
         <SessionProvider>
-          <StatusBar style="light" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: color.background },
-              animation: "fade",
-            }}
-          />
+          <WorldSelectionProvider>
+            <StatusBar style="light" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: color.background },
+                animation: "fade",
+              }}
+            />
+          </WorldSelectionProvider>
         </SessionProvider>
       </SafeAreaProvider>
     </ClerkProvider>
