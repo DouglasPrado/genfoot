@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { WorldImageField } from "@/components/world-image-field";
 import {
   DESCRIPTION_MAX,
@@ -47,6 +48,7 @@ export function WorldIdentityForm({
   onSaved: () => void;
 }) {
   const { api } = useSession();
+  const { error: showError } = useToast();
   const [draft, setDraft] = useState({
     name: name ?? "",
     description: description ?? "",
@@ -61,7 +63,6 @@ export function WorldIdentityForm({
     photo: string | null;
   }>({ banner: null, photo: null });
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
   // O mundo pode mudar por fora (outra aba, outro operador, o refresh depois de
@@ -82,13 +83,14 @@ export function WorldIdentityForm({
     draft,
   );
   const violations = identityViolations(draft);
-  const nameViolation = violations.find((v) => v.field === "name");
-  const descriptionViolation = violations.find((v) => v.field === "description");
 
   async function save() {
-    if (payload === null || violations.length > 0) return;
+    if (payload === null) return;
+    if (violations.length > 0) {
+      showError(violations.map((violation) => violation.message).join(" "));
+      return;
+    }
     setBusy(true);
-    setError(null);
     setSaved(false);
     try {
       const response = await api.command({
@@ -99,13 +101,13 @@ export function WorldIdentityForm({
         ...(expectedVersion === null ? {} : { expectedVersion }),
       });
       if (response.status === "REJECTED") {
-        setError(response.error?.code ?? "REJECTED");
+        showError(response.error?.code ?? "REJECTED");
         return;
       }
       setSaved(true);
       onSaved();
     } catch (err) {
-      setError(
+      showError(
         err instanceof GrintaApiError ? err.standard.code : "Falha na API",
       );
     } finally {
@@ -118,11 +120,7 @@ export function WorldIdentityForm({
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between gap-2">
           <Label htmlFor="world-name">Nome</Label>
-          <span
-            className={`mono text-[11px] ${
-              nameViolation ? "text-danger" : "text-muted-foreground"
-            }`}
-          >
+          <span className="mono text-[11px] text-muted-foreground">
             {draft.name.trim().length}/{NAME_MAX}
           </span>
         </div>
@@ -132,26 +130,18 @@ export function WorldIdentityForm({
           onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
           placeholder={seed ?? "sem nome"}
         />
-        {nameViolation ? (
-          <p className="text-[11px] text-danger">{nameViolation.message}</p>
-        ) : (
-          <p className="text-[11px] text-muted-foreground">
-            {/* Sem nome não é erro: o mundo cai no seed, que é o que a tela
-                sempre mostrou. Deixar em branco é uma escolha legítima. */}
-            Em branco, o mundo aparece pelo seed (
-            <span className="mono">{seed ?? "—"}</span>).
-          </p>
-        )}
+        <p className="text-[11px] text-muted-foreground">
+          {/* Sem nome não é erro: o mundo cai no seed, que é o que a tela
+              sempre mostrou. Deixar em branco é uma escolha legítima. */}
+          Em branco, o mundo aparece pelo seed (
+          <span className="mono">{seed ?? "—"}</span>).
+        </p>
       </div>
 
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between gap-2">
           <Label htmlFor="world-description">Descrição</Label>
-          <span
-            className={`mono text-[11px] ${
-              descriptionViolation ? "text-danger" : "text-muted-foreground"
-            }`}
-          >
+          <span className="mono text-[11px] text-muted-foreground">
             {draft.description.trim().length}/{DESCRIPTION_MAX}
           </span>
         </div>
@@ -165,11 +155,6 @@ export function WorldIdentityForm({
           className="w-full rounded-sm border border-border bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary"
           placeholder="Para que serve este mundo, quem joga, o que está sendo testado…"
         />
-        {descriptionViolation ? (
-          <p className="text-[11px] text-danger">
-            {descriptionViolation.message}
-          </p>
-        ) : null}
       </div>
 
       <div className="grid gap-5 sm:grid-cols-[1fr_auto]">
@@ -214,10 +199,7 @@ export function WorldIdentityForm({
       </div>
 
       <div className="flex items-center gap-3">
-        <Button
-          onClick={() => void save()}
-          disabled={busy || payload === null || violations.length > 0}
-        >
+        <Button onClick={() => void save()} disabled={busy || payload === null}>
           {busy ? "Salvando…" : "Salvar"}
         </Button>
         {/* O botão desabilitado sem explicação faz o operador achar que quebrou.
@@ -235,12 +217,6 @@ export function WorldIdentityForm({
           </span>
         ) : null}
       </div>
-
-      {error !== null ? (
-        <p className="mono rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

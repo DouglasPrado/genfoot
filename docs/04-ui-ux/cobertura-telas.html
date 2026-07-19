@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-16</b> · commit <b>7b3c898</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-18</b> · commit <b>5ad35c7</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -718,6 +718,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-18</span>
+        <span class="log-text"><b>O mundo passou a andar sozinho — e nenhuma tela mobile mudou de cor.</b> Entrega de <b>back-end + admin</b>, provada por HTTP, não por navegador: o relógio do mundo (MUNDO V1–V4, commits até <code>64c71fa</code>) avança a data lógica automaticamente num intervalo configurável por mundo (segundos/minutos/horas), com o scheduler abrindo competições, jogando as rodadas vencidas e homologando as encerradas; o admin liga/pausa e ajusta o tempo. E o <b>desfecho da temporada</b> (C7-V6b, <code>5ad35c7</code>): a query <code>competition-outcome</code> projeta campeão, acesso e rebaixamento da classificação final — provada ponta a ponta (mundo novo → liga de 6 clubes → 15 jogos → campeão Serrano, 1 sobe, 2 descem). <b>Continua 0/114:</b> isto destrava a <em>premissa</em> das telas de rodada e competição (<code>M-ROUND</code>, tabela, artilharia, chaveamento) — dá o dado real que elas vão consumir —, mas nenhuma dessas telas foi construída nem exercitada no simulador. O painel de relógio do admin e a exibição do desfecho <b>aguardam o teste do dono no navegador</b> (§5.1) antes de contar como algo. As queries que faltavam para essas telas (<code>competitions</code>, <code>top-scorers</code>, <code>competition-outcome</code>, <code>world-clock</code>) deixaram de ser trava: existem.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-16</span>
         <span class="log-text"><b>M-RECOVER entra amarela</b> (<code>7b3c898</code>) — 16 → 17 parciais. Redefinição de senha real feita por uma pessoa: e-mail → código → nova senha. Não é verde porque o doc pede "enviar link" e o Clerk faz por <b>código</b> — decisão pendente do dono: atualizar o doc ou manter o desvio. A trava de envio de e-mail, que eu havia dado como impossível de remover por código, <b>caiu</b>: quem envia é o provedor.</span>

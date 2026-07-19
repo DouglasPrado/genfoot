@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 export interface KnownWorld {
@@ -36,9 +37,10 @@ export interface KnownWorld {
  */
 export function useKnownWorlds() {
   const { api, session } = useSession();
+  const { error: showError } = useToast();
   const [worlds, setWorlds] = useState<readonly KnownWorld[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -72,14 +74,15 @@ export function useKnownWorlds() {
             };
           }),
         );
-        setError(null);
+        setFailed(false);
       })
       .catch(() => {
         if (!alive) return;
         // Lista vazia com erro NOMEADO. Cair calado em `[]` diria "não há
         // mundos" quando a verdade é "não consegui perguntar".
         setWorlds([]);
-        setError("Falha ao listar os mundos.");
+        setFailed(true);
+        showError("Falha ao listar os mundos.");
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -87,9 +90,9 @@ export function useKnownWorlds() {
     return () => {
       alive = false;
     };
-  }, [api, session, tick]);
+  }, [api, session, tick, showError]);
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  return { worlds, loading, error, refresh };
+  return { worlds, loading, failed, refresh };
 }

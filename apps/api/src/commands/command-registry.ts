@@ -16,6 +16,18 @@ import {
   ReleasePlayer,
   SellPlayer,
   ListPlayer,
+  CreateCompetition,
+  ConfigureCompetition,
+  LockCompetition,
+  StartCompetition,
+  FinishCompetition,
+  defaultLeagueConfig,
+  SetOfflinePlan,
+  SaveAutomation,
+  ToggleAutomation,
+  RunClubAutopilot,
+  SetWorldClock,
+  AdvanceWorldOneDay,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -29,6 +41,9 @@ import {
   type ClubUnitOfWork,
   type GenesisUnitOfWork,
   type MatchPlayRepository,
+  type PresenceRepository,
+  type WorldClockRepository,
+  type CompetitionReadModel,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -36,6 +51,10 @@ import {
   type ReleaseUnitOfWork,
   type SellUnitOfWork,
   type ListUnitOfWork,
+  type CompetitionUnitOfWork,
+  type AutomationUnitOfWork,
+  type OfflinePlan,
+  type ConfigureCompetitionPatch,
   type ClubRepository,
   type IdentityUnitOfWork,
   type WorldDomainEvent,
@@ -51,6 +70,8 @@ import {
   succeed,
   type Result,
 } from "@grinta/shared";
+import { randomUUID } from "node:crypto";
+
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
@@ -91,6 +112,12 @@ export interface CommandContext {
   readonly genesisUnitOfWork: GenesisUnitOfWork;
   /** C5 — joga a próxima rodada da liga (simulação determinística). */
   readonly matchPlay: MatchPlayRepository;
+  /** X-001 — a presença do usuário no mundo (heartbeat). */
+  readonly presence: PresenceRepository;
+  /** MUNDO-V1 — o relógio do mundo (config de tempo por dia lógico). */
+  readonly worldClock: WorldClockRepository;
+  /** MUNDO-V2 — o motor do dia lê as competições para iniciar/homologar por data. */
+  readonly competitionReadModel: CompetitionReadModel;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -103,6 +130,10 @@ export interface CommandContext {
   readonly sellUnitOfWork: SellUnitOfWork;
   /** C6 — coloca um jogador à venda (cria a TransferListing). */
   readonly listUnitOfWork: ListUnitOfWork;
+  /** C7 — competição autorada: criar, configurar, travar, iniciar, homologar (R-202). */
+  readonly competitionUnitOfWork: CompetitionUnitOfWork;
+  /** X-001 — o plano offline do clube: o que a IA pode decidir na ausência. */
+  readonly automationUnitOfWork: AutomationUnitOfWork;
   /** C9 — o débito de custos de UM clube no encerramento de temporada. */
   readonly seasonFinanceUnitOfWork: SeasonFinanceUnitOfWork;
   /** Para iterar os clubes do mundo na virada (o débito roda para cada um). */
@@ -183,6 +214,176 @@ const signPlayerPayload = z.object({
   playerId: z.string().uuid(),
   feeMinor: z.union([z.string(), z.number()]).transform((v) => BigInt(v)),
   currentSeason: z.number().int().positive().default(1),
+});
+
+// ── Competição autorada (C7, R-202..R-207) ──────────────────────────────────
+// O zod garante só a FORMA; as regras (nº par de clubes, potência de 2, janela
+// coerente) são do agregado — duplicar aqui seria dois donos para a mesma regra.
+const competitionTypeEnum = z.enum([
+  "LEAGUE",
+  "CUP",
+  "SUPER_CUP",
+  "INTERNATIONAL_CUP",
+  "FRIENDLY",
+]);
+const competitionFormatEnum = z.enum([
+  "ROUND_ROBIN",
+  "DOUBLE_ROUND_ROBIN",
+  "KNOCKOUT",
+  "GROUPS_AND_KNOCKOUT",
+  "SWISS",
+]);
+const dateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+const minor = z.string().regex(/^\d+$/u);
+
+const createCompetitionPayload = z.object({
+  name: z.string().min(1),
+  type: competitionTypeEnum,
+  format: competitionFormatEnum,
+  tier: z.number().int().positive().nullable().default(null),
+  reputation: z.number().int().min(0).max(100).optional(),
+  /** Pirâmide (R-204): divisões do mesmo campeonato compartilham este id. */
+  championshipId: z.string().uuid().nullable().optional(),
+});
+
+const competitionRulesSchema = z.object({
+  pointsWin: z.number().int(),
+  pointsDraw: z.number().int(),
+  legs: z.union([z.literal(1), z.literal(2)]),
+  promotionSlots: z.number().int().min(0),
+  relegationSlots: z.number().int().min(0),
+  tiebreakers: z
+    .array(
+      z.enum([
+        "POINTS",
+        "WINS",
+        "GOAL_DIFFERENCE",
+        "GOALS_FOR",
+        "HEAD_TO_HEAD",
+        "FAIR_PLAY",
+        "DRAW",
+      ]),
+    )
+    .min(1),
+  groupCount: z.number().int().positive().nullable(),
+  qualifiersPerGroup: z.number().int().positive().nullable(),
+});
+const competitionPrizesSchema = z.object({
+  participationMinor: minor,
+  winBonusMinor: minor,
+  positionMinor: z.array(minor),
+  topScorerMinor: minor,
+  bestPlayerMinor: minor,
+});
+const competitionConfigSchema = z.object({
+  rules: competitionRulesSchema,
+  prizes: competitionPrizesSchema,
+  qualifications: z.array(
+    z.object({
+      targetCompetitionId: z.string().uuid(),
+      criteria: z.enum(["TOP_POSITIONS", "CHAMPION", "CUP_WINNER"]),
+      slots: z.number().int().positive(),
+    }),
+  ),
+});
+const configureCompetitionPayload = z.object({
+  competitionId: z.string().uuid(),
+  name: z.string().min(1).optional(),
+  type: competitionTypeEnum.optional(),
+  format: competitionFormatEnum.optional(),
+  tier: z.number().int().positive().nullable().optional(),
+  clubIds: z.array(z.string().uuid()).optional(),
+  startsOn: dateOnly.nullable().optional(),
+  endsOn: dateOnly.nullable().optional(),
+  config: competitionConfigSchema.optional(),
+});
+
+/**
+ * Autoria de um CAMPEONATO inteiro (R-204): a pirâmide de divisões numa tacada.
+ * Cada item de `divisions` é uma divisão (tier = posição no array, 1 = topo),
+ * com seus clubes e as vagas de acesso/rebaixamento — o dono põe 0 no acesso do
+ * topo e 0 no rebaixamento do fundo. Todas compartilham a janela e o mesmo
+ * `championshipId`, gerado aqui, que liga a pirâmide para o rollover.
+ */
+const createChampionshipPayload = z.object({
+  name: z.string().min(1),
+  startsOn: dateOnly,
+  endsOn: dateOnly,
+  format: competitionFormatEnum.default("ROUND_ROBIN"),
+  divisions: z
+    .array(
+      z.object({
+        clubIds: z.array(z.string().uuid()).min(2),
+        promotionSlots: z.number().int().min(0),
+        relegationSlots: z.number().int().min(0),
+      }),
+    )
+    .min(1),
+  /** Premiação comum às divisões (opcional; padrão = sem prêmios). */
+  prizes: competitionPrizesSchema.optional(),
+});
+const competitionTransitionPayload = z.object({
+  competitionId: z.string().uuid(),
+});
+
+// X-001 — o plano offline. O zod só valida a FORMA; as invariantes (alto risco
+// não delegável, coerência nível×profundidade) são do agregado ClubAIProfile.
+const minorStr = z.string().regex(/^\d+$/u);
+const setOfflinePlanPayload = z.object({
+  clubId: z.string().uuid(),
+  automationLevel: z.enum([
+    "MANUAL",
+    "ASSISTED",
+    "SEMI_AUTOMATED",
+    "FULLY_AUTOMATED",
+  ]),
+  offlineDecisionLevel: z.number().int(),
+  lineupPolicy: z.string().min(1),
+  substitutionPolicy: z.string().min(1),
+  marketPolicy: z.string().min(1),
+  crisisPolicy: z.string().min(1),
+  authorityLimits: z.object({
+    maxDebtMinor: minorStr,
+    maxTransferSpendMinor: minorStr,
+    canSellKeyPlayers: z.boolean(),
+    canChangeIdentity: z.boolean(),
+  }),
+});
+
+const saveAutomationPayload = z.object({
+  clubId: z.string().uuid(),
+  ruleId: z.string().uuid().optional(),
+  activate: z.boolean().default(false),
+  name: z.string().min(1),
+  level: z.enum(["MANUAL", "ASSISTED", "SEMI_AUTOMATED", "FULLY_AUTOMATED"]),
+  triggerEvent: z.string().min(1),
+  condition: z.unknown().optional(),
+  action: z.unknown().optional(),
+  risk: z.number().int(),
+  priority: z.number().int(),
+});
+
+const toggleAutomationPayload = z.object({
+  clubId: z.string().uuid(),
+  ruleId: z.string().uuid(),
+  activate: z.boolean(),
+});
+
+// X-001 presença: só diz se está entrando (online) ou saindo. QUEM é o ator vem
+// do token (actorId), nunca do payload.
+const presencePayload = z.object({
+  online: z.boolean().default(true),
+});
+
+const runAutopilotPayload = z.object({
+  clubId: z.string().uuid(),
+  triggerEvent: z.string().min(1),
+});
+
+// MUNDO-V1 — o relógio: quantos segundos reais valem um dia lógico, e se roda.
+const setClockPayload = z.object({
+  realSecondsPerDay: z.number().int(),
+  running: z.boolean().default(true),
 });
 
 const createWorldPayload = z.object({
@@ -581,6 +782,313 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `player:${parsed.data.playerId}` });
+  },
+
+  // ── Competição autorada (C7, R-202) ──────────────────────────────────────
+  "competition:create": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = createCompetitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    // O id é autorado (não é artefato determinístico da gênese): a idempotência
+    // vem do barramento (fingerprint do pedido), não de um seed de mundo.
+    const id = randomUUID();
+    const result = await new CreateCompetition(competitionUnitOfWork).execute({
+      id,
+      gameWorldId: world.value.worldId,
+      name: parsed.data.name,
+      type: parsed.data.type,
+      format: parsed.data.format,
+      tier: parsed.data.tier,
+      ...(parsed.data.reputation !== undefined
+        ? { reputation: parsed.data.reputation }
+        : {}),
+      ...(parsed.data.championshipId !== undefined
+        ? { championshipId: parsed.data.championshipId }
+        : {}),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${id}` });
+  },
+
+  // Autora um CAMPEONATO inteiro (R-204): cria, configura e trava cada divisão,
+  // todas ligadas por um mesmo championshipId. Depois disso o motor do dia
+  // (MUNDO-V2) as inicia, joga e, na virada, aplica o acesso/rebaixamento entre
+  // elas. As divisões são autoradas — não nascem na gênese.
+  "championship:create": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = createChampionshipPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const gameWorldId = world.value.worldId;
+    const championshipId = randomUUID();
+    const base = defaultLeagueConfig();
+    const legs = parsed.data.format === "DOUBLE_ROUND_ROBIN" ? 2 : 1;
+
+    for (let index = 0; index < parsed.data.divisions.length; index += 1) {
+      const division = parsed.data.divisions[index]!;
+      const tier = index + 1;
+      const competitionId = randomUUID();
+      const created = await new CreateCompetition(
+        competitionUnitOfWork,
+      ).execute({
+        id: competitionId,
+        gameWorldId,
+        name: `${parsed.data.name} · Divisão ${tier}`,
+        type: "LEAGUE",
+        format: parsed.data.format,
+        tier,
+        championshipId,
+      });
+      if (!created.ok) return created;
+
+      const configured = await new ConfigureCompetition(
+        competitionUnitOfWork,
+      ).execute({
+        gameWorldId,
+        competitionId,
+        patch: {
+          clubIds: division.clubIds,
+          startsOn: parsed.data.startsOn,
+          endsOn: parsed.data.endsOn,
+          config: {
+            rules: {
+              ...base.rules,
+              legs,
+              promotionSlots: division.promotionSlots,
+              relegationSlots: division.relegationSlots,
+            },
+            prizes: parsed.data.prizes ?? base.prizes,
+            qualifications: [],
+          },
+        },
+      });
+      if (!configured.ok) return configured;
+
+      const locked = await new LockCompetition(competitionUnitOfWork).execute({
+        gameWorldId,
+        competitionId,
+      });
+      if (!locked.ok) return locked;
+    }
+    return succeed({ resource: `championship:${championshipId}` });
+  },
+
+  "competition:configure": async ({
+    worlds,
+    competitionUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = configureCompetitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const { competitionId, ...patch } = parsed.data;
+    const result = await new ConfigureCompetition(
+      competitionUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      competitionId,
+      patch: patch as ConfigureCompetitionPatch,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${competitionId}` });
+  },
+
+  "competition:lock": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new LockCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  "competition:start": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new StartCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  "competition:finish": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = competitionTransitionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new FinishCompetition(competitionUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      competitionId: parsed.data.competitionId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `competition:${parsed.data.competitionId}` });
+  },
+
+  // X-001 — o clube define o que a IA pode decidir na sua ausência (R-01).
+  "automation:set-offline-plan": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = setOfflinePlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const { clubId, ...plan } = parsed.data;
+    const result = await new SetOfflinePlan(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId,
+      plan: plan as OfflinePlan,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${clubId}` });
+  },
+
+  // X-001 — regra "se gatilho então ação". Cada save congela uma versão.
+  "automation:save-automation": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = saveAutomationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const d = parsed.data;
+    const result = await new SaveAutomation(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: d.clubId,
+      ...(d.ruleId !== undefined ? { ruleId: d.ruleId } : {}),
+      newRuleId: d.ruleId ?? randomUUID(),
+      activate: d.activate,
+      config: {
+        name: d.name,
+        level: d.level,
+        triggerEvent: d.triggerEvent,
+        condition: d.condition ?? null,
+        action: d.action ?? null,
+        risk: d.risk,
+        priority: d.priority,
+      },
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `automation:${result.value.ruleId}` });
+  },
+
+  "automation:toggle-automation": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = toggleAutomationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ToggleAutomation(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      ruleId: parsed.data.ruleId,
+      activate: parsed.data.activate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `automation:${parsed.data.ruleId}` });
+  },
+
+  // X-001 — o usuário registra que está (ou deixou de estar) presente no mundo.
+  "presence:heartbeat": async ({ worlds, presence, actorId, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    if (actorId === null) {
+      return fail(
+        new DomainError(
+          "PRESENCE_REQUIRES_USER",
+          "Presença exige uma sessão de usuário (o admin/sistema não tem presença de jogo).",
+        ),
+      );
+    }
+    const parsed = presencePayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    if (parsed.data.online) {
+      await presence.recordOnline(world.value.worldId, actorId);
+    } else {
+      await presence.recordOffline(world.value.worldId, actorId);
+    }
+    return succeed({ resource: `presence:${actorId}` });
+  },
+
+  // X-001 — o executor: roda a automação do clube num gatilho. A precedência
+  // (humano presente → IA se cala) decide dentro do caso de uso.
+  "automation:run-autopilot": async ({
+    worlds,
+    automationUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = runAutopilotPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new RunClubAutopilot(automationUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      triggerEvent: parsed.data.triggerEvent,
+      // Presença é tempo real: o "agora" é o relógio de parede, na borda.
+      nowIso: new Date().toISOString(),
+      occurredOn: world.value.snapshot.currentDate,
+      worldSeed: world.value.snapshot.seed,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  // MUNDO-V1 — configura o relógio: o mundo passa a andar sozinho (ou pausa).
+  "world:set-clock": async ({ worlds, worldClock, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = setClockPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetWorldClock(worldClock).execute({
+      gameWorldId: world.value.worldId,
+      realSecondsPerDay: parsed.data.realSecondsPerDay,
+      running: parsed.data.running,
+      // O relógio de parede AGORA, na borda — para agendar o próximo tick.
+      nowIso: new Date().toISOString(),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `world:${world.value.worldId}` });
+  },
+
+  // MUNDO-V2 — avança UM dia lógico e roda o trabalho do dia (abre competições,
+  // joga as partidas vencidas, homologa as encerradas). O motor do mundo.
+  "world:advance-day": async ({
+    worlds,
+    competitionUnitOfWork,
+    competitionReadModel,
+    matchPlay,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const result = await new AdvanceWorldOneDay({
+      worlds,
+      competitionUnitOfWork,
+      competitionReadModel,
+      matchPlay,
+    }).execute({ gameWorldId: world.value.worldId });
+    if (!result.ok) return result;
+    return succeed({ resource: `world:${world.value.worldId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

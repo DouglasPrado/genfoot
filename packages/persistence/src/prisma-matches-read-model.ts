@@ -1,4 +1,6 @@
 import type {
+  MatchDetailView,
+  MatchFeedEvent,
   MatchListItem,
   MatchesReadModel,
   MatchesView,
@@ -30,7 +32,12 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
 
     const [finished, scheduled] = await Promise.all([
       this.client.match.findMany({
-        where: { gameWorldId, runtimeStatus: "FINISHED", ...clubFilter },
+        // FINISHED (jogada) e PROCESSED (já homologada, C5-V3) — ambas têm placar.
+        where: {
+          gameWorldId,
+          runtimeStatus: { in: ["FINISHED", "PROCESSED"] },
+          ...clubFilter,
+        },
         orderBy: [{ finishedAt: "desc" }, { roundNumber: "desc" }],
         take: RESULTS_LIMIT,
       }),
@@ -66,6 +73,57 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
     return {
       results: finished.map((m) => toItem(m, true)),
       upcoming: scheduled.map((m) => toItem(m, false)),
+    };
+  }
+
+  public async matchDetail(
+    gameWorldId: GameWorldId,
+    matchId: string,
+  ): Promise<MatchDetailView | null> {
+    const match = await this.client.match.findFirst({
+      where: { id: matchId, gameWorldId },
+      include: {
+        events: {
+          orderBy: { eventSequence: "asc" },
+          include: {
+            player: { include: { person: { select: { firstName: true, lastName: true } } } },
+          },
+        },
+      },
+    });
+    if (match === null) return null;
+
+    const names = await this.clubNames(gameWorldId, [
+      match.homeClubId,
+      match.awayClubId,
+    ]);
+    const finished = match.runtimeStatus === "FINISHED" || match.runtimeStatus === "PROCESSED";
+
+    const events: MatchFeedEvent[] = match.events.map((e) => ({
+      sequence: e.eventSequence,
+      minute: e.minute,
+      type: e.type,
+      clubId: e.clubId,
+      playerId: e.playerId,
+      playerName: e.player
+        ? `${e.player.person.firstName} ${e.player.person.lastName}`
+        : null,
+      description: e.description,
+    }));
+
+    return {
+      matchId: match.id,
+      roundNumber: match.roundNumber ?? 0,
+      scheduledOn: match.scheduledAt.toISOString().slice(0, 10),
+      runtimeStatus: match.runtimeStatus,
+      finished,
+      homeClubId: match.homeClubId,
+      awayClubId: match.awayClubId,
+      homeClubName: names.get(match.homeClubId)?.name ?? "—",
+      awayClubName: names.get(match.awayClubId)?.name ?? "—",
+      homeGoals: finished ? match.homeGoals : null,
+      awayGoals: finished ? match.awayGoals : null,
+      events,
     };
   }
 

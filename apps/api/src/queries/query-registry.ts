@@ -6,6 +6,7 @@ import type {
   LedgerReadModel,
   CompetitionReadModel,
   MatchesReadModel,
+  WorldClockRepository,
   MarketReadModel,
   FanbaseReadModel,
   NarrativeReadModel,
@@ -41,6 +42,8 @@ export interface QueryContext {
   readonly narrativeReadModel: NarrativeReadModel;
   readonly staffReadModel: StaffReadModel;
   readonly inboxReadModel: InboxReadModel;
+  /** MUNDO-V4 — o relógio do mundo, para o admin ler a config e o próximo tick. */
+  readonly worldClock: WorldClockRepository;
 }
 
 /**
@@ -68,9 +71,30 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await ledgerReadModel.summary(worldId)),
   competitions: async ({ competitionReadModel }, worldId) =>
     succeed(await competitionReadModel.leagueStandings(worldId)),
+  "competitions-list": async ({ competitionReadModel }, worldId) =>
+    succeed({ competitions: await competitionReadModel.listCompetitions(worldId) }),
+  "competition-outcome": async ({ competitionReadModel }, worldId) =>
+    succeed(await competitionReadModel.competitionOutcome(worldId)),
+  "top-scorers": async ({ competitionReadModel }, worldId) =>
+    succeed({ scorers: await competitionReadModel.topScorers(worldId) }),
   matches: async ({ matchesReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     return succeed(await matchesReadModel.recentAndUpcoming(worldId, clubId));
+  },
+  "world-clock": async ({ worldClock }, worldId) =>
+    succeed(await worldClock.getClock(worldId)),
+  "match-detail": async ({ matchesReadModel }, worldId, params) => {
+    const matchId = typeof params.matchId === "string" ? params.matchId : null;
+    if (matchId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "match-detail exige o parâmetro matchId.",
+          { param: "matchId" },
+        ),
+      );
+    }
+    return succeed(await matchesReadModel.matchDetail(worldId, matchId));
   },
   market: async ({ marketReadModel }, worldId, params) => {
     const excludeClubId = typeof params.clubId === "string" ? params.clubId : null;

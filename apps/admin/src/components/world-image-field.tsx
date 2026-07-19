@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 /**
@@ -39,13 +40,12 @@ export function WorldImageField({
   onCleared: () => void;
 }) {
   const { authorizedFetch } = useSession();
+  const { error: showError } = useToast();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function send(file: File) {
     setBusy(true);
-    setError(null);
     try {
       const body = new FormData();
       body.append("file", file);
@@ -66,16 +66,20 @@ export function WorldImageField({
         code?: string;
         messageKey?: string;
       };
-      if (!response.ok || payload.key === undefined || payload.url === undefined) {
+      if (
+        !response.ok ||
+        payload.key === undefined ||
+        payload.url === undefined
+      ) {
         // A mensagem do servidor diz o tamanho recebido ("recebi 900×400"), que
         // é a informação que resolve o problema. Trocá-la por "falha no upload"
         // deixaria o operador adivinhando.
-        setError(payload.messageKey ?? payload.code ?? "Falha no upload.");
+        showError(payload.messageKey ?? payload.code ?? "Falha no upload.");
         return;
       }
       onUploaded(payload.key, payload.url);
     } catch {
-      setError("Falha na API");
+      showError("Falha na API");
     } finally {
       setBusy(false);
       if (input.current !== null) input.current.value = "";
@@ -136,12 +140,6 @@ export function WorldImageField({
       </div>
 
       <p className="text-[11px] leading-snug text-muted-foreground">{hint}</p>
-
-      {error !== null ? (
-        <p className="rounded-sm border border-danger/40 bg-danger/10 px-2 py-1.5 text-[11px] text-danger">
-          {error}
-        </p>
-      ) : null}
     </div>
   );
 }

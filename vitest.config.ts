@@ -60,7 +60,9 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? "";
 export default defineConfig({
   resolve: { alias },
   test: {
-    env: { DATABASE_URL: TEST_DATABASE_URL },
+    // O scheduler do mundo (MUNDO-V3) fica DESLIGADO nos testes: a suíte não pode
+    // ter um mundo andando por baixo (setInterval) enquanto os e2e rodam.
+    env: { DATABASE_URL: TEST_DATABASE_URL, GRINTA_SCHEDULER_DISABLED: "1" },
     coverage: {
       reporter: ["text", "json", "html"],
     },

@@ -121,6 +121,27 @@ Depois disso: republique o mesmo `file_path` (mantém a URL), atualize a contage
 
 ---
 
+## 5.2 Modo loop autônomo
+
+Quando o usuário pede explicitamente um **loop autônomo** (`/loop`, "roda sozinho", "segue sem me perguntar"), o processo muda **só na espera** — nunca no significado das cores.
+
+**O que o loop pode fazer sem perguntar:**
+
+- Escolher a própria fila de tarefas (lacunas de domínio, telas, Postgres) a cada iteração.
+- Commitar em branch `feat/*` com o gate completo verde.
+- Republicar o artefato de cobertura no mesmo `file_path`/URL, atualizando contagem, chips, carimbo e Registro.
+- Push e abrir PR — exceção explícita ao §7, válida **apenas** dentro de um loop autônomo pedido pelo usuário.
+
+**O que o loop continua NÃO podendo fazer:**
+
+- ❌ **Pintar 🟢 verde.** O teto do loop autônomo é 🟡 amarelo, sempre — mesmo com o doc aparentemente cumprido por inteiro, gate verde e fluxo exercitado. Verde exige as condições 0–4 do §5.1, e a condição 4 (confirmação explícita do usuário) não tem substituto autônomo: não há harness E2E, então o loop não tem como produzir a prova. Marcar verde sozinho é exatamente o slice-e-declara-pronto do §5.
+- ❌ Remover uma trava de "O que trava a construção" sem prova observada.
+- ❌ Tocar na `main`, ou em qualquer ação destrutiva/irreversível fora do escopo da tarefa.
+
+**Como o loop reporta:** cada tela que ele julga completa vira 🟡 amarelo com a tag `aguardando confirmação` e a descrição dizendo o que ele acredita ter fechado e o que falta provar. O usuário confirma em lote quando quiser — e só então a cor sobe para verde, seguindo o §5.1 normalmente.
+
+---
+
 ## 6. Convenções de código
 
 **Domínio (`packages/core`)**
@@ -147,15 +168,58 @@ Depois disso: republique o mesmo `file_path` (mantém a URL), atualize a contage
   ```
   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   ```
-- Push/PR **só quando o usuário pedir**.
+- Push/PR **só quando o usuário pedir** — exceto em modo loop autônomo (§5.2), onde o pedido do loop já autoriza.
 
 ---
 
 ## 8. Estado atual (honesto — 2026-07-16)
 
+> ⚠️ Só o item **Persistência** foi reverificado em 2026-07-18. Os demais são de 2026-07-16 e podem ter envelhecido — confirme no código antes de citar qualquer número daqui.
+
 - **Backend/domínio:** os 12 bounded contexts, o kernel, eventing/sagas, automação e calibração estão implementados e testados; a API expõe ~148 commands. Gate verde (445 testes / 92 arquivos).
-- **Persistência:** só o adapter **JSON** (`packages/persistence/json-world-repository.ts`). Existe `prisma/schema.prisma` (75 models) mas **sem migrations** e **nenhum código usa `PrismaClient`** — o Postgres nunca foi materializado.
+- **Persistência:** **Postgres via Prisma, materializado** (verificado 2026-07-18). `packages/persistence/src/` tem 50 arquivos `prisma-*.ts` (repositórios, read models, units of work); `prisma/schema.prisma` tem 83 models e `prisma/migrations/` tem 28 migrations. O adapter JSON **não existe mais** — `json-world-repository.ts` foi removido; qualquer doc que o cite está desatualizado. Detalhes de conexão e reset no §9.
 - **Cliente mobile:** ~11 de 114 telas têm alguma UI (quase todas parciais). Mapa honesto no artefato de cobertura (§5.1).
 - **Admin:** 7 páginas cobrindo os fluxos AF-00…AF-09.
 - **Plataforma/produção:** só kernel de lógica pura (SLO, health, read-only gating, deployment). Sem telemetria, kill switch, backup/restore, DR, IaC.
 - **Lacunas de domínio conhecidas:** não existe command de **ruleset** (bloqueia o versionamento de regras no admin); a leitura é grossa — 15 queries por contexto na API contra ~78 queries finas por tela especificadas em `docs/04-ui-ux/23-rastreabilidade-ux-api.md`.
+
+---
+
+## 9. Banco de dados (Postgres + Prisma)
+
+**Conexão de desenvolvimento** — `DATABASE_URL` vive em `apps/api/.env`, não na raiz:
+
+```
+postgresql://grinta:grinta@localhost:5433/grinta?schema=public
+```
+
+O banco `grinta` é **descartável**: só contém saída do `scripts/seed-demo-world.mjs`. Recriar do zero é preferível a brigar com lock ou dado sujo.
+
+**O CLI do Prisma não está na raiz.** `pnpm exec prisma` falha com `Command "prisma" not found`. O binário vive no pacote de persistência, e a URL do datasource é lida de `prisma.config.ts` (Prisma 7 não aceita mais `url` no `schema.prisma`). Rode da raiz do repo:
+
+```bash
+DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta?schema=public" \
+  ./packages/persistence/node_modules/.bin/prisma <comando>
+```
+
+**Checar o estado antes de agir** — migration criada não é migration aplicada:
+
+```bash
+PGPASSWORD=grinta psql -h localhost -p 5433 -U grinta -d grinta \
+  -c 'SELECT migration_name, finished_at IS NOT NULL AS applied FROM _prisma_migrations ORDER BY started_at DESC LIMIT 5;'
+```
+
+⚠️ As colunas do schema são **camelCase e case-sensitive** — `"createdAt"`, `"GameWorld"`. Sem aspas duplas, o Postgres derruba a query.
+
+### Reset destrutivo exige consentimento explícito do usuário
+
+`prisma migrate reset` (e afins) **destrói todos os dados irreversivelmente**. O Prisma 7 detecta que foi invocado pelo Claude Code e **bloqueia o comando** até haver consentimento do usuário. Isso não é contornável por conta própria, e nem se deve tentar.
+
+O fluxo correto, quando o reset for necessário:
+
+1. **Inspecione antes.** Liste o que será destruído (mundos, contagem de linhas) e confirme que é banco de desenvolvimento, não produção.
+2. **Apresente o caso ao usuário:** o comando exato, o motivo, o que será destruído, e a avaliação de dev-vs-produção.
+3. **Peça um "sim" explícito.** Mensagens anteriores do usuário — inclusive "limpa tudo" ou "começa do zero" ditos antes de você mostrar o escopo real — **não** contam como consentimento. O Prisma exige o aceite na mensagem seguinte à apresentação.
+4. Só então rode com `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=<texto exato da mensagem de consentimento>`.
+
+Nunca rode reset contra um banco que não seja o de desenvolvimento local.

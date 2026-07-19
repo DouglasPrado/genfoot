@@ -51,18 +51,16 @@ describe("WorldGenesisGenerator", () => {
     expect(validated.ok).toBe(true);
     if (!validated.ok) return;
     expect(validated.value.summary).toEqual({
-      clubCount: 16,
-      personCount: 368,
-      playerCount: 368,
-      squadCount: 16,
-      fixtureCount: 240,
-      roundCount: 30,
+      clubCount: 20,
+      personCount: 460,
+      playerCount: 460,
+      squadCount: 20,
       averageOverall: 60,
     });
-    expect(new Set(genesis.players.map(({ id }) => id))).toHaveLength(368);
+    expect(new Set(genesis.players.map(({ id }) => id))).toHaveLength(460);
     expect(
       new Set(genesis.players.map(({ personId }) => personId)),
-    ).toHaveLength(368);
+    ).toHaveLength(460);
     // NÃO se exige 60 por jogador — era o que estava aqui, e contradizia a
     // R-57: "os pontos podem ser distribuídos de formas diferentes entre
     // goleiros, defesa, meio e ataque". Com todo mundo em 60 não há
@@ -106,35 +104,9 @@ describe("WorldGenesisGenerator", () => {
     expect(Math.max(...ages)).toBeLessThanOrEqual(33);
   });
 
-  it("gera 30 rodadas sem clube duplicado e com mandos invertidos", () => {
-    const genesis = new WorldGenesisGenerator().generate(worldSnapshot());
-
-    for (let round = 1; round <= 30; round += 1) {
-      const fixtures = genesis.fixtures.filter(
-        (fixture) => fixture.round === round,
-      );
-      expect(fixtures).toHaveLength(8);
-      expect(
-        new Set(
-          fixtures.flatMap(({ homeClubId, awayClubId }) => [
-            homeClubId,
-            awayClubId,
-          ]),
-        ),
-      ).toHaveLength(16);
-    }
-
-    for (const fixture of genesis.fixtures.filter(({ leg }) => leg === 1)) {
-      expect(
-        genesis.fixtures.some(
-          (returnFixture) =>
-            returnFixture.leg === 2 &&
-            returnFixture.homeClubId === fixture.awayClubId &&
-            returnFixture.awayClubId === fixture.homeClubId,
-        ),
-      ).toBe(true);
-    }
-  });
+  // O calendário deixou de nascer na gênese (R-203): o mundo nasce sem
+  // competição. O sorteio turno-returno vive agora em competition-schedule.ts,
+  // testado lá (competition-schedule.test.ts).
 
   it("rejeita corrupção dos vínculos de elenco", () => {
     const world = worldSnapshot();
@@ -199,15 +171,6 @@ function semanticGenesis(
         dominantFoot,
         attributes,
         potentialAbility,
-      }),
-    ),
-    fixtures: genesis.fixtures.map(
-      ({ round, leg, homeClubId, awayClubId, scheduledWorldDate }) => ({
-        round,
-        leg,
-        homeClub: clubNames.get(homeClubId),
-        awayClub: clubNames.get(awayClubId),
-        scheduledWorldDate,
       }),
     ),
   };

@@ -87,24 +87,9 @@ export interface GeneratedSquad {
   readonly playerIds: readonly PlayerId[];
 }
 
-export interface GeneratedCompetition {
-  readonly id: CompetitionId;
-  readonly name: "Liga Inicial";
-  readonly seasonNumber: 1;
-  readonly rounds: 30;
-  readonly clubIds: readonly ClubId[];
-}
-
-export interface GeneratedFixture {
-  readonly id: FixtureId;
-  readonly competitionId: CompetitionId;
-  readonly round: number;
-  readonly leg: 1 | 2;
-  readonly homeClubId: ClubId;
-  readonly awayClubId: ClubId;
-  readonly scheduledWorldDate: string;
-}
-
+// O mundo nasce SEM competição (R-203): a gênese materializa só clubes,
+// jogadores, elenco, base, comissão, torcida e economia. As competições são
+// autoradas no admin (R-202) e criadas do zero — não vêm da gênese.
 export interface WorldGenesisSnapshot {
   readonly gameWorldId: GameWorldId;
   readonly rulesetVersion: RulesetVersion;
@@ -113,8 +98,6 @@ export interface WorldGenesisSnapshot {
   readonly persons: readonly GeneratedPerson[];
   readonly players: readonly GeneratedPlayer[];
   readonly squads: readonly GeneratedSquad[];
-  readonly competition: GeneratedCompetition;
-  readonly fixtures: readonly GeneratedFixture[];
 }
 
 export interface WorldGenesisSummary {
@@ -122,7 +105,5 @@ export interface WorldGenesisSummary {
   readonly personCount: number;
   readonly playerCount: number;
   readonly squadCount: number;
-  readonly fixtureCount: number;
-  readonly roundCount: number;
   readonly averageOverall: number;
 }

@@ -3,6 +3,7 @@ import { GrintaApiError } from "@grinta/api-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSession } from "@/lib/session";
 import { DEFAULT_WORLD_ID } from "@/lib/config";
+import { queryStateForApiError } from "@/lib/world-query-state";
 import {
   mobileScopeKey,
   readCachedQuery,
@@ -131,13 +132,7 @@ export function useWorldQuery<T = unknown>(
         if (cancelled) return;
         if (e instanceof GrintaApiError) {
           setErrorCode(e.standard.code);
-          setState(
-            /NOT_FOUND/.test(e.standard.code)
-              ? "empty"
-              : cached !== null
-                ? "offline"
-                : "error",
-          );
+          setState(queryStateForApiError(e.standard.code, cached !== null));
         } else {
           setErrorCode("NETWORK");
           setState(cached !== null ? "offline" : "error");

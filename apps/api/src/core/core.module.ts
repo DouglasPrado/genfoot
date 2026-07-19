@@ -17,12 +17,16 @@ import {
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
+  PrismaPresenceRepository,
+  PrismaWorldClockRepository,
   PrismaTransferUnitOfWork,
   PrismaPromoteYouthUnitOfWork,
   PrismaDemoteToYouthUnitOfWork,
   PrismaReleaseUnitOfWork,
   PrismaSellUnitOfWork,
   PrismaListUnitOfWork,
+  PrismaCompetitionUnitOfWork,
+  PrismaAutomationUnitOfWork,
   PrismaSeasonFinanceUnitOfWork,
   PrismaIdentityReadModel,
   PrismaUserAccountRepository,
@@ -50,12 +54,16 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  PRESENCE_REPOSITORY,
+  WORLD_CLOCK_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
   PROMOTE_YOUTH_UNIT_OF_WORK,
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
   RELEASE_UNIT_OF_WORK,
   SELL_UNIT_OF_WORK,
   LIST_UNIT_OF_WORK,
+  COMPETITION_UNIT_OF_WORK,
+  AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
   IDEMPOTENCY_STORE,
@@ -198,6 +206,18 @@ import {
         new PrismaMatchPlayRepository(client),
     },
     {
+      provide: PRESENCE_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPresenceRepository =>
+        new PrismaPresenceRepository(client),
+    },
+    {
+      provide: WORLD_CLOCK_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaWorldClockRepository =>
+        new PrismaWorldClockRepository(client),
+    },
+    {
       provide: TRANSFER_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTransferUnitOfWork =>
@@ -232,6 +252,18 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaListUnitOfWork =>
         new PrismaListUnitOfWork(client),
+    },
+    {
+      provide: COMPETITION_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaCompetitionUnitOfWork =>
+        new PrismaCompetitionUnitOfWork(client),
+    },
+    {
+      provide: AUTOMATION_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaAutomationUnitOfWork =>
+        new PrismaAutomationUnitOfWork(client),
     },
     {
       provide: SEASON_FINANCE_UNIT_OF_WORK,
@@ -287,12 +319,16 @@ import {
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
+    PRESENCE_REPOSITORY,
+    WORLD_CLOCK_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
     PROMOTE_YOUTH_UNIT_OF_WORK,
     DEMOTE_TO_YOUTH_UNIT_OF_WORK,
     RELEASE_UNIT_OF_WORK,
     SELL_UNIT_OF_WORK,
     LIST_UNIT_OF_WORK,
+    COMPETITION_UNIT_OF_WORK,
+    AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
     IDEMPOTENCY_STORE,

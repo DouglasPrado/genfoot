@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 import { useKnownWorlds } from "@/lib/worlds";
 
@@ -20,15 +21,14 @@ function newKey(prefix: string): string {
 
 export default function WorldsPage() {
   const { api } = useSession();
-  const { worlds, loading, error: listError, refresh } = useKnownWorlds();
+  const { error: showError } = useToast();
+  const { worlds, loading, failed: listFailed, refresh } = useKnownWorlds();
   const [seed, setSeed] = useState("mundo-alpha");
   const [startDate, setStartDate] = useState("2026-01-01");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function createWorld() {
     setBusy(true);
-    setError(null);
     try {
       const created = await api.command({
         commandType: "world:create",
@@ -36,7 +36,7 @@ export default function WorldsPage() {
         idempotencyKey: newKey("create"),
       });
       if (created.status !== "ACCEPTED" || !created.resource) {
-        setError(created.error?.code ?? "REJECTED");
+        showError(created.error?.code ?? "REJECTED");
         return;
       }
       const id = created.resource.slice("world:".length);
@@ -48,7 +48,7 @@ export default function WorldsPage() {
         idempotencyKey: newKey("genesis"),
       });
       if (genesis.status !== "ACCEPTED") {
-        setError(`gênese: ${genesis.error?.code ?? "REJECTED"}`);
+        showError(`gênese: ${genesis.error?.code ?? "REJECTED"}`);
         return;
       }
       const activated = await api.command({
@@ -57,7 +57,7 @@ export default function WorldsPage() {
         idempotencyKey: newKey("activate"),
       });
       if (activated.status !== "ACCEPTED") {
-        setError(`ativar: ${activated.error?.code ?? "REJECTED"}`);
+        showError(`ativar: ${activated.error?.code ?? "REJECTED"}`);
         return;
       }
       setSeed(newKey("mundo"));
@@ -65,7 +65,7 @@ export default function WorldsPage() {
       // ser criado — pergunta-se de novo a quem sabe.
       refresh();
     } catch (err) {
-      setError(
+      showError(
         err instanceof GrintaApiError ? err.standard.code : "Falha na API.",
       );
     } finally {
@@ -79,7 +79,12 @@ export default function WorldsPage() {
         title="Mundos"
         hint="Criar, ativar e inspecionar mundos persistentes."
         actions={
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={refresh}
+            disabled={loading}
+          >
             <RefreshCw className="size-4" />
             {loading ? "Carregando…" : "Atualizar"}
           </Button>
@@ -94,21 +99,13 @@ export default function WorldsPage() {
             No servidor ({worlds.length})
           </h2>
 
-          {listError === null ? null : (
-            <Card className="mb-2">
-              <CardContent className="py-3 text-sm text-danger">
-                {listError}
-              </CardContent>
-            </Card>
-          )}
-
           {loading && worlds.length === 0 ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 Carregando mundos…
               </CardContent>
             </Card>
-          ) : worlds.length === 0 && listError === null ? (
+          ) : worlds.length === 0 && !listFailed ? (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
                 Nenhum mundo no servidor. Crie o primeiro ao lado — ele nasce,
@@ -213,11 +210,6 @@ export default function WorldsPage() {
                   className="mono"
                 />
               </div>
-              {error ? (
-                <p className="mono rounded-sm border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
-                  {error}
-                </p>
-              ) : null}
               <Button className="w-full" onClick={createWorld} disabled={busy}>
                 <Plus className="size-4" />
                 {busy ? "Provisionando…" : "Criar + gênese + ativar"}

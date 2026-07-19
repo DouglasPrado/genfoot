@@ -11,10 +11,7 @@ import {
 import {
   DominantFoot,
   PlayerPosition,
-  type ClubId,
-  type CompetitionId,
   type GeneratedClub,
-  type GeneratedFixture,
   type GeneratedPerson,
   type GeneratedPlayer,
   type GeneratedSquad,
@@ -39,8 +36,12 @@ const CLUB_NAMES = [
   "Nacional da Serra",
   "Operário Unido",
   "Pioneiros",
+  "Quilombo",
   "Real do Vale",
+  "Serrano",
+  "Tempestade",
   "Vanguarda",
+  "Vendaval",
 ] as const;
 
 const FIRST_NAMES = [
@@ -173,19 +174,8 @@ export class WorldGenesisGenerator {
       });
     });
 
-    const competitionId = deterministicUuidV7<"Competition">({
-      worldSeed: world.seed,
-      context: `${world.id}:competition:initial-league`,
-      timestampMilliseconds: baseTimestamp,
-    }) as CompetitionId;
-    const fixtures = generateFixtures({
-      world,
-      startDate,
-      competitionId,
-      clubIds: clubs.map((club) => club.id),
-      baseTimestamp,
-    });
-
+    // O mundo nasce SEM competição (R-203): nenhuma liga/fixture aqui. As
+    // competições são autoradas no admin (R-202) sobre este pool de clubes.
     return {
       gameWorldId: world.id,
       rulesetVersion: world.rulesetVersion,
@@ -194,14 +184,6 @@ export class WorldGenesisGenerator {
       persons,
       players,
       squads,
-      competition: {
-        id: competitionId,
-        name: "Liga Inicial",
-        seasonNumber: 1,
-        rounds: 30,
-        clubIds: clubs.map((club) => club.id),
-      },
-      fixtures,
     };
   }
 }
@@ -274,72 +256,6 @@ function shuffledClubNames(seed: string): string[] {
   return names;
 }
 
-function generateFixtures(
-  input: Readonly<{
-    world: GameWorldSnapshot;
-    startDate: WorldDate;
-    competitionId: CompetitionId;
-    clubIds: readonly ClubId[];
-    baseTimestamp: number;
-  }>,
-): GeneratedFixture[] {
-  const rotation = [...input.clubIds];
-  const firstLeg: GeneratedFixture[] = [];
-
-  for (
-    let roundIndex = 0;
-    roundIndex < input.clubIds.length - 1;
-    roundIndex += 1
-  ) {
-    for (
-      let pairIndex = 0;
-      pairIndex < input.clubIds.length / 2;
-      pairIndex += 1
-    ) {
-      const first = rotation[pairIndex]!;
-      const second = rotation[rotation.length - 1 - pairIndex]!;
-      const firstIsHome = (roundIndex + pairIndex) % 2 === 0;
-      const homeClubId = firstIsHome ? first : second;
-      const awayClubId = firstIsHome ? second : first;
-      const fixtureIndex = firstLeg.length;
-      firstLeg.push({
-        id: deterministicUuidV7<"Fixture">({
-          worldSeed: input.world.seed,
-          context: `${input.world.id}:fixture:${fixtureIndex}`,
-          timestampMilliseconds: input.baseTimestamp,
-        }),
-        competitionId: input.competitionId,
-        round: roundIndex + 1,
-        leg: 1,
-        homeClubId,
-        awayClubId,
-        scheduledWorldDate: input.startDate
-          .addDays((roundIndex + 1) * 3)
-          .toString(),
-      });
-    }
-
-    rotation.splice(1, 0, rotation.pop()!);
-  }
-
-  const secondLeg = firstLeg.map((fixture, index): GeneratedFixture => ({
-    id: deterministicUuidV7<"Fixture">({
-      worldSeed: input.world.seed,
-      context: `${input.world.id}:fixture:${firstLeg.length + index}`,
-      timestampMilliseconds: input.baseTimestamp,
-    }),
-    competitionId: fixture.competitionId,
-    round: fixture.round + 15,
-    leg: 2,
-    homeClubId: fixture.awayClubId,
-    awayClubId: fixture.homeClubId,
-    scheduledWorldDate: input.startDate
-      .addDays((fixture.round + 15) * 3)
-      .toString(),
-  }));
-
-  return [...firstLeg, ...secondLeg];
-}
 
 function requiredWorldDate(value: string): WorldDate {
   const parsed = WorldDate.parse(value);

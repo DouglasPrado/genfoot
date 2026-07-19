@@ -48,6 +48,8 @@ export class PlayNextRound {
         awayClubId: match.awayClubId,
         homeStrength: match.homeStrength,
         awayStrength: match.awayStrength,
+        homeScorers: match.homeScorers,
+        awayScorers: match.awayScorers,
       }),
     );
 

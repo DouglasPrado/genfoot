@@ -10,7 +10,6 @@ import { buildClubsFromGenesis } from "../clubs/club-bootstrap.js";
 import type { ClubRepository } from "../clubs/club-repository.js";
 import { Club } from "../clubs/club.js";
 import { Squad } from "../clubs/squad.js";
-import { buildCompetitionGenesis } from "../competitions/competition-bootstrap.js";
 import { buildFanbaseGenesis } from "../fanbase/fanbase-bootstrap.js";
 import { buildStaffGenesis } from "../staff/staff-bootstrap.js";
 import { buildYouthGenesis } from "../youth/youth-bootstrap.js";
@@ -116,7 +115,6 @@ export class GenerateWorldGenesis {
     const players = buildPlayersFromGenesis(world, genesis);
     const squads = buildSquadsFromGenesis(world, genesis);
     const ledger = buildLedgerGenesis(world, genesis);
-    const competition = buildCompetitionGenesis(world, genesis);
     const fanbases = buildFanbaseGenesis(world, genesis);
     const staff = buildStaffGenesis(world, genesis);
     const youth = buildYouthGenesis(world, genesis);
@@ -163,8 +161,8 @@ export class GenerateWorldGenesis {
       // O razão por último: a conta de caixa e a dotação de cada clube dependem
       // de o clube já existir (a FK da conta aponta para o clube).
       any = (await materializeLedger(repositories, ledger)) || any;
-      // A competição por último: as partidas referenciam os clubes.
-      any = (await repositories.competitions.materializeGenesis(competition)) || any;
+      // Sem competição na gênese (R-203): o mundo nasce só com o pool de clubes;
+      // as ligas/copas são autoradas no admin (R-202).
       return any;
     });
     return succeed(created);

@@ -77,11 +77,24 @@ describe("API command catalog integrity (e2e)", () => {
    */
   it("o catálogo é exatamente o que a vertical viva exige", () => {
     expect([...registeredCommandTypes()].sort()).toEqual([
+      // X-001: regras de automação, executor (autopilot) e o plano offline.
+      "automation:run-autopilot",
+      "automation:save-automation",
+      "automation:set-offline-plan",
+      "automation:toggle-automation",
+      // R-204: autora um campeonato inteiro (pirâmide de divisões) numa tacada.
+      "championship:create",
       // BC-003 pela tela do clube no mobile (MF-25). Faltava aqui: eu o
       // registrei em 608fd99 e não atualizei esta lista — o gate ficou vermelho
       // nesse commit, e eu não vi porque rodei a suíte sem `DATABASE_URL` e
       // tomei o erro dos e2e por ambiental.
       "club:apply-identity",
+      // C7: competição autorada no admin (R-202..R-207).
+      "competition:configure",
+      "competition:create",
+      "competition:finish",
+      "competition:lock",
+      "competition:start",
       "identity:confirm-onboarding",
       "identity:end-club-control",
       "identity:join-world",
@@ -93,7 +106,11 @@ describe("API command catalog integrity (e2e)", () => {
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // X-001: o usuário registra presença no mundo (heartbeat).
+      "presence:heartbeat",
       "world:activate",
+      // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
+      "world:advance-day",
       // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
       // para reverdejar o gate — o command existe, faltava a linha do catálogo.
       "world:advance-days",
@@ -107,6 +124,8 @@ describe("API command catalog integrity (e2e)", () => {
       // C5: joga a próxima rodada da liga (simulação determinística).
       "world:play-round",
       "world:resume",
+      // MUNDO-V1: o relógio — o mundo passa a andar sozinho.
+      "world:set-clock",
       "world:set-identity",
       // C8: desce um profissional (≤21) de volta à base.
       "youth:demote-player",
@@ -120,15 +139,19 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(23);
+    expect(response.body.commandCount).toBe(36);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // O desfecho da temporada (C7-V6b): campeão, acesso e rebaixamento.
+      "competition-outcome",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
+      // A lista de competições do mundo para o admin gerir (C7, R-202).
+      "competitions-list",
       // A torcida (C10, M-25): headcount, paciência da diretoria, pressão.
       "fanbase",
       // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
@@ -141,6 +164,8 @@ describe("API command catalog integrity (e2e)", () => {
       "ledger",
       // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.
       "market",
+      // O detalhe de uma partida (C5-V1): placar + feed de eventos, por matchId.
+      "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
@@ -150,6 +175,10 @@ describe("API command catalog integrity (e2e)", () => {
       "roster",
       // A comissão técnica (C8, M-25): recorte por clubId.
       "staff",
+      // Os artilheiros do mundo (C7-V5): projeção dos PlayerMatchStats.
+      "top-scorers",
+      // O relógio do mundo (MUNDO-V4): config do tempo e próximo tick, para o admin.
+      "world-clock",
       // A base (C8): os jovens em formação, recorte por clubId.
       "youth",
     ]);

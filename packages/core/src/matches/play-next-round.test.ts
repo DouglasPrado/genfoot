@@ -13,6 +13,9 @@ class MemoryPlayRepo implements MatchPlayRepository {
   nextUnplayedRound(): Promise<readonly ScheduledMatchWithStrength[]> {
     return Promise.resolve(this.round);
   }
+  matchesDueBy(): Promise<readonly ScheduledMatchWithStrength[]> {
+    return Promise.resolve(this.round);
+  }
   saveResults(
     _worldId: unknown,
     results: readonly SimulatedMatchResult[],
@@ -31,6 +34,8 @@ const round: readonly ScheduledMatchWithStrength[] = [
     awayClubId: "club-b",
     homeStrength: 70,
     awayStrength: 55,
+    homeScorers: [{ playerId: "a-st", primaryPosition: "ST", ability: 75 }],
+    awayScorers: [{ playerId: "b-st", primaryPosition: "ST", ability: 70 }],
   },
   {
     matchId: "019b76da-a800-7a02-9462-49c009be0002",
@@ -39,6 +44,8 @@ const round: readonly ScheduledMatchWithStrength[] = [
     awayClubId: "club-d",
     homeStrength: 60,
     awayStrength: 60,
+    homeScorers: [{ playerId: "c-st", primaryPosition: "ST", ability: 68 }],
+    awayScorers: [{ playerId: "d-st", primaryPosition: "ST", ability: 68 }],
   },
 ];
 
@@ -81,6 +88,8 @@ describe("PlayNextRound", () => {
       awayClubId: `a${i}`,
       homeStrength: 55 + (i % 20),
       awayStrength: 55 + ((i * 7) % 20),
+      homeScorers: [],
+      awayScorers: [],
     }));
     const result = await new PlayNextRound(
       "grinta-demo",

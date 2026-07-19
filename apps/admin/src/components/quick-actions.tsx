@@ -5,6 +5,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 function key(prefix: string): string {
@@ -30,6 +31,7 @@ export function QuickActions({
   onDone: () => void;
 }) {
   const { api } = useSession();
+  const { error: showError } = useToast();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export function QuickActions({
         idempotencyKey: key("genesis"),
       });
       if (genesis.status === "REJECTED") {
-        setNote(`gênese: ${genesis.error?.code}`);
+        showError(`gênese: ${genesis.error?.code ?? "REJECTED"}`);
         return;
       }
       const activated = await api.command({
@@ -56,13 +58,13 @@ export function QuickActions({
         worldId,
         idempotencyKey: key("activate"),
       });
-      setNote(
-        activated.status === "REJECTED"
-          ? `ativar: ${activated.error?.code}`
-          : "clubes gerados · mundo ativo",
-      );
+      if (activated.status === "REJECTED") {
+        showError(`ativar: ${activated.error?.code ?? "REJECTED"}`);
+        return;
+      }
+      setNote("clubes gerados · mundo ativo");
     } catch (err) {
-      setNote(err instanceof GrintaApiError ? err.standard.code : "falha");
+      showError(err instanceof GrintaApiError ? err.standard.code : "falha");
     } finally {
       setBusy(false);
       onDone();

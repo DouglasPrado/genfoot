@@ -22,9 +22,9 @@ function date(value = "2026-01-01"): WorldDate {
 
 function evidence(): WorldProvisioningEvidence {
   return {
-    generatedClubCount: 16,
-    clubsWithValidSquads: 16,
-    generatedPlayerCount: 368,
+    generatedClubCount: 20,
+    clubsWithValidSquads: 20,
+    generatedPlayerCount: 460,
     playersPerSquad: 23,
     calendarValidated: true,
     rulesetVersion: ruleset(),

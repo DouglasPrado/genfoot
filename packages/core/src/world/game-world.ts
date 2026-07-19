@@ -194,9 +194,9 @@ export class GameWorld {
     }
 
     if (
-      evidence.generatedClubCount !== 16 ||
-      evidence.clubsWithValidSquads !== 16 ||
-      evidence.generatedPlayerCount !== 368 ||
+      evidence.generatedClubCount !== 20 ||
+      evidence.clubsWithValidSquads !== 20 ||
+      evidence.generatedPlayerCount !== 460 ||
       evidence.playersPerSquad !== 23 ||
       evidence.calendarValidated !== true
     ) {

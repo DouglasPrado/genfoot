@@ -134,6 +134,15 @@ enum SeasonStatus {
   ARCHIVED
 }
 
+// Ciclo de vida do agregado de competição AUTORADO (C7, R-202): rascunho
+// editável → agendada (config congelada, sorteio feito) → em andamento → homologada.
+enum CompetitionLifecycle {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  FINISHED
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -843,6 +852,12 @@ model GameWorld {
   currentRuleSetVersionId String?     @db.Uuid // sem escritor: não há catálogo de ruleset
   currentDate             DateTime    @db.Date // data virtual do mundo (R-177)
   timezone                String      @default("America/Sao_Paulo")
+  // Relógio do mundo (MUNDO-V1): quanto tempo REAL vale um dia lógico, e quando
+  // o próximo dia dispara. É agendamento (infra), não simulação — o tempo do
+  // mundo continua sendo `currentDate` (R-177). `nextTickAt` é relógio de parede.
+  realSecondsPerDay       Int? // ex.: 14400 = cada dia lógico a cada 4h reais
+  clockRunning            Boolean     @default(false)
+  nextTickAt              DateTime? // quando o próximo dia lógico deve rodar
   maxClubs                Int? // pendente: GameRuleConfig (R-182)
   seasonDays              Int? // R-107 · pendente: GameRuleConfig
   initialClubCashMinor    BigInt? // pendente: GameEconomyConfig (R-182)
@@ -1868,6 +1883,10 @@ model Competition {
   country     String?
   tier        Int?
   reputation  Int               @default(1)
+  // As divisões de um mesmo campeonato compartilham este id e diferem pelo
+  // `tier` (R-204): é o que liga a pirâmide para o acesso/rebaixamento na virada
+  // de temporada. `null` = liga avulsa, sem divisão de cima nem de baixo.
+  championshipId String?        @db.Uuid
   version     Int               @default(1) // concorrência otimista (agregado C7)
 
   gameWorld GameWorld           @relation(fields: [gameWorldId], references: [id], onDelete: Cascade)
@@ -1875,6 +1894,7 @@ model Competition {
 
   @@unique([gameWorldId, id])
   @@index([gameWorldId])
+  @@index([gameWorldId, championshipId])
 }
 
 model CompetitionSeason {
@@ -1882,12 +1902,13 @@ model CompetitionSeason {
   competitionId String       @db.Uuid
   seasonId      String       @db.Uuid
   name          String
-  status        SeasonStatus @default(PLANNED)
-  startsAt      DateTime
-  endsAt        DateTime?
-  prizeJson     Json?
-  rulesJson     Json? // regras flexíveis por competição
-  version       Int          @default(1) // concorrência otimista (agregado C7 · edição)
+  status        SeasonStatus         @default(PLANNED)
+  lifecycle     CompetitionLifecycle @default(DRAFT) // ciclo autoral (R-202)
+  startsAt      DateTime?            @db.Date // janela: data, não relógio (R-177)
+  endsAt        DateTime?            @db.Date
+  prizeJson     Json? // premiação (R-205)
+  rulesJson     Json? // regras + qualificação (R-207)
+  version       Int                  @default(1) // concorrência otimista (agregado C7 · edição)
 
   competition       Competition               @relation(fields: [competitionId], references: [id], onDelete: Cascade)
   clubs             CompetitionClub[]
@@ -1907,7 +1928,7 @@ model CompetitionClub {
   seed                Int?
   groupName           String?
 
-  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
 
   @@unique([competitionSeasonId, clubId])
 }
@@ -1922,7 +1943,7 @@ model CompetitionStage {
   endsAt              DateTime?
   version             Int               @default(1) // concorrência otimista (agregado C7 · estágio)
 
-  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
   matches           Match[]
 
   @@index([competitionSeasonId])
@@ -1955,8 +1976,8 @@ model Match {
   simulatedOffline    Boolean            @default(false) // + MatchControlSource
   version             Int                @default(1)
 
-  competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id])
-  stage             CompetitionStage?    @relation(fields: [stageId], references: [id])
+  competitionSeason CompetitionSeason?   @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
+  stage             CompetitionStage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
   homeClub          Club                 @relation("HomeClubMatches", fields: [homeClubId], references: [id], onDelete: Cascade)
   awayClub          Club                 @relation("AwayClubMatches", fields: [awayClubId], references: [id], onDelete: Cascade)
   teamStates        MatchTeamState[]
@@ -2208,7 +2229,7 @@ model ClubSeasonStats {
   fanMood             MoodLevel @default(NEUTRAL)
 
   club              Club               @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
 
   @@unique([clubId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
@@ -2230,7 +2251,7 @@ model PlayerSeasonStats {
   injuriesCount       Int     @default(0)
 
   player            Player             @relation(fields: [playerId], references: [id], onDelete: Cascade)
-  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason? @relation(fields: [competitionSeasonId], references: [id], onDelete: SetNull)
 
   @@unique([playerId, seasonId, competitionSeasonId]) // M-04: agregado geral (NULL) coexiste com linhas por competição
 }
@@ -2321,11 +2342,35 @@ model AutomationRule {
   triggerJson   Json?
   conditionJson Json?
   actionJson    Json?
+  risk          Int                  @default(1) // 1..5; alto risco (≥4) não é delegável (X-001)
+  priority      Int                  @default(0) // desempata precedência entre regras do mesmo gatilho
   version       Int                  @default(1)
 
-  club Club @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  club     Club                    @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  versions AutomationRuleVersion[]
 
   @@index([gameWorldId, clubId])
+}
+
+// O histórico IMUTÁVEL de uma regra (X-001, canon: AutomationRuleVersion). Cada
+// SaveAutomation congela uma versão; a regra aponta para a mais nova (`version`).
+model AutomationRuleVersion {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  ruleId        String               @db.Uuid
+  version       Int
+  name          String
+  level         AutomationLevel
+  status        AutomationRuleStatus
+  triggerJson   Json?
+  conditionJson Json?
+  actionJson    Json?
+  risk          Int
+  priority      Int
+
+  rule AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, version])
+  @@index([ruleId])
 }
 
 // =============================================================================
@@ -2622,7 +2667,7 @@ model CompetitionRegistration {
   approvedAt          DateTime?
   version             Int                @default(1)
 
-  competitionSeason CompetitionSeason    @relation(fields: [competitionSeasonId], references: [id])
+  competitionSeason CompetitionSeason    @relation(fields: [competitionSeasonId], references: [id], onDelete: Cascade)
   players           PlayerRegistration[]
 
   @@unique([competitionSeasonId, clubId]) // 1 inscrição por clube/edição

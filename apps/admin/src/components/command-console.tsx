@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 import { useSession } from "@/lib/session";
 
 interface LogLine {
   readonly id: number;
   readonly command: string;
-  readonly ok: boolean;
   readonly text: string;
 }
 
@@ -52,6 +52,7 @@ export function CommandConsole({
   commandTypes: readonly string[];
 }) {
   const { api, session, stepUp } = useSession();
+  const { error: showError } = useToast();
   const [commandType, setCommandType] = useState("world:advance-days");
   const [payload, setPayload] = useState('{ "days": 1 }');
   const [expectedVersion, setExpectedVersion] = useState("");
@@ -59,7 +60,6 @@ export function CommandConsole({
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reauthKey, setReauthKey] = useState("");
-  const [reauthError, setReauthError] = useState<string | null>(null);
   const counter = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -67,9 +67,9 @@ export function CommandConsole({
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [log]);
 
-  function append(command: string, ok: boolean, text: string) {
+  function append(command: string, text: string) {
     counter.current += 1;
-    setLog((l) => [...l, { id: counter.current, command, ok, text }]);
+    setLog((l) => [...l, { id: counter.current, command, text }]);
   }
 
   function parsePayload(): Record<string, unknown> | null {
@@ -86,7 +86,7 @@ export function CommandConsole({
     setBusy(true);
     const parsed = parsePayload();
     if (parsed === null) {
-      append(commandType, false, "payload JSON inválido");
+      showError("Payload JSON inválido.");
       setBusy(false);
       return;
     }
@@ -96,20 +96,18 @@ export function CommandConsole({
         worldId,
         payload: parsed,
         idempotencyKey: newKey(),
-        ...(expectedVersion ? { expectedVersion: Number(expectedVersion) } : {}),
+        ...(expectedVersion
+          ? { expectedVersion: Number(expectedVersion) }
+          : {}),
       });
-      append(
-        commandType,
-        response.status !== "REJECTED",
-        JSON.stringify(response, null, 2),
-      );
+      if (response.status === "REJECTED") {
+        showError(response.error?.code ?? "REJECTED");
+        return;
+      }
+      append(commandType, JSON.stringify(response, null, 2));
     } catch (err) {
-      append(
-        commandType,
-        false,
-        err instanceof GrintaApiError
-          ? JSON.stringify(err.standard, null, 2)
-          : "Falha na API",
+      showError(
+        err instanceof GrintaApiError ? err.standard.code : "Falha na API",
       );
     } finally {
       setBusy(false);
@@ -118,12 +116,11 @@ export function CommandConsole({
 
   function run() {
     if (parsePayload() === null) {
-      append(commandType, false, "payload JSON inválido");
+      showError("Payload JSON inválido.");
       return;
     }
     if (requiresConfirmation(commandType)) {
       setReauthKey("");
-      setReauthError(null);
       setConfirmOpen(true);
       return;
     }
@@ -136,7 +133,7 @@ export function CommandConsole({
   async function confirmAndRun() {
     if (needsReauth) {
       if (!reauthKey) {
-        setReauthError("Digite a chave admin para reautenticar.");
+        showError("Digite a chave admin para reautenticar.");
         return;
       }
       try {
@@ -145,7 +142,7 @@ export function CommandConsole({
         await execute(stepped);
         return;
       } catch (err) {
-        setReauthError(
+        showError(
           err instanceof GrintaApiError ? err.standard.code : "reauth falhou",
         );
         return;
@@ -162,7 +159,8 @@ export function CommandConsole({
       <div className="min-h-[220px] flex-1 overflow-auto rounded-sm border border-border bg-background p-3">
         {log.length === 0 ? (
           <p className="mono text-xs text-muted-foreground">
-            $ pronto. Escolha um commandType e dispare — 136 comandos disponíveis.
+            $ pronto. Escolha um commandType e dispare — 136 comandos
+            disponíveis.
           </p>
         ) : (
           log.map((line) => (
@@ -170,11 +168,7 @@ export function CommandConsole({
               <div className="mono text-[11px] text-muted-foreground">
                 <span className="text-primary">$</span> {line.command}
               </div>
-              <pre
-                className={`mono mt-1 whitespace-pre-wrap text-[11px] ${
-                  line.ok ? "text-foreground" : "text-danger"
-                }`}
-              >
+              <pre className="mono mt-1 whitespace-pre-wrap text-[11px] text-foreground">
                 {line.text}
               </pre>
             </div>
@@ -248,10 +242,6 @@ export function CommandConsole({
                 autoFocus
               />
             </div>
-          ) : null}
-
-          {reauthError ? (
-            <p className="mono mt-2 text-xs text-danger">{reauthError}</p>
           ) : null}
 
           <div className="mt-5 flex justify-end gap-2">

@@ -1,5 +1,6 @@
 import type { GameWorldId } from "@grinta/shared";
 
+import type { ScorerCandidate } from "./goal-attribution.js";
 import type { SimulatedMatchResult } from "./match-simulation.js";
 
 /**
@@ -16,6 +17,9 @@ export interface ScheduledMatchWithStrength {
   readonly awayClubId: string;
   readonly homeStrength: number;
   readonly awayStrength: number;
+  /** Candidatos a goleador de cada lado (C7-V5): jogadores + posição + nota. */
+  readonly homeScorers: readonly ScorerCandidate[];
+  readonly awayScorers: readonly ScorerCandidate[];
 }
 
 /**
@@ -29,6 +33,15 @@ export interface ScheduledMatchWithStrength {
 export interface MatchPlayRepository {
   nextUnplayedRound(
     gameWorldId: GameWorldId,
+  ): Promise<readonly ScheduledMatchWithStrength[]>;
+
+  /**
+   * As partidas AGENDADAS com data ≤ `dateIso` — as "vencidas" que o dia lógico
+   * deve jogar (MUNDO-V2). Mesma forma da rodada, com forças e goleadores.
+   */
+  matchesDueBy(
+    gameWorldId: GameWorldId,
+    dateIso: string,
   ): Promise<readonly ScheduledMatchWithStrength[]>;
 
   saveResults(
