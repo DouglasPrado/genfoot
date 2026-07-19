@@ -1342,6 +1342,10 @@ model Player {
   // Reescrita no passo 7 da virada de temporada, junto da aplicação do accrual
   // (INV-29): estrutura ruim ATRASA o jogador, não o limita de vez.
   baselineAbility         Int
+  // R-217: última temporada em que o envelhecimento foi aplicado a este jogador.
+  // Trava de idempotência: a virada declina/aposenta uma vez só (INV-29). Sem
+  // isto, reprocessar a virada declinava o sobrevivente de novo.
+  lastAgedSeasonId        String?  @db.Uuid
   /// Dinheiro do jogador — NULO até C9 existir (R-189).
   ///
   /// Eram NOT NULL, e isso tornava impossível materializar um jogador sem

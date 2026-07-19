@@ -162,3 +162,4 @@ export * from "./training/apply-season-accruals.js";
 export * from "./players/player-development-view.js";
 export * from "./players/age-decline.js";
 export * from "./players/retirement-decision.js";
+export * from "./players/apply-season-aging.js";

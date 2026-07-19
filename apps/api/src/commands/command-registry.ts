@@ -39,6 +39,7 @@ import {
   SetTrainingPlan,
   AccrueClubTraining,
   ApplySeasonAccruals,
+  ApplySeasonAging,
   TrainingFocus,
   type ClubControlRepository,
   type ClubReadModel,
@@ -53,6 +54,7 @@ import {
   type AccrualContextReader,
   type AccrualBufferWriter,
   type SeasonAccrualUnitOfWork,
+  type SeasonAgingUnitOfWork,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -132,6 +134,7 @@ export interface CommandContext {
   readonly accrualContextReader: AccrualContextReader;
   readonly accrualBufferWriter: AccrualBufferWriter;
   readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork;
+  readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -800,6 +803,23 @@ const handlers: Record<string, CommandHandler> = {
     const parsed = applySeasonPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
     const result = await new ApplySeasonAccruals(seasonAccrualUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      seasonId: parsed.data.seasonId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      rulesetVersion: world.value.snapshot.rulesetVersion as never,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `season:${parsed.data.seasonId}` });
+  },
+
+  /** Treino/idade — virada: declínio físico + aposentadoria por idade (R-217). */
+  "training:apply-season-aging": async ({ worlds, seasonAgingUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = applySeasonPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ApplySeasonAging(seasonAgingUnitOfWork).execute({
       gameWorldId: world.value.worldId,
       seasonId: parsed.data.seasonId,
       worldSeed: world.value.snapshot.seed,
