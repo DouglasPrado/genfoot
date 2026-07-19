@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ImageBackground,
   Pressable,
@@ -29,6 +29,17 @@ import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
+import {
+  deriveHomeNextMatch,
+  deriveHomeWorldClockProgress,
+  deriveHomeWorldStatus,
+  type HomeMatchProjection,
+  type HomeNextMatch,
+  type HomeWorldClockProgress,
+  type HomeWorldClockProjection,
+  type HomeWorldProjection,
+  type HomeWorldStatus,
+} from "./home-world-status-model";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 
 /**
@@ -36,9 +47,13 @@ import { color, fontSize, fontWeight, radius, space } from "@/theme";
  * fotos dos cards de jogo. O domínio não entrega arte, então são estáticas do
  * bundle — decorativas, não representam dado de mundo.
  */
-const FIELD_BG = require("../../../assets/home-field-bg.jpg") as ImageSourcePropType;
-const CARD_PARTIDAS = require("../../../assets/card-partidas.jpg") as ImageSourcePropType;
-const CARD_CLUBE = require("../../../assets/card-clube.jpg") as ImageSourcePropType;
+const FIELD_BG =
+  require("../../../assets/home-field-bg.jpg") as ImageSourcePropType;
+const CARD_PARTIDAS =
+  require("../../../assets/card-partidas.jpg") as ImageSourcePropType;
+const CARD_CLUBE =
+  require("../../../assets/card-clube.jpg") as ImageSourcePropType;
+const WORLD_DAY_PROGRESS_WIDTH = 44;
 
 /**
  * A tabela da liga como a query `competitions` a entrega (C7). Antes esta tela
@@ -62,10 +77,15 @@ interface CompetitionStandingsProjection {
   }[];
 }
 
-interface MatchSummaryProjection {
-  readonly matchCount: number;
-  readonly finalCount: number;
-  readonly commandCount: number;
+interface MatchItem extends HomeMatchProjection {
+  readonly homeGoals: number | null;
+  readonly awayGoals: number | null;
+  readonly finished: boolean;
+}
+
+interface MatchesProjection {
+  readonly results: readonly MatchItem[];
+  readonly upcoming: readonly MatchItem[];
 }
 
 interface InboxSummaryProjection {
@@ -91,12 +111,15 @@ function combinedQueryState(states: readonly QueryState[]): QueryState {
 /** Painel de comando do clube: somente projeções oficiais, sem seeds de demo. */
 export function Home() {
   const { session, status } = useSession();
+  const worldQuery = useWorldQuery<HomeWorldProjection>("world");
+  const worldClockQuery =
+    useWorldQuery<HomeWorldClockProjection>("world-clock");
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
   const competitionQuery =
     useWorldQuery<CompetitionStandingsProjection>("competitions");
-  const matchQuery = useWorldQuery<MatchSummaryProjection>("matches");
   const automationQuery =
     useWorldQuery<AutomationSummaryProjection>("automation");
 
@@ -109,12 +132,34 @@ export function Home() {
     clubQuery.data,
     onboarding?.kind === "complete" ? onboarding.clubId : null,
   );
+  const worldStatus =
+    worldQuery.data === null ? null : deriveHomeWorldStatus(worldQuery.data);
+  const matchQuery = useWorldQuery<MatchesProjection>(
+    club === null ? null : "matches",
+    club === null ? undefined : { clubId: club.id },
+  );
+  const nextMatch = deriveHomeNextMatch(
+    matchQuery.data?.upcoming[0] ?? null,
+    club?.id ?? "",
+    competitionQuery.data?.competitionName ?? null,
+  );
+  const worldClockProgress = deriveHomeWorldClockProgress(
+    worldClockQuery.data,
+    clockNowMs,
+  );
   // O inbox é recortado pelo clube gerido (C12): as pendências são do clube.
   // Sem clubId a query devolve zeros; com ele, as pendências reais aparecem.
   const inboxQuery = useWorldQuery<InboxSummaryProjection>(
     club === null ? null : "inbox",
     club === null ? undefined : { clubId: club.id },
   );
+
+  useEffect(() => {
+    if (worldClockQuery.data?.clockRunning !== true) return;
+    setClockNowMs(Date.now());
+    const timer = setInterval(() => setClockNowMs(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [worldClockQuery.data?.clockRunning, worldClockQuery.data?.nextTickAt]);
 
   useEffect(() => {
     if (
@@ -129,6 +174,8 @@ export function Home() {
   }, [identity, identityQuery.state, session]);
 
   const refresh = useCallback(() => {
+    worldQuery.refetch();
+    worldClockQuery.refetch();
     clubQuery.refetch();
     identityQuery.refetch();
     competitionQuery.refetch();
@@ -142,13 +189,20 @@ export function Home() {
     identityQuery.refetch,
     inboxQuery.refetch,
     matchQuery.refetch,
+    worldClockQuery.refetch,
+    worldQuery.refetch,
   ]);
 
-  const queryState = combinedQueryState([clubQuery.state, identityQuery.state]);
+  const queryState = combinedQueryState([
+    worldQuery.state,
+    clubQuery.state,
+    identityQuery.state,
+  ]);
   const screenState = deriveScreenState({
     session: status,
     query: queryState,
-    hasCachedData: clubQuery.isStale || identityQuery.isStale,
+    hasCachedData:
+      worldQuery.isStale || clubQuery.isStale || identityQuery.isStale,
   });
 
   return (
@@ -160,183 +214,329 @@ export function Home() {
       />
       <View style={styles.fieldScrim} pointerEvents="none" />
       <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<Refresh onRefresh={refresh} />}
-      >
-        {screenState !== "success" || club === null ? (
-          <ScreenStatePanel
-            state={screenState === "success" ? "empty" : screenState}
-            title={club === null ? "CLUBE AINDA NÃO DEFINIDO" : undefined}
-            body={
-              club === null
-                ? "Conclua a escolha do clube para abrir seu painel de comando."
-                : undefined
-            }
-            onRetry={refresh}
-          />
-        ) : (
-          <>
-            <View style={styles.hero}>
-              <View style={styles.crest}>
-                <ClubCrest
-                  {...clubCrestData(
-                    club.name,
-                    club.primaryColor,
-                    club.secondaryColor,
-                    club.crestTemplateId,
-                  )}
-                  size={64}
-                />
-              </View>
-              <View style={styles.heroText}>
-                <Text style={styles.eyebrow}>SEU CLUBE</Text>
-                <Text style={styles.title}>{club.name}</Text>
-                <Text style={styles.subtitle}>
-                  {club.stadiumName} ·{" "}
-                  {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.featured}>
-              <GameCard
-                image={CARD_CLUBE}
-                eyebrow="GERIR"
-                title="CLUBE"
-                subtitle="Elenco e finanças"
-                to="/clube"
-              />
-              <GameCard
-                image={CARD_PARTIDAS}
-                eyebrow="JOGAR"
-                title="PARTIDAS"
-                subtitle="Calendário e resultados"
-                to="/partidas"
-              />
-            </View>
-
-            <Card>
-              <SectionHeader
-                title="DESDE SUA ÚLTIMA VISITA"
-                trailing={
-                  <Icon
-                    name="notifications"
-                    size={17}
-                    color={color.textMuted}
-                  />
-                }
-              />
-              {inboxQuery.state === "ready" && inboxQuery.data !== null ? (
-                <View style={styles.metrics}>
-                  <Metric
-                    value={inboxQuery.data.openNotificationCount}
-                    label="PENDÊNCIAS"
-                  />
-                  <Metric
-                    value={inboxQuery.data.timelineCount}
-                    label="EVENTOS NO PERÍODO"
-                  />
-                  <Metric
-                    value={automationQuery.data?.executionCount ?? 0}
-                    label="AÇÕES AUTOMÁTICAS"
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<Refresh onRefresh={refresh} />}
+        >
+          {screenState !== "success" ||
+          club === null ||
+          worldStatus === null ? (
+            <ScreenStatePanel
+              state={screenState === "success" ? "empty" : screenState}
+              title={
+                club === null
+                  ? "CLUBE AINDA NÃO DEFINIDO"
+                  : worldStatus === null
+                    ? "MUNDO ATIVO INDISPONÍVEL"
+                    : undefined
+              }
+              body={
+                club === null
+                  ? "Conclua a escolha do clube para abrir seu painel de comando."
+                  : worldStatus === null
+                    ? "Não foi possível identificar o mundo e sua data lógica."
+                    : undefined
+              }
+              onRetry={refresh}
+            />
+          ) : (
+            <>
+              <View style={styles.hero}>
+                <View style={styles.crest}>
+                  <ClubCrest
+                    {...clubCrestData(
+                      club.name,
+                      club.primaryColor,
+                      club.secondaryColor,
+                      club.crestTemplateId,
+                    )}
+                    size={64}
                   />
                 </View>
-              ) : (
-                <InlineUnavailable
-                  loading={inboxQuery.state === "loading"}
-                  text="Ainda não há um resumo oficial do período ausente."
-                />
-              )}
-            </Card>
-
-            <Card>
-              <SectionHeader
-                title="TEMPORADA"
-                trailing={
-                  <Icon name="football" size={17} color={color.textMuted} />
-                }
-              />
-              {competitionQuery.state === "ready" &&
-              competitionQuery.data !== null ? (
-                <>
-                  <Text style={styles.competitionNote}>
-                    {competitionQuery.data.competitionName} ·{" "}
-                    {competitionQuery.data.playedMatches}/
-                    {competitionQuery.data.totalMatches} partidas
+                <View style={styles.heroText}>
+                  <Text style={styles.eyebrow}>SEU CLUBE</Text>
+                  <Text style={styles.title}>{club.name}</Text>
+                  <Text style={styles.subtitle}>
+                    {club.stadiumName} ·{" "}
+                    {club.stadiumCapacity.toLocaleString("pt-BR")} lugares
                   </Text>
-                  {competitionQuery.data.table.slice(0, 5).map((row, index) => (
-                    <View key={row.clubId} style={styles.standingRow}>
-                      <Text style={styles.standingPos}>{index + 1}</Text>
-                      <Text style={styles.standingName} numberOfLines={1}>
-                        {row.clubName}
-                      </Text>
-                      <Text style={styles.standingStat}>{row.played}</Text>
-                      <Text style={styles.standingStat}>
-                        {row.goalDifference > 0 ? "+" : ""}
-                        {row.goalDifference}
-                      </Text>
-                      <Text style={styles.standingPoints}>{row.points}</Text>
-                    </View>
-                  ))}
-                  {/* A tabela é derivada dos jogos (R-178): no início da
-                      temporada todos zerados; a cada rodada jogada, ela move. */}
-                </>
-              ) : (
-                <InlineUnavailable
-                  loading={competitionQuery.state === "loading"}
-                  text="A temporada ainda não foi publicada no mundo do jogo."
-                />
-              )}
-            </Card>
-
-            <Card>
-              <SectionHeader
-                title="PARTIDAS"
-                trailing={
-                  <Icon name="pulse" size={17} color={color.textMuted} />
-                }
-              />
-              {matchQuery.state === "ready" && matchQuery.data !== null ? (
-                <View style={styles.metrics}>
-                  <Metric value={matchQuery.data.matchCount} label="CRIADAS" />
-                  <Metric
-                    value={matchQuery.data.finalCount}
-                    label="FINALIZADAS"
-                  />
-                  <Metric
-                    value={matchQuery.data.commandCount}
-                    label="COMANDOS"
-                  />
                 </View>
-              ) : (
-                <InlineUnavailable
-                  loading={matchQuery.state === "loading"}
-                  text="Nenhuma partida oficial está disponível agora."
-                />
-              )}
-            </Card>
+              </View>
 
-            <Card>
-              <SectionHeader
-                title="ESTRUTURA"
-                trailing={
-                  <Icon name="construct" size={17} color={color.textMuted} />
-                }
-              />
-              <View style={styles.metrics}>
-                <Metric value={club.departments.length} label="DEPARTAMENTOS" />
-                <Metric
-                  value={club.reputationBand}
-                  label="FAIXA DE REPUTAÇÃO"
+              <View style={styles.featured}>
+                <GameCard
+                  image={CARD_CLUBE}
+                  eyebrow="GERIR"
+                  title="CLUBE"
+                  subtitle="Elenco e finanças"
+                  to="/clube"
+                />
+                <GameCard
+                  image={CARD_PARTIDAS}
+                  eyebrow="JOGAR"
+                  title="PARTIDAS"
+                  subtitle="Calendário e resultados"
+                  to="/partidas"
                 />
               </View>
-            </Card>
-          </>
-        )}
-      </ScrollView>
+
+              <HomeCalendar
+                status={worldStatus}
+                nextMatch={nextMatch}
+                loading={matchQuery.state === "loading"}
+                clockProgress={worldClockProgress}
+              />
+
+              <Card>
+                <SectionHeader
+                  title="DESDE SUA ÚLTIMA VISITA"
+                  trailing={
+                    <Icon
+                      name="notifications"
+                      size={17}
+                      color={color.textMuted}
+                    />
+                  }
+                />
+                {inboxQuery.state === "ready" && inboxQuery.data !== null ? (
+                  <View style={styles.metrics}>
+                    <Metric
+                      value={inboxQuery.data.openNotificationCount}
+                      label="PENDÊNCIAS"
+                    />
+                    <Metric
+                      value={inboxQuery.data.timelineCount}
+                      label="EVENTOS NO PERÍODO"
+                    />
+                    <Metric
+                      value={automationQuery.data?.executionCount ?? 0}
+                      label="AÇÕES AUTOMÁTICAS"
+                    />
+                  </View>
+                ) : (
+                  <InlineUnavailable
+                    loading={inboxQuery.state === "loading"}
+                    text="Ainda não há um resumo oficial do período ausente."
+                  />
+                )}
+              </Card>
+
+              <Card>
+                <SectionHeader
+                  title="TEMPORADA"
+                  trailing={
+                    <Icon name="football" size={17} color={color.textMuted} />
+                  }
+                />
+                {competitionQuery.state === "ready" &&
+                competitionQuery.data !== null ? (
+                  <>
+                    <Text style={styles.competitionNote}>
+                      {competitionQuery.data.competitionName} ·{" "}
+                      {competitionQuery.data.playedMatches}/
+                      {competitionQuery.data.totalMatches} partidas
+                    </Text>
+                    {competitionQuery.data.table
+                      .slice(0, 5)
+                      .map((row, index) => (
+                        <View key={row.clubId} style={styles.standingRow}>
+                          <Text style={styles.standingPos}>{index + 1}</Text>
+                          <Text style={styles.standingName} numberOfLines={1}>
+                            {row.clubName}
+                          </Text>
+                          <Text style={styles.standingStat}>{row.played}</Text>
+                          <Text style={styles.standingStat}>
+                            {row.goalDifference > 0 ? "+" : ""}
+                            {row.goalDifference}
+                          </Text>
+                          <Text style={styles.standingPoints}>
+                            {row.points}
+                          </Text>
+                        </View>
+                      ))}
+                    {/* A tabela é derivada dos jogos (R-178): no início da
+                      temporada todos zerados; a cada rodada jogada, ela move. */}
+                  </>
+                ) : (
+                  <InlineUnavailable
+                    loading={competitionQuery.state === "loading"}
+                    text="A temporada ainda não foi publicada no mundo do jogo."
+                  />
+                )}
+              </Card>
+
+              <Card>
+                <SectionHeader
+                  title="PARTIDAS"
+                  trailing={
+                    <Icon name="pulse" size={17} color={color.textMuted} />
+                  }
+                />
+                {matchQuery.state === "ready" && matchQuery.data !== null ? (
+                  <View style={styles.metrics}>
+                    <Metric
+                      value={matchQuery.data.upcoming.length}
+                      label="AGENDADAS"
+                    />
+                    <Metric
+                      value={matchQuery.data.results.length}
+                      label="FINALIZADAS"
+                    />
+                    <Metric
+                      value={
+                        matchQuery.data.upcoming.length +
+                        matchQuery.data.results.length
+                      }
+                      label="TOTAL"
+                    />
+                  </View>
+                ) : (
+                  <InlineUnavailable
+                    loading={matchQuery.state === "loading"}
+                    text="Nenhuma partida oficial está disponível agora."
+                  />
+                )}
+              </Card>
+
+              <Card>
+                <SectionHeader
+                  title="ESTRUTURA"
+                  trailing={
+                    <Icon name="construct" size={17} color={color.textMuted} />
+                  }
+                />
+                <View style={styles.metrics}>
+                  <Metric
+                    value={club.departments.length}
+                    label="DEPARTAMENTOS"
+                  />
+                  <Metric
+                    value={club.reputationBand}
+                    label="FAIXA DE REPUTAÇÃO"
+                  />
+                </View>
+              </Card>
+
+              <Text
+                style={styles.worldFooter}
+                accessibilityLabel={`Referência do mundo ${worldStatus.worldReference}`}
+              >
+                MUNDO · REF. {worldStatus.worldReference}
+              </Text>
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
+    </View>
+  );
+}
+
+function HomeCalendar({
+  status,
+  nextMatch,
+  loading,
+  clockProgress,
+}: {
+  readonly status: HomeWorldStatus;
+  readonly nextMatch: HomeNextMatch | null;
+  readonly loading: boolean;
+  readonly clockProgress: HomeWorldClockProgress | null;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.calendarCard,
+        pressed ? styles.calendarCardPressed : null,
+      ]}
+      onPress={() => router.push("/partidas")}
+      accessibilityRole="button"
+      accessibilityLabel={
+        nextMatch === null
+          ? `Calendário em ${status.dateLabel}. Sem próximo jogo agendado.`
+          : `Próximo jogo em ${nextMatch.dateLabel}: ${nextMatch.homeClubName} contra ${nextMatch.awayClubName}.`
+      }
+    >
+      <View style={styles.calendarHeader}>
+        <View style={styles.calendarHeading}>
+          <Icon name="time" size={17} color={color.primary} />
+          <Text style={styles.calendarTitle}>CALENDÁRIO</Text>
+        </View>
+        <View style={styles.calendarWorldDate}>
+          <Text style={styles.calendarDate}>{status.dateLabel}</Text>
+          <View style={styles.calendarWeekdayRow}>
+            {clockProgress !== null ? (
+              <WorldDayProgress progress={clockProgress} />
+            ) : null}
+            <Text style={styles.calendarWeekday}>{status.weekdayLabel}</Text>
+          </View>
+        </View>
+      </View>
+
+      {nextMatch !== null ? (
+        <View style={styles.nextMatch}>
+          <View style={styles.nextMatchTopline}>
+            <Text style={styles.nextMatchLabel}>PRÓXIMO JOGO</Text>
+            <Text style={styles.nextMatchMeta} numberOfLines={1}>
+              {nextMatch.competitionLabel} · {nextMatch.roundLabel}
+            </Text>
+          </View>
+          <View style={styles.nextMatchTeams}>
+            <Text style={styles.nextMatchTeam} numberOfLines={1}>
+              {nextMatch.homeClubName}
+            </Text>
+            <Text style={styles.nextMatchVersus}>×</Text>
+            <Text style={styles.nextMatchTeamRight} numberOfLines={1}>
+              {nextMatch.awayClubName}
+            </Text>
+          </View>
+          <View style={styles.nextMatchFooter}>
+            <Text style={styles.nextMatchDate}>{nextMatch.dateLabel}</Text>
+            <Text style={styles.nextMatchVenue}>{nextMatch.venueLabel}</Text>
+            <Icon name="chevron-forward" size={16} color={color.textMuted} />
+          </View>
+        </View>
+      ) : (
+        <View style={styles.calendarEmpty}>
+          <View>
+            <Text style={styles.calendarEmptyTitle}>
+              {loading ? "SINCRONIZANDO AGENDA" : "SEM PRÓXIMO JOGO"}
+            </Text>
+            <Text style={styles.calendarEmptyBody}>
+              {loading
+                ? "Buscando o calendário oficial do clube."
+                : "Nenhum compromisso foi publicado para o clube."}
+            </Text>
+          </View>
+          <Icon name="chevron-forward" size={16} color={color.textMuted} />
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function WorldDayProgress({
+  progress,
+}: {
+  readonly progress: HomeWorldClockProgress;
+}) {
+  return (
+    <View
+      style={styles.worldDayProgress}
+      accessible
+      accessibilityLabel={`Próximo dia em ${progress.remainingLabel}`}
+    >
+      <Text style={styles.worldDayRemaining}>{progress.remainingLabel}</Text>
+      <View style={styles.worldDayTrack}>
+        <View
+          style={[
+            styles.worldDayFill,
+            {
+              width: WORLD_DAY_PROGRESS_WIDTH * progress.remainingFraction,
+            },
+          ]}
+        />
+      </View>
     </View>
   );
 }
@@ -365,7 +565,10 @@ function GameCard({
       onPress={() => router.push(to)}
       accessibilityRole="button"
       accessibilityLabel={`Abrir ${title}`}
-      style={({ pressed }) => [styles.gameCard, pressed ? styles.gameCardPressed : null]}
+      style={({ pressed }) => [
+        styles.gameCard,
+        pressed ? styles.gameCardPressed : null,
+      ]}
     >
       <ImageBackground
         source={image}
@@ -381,7 +584,13 @@ function GameCard({
               <Stop offset="1" stopColor="#06080A" stopOpacity={0.92} />
             </LinearGradient>
           </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradId})`} />
+          <Rect
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            fill={`url(#${gradId})`}
+          />
         </Svg>
         <View style={styles.gameCardContent}>
           <Text style={styles.gameCardEyebrow}>{eyebrow}</Text>
@@ -437,6 +646,160 @@ const styles = StyleSheet.create({
   },
   safe: { flex: 1, backgroundColor: "transparent" },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl4 },
+  calendarCard: {
+    padding: space.lg,
+    borderWidth: 1,
+    borderColor: color.primaryDim,
+    borderRadius: radius.lg,
+    backgroundColor: color.surface,
+    gap: space.md,
+  },
+  calendarCardPressed: { opacity: 0.9 },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
+  calendarHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  calendarTitle: {
+    color: color.primary,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 1,
+  },
+  calendarWeekdayRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  calendarWorldDate: { alignItems: "flex-end" },
+  calendarDate: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  calendarWeekday: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 1,
+  },
+  worldDayProgress: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  worldDayRemaining: {
+    color: color.textMuted,
+    fontSize: 8,
+    fontWeight: fontWeight.bold as "700",
+  },
+  worldDayTrack: {
+    width: WORLD_DAY_PROGRESS_WIDTH,
+    height: 3,
+    overflow: "hidden",
+    borderRadius: radius.pill,
+    backgroundColor: color.borderStrong,
+  },
+  worldDayFill: {
+    height: 3,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  nextMatch: {
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.borderStrong,
+    gap: space.sm,
+  },
+  nextMatchTopline: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.sm,
+  },
+  nextMatchLabel: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 1.2,
+  },
+  nextMatchMeta: {
+    flex: 1,
+    textAlign: "right",
+    color: color.textMuted,
+    fontSize: 9,
+  },
+  nextMatchTeams: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  nextMatchTeam: {
+    flex: 1,
+    textAlign: "right",
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+  },
+  nextMatchTeamRight: {
+    flex: 1,
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+  },
+  nextMatchVersus: {
+    color: color.primary,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+  },
+  nextMatchFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  nextMatchDate: {
+    color: color.primary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  nextMatchVenue: {
+    flex: 1,
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+  },
+  calendarEmpty: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.md,
+    paddingTop: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.borderStrong,
+  },
+  calendarEmptyTitle: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  calendarEmptyBody: {
+    marginTop: 2,
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+  },
+  worldFooter: {
+    alignSelf: "center",
+    color: color.textFaint,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 1.2,
+  },
   featured: { flexDirection: "row", gap: space.md },
   gameCard: {
     flex: 1,
