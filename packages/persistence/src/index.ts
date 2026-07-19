@@ -50,3 +50,4 @@ export * from "./prisma-season-finance-unit-of-work.js";
 export * from "./prisma-training-plan-repository.js";
 export * from "./prisma-training-accrual.js";
 export * from "./prisma-season-accrual-unit-of-work.js";
+export * from "./prisma-player-development-read-model.js";

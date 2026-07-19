@@ -12,6 +12,7 @@ import {
   PrismaAccrualContextReader,
   PrismaAccrualBufferWriter,
   PrismaSeasonAccrualUnitOfWork,
+  PrismaPlayerDevelopmentReadModel,
   PrismaMatchesReadModel,
   PrismaMarketReadModel,
   PrismaFanbaseReadModel,
@@ -54,6 +55,7 @@ import {
   TRAINING_ACCRUAL_CONTEXT_READER,
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
+  PLAYER_DEVELOPMENT_READ_MODEL,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
@@ -184,6 +186,12 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaSeasonAccrualUnitOfWork =>
         new PrismaSeasonAccrualUnitOfWork(client),
+    },
+    {
+      provide: PLAYER_DEVELOPMENT_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPlayerDevelopmentReadModel =>
+        new PrismaPlayerDevelopmentReadModel(client),
     },
     {
       provide: COMPETITION_READ_MODEL,
@@ -373,6 +381,7 @@ import {
     TRAINING_ACCRUAL_CONTEXT_READER,
     TRAINING_ACCRUAL_BUFFER_WRITER,
     SEASON_ACCRUAL_UNIT_OF_WORK,
+    PLAYER_DEVELOPMENT_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,

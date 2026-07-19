@@ -159,3 +159,4 @@ export * from "./training/training-accrual.js";
 export * from "./training/apply-accruals.js";
 export * from "./training/accrue-club-training.js";
 export * from "./training/apply-season-accruals.js";
+export * from "./players/player-development-view.js";

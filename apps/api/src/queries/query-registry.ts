@@ -14,6 +14,7 @@ import type {
   InboxReadModel,
   TrainingPlanRepository,
 } from "@grinta/core";
+import type { PlayerDevelopmentReadModel } from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
@@ -47,6 +48,7 @@ export interface QueryContext {
   readonly worldClock: WorldClockRepository;
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
+  readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
 }
 
 /**
@@ -106,6 +108,23 @@ const handlers: Record<string, QueryHandler> = {
       seasonId,
     );
     return succeed({ plan });
+  },
+  "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {
+    const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
+    if (playerId === null || seasonId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "player-development exige os parâmetros playerId e seasonId.",
+          { params: ["playerId", "seasonId"] },
+        ),
+      );
+    }
+    // `null` = jogador inexistente no mundo; a tela cai no estado vazio.
+    return succeed({
+      development: await playerDevelopmentReadModel.view(worldId, playerId, seasonId),
+    });
   },
   "match-detail": async ({ matchesReadModel }, worldId, params) => {
     const matchId = typeof params.matchId === "string" ? params.matchId : null;

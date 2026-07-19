@@ -1,3 +1,4 @@
+import type { PlayerDevelopmentReadModel } from "@grinta/persistence";
 import type {
   ClubReadModel,
   CompetitionReadModel,
@@ -46,6 +47,7 @@ import {
   MATCHES_READ_MODEL,
   WORLD_CLOCK_REPOSITORY,
   TRAINING_PLAN_REPOSITORY,
+  PLAYER_DEVELOPMENT_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
   NARRATIVE_READ_MODEL,
@@ -100,6 +102,8 @@ export class QueriesController {
     private readonly worldClock: WorldClockRepository,
     @Inject(TRAINING_PLAN_REPOSITORY)
     private readonly trainingPlanRepository: TrainingPlanRepository,
+    @Inject(PLAYER_DEVELOPMENT_READ_MODEL)
+    private readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel,
     @Inject(MARKET_READ_MODEL)
     private readonly marketReadModel: MarketReadModel,
     @Inject(FANBASE_READ_MODEL)
@@ -297,6 +301,7 @@ export class QueriesController {
         matchesReadModel: this.matchesReadModel,
         worldClock: this.worldClock,
         trainingPlanRepository: this.trainingPlanRepository,
+        playerDevelopmentReadModel: this.playerDevelopmentReadModel,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,
         narrativeReadModel: this.narrativeReadModel,
