@@ -196,3 +196,20 @@ nada avisava quando um nome divergia do handler real (`player:promote-youth` vs
   `M-YOUTH-INTAKE`, `M-YOUTH-PLAYER`, `M-MENTORING`, `M-TRAINING-INDIV`, `M-PLAYER-DEV`,
   `M-ROLES`. O contrato (query · command · evento · errorCode · invariante) precisa ser
   decidido e escrito em `23-rastreabilidade-ux-api.md` antes de cada uma ser construída.
+
+### Trava B-08 — o auto-disparo do treino depende de ciclo de vida de temporada, que não existe
+
+`training:accrue-day` e `training:apply-season` funcionam e são provados por HTTP, mas são
+commands **explícitos**: nada os chama quando o mundo avança um dia ou vira a temporada.
+Ligá-los ao relógio (`world:advance-day` / `AdvanceWorldOneDay`) esbarra num gap real,
+constatado no banco em 2026-07-19:
+
+- `GameWorld.currentSeasonId` está **NULL** — a gênese e a ativação do mundo nunca o
+  populam.
+- A `Season` do mundo nasce **`PLANNED`** e nada a transiciona para `ACTIVE`.
+
+O accrual e a virada são chaveados por `seasonId`, e o mundo **não sabe dizer qual é a
+temporada corrente**. Sem essa plumbing (ativar a temporada na gênese, popular
+`currentSeasonId`, transicioná-la na virada), o auto-disparo não tem em que se ancorar.
+É um vertical próprio, com decisão de produto embutida (quando a temporada vira `ACTIVE`?),
+e ficou para depois. Enquanto isso, o treino é dirigido pelos commands explícitos.
