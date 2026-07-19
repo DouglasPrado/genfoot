@@ -82,6 +82,8 @@ describe("API command catalog integrity (e2e)", () => {
       "automation:save-automation",
       "automation:set-offline-plan",
       "automation:toggle-automation",
+      // R-204: autora um campeonato inteiro (pirâmide de divisões) numa tacada.
+      "championship:create",
       // BC-003 pela tela do clube no mobile (MF-25). Faltava aqui: eu o
       // registrei em 608fd99 e não atualizei esta lista — o gate ficou vermelho
       // nesse commit, e eu não vi porque rodei a suíte sem `DATABASE_URL` e
@@ -137,7 +139,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(35);
+    expect(response.body.commandCount).toBe(36);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

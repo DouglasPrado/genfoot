@@ -21,6 +21,7 @@ import {
   LockCompetition,
   StartCompetition,
   FinishCompetition,
+  defaultLeagueConfig,
   SetOfflinePlan,
   SaveAutomation,
   ToggleAutomation,
@@ -295,6 +296,31 @@ const configureCompetitionPayload = z.object({
   startsOn: dateOnly.nullable().optional(),
   endsOn: dateOnly.nullable().optional(),
   config: competitionConfigSchema.optional(),
+});
+
+/**
+ * Autoria de um CAMPEONATO inteiro (R-204): a pirâmide de divisões numa tacada.
+ * Cada item de `divisions` é uma divisão (tier = posição no array, 1 = topo),
+ * com seus clubes e as vagas de acesso/rebaixamento — o dono põe 0 no acesso do
+ * topo e 0 no rebaixamento do fundo. Todas compartilham a janela e o mesmo
+ * `championshipId`, gerado aqui, que liga a pirâmide para o rollover.
+ */
+const createChampionshipPayload = z.object({
+  name: z.string().min(1),
+  startsOn: dateOnly,
+  endsOn: dateOnly,
+  format: competitionFormatEnum.default("ROUND_ROBIN"),
+  divisions: z
+    .array(
+      z.object({
+        clubIds: z.array(z.string().uuid()).min(2),
+        promotionSlots: z.number().int().min(0),
+        relegationSlots: z.number().int().min(0),
+      }),
+    )
+    .min(1),
+  /** Premiação comum às divisões (opcional; padrão = sem prêmios). */
+  prizes: competitionPrizesSchema.optional(),
 });
 const competitionTransitionPayload = z.object({
   competitionId: z.string().uuid(),
@@ -783,6 +809,70 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `competition:${id}` });
+  },
+
+  // Autora um CAMPEONATO inteiro (R-204): cria, configura e trava cada divisão,
+  // todas ligadas por um mesmo championshipId. Depois disso o motor do dia
+  // (MUNDO-V2) as inicia, joga e, na virada, aplica o acesso/rebaixamento entre
+  // elas. As divisões são autoradas — não nascem na gênese.
+  "championship:create": async ({ worlds, competitionUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = createChampionshipPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const gameWorldId = world.value.worldId;
+    const championshipId = randomUUID();
+    const base = defaultLeagueConfig();
+    const legs = parsed.data.format === "DOUBLE_ROUND_ROBIN" ? 2 : 1;
+
+    for (let index = 0; index < parsed.data.divisions.length; index += 1) {
+      const division = parsed.data.divisions[index]!;
+      const tier = index + 1;
+      const competitionId = randomUUID();
+      const created = await new CreateCompetition(
+        competitionUnitOfWork,
+      ).execute({
+        id: competitionId,
+        gameWorldId,
+        name: `${parsed.data.name} · Divisão ${tier}`,
+        type: "LEAGUE",
+        format: parsed.data.format,
+        tier,
+        championshipId,
+      });
+      if (!created.ok) return created;
+
+      const configured = await new ConfigureCompetition(
+        competitionUnitOfWork,
+      ).execute({
+        gameWorldId,
+        competitionId,
+        patch: {
+          clubIds: division.clubIds,
+          startsOn: parsed.data.startsOn,
+          endsOn: parsed.data.endsOn,
+          config: {
+            rules: {
+              ...base.rules,
+              legs,
+              promotionSlots: division.promotionSlots,
+              relegationSlots: division.relegationSlots,
+            },
+            prizes: parsed.data.prizes ?? base.prizes,
+            qualifications: [],
+          },
+        },
+      });
+      if (!configured.ok) return configured;
+
+      const locked = await new LockCompetition(competitionUnitOfWork).execute({
+        gameWorldId,
+        competitionId,
+      });
+      if (!locked.ok) return locked;
+    }
+    return succeed({ resource: `championship:${championshipId}` });
   },
 
   "competition:configure": async ({
