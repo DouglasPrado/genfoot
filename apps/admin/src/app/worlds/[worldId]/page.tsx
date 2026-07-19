@@ -24,6 +24,7 @@ import { useToast } from "@/components/ui/toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorldIdentityForm } from "@/components/world-identity-form";
 import { WorldParametersTable } from "@/components/world-parameters-table";
+import { WorldClockPanel } from "@/components/world-clock-panel";
 import { WorldSettingsPanel } from "@/components/world-settings-panel";
 import {
   mockCompeticoes,
@@ -479,6 +480,22 @@ export default function WorldDetailPage() {
                     status={snapshot?.status ?? null}
                     currentDate={snapshot?.currentDate ?? null}
                     expectedVersion={snapshot?.version ?? null}
+                    onChanged={() => setRefreshKey((k) => k + 1)}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Relógio do mundo</CardTitle>
+                  <Badge tone="ok">dado real · sem mock</Badge>
+                </CardHeader>
+                <CardContent>
+                  {/* MUNDO-V4: o operador define quanto tempo real dura um dia
+                      lógico e liga/desliga o relógio. O scheduler faz o resto. */}
+                  <WorldClockPanel
+                    worldId={worldId}
+                    worldStatus={snapshot?.status ?? null}
                     onChanged={() => setRefreshKey((k) => k + 1)}
                   />
                 </CardContent>

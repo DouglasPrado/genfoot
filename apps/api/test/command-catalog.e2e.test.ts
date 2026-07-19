@@ -173,6 +173,8 @@ describe("API command catalog integrity (e2e)", () => {
       "staff",
       // Os artilheiros do mundo (C7-V5): projeção dos PlayerMatchStats.
       "top-scorers",
+      // O relógio do mundo (MUNDO-V4): config do tempo e próximo tick, para o admin.
+      "world-clock",
       // A base (C8): os jovens em formação, recorte por clubId.
       "youth",
     ]);
