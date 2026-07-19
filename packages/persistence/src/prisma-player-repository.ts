@@ -174,6 +174,10 @@ export class PrismaPlayerRepository implements PlayerRepository {
           player.attributes,
         ),
         potentialAbility: player.potentialAbility,
+        // R-216: a virada reescreve a base; sem isto ela nunca persistia e a
+        // margem da próxima temporada partiria do valor antigo. A prova por HTTP
+        // pegou o que typecheck/build não pegam — base 33 contra habilidade 34.
+        baselineAbility: player.baselineAbility,
         morale: player.dynamicState.morale,
         confidence: player.dynamicState.confidence,
         happiness: player.dynamicState.happiness,

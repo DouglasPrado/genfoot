@@ -38,6 +38,7 @@ import {
   SetWorldIdentity,
   SetTrainingPlan,
   AccrueClubTraining,
+  ApplySeasonAccruals,
   TrainingFocus,
   type ClubControlRepository,
   type ClubReadModel,
@@ -51,6 +52,7 @@ import {
   type TrainingContextReader,
   type AccrualContextReader,
   type AccrualBufferWriter,
+  type SeasonAccrualUnitOfWork,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -129,6 +131,7 @@ export interface CommandContext {
   readonly trainingContextReader: TrainingContextReader;
   readonly accrualContextReader: AccrualContextReader;
   readonly accrualBufferWriter: AccrualBufferWriter;
+  readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -429,6 +432,10 @@ const worldLifecyclePayload = z.object({
  * e um número duplicado na borda vira dois números que divergem. O zod só
  * garante o tipo.
  */
+const applySeasonPayload = z.object({
+  seasonId: z.string().uuid(),
+});
+
 const accrueDayPayload = z.object({
   clubId: z.string().uuid(),
   seasonId: z.string().uuid(),
@@ -784,6 +791,23 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  /** Treino — virada: aplica o accrual da temporada e zera o buffer (INV-29). */
+  "training:apply-season": async ({ worlds, seasonAccrualUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = applySeasonPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new ApplySeasonAccruals(seasonAccrualUnitOfWork).execute({
+      gameWorldId: world.value.worldId,
+      seasonId: parsed.data.seasonId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      rulesetVersion: world.value.snapshot.rulesetVersion as never,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `season:${parsed.data.seasonId}` });
   },
 
   "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {
