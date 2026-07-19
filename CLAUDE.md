@@ -121,6 +121,27 @@ Depois disso: republique o mesmo `file_path` (mantém a URL), atualize a contage
 
 ---
 
+## 5.2 Modo loop autônomo
+
+Quando o usuário pede explicitamente um **loop autônomo** (`/loop`, "roda sozinho", "segue sem me perguntar"), o processo muda **só na espera** — nunca no significado das cores.
+
+**O que o loop pode fazer sem perguntar:**
+
+- Escolher a própria fila de tarefas (lacunas de domínio, telas, Postgres) a cada iteração.
+- Commitar em branch `feat/*` com o gate completo verde.
+- Republicar o artefato de cobertura no mesmo `file_path`/URL, atualizando contagem, chips, carimbo e Registro.
+- Push e abrir PR — exceção explícita ao §7, válida **apenas** dentro de um loop autônomo pedido pelo usuário.
+
+**O que o loop continua NÃO podendo fazer:**
+
+- ❌ **Pintar 🟢 verde.** O teto do loop autônomo é 🟡 amarelo, sempre — mesmo com o doc aparentemente cumprido por inteiro, gate verde e fluxo exercitado. Verde exige as condições 0–4 do §5.1, e a condição 4 (confirmação explícita do usuário) não tem substituto autônomo: não há harness E2E, então o loop não tem como produzir a prova. Marcar verde sozinho é exatamente o slice-e-declara-pronto do §5.
+- ❌ Remover uma trava de "O que trava a construção" sem prova observada.
+- ❌ Tocar na `main`, ou em qualquer ação destrutiva/irreversível fora do escopo da tarefa.
+
+**Como o loop reporta:** cada tela que ele julga completa vira 🟡 amarelo com a tag `aguardando confirmação` e a descrição dizendo o que ele acredita ter fechado e o que falta provar. O usuário confirma em lote quando quiser — e só então a cor sobe para verde, seguindo o §5.1 normalmente.
+
+---
+
 ## 6. Convenções de código
 
 **Domínio (`packages/core`)**
@@ -147,7 +168,7 @@ Depois disso: republique o mesmo `file_path` (mantém a URL), atualize a contage
   ```
   Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
   ```
-- Push/PR **só quando o usuário pedir**.
+- Push/PR **só quando o usuário pedir** — exceto em modo loop autônomo (§5.2), onde o pedido do loop já autoriza.
 
 ---
 
