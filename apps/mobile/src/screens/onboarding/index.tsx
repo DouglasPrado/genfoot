@@ -28,6 +28,14 @@ interface OnboardingClub {
   readonly status: string;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
+  /**
+   * A identidade visual do período vigente (R-211). Anulável porque a coluna é:
+   * mundo semeado antes da R-211 tem clube sem cara, e a lista cai no
+   * placeholder em vez de renderizar escudo inventado no cliente.
+   */
+  readonly crestTemplateId: string | null;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
   /** `null` = IA. Clube com gestor não entra na lista (R-180). */
   readonly manager: { readonly accountId: string; readonly name: string } | null;
   /** Reservado por alguém que ainda decide (R-25). Aparece, mas bloqueado. */
@@ -41,6 +49,7 @@ import {
   submitTrackedCommand,
   type TrackedCommandResult,
 } from "@/lib/command-orchestrator";
+import { ClubCrest } from "@/screens/club/customization/crest";
 import { useSession } from "@/lib/session";
 import { useWorldId, useWorldQuery } from "@/lib/world";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
@@ -385,11 +394,26 @@ export function Onboarding() {
                         : `Selecionar ${club.name}`
                     }
                   >
-                    <View style={styles.clubCrest}>
-                      <Text style={styles.clubInitial}>
-                        {club.shortCode}
-                      </Text>
-                    </View>
+                    {club.crestTemplateId !== null &&
+                    club.primaryColor !== null &&
+                    club.secondaryColor !== null ? (
+                      <ClubCrest
+                        templateId={club.crestTemplateId}
+                        primary={club.primaryColor}
+                        secondary={club.secondaryColor}
+                        tertiary={null}
+                        letter={club.name.slice(0, 1).toUpperCase()}
+                        size={46}
+                      />
+                    ) : (
+                      // Sem identidade no dado, o placeholder fica. Desenhar um
+                      // escudo com cor sorteada aqui seria o cliente inventando
+                      // fato do mundo (§6) — e ele mudaria quando a gênese
+                      // atribuísse a identidade de verdade.
+                      <View style={styles.clubCrest}>
+                        <Text style={styles.clubInitial}>{club.shortCode}</Text>
+                      </View>
+                    )}
                     <View style={styles.clubInfo}>
                       <Text style={styles.clubName}>{club.name}</Text>
                       <Text style={styles.clubMeta}>

@@ -530,6 +530,16 @@ O mobile nunca selecionou mundo: `useWorldId()` (`apps/mobile/src/lib/world.ts:1
 
 A definição completa e as pendências vivem em [`selecao-de-mundo-2026-07-19.md`](selecao-de-mundo-2026-07-19.md).
 
+### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
+
+Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
+
+- **R-211 — A gênese atribui identidade visual determinística por `(seed, índice)`.** `generateClubVisualIdentity` (`packages/core/src/clubs/visual-identity-generator.ts`) sorteia template de escudo, kits de casa/fora e três cores distintas de uma **paleta canônica fechada** — sorteio livre em RGB produz bege e pastel lavado, que num escudo de 42px viram borrão. Stream isolada por contexto (`club-visual-identity:<índice>`): mudar a paleta não altera o elenco gerado.
+
+Mora no **domínio**, não no cliente: se o mobile sorteasse cores localmente, dois aparelhos mostrariam escudos diferentes para o mesmo clube e o replay não reproduziria o que o jogador viu. O cliente renderiza o SVG pelo `templateId`; quem decide é o mundo.
+
+Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis e o jogador sobrescreve ao personalizar (BC-003). Mundo semeado antes da R-211 mantém clube sem identidade, e a tela cai no placeholder em vez de inventar escudo no cliente.
+
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-210 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-211 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).

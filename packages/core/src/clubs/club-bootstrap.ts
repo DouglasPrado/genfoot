@@ -8,6 +8,7 @@ import {
   type ClubDepartmentSnapshot,
   type ClubSnapshot,
 } from "./club-types.js";
+import { generateClubVisualIdentity } from "./visual-identity-generator.js";
 
 const departmentKinds = Object.values(ClubDepartmentKind);
 
@@ -41,6 +42,11 @@ export function buildClubsFromGenesis(
       effectiveFrom: world.startDate,
       effectiveThrough: null,
       rulesetVersion: world.rulesetVersion,
+      // O clube nasce COM cara (R-211). Antes nascia sem: `crestTemplateId` e
+      // cores ficavam nulos até o jogador personalizar, e a lista de escolher
+      // clube mostrava 20 caixas cinzas idênticas — nada para escolher olhando.
+      // Determinística por `(seed, índice)`: o replay reproduz o mesmo escudo.
+      visualIdentity: generateClubVisualIdentity(world.seed, index),
     } as const;
     return {
       id: generated.id,
