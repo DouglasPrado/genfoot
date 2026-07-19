@@ -35,6 +35,15 @@ export interface MatchPlayRepository {
     gameWorldId: GameWorldId,
   ): Promise<readonly ScheduledMatchWithStrength[]>;
 
+  /**
+   * As partidas AGENDADAS com data ≤ `dateIso` — as "vencidas" que o dia lógico
+   * deve jogar (MUNDO-V2). Mesma forma da rodada, com forças e goleadores.
+   */
+  matchesDueBy(
+    gameWorldId: GameWorldId,
+    dateIso: string,
+  ): Promise<readonly ScheduledMatchWithStrength[]>;
+
   saveResults(
     gameWorldId: GameWorldId,
     results: readonly SimulatedMatchResult[],

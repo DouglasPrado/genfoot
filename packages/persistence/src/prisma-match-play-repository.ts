@@ -64,6 +64,40 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
     }));
   }
 
+  public async matchesDueBy(
+    gameWorldId: GameWorldId,
+    dateIso: string,
+  ): Promise<readonly ScheduledMatchWithStrength[]> {
+    const matches = await this.client.match.findMany({
+      where: {
+        gameWorldId,
+        runtimeStatus: "SCHEDULED",
+        scheduledAt: { lte: new Date(`${dateIso}T23:59:59.999Z`) },
+      },
+      orderBy: [{ scheduledAt: "asc" }, { roundNumber: "asc" }],
+      select: { id: true, roundNumber: true, homeClubId: true, awayClubId: true },
+    });
+    if (matches.length === 0) return [];
+
+    const clubIds = [
+      ...new Set(matches.flatMap((m) => [m.homeClubId, m.awayClubId])),
+    ];
+    const [strengths, scorers] = await Promise.all([
+      this.clubStrengths(gameWorldId),
+      this.scorerCandidates(gameWorldId, clubIds),
+    ]);
+    return matches.map((match) => ({
+      matchId: match.id,
+      roundNumber: match.roundNumber ?? 0,
+      homeClubId: match.homeClubId,
+      awayClubId: match.awayClubId,
+      homeStrength: strengths.get(match.homeClubId) ?? 50,
+      awayStrength: strengths.get(match.awayClubId) ?? 50,
+      homeScorers: scorers.get(match.homeClubId) ?? [],
+      awayScorers: scorers.get(match.awayClubId) ?? [],
+    }));
+  }
+
   public async saveResults(
     gameWorldId: GameWorldId,
     results: readonly SimulatedMatchResult[],

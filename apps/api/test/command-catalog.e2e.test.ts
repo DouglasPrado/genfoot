@@ -107,6 +107,8 @@ describe("API command catalog integrity (e2e)", () => {
       // X-001: o usuário registra presença no mundo (heartbeat).
       "presence:heartbeat",
       "world:activate",
+      // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
+      "world:advance-day",
       // Registrado por trabalho paralelo (ciclo de temporada/finanças). Entra aqui
       // para reverdejar o gate — o command existe, faltava a linha do catálogo.
       "world:advance-days",
@@ -135,7 +137,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(34);
+    expect(response.body.commandCount).toBe(35);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

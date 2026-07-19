@@ -26,6 +26,7 @@ import {
   ToggleAutomation,
   RunClubAutopilot,
   SetWorldClock,
+  AdvanceWorldOneDay,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -41,6 +42,7 @@ import {
   type MatchPlayRepository,
   type PresenceRepository,
   type WorldClockRepository,
+  type CompetitionReadModel,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -113,6 +115,8 @@ export interface CommandContext {
   readonly presence: PresenceRepository;
   /** MUNDO-V1 — o relógio do mundo (config de tempo por dia lógico). */
   readonly worldClock: WorldClockRepository;
+  /** MUNDO-V2 — o motor do dia lê as competições para iniciar/homologar por data. */
+  readonly competitionReadModel: CompetitionReadModel;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -966,6 +970,30 @@ const handlers: Record<string, CommandHandler> = {
       running: parsed.data.running,
       // O relógio de parede AGORA, na borda — para agendar o próximo tick.
       nowIso: new Date().toISOString(),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `world:${world.value.worldId}` });
+  },
+
+  // MUNDO-V2 — avança UM dia lógico e roda o trabalho do dia (abre competições,
+  // joga as partidas vencidas, homologa as encerradas). O motor do mundo.
+  "world:advance-day": async ({
+    worlds,
+    competitionUnitOfWork,
+    competitionReadModel,
+    matchPlay,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const result = await new AdvanceWorldOneDay({
+      worlds,
+      competitionUnitOfWork,
+      competitionReadModel,
+      matchPlay,
+    }).execute({
+      gameWorldId: world.value.worldId,
+      worldSeed: world.value.snapshot.seed,
     });
     if (!result.ok) return result;
     return succeed({ resource: `world:${world.value.worldId}` });

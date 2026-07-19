@@ -13,6 +13,9 @@ class MemoryPlayRepo implements MatchPlayRepository {
   nextUnplayedRound(): Promise<readonly ScheduledMatchWithStrength[]> {
     return Promise.resolve(this.round);
   }
+  matchesDueBy(): Promise<readonly ScheduledMatchWithStrength[]> {
+    return Promise.resolve(this.round);
+  }
   saveResults(
     _worldId: unknown,
     results: readonly SimulatedMatchResult[],
