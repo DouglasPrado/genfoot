@@ -37,6 +37,7 @@ import {
   ResumeWorld,
   SetWorldIdentity,
   SetTrainingPlan,
+  AccrueClubTraining,
   TrainingFocus,
   type ClubControlRepository,
   type ClubReadModel,
@@ -48,6 +49,8 @@ import {
   type CompetitionReadModel,
   type TrainingPlanRepository,
   type TrainingContextReader,
+  type AccrualContextReader,
+  type AccrualBufferWriter,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -124,6 +127,8 @@ export interface CommandContext {
   readonly competitionReadModel: CompetitionReadModel;
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly trainingContextReader: TrainingContextReader;
+  readonly accrualContextReader: AccrualContextReader;
+  readonly accrualBufferWriter: AccrualBufferWriter;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -424,6 +429,11 @@ const worldLifecyclePayload = z.object({
  * e um número duplicado na borda vira dois números que divergem. O zod só
  * garante o tipo.
  */
+const accrueDayPayload = z.object({
+  clubId: z.string().uuid(),
+  seasonId: z.string().uuid(),
+});
+
 const trainingPlanPayload = z.object({
   clubId: z.string().uuid(),
   seasonId: z.string().uuid(),
@@ -749,6 +759,31 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /** Treino — um dia de accrual: soma o ganho do plano ao buffer (R-212/R-113). */
+  "training:accrue-day": async ({
+    worlds,
+    trainingPlanRepository,
+    accrualContextReader,
+    accrualBufferWriter,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = accrueDayPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new AccrueClubTraining(
+      trainingPlanRepository,
+      accrualContextReader,
+      accrualBufferWriter,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      seasonId: parsed.data.seasonId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {
