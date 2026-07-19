@@ -74,6 +74,19 @@ export interface CompetitionAggregateRepository {
     gameWorldId: string,
     competitionId: string,
   ): Promise<number>;
+  /**
+   * Abre a PRÓXIMA edição da liga (rollover, R-204): cria a temporada seguinte e
+   * uma edição EM RASCUNHO com os mesmos clubes e a mesma config da edição atual,
+   * na janela `[startsOn, endsOn]`. A edição nova passa a ser a corrente (a de
+   * início mais recente). Idempotente: se já existe edição começando em
+   * `startsOn` ou depois, não faz nada. Devolve `true` se abriu.
+   */
+  openNextEdition(input: {
+    gameWorldId: string;
+    competitionId: string;
+    startsOn: string;
+    endsOn: string;
+  }): Promise<boolean>;
 }
 
 export interface CompetitionRepositories {

@@ -7,6 +7,7 @@ import {
   type CompetitionUnitOfWork,
 } from "../competitions/author-competition.js";
 import type { CompetitionReadModel } from "../competitions/competition-read-model.js";
+import { RolloverLeague } from "../competitions/season-rollover.js";
 import type { MatchPlayRepository } from "../matches/match-play-repository.js";
 import { simulateScheduledMatch } from "../matches/match-simulation.js";
 
@@ -41,6 +42,8 @@ export interface AdvanceWorldDayResult {
   readonly competitionsStarted: number;
   readonly matchesPlayed: number;
   readonly competitionsHomologated: number;
+  /** Ligas que encerraram e abriram a temporada seguinte (rollover, R-204). */
+  readonly seasonsRolledOver: number;
 }
 
 export class AdvanceWorldOneDay {
@@ -116,11 +119,34 @@ export class AdvanceWorldOneDay {
       }
     }
 
+    // 5. Rollover: as ligas que encerraram abrem a próxima temporada sozinhas
+    //    (R-204) — mesmos clubes, config e duração, janela nova, já agendada
+    //    para o motor do dia iniciar quando a data chegar. Só a liga cuja edição
+    //    CORRENTE está encerrada rola; depois de rolar, a corrente vira a nova
+    //    (rascunho/agendada), então reexecutar não abre uma segunda.
+    let rolledOver = 0;
+    if (homologated > 0) {
+      const afterFinish =
+        await this.deps.competitionReadModel.listCompetitions(worldId);
+      for (const c of afterFinish) {
+        if (c.type !== "LEAGUE" || c.lifecycle !== "FINISHED") continue;
+        const r = await new RolloverLeague(
+          this.deps.competitionUnitOfWork,
+        ).execute({
+          gameWorldId: worldId,
+          competitionId: c.competitionId,
+          occurredOn: newDate,
+        });
+        if (r.ok && r.value.opened) rolledOver += 1;
+      }
+    }
+
     return succeed({
       newDate,
       competitionsStarted: started,
       matchesPlayed: due.length,
       competitionsHomologated: homologated,
+      seasonsRolledOver: rolledOver,
     });
   }
 }

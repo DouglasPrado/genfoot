@@ -10,7 +10,7 @@ import {
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
-import type { Prisma } from "./generated/prisma/client.js";
+import { Prisma } from "./generated/prisma/client.js";
 
 /**
  * Adapter do agregado de competição autorado (C7, R-202).
@@ -305,6 +305,86 @@ export class PrismaCompetitionAggregateRepository
       },
     });
     return count;
+  }
+
+  public async openNextEdition(input: {
+    gameWorldId: string;
+    competitionId: string;
+    startsOn: string;
+    endsOn: string;
+  }): Promise<boolean> {
+    const nextStart = new Date(`${input.startsOn}T00:00:00.000Z`);
+    // Idempotência: se já existe edição começando nesta janela (ou depois), o
+    // rollover já rolou — não abre uma segunda.
+    const already = await this.client.competitionSeason.findFirst({
+      where: { competitionId: input.competitionId, startsAt: { gte: nextStart } },
+      select: { id: true },
+    });
+    if (already !== null) return false;
+
+    // A edição encerrada corrente — de onde herdamos config e clubes.
+    const finished = await this.client.competitionSeason.findFirst({
+      where: { competitionId: input.competitionId },
+      orderBy: { startsAt: "desc" },
+      include: {
+        clubs: { select: { clubId: true }, orderBy: { seed: "asc" } },
+      },
+    });
+    if (finished === null) return false;
+
+    // A próxima temporada do mundo é COMPARTILHADA entre as competições (todas
+    // sobem de número juntas): encontra-ou-cria por (mundo, número). O número da
+    // temporada encerrada vem da linha `Season` (a edição só guarda o id).
+    const finishedSeason = await this.client.season.findUnique({
+      where: { id: finished.seasonId },
+      select: { number: true },
+    });
+    const nextNumber = (finishedSeason?.number ?? 1) + 1;
+    const season =
+      (await this.client.season.findFirst({
+        where: { gameWorldId: input.gameWorldId, number: nextNumber },
+        select: { id: true },
+      })) ??
+      (await this.client.season.create({
+        data: {
+          gameWorldId: input.gameWorldId,
+          number: nextNumber,
+          name: `Temporada ${nextNumber}`,
+          startsAt: nextStart,
+        },
+        select: { id: true },
+      }));
+
+    // Nova edição EM RASCUNHO, herdando a config imutável (R-52) da anterior. É
+    // a de início mais recente ⇒ passa a ser a corrente para as leituras.
+    const edition = await this.client.competitionSeason.create({
+      data: {
+        competitionId: input.competitionId,
+        seasonId: season.id,
+        name: finished.name,
+        status: "PLANNED",
+        lifecycle: "DRAFT",
+        startsAt: nextStart,
+        endsAt: new Date(`${input.endsOn}T00:00:00.000Z`),
+        rulesJson: finished.rulesJson ?? Prisma.JsonNull,
+        prizeJson: finished.prizeJson ?? Prisma.JsonNull,
+        version: 1,
+      },
+      select: { id: true },
+    });
+
+    // Mesmos clubes (uma divisão que se repete; mover entre divisões é o passo
+    // do acesso/rebaixamento estrutural, ainda por vir).
+    if (finished.clubs.length > 0) {
+      await this.client.competitionClub.createMany({
+        data: finished.clubs.map((c, index) => ({
+          competitionSeasonId: edition.id,
+          clubId: c.clubId,
+          seed: index + 1,
+        })),
+      });
+    }
+    return true;
   }
 
   /** Encontra ou cria a "Temporada 1" do mundo (FK obrigatória da edição). */
