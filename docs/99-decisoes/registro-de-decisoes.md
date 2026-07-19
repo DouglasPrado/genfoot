@@ -551,6 +551,14 @@ O §5 e o §17 especificavam declínio por idade e aposentadoria contextual; o c
 
 A definição completa e as pendências vivem em [`envelhecimento-e-aposentadoria-2026-07-19.md`](envelhecimento-e-aposentadoria-2026-07-19.md).
 
+### R-218 — A reposição de aposentados vem da captação, não de geração automática · RATIFICADA em 2026-07-19
+
+A R-217 aposenta; faltava a fonte da reposição (R-114 já dá o ritmo). O dono escolheu **captação/intake** (`M-YOUTH-INTAKE`) — safra anual gerenciada, não regen automático.
+
+- **R-218 — A nova safra entra pela captação.** Cadência anual (`youthIntakeDate`, um por temporada). Cadeia: motor de safra + `ScoutReport` (R-04) construíveis já; disputa entre clubes a seguir; contrato de formação (puxa C6/C9) e gatilho de calendário (trava B-08) bloqueados. **Enquanto a cadeia não fecha, o elenco encolhe a cada virada — sabido.**
+
+A definição completa vive em [`captacao-como-fonte-de-safra-2026-07-19.md`](captacao-como-fonte-de-safra-2026-07-19.md).
+
 ### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
 
 Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
@@ -563,4 +571,4 @@ Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis
 
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-217 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-218 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
