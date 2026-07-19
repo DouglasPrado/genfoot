@@ -29,6 +29,8 @@ import type {
   ListUnitOfWork,
   CompetitionUnitOfWork,
   CompetitionReadModel,
+  TrainingPlanRepository,
+  TrainingContextReader,
   AutomationUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -56,6 +58,8 @@ import {
   LIST_UNIT_OF_WORK,
   COMPETITION_UNIT_OF_WORK,
   COMPETITION_READ_MODEL,
+  TRAINING_PLAN_REPOSITORY,
+  TRAINING_CONTEXT_READER,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
@@ -109,6 +113,10 @@ export class CommandsController {
     private readonly competitionUnitOfWork: CompetitionUnitOfWork,
     @Inject(COMPETITION_READ_MODEL)
     private readonly competitionReadModel: CompetitionReadModel,
+    @Inject(TRAINING_PLAN_REPOSITORY)
+    private readonly trainingPlanRepository: TrainingPlanRepository,
+    @Inject(TRAINING_CONTEXT_READER)
+    private readonly trainingContextReader: TrainingContextReader,
     @Inject(AUTOMATION_UNIT_OF_WORK)
     private readonly automationUnitOfWork: AutomationUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
@@ -262,6 +270,8 @@ export class CommandsController {
         listUnitOfWork: this.listUnitOfWork,
         competitionUnitOfWork: this.competitionUnitOfWork,
         competitionReadModel: this.competitionReadModel,
+        trainingPlanRepository: this.trainingPlanRepository,
+        trainingContextReader: this.trainingContextReader,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,

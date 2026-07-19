@@ -7,6 +7,8 @@ import {
   PrismaLedgerReadModel,
   PrismaClubFinanceReadModel,
   PrismaCompetitionReadModel,
+  PrismaTrainingPlanRepository,
+  PrismaTrainingContextReader,
   PrismaMatchesReadModel,
   PrismaMarketReadModel,
   PrismaFanbaseReadModel,
@@ -44,6 +46,8 @@ import {
   LEDGER_READ_MODEL,
   CLUB_FINANCE_READ_MODEL,
   COMPETITION_READ_MODEL,
+  TRAINING_PLAN_REPOSITORY,
+  TRAINING_CONTEXT_READER,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
@@ -144,6 +148,18 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubFinanceReadModel =>
         new PrismaClubFinanceReadModel(client),
+    },
+    {
+      provide: TRAINING_PLAN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTrainingPlanRepository =>
+        new PrismaTrainingPlanRepository(client),
+    },
+    {
+      provide: TRAINING_CONTEXT_READER,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTrainingContextReader =>
+        new PrismaTrainingContextReader(client),
     },
     {
       provide: COMPETITION_READ_MODEL,

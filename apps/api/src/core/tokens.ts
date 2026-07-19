@@ -69,3 +69,6 @@ export const OBJECT_STORAGE = "OBJECT_STORAGE";
 export interface ApiInfo {
   readonly contractVersion: string;
 }
+
+export const TRAINING_PLAN_REPOSITORY = "TRAINING_PLAN_REPOSITORY";
+export const TRAINING_CONTEXT_READER = "TRAINING_CONTEXT_READER";

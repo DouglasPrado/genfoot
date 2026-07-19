@@ -36,6 +36,8 @@ import {
   ReserveClub,
   ResumeWorld,
   SetWorldIdentity,
+  SetTrainingPlan,
+  TrainingFocus,
   type ClubControlRepository,
   type ClubReadModel,
   type ClubUnitOfWork,
@@ -44,6 +46,8 @@ import {
   type PresenceRepository,
   type WorldClockRepository,
   type CompetitionReadModel,
+  type TrainingPlanRepository,
+  type TrainingContextReader,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -118,6 +122,8 @@ export interface CommandContext {
   readonly worldClock: WorldClockRepository;
   /** MUNDO-V2 — o motor do dia lê as competições para iniciar/homologar por data. */
   readonly competitionReadModel: CompetitionReadModel;
+  readonly trainingPlanRepository: TrainingPlanRepository;
+  readonly trainingContextReader: TrainingContextReader;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -418,6 +424,22 @@ const worldLifecyclePayload = z.object({
  * e um número duplicado na borda vira dois números que divergem. O zod só
  * garante o tipo.
  */
+const trainingPlanPayload = z.object({
+  clubId: z.string().uuid(),
+  seasonId: z.string().uuid(),
+  name: z.string(),
+  focus: z.nativeEnum(TrainingFocus),
+  intensity: z.number().int(),
+  entries: z.array(
+    z.object({
+      playerId: z.string().uuid(),
+      focus: z.nativeEnum(TrainingFocus),
+      workload: z.number().int(),
+    }),
+  ),
+  expectedVersion: z.number().int().nullable(),
+});
+
 const worldIdentityPayload = z.object({
   name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -699,6 +721,36 @@ const handlers: Record<string, CommandHandler> = {
   },
 
   /** C8 — a promoção base→profissional. Move a membership entre os dois elencos. */
+  /** Treino — define o plano do clube na temporada (M-TRAINING, doc 23 §9). */
+  "training:set-plan": async ({
+    worlds,
+    trainingPlanRepository,
+    trainingContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = trainingPlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetTrainingPlan(
+      trainingPlanRepository,
+      trainingContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      seasonId: parsed.data.seasonId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      name: parsed.data.name,
+      focus: parsed.data.focus,
+      intensity: parsed.data.intensity,
+      entries: parsed.data.entries,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
   "youth:promote-player": async ({ worlds, promoteYouthUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
