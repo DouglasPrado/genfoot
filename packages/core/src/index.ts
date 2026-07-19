@@ -155,3 +155,5 @@ export * from "./presence/presence-repository.js";
 export * from "./training/development-gain.js";
 export * from "./training/training-types.js";
 export * from "./training/set-training-plan.js";
+export * from "./training/training-accrual.js";
+export * from "./training/apply-accruals.js";

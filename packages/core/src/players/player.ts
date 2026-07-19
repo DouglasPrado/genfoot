@@ -222,6 +222,27 @@ export class Player {
     });
   }
 
+  /** O valor atual de um atributo (para o accrual somar seu delta). */
+  public attributeValue(code: PlayerAttributeCode): number | null {
+    return this.state.attributes[code];
+  }
+
+  /**
+   * Fixa a linha de base na habilidade atual (R-216).
+   *
+   * Chamada UMA vez na virada de temporada, depois de aplicado o accrual: a
+   * margem de crescimento da próxima temporada passa a ser medida daqui. É o que
+   * faz a estrutura ruim ATRASAR em vez de limitar para sempre — a cada virada o
+   * jogador recomeça a corrida do ponto a que chegou.
+   */
+  public rebaseline(): void {
+    this.state = {
+      ...this.state,
+      baselineAbility: this.state.currentAbility,
+      version: this.state.version + 1,
+    };
+  }
+
   public snapshot(): PlayerLifecycleSnapshot {
     return this.state;
   }
