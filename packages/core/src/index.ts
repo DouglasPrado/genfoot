@@ -150,3 +150,6 @@ export * from "./automation/save-automation.js";
 export * from "./automation/run-autopilot.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";
+
+// Treino — a fórmula de evolução do §6 (R-212).
+export * from "./training/development-gain.js";

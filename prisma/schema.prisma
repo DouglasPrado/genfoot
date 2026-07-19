@@ -1674,10 +1674,16 @@ model TrainingPlan {
   createdByStaffId  String?       @db.Uuid
   startsAt          DateTime
   endsAt            DateTime?
+  // R-214: a rastreabilidade (§9) exige `expectedVersion` no SetTrainingPlan e
+  // a INV-31 o cobre — mas a coluna não existia. Concorrência otimista
+  // declarada e inexequível: dois aparelhos salvando o plano se sobrescreviam
+  // em silêncio.
+  version           Int           @default(1)
 
   club    Club                  @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
   entries TrainingPlayerEntry[]
 
+  @@unique([gameWorldId, id]) // par de referência para FKs compostas por mundo
   @@index([gameWorldId, clubId])
 }
 
