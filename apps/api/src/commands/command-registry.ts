@@ -25,6 +25,7 @@ import {
   SaveAutomation,
   ToggleAutomation,
   RunClubAutopilot,
+  SetWorldClock,
   InspectWorld,
   JoinWorld,
   PauseWorld,
@@ -39,6 +40,7 @@ import {
   type GenesisUnitOfWork,
   type MatchPlayRepository,
   type PresenceRepository,
+  type WorldClockRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -109,6 +111,8 @@ export interface CommandContext {
   readonly matchPlay: MatchPlayRepository;
   /** X-001 — a presença do usuário no mundo (heartbeat). */
   readonly presence: PresenceRepository;
+  /** MUNDO-V1 — o relógio do mundo (config de tempo por dia lógico). */
+  readonly worldClock: WorldClockRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -342,6 +346,12 @@ const presencePayload = z.object({
 const runAutopilotPayload = z.object({
   clubId: z.string().uuid(),
   triggerEvent: z.string().min(1),
+});
+
+// MUNDO-V1 — o relógio: quantos segundos reais valem um dia lógico, e se roda.
+const setClockPayload = z.object({
+  realSecondsPerDay: z.number().int(),
+  running: z.boolean().default(true),
 });
 
 const createWorldPayload = z.object({
@@ -942,6 +952,23 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  // MUNDO-V1 — configura o relógio: o mundo passa a andar sozinho (ou pausa).
+  "world:set-clock": async ({ worlds, worldClock, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = setClockPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetWorldClock(worldClock).execute({
+      gameWorldId: world.value.worldId,
+      realSecondsPerDay: parsed.data.realSecondsPerDay,
+      running: parsed.data.running,
+      // O relógio de parede AGORA, na borda — para agendar o próximo tick.
+      nowIso: new Date().toISOString(),
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `world:${world.value.worldId}` });
   },
 
   "world:activate": async ({ worlds, clubs, envelope }) => {

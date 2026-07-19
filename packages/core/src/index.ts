@@ -38,6 +38,7 @@ export * from "./world/game-world.js";
 export * from "./world/world-repository.js";
 export * from "./world/world-types.js";
 export * from "./world/world-use-cases.js";
+export * from "./world/world-clock.js";
 
 // C3 — clube. Os agregados por entidade e a porta nova; o `WorldClubPortfolio`
 // (672 linhas embrulhando os 16 clubes numa revisão só) morreu.

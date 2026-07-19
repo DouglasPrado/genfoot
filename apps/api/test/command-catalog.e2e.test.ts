@@ -120,6 +120,8 @@ describe("API command catalog integrity (e2e)", () => {
       // C5: joga a próxima rodada da liga (simulação determinística).
       "world:play-round",
       "world:resume",
+      // MUNDO-V1: o relógio — o mundo passa a andar sozinho.
+      "world:set-clock",
       "world:set-identity",
       // C8: desce um profissional (≤21) de volta à base.
       "youth:demote-player",
@@ -133,7 +135,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(33);
+    expect(response.body.commandCount).toBe(34);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

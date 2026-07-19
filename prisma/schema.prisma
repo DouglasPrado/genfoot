@@ -852,6 +852,12 @@ model GameWorld {
   currentRuleSetVersionId String?     @db.Uuid // sem escritor: não há catálogo de ruleset
   currentDate             DateTime    @db.Date // data virtual do mundo (R-177)
   timezone                String      @default("America/Sao_Paulo")
+  // Relógio do mundo (MUNDO-V1): quanto tempo REAL vale um dia lógico, e quando
+  // o próximo dia dispara. É agendamento (infra), não simulação — o tempo do
+  // mundo continua sendo `currentDate` (R-177). `nextTickAt` é relógio de parede.
+  realSecondsPerDay       Int? // ex.: 14400 = cada dia lógico a cada 4h reais
+  clockRunning            Boolean     @default(false)
+  nextTickAt              DateTime? // quando o próximo dia lógico deve rodar
   maxClubs                Int? // pendente: GameRuleConfig (R-182)
   seasonDays              Int? // R-107 · pendente: GameRuleConfig
   initialClubCashMinor    BigInt? // pendente: GameEconomyConfig (R-182)

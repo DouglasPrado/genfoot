@@ -18,6 +18,7 @@ import {
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
   PrismaPresenceRepository,
+  PrismaWorldClockRepository,
   PrismaTransferUnitOfWork,
   PrismaPromoteYouthUnitOfWork,
   PrismaDemoteToYouthUnitOfWork,
@@ -54,6 +55,7 @@ import {
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
   PRESENCE_REPOSITORY,
+  WORLD_CLOCK_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
   PROMOTE_YOUTH_UNIT_OF_WORK,
   DEMOTE_TO_YOUTH_UNIT_OF_WORK,
@@ -210,6 +212,12 @@ import {
         new PrismaPresenceRepository(client),
     },
     {
+      provide: WORLD_CLOCK_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaWorldClockRepository =>
+        new PrismaWorldClockRepository(client),
+    },
+    {
       provide: TRANSFER_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTransferUnitOfWork =>
@@ -312,6 +320,7 @@ import {
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
     PRESENCE_REPOSITORY,
+    WORLD_CLOCK_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
     PROMOTE_YOUTH_UNIT_OF_WORK,
     DEMOTE_TO_YOUTH_UNIT_OF_WORK,
