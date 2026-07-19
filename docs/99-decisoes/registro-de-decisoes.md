@@ -520,6 +520,16 @@ A liga era cravada na gênese (16 clubes, 30 rodadas, hardcoded). A spec §2 já
 
 A definição completa e as pendências vivem em [`competicoes-autoradas-2026-07-18.md`](competicoes-autoradas-2026-07-18.md).
 
+### R-208..R-210 — Seleção de mundo é lista viva, não constante de build · RATIFICADAS em 2026-07-19
+
+O mobile nunca selecionou mundo: `useWorldId()` (`apps/mobile/src/lib/world.ts:17-19`) devolvia uma constante de build (`EXPO_PUBLIC_WORLD_ID`), com UUID hardcoded de fallback em `config.ts:27` apontando para um mundo já inexistente. A tela `M-WORLD-PICK` e seu contrato (`GetAvailableWorlds`/`GetEntryEligibility`) estavam especificados desde o início e **nunca foram implementados** — a constante era o sintoma dessa ausência.
+
+- **R-208 — Seleção de mundo é lista viva, não constante de build.** O mundo ativo vem de escolha do usuário sobre lista servida pela API. `EXPO_PUBLIC_WORLD_ID` e o fallback hardcoded morrem. Sem mundo selecionado o app não consulta nada — a ausência leva a `M-WORLD-PICK`, não a dado fictício.
+- **R-209 — A vitrine de mundos é pública; a elegibilidade não.** `GetAvailableWorlds` responde sem autenticação, só com dados públicos (nome, temporada, tipo, nº de clubes, vagas). **Estende** o doc da tela, que previa só acesso pós-cadastro. Nada derivado de identidade vaza na rota pública.
+- **R-210 — Elegibilidade é pós-login e nunca revela a fórmula.** `GetEntryEligibility` exige sessão; o motivo do bloqueio é geral (`ENTRY_ELIGIBILITY_DENIED`/`ACCOUNT_COOLDOWN_ACTIVE`/`RELATED_ACCOUNT_BLOCKED`/`CLUB_ALREADY_CONTROLLED`), nunca a regra do anti-abuso (§2.9). Preserva INV-19.
+
+A definição completa e as pendências vivem em [`selecao-de-mundo-2026-07-19.md`](selecao-de-mundo-2026-07-19.md).
+
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-207 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-210 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
