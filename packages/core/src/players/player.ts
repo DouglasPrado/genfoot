@@ -10,6 +10,7 @@ import {
 import type { GeneratedPlayer } from "../genesis/genesis-types.js";
 
 import { derivePlayerOverall } from "./player-attributes.js";
+import { derivePotentialLayers } from "./potential-layers.js";
 import {
   PlayerAvailability,
   PlayerCareerStatus,
@@ -46,6 +47,9 @@ export class Player {
         attributes: player.attributes,
         currentAbility: derivePlayerOverall(player.primaryPosition, player.attributes),
         potentialAbility: player.potentialAbility,
+        // Jogador nasce com a base igual ao que ele é: a margem daqui para
+        // frente é o que a estrutura do clube vai render (R-216).
+        baselineAbility: derivePlayerOverall(player.primaryPosition, player.attributes),
         dynamicState: {
           morale: 50,
           confidence: 50,
@@ -164,16 +168,32 @@ export class Player {
       previousValue - 6,
       Math.min(previousValue + 6, input.requestedValue),
     );
-    if (
-      nextValue > previousValue &&
-      this.state.currentAbility >= this.state.potentialAbility
-    ) {
+    /**
+     * O teto é o potencial APROVEITÁVEL (R-213), medido da LINHA DE BASE
+     * (R-216) — e é a linha de base que faz a R-12 travar de verdade.
+     *
+     * Medindo da habilidade atual, o teto subia a cada ganho e convergia para o
+     * natural: o clamp parecia cumprir a R-12 e não travava nada (trava B-07).
+     * Da base fixa, um jovem de potencial 85 e base 35 para em 55 numa
+     * estrutura nível 1, como manda `04-estrutura-do-clube-e-staff.md:258-264`.
+     *
+     * A base é reescrita na virada de temporada: estrutura ruim ATRASA o
+     * jogador, não o limita para sempre.
+     *
+     * `structureLevel` ainda não é conhecido aqui e cai no provisório da R-213
+     * (nível 3) — dívida declarada: hoje clube nível 1 e nível 5 rendem igual.
+     */
+    const ceiling = derivePotentialLayers({
+      natural: this.state.potentialAbility,
+      baselineAbility: this.state.baselineAbility,
+      currentAbility: this.state.currentAbility,
+    }).usable;
+    if (nextValue > previousValue && this.state.currentAbility >= ceiling) {
       nextValue = previousValue;
     }
     while (
       nextValue > previousValue &&
-      this.overallWith(input.attributeCode, nextValue) >
-        this.state.potentialAbility
+      this.overallWith(input.attributeCode, nextValue) > ceiling
     ) {
       nextValue -= 1;
     }
@@ -200,6 +220,27 @@ export class Player {
       worldDate: input.worldDate,
       rulesetVersion: input.rulesetVersion,
     });
+  }
+
+  /** O valor atual de um atributo (para o accrual somar seu delta). */
+  public attributeValue(code: PlayerAttributeCode): number | null {
+    return this.state.attributes[code];
+  }
+
+  /**
+   * Fixa a linha de base na habilidade atual (R-216).
+   *
+   * Chamada UMA vez na virada de temporada, depois de aplicado o accrual: a
+   * margem de crescimento da próxima temporada passa a ser medida daqui. É o que
+   * faz a estrutura ruim ATRASAR em vez de limitar para sempre — a cada virada o
+   * jogador recomeça a corrida do ponto a que chegou.
+   */
+  public rebaseline(): void {
+    this.state = {
+      ...this.state,
+      baselineAbility: this.state.currentAbility,
+      version: this.state.version + 1,
+    };
   }
 
   public snapshot(): PlayerLifecycleSnapshot {

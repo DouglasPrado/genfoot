@@ -28,6 +28,14 @@ interface OnboardingClub {
   readonly status: string;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
+  /**
+   * A identidade visual do período vigente (R-211). Anulável porque a coluna é:
+   * mundo semeado antes da R-211 tem clube sem cara, e a lista cai no
+   * placeholder em vez de renderizar escudo inventado no cliente.
+   */
+  readonly crestTemplateId: string | null;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
   /** `null` = IA. Clube com gestor não entra na lista (R-180). */
   readonly manager: { readonly accountId: string; readonly name: string } | null;
   /** Reservado por alguém que ainda decide (R-25). Aparece, mas bloqueado. */
@@ -41,8 +49,11 @@ import {
   submitTrackedCommand,
   type TrackedCommandResult,
 } from "@/lib/command-orchestrator";
+import { ClubCrest } from "@/screens/club/customization/crest";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useWorldId, useWorldQuery, useWorldsList } from "@/lib/world";
+import { useWorldSelection } from "@/lib/world-selection";
+import { WorldList } from "./world-list";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 import {
   addWorldDays,
@@ -101,6 +112,8 @@ const STEP_ORDER = [
 /** GP-001: entrada real no mundo e ativação do controle de clube. */
 export function Onboarding() {
   const worldId = useWorldId();
+  const worldSelection = useWorldSelection();
+  const worldsList = useWorldsList();
   const { client, session, status, contractVersion } = useSession();
   const worldQuery = useWorldQuery<WorldProjection>("world");
   const identityQuery =
@@ -172,7 +185,11 @@ export function Onboarding() {
       payload: Record<string, unknown>,
       idempotencyKey: string,
     ) => {
-      if (client === null || contractVersion === null) return;
+      // `worldId` nulo aqui é inalcançável: sem mundo escolhido a tela é a
+      // LISTA, e nenhum destes commands tem botão. O guarda existe para o tipo
+      // dizer a verdade em vez de um `!` que esconde a suposição.
+      if (client === null || contractVersion === null || worldId === null)
+        return;
       const correlationId = `mobile:${idempotencyKey}`;
       setSubmittedStep(step.kind);
       setTracking({
@@ -317,6 +334,42 @@ export function Onboarding() {
   // onboarding — a barra fica em zero em vez de fingir progresso.
   const stepIndex = STEP_ORDER.indexOf(step.kind as (typeof STEP_ORDER)[number]);
 
+  /**
+   * Sem mundo escolhido, a tela é a LISTA (R-208) — não há onboarding a fazer
+   * antes de saber em que mundo. Vem antes de tudo: as demais queries são
+   * escopadas num mundo, e sem ele todas ficariam presas em `loading`.
+   */
+  if (!worldSelection.loading && worldSelection.worldId === null) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        {/*
+          `flex: 1` obrigatório: `styles.content` é contentContainerStyle de
+          ScrollView (só padding/gap). Num View comum ele encolhe para o
+          conteúdo, e a ScrollView da lista, com `flex: 1` dentro de um pai sem
+          altura, renderiza com altura ZERO — a tela aparecia vazia.
+        */}
+        <View style={[styles.content, styles.listaCheia]}>
+          <View style={styles.brand}>
+            <View style={styles.brandIcon}>
+              <Icon name="shield" size={28} color={color.primary} />
+            </View>
+            <View>
+              <Text style={styles.eyebrow}>GRINTA · ESCOLHA O MUNDO</Text>
+              <Text style={styles.heading}>ONDE VOCÊ VAI JOGAR</Text>
+            </View>
+          </View>
+          <WorldList
+            worlds={worldsList.worlds}
+            state={worldsList.state}
+            authenticated={accountId !== null}
+            onSelect={worldSelection.selectWorld}
+            onRetry={worldsList.refetch}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -385,11 +438,26 @@ export function Onboarding() {
                         : `Selecionar ${club.name}`
                     }
                   >
-                    <View style={styles.clubCrest}>
-                      <Text style={styles.clubInitial}>
-                        {club.shortCode}
-                      </Text>
-                    </View>
+                    {club.crestTemplateId !== null &&
+                    club.primaryColor !== null &&
+                    club.secondaryColor !== null ? (
+                      <ClubCrest
+                        templateId={club.crestTemplateId}
+                        primary={club.primaryColor}
+                        secondary={club.secondaryColor}
+                        tertiary={null}
+                        letter={club.name.slice(0, 1).toUpperCase()}
+                        size={46}
+                      />
+                    ) : (
+                      // Sem identidade no dado, o placeholder fica. Desenhar um
+                      // escudo com cor sorteada aqui seria o cliente inventando
+                      // fato do mundo (§6) — e ele mudaria quando a gênese
+                      // atribuísse a identidade de verdade.
+                      <View style={styles.clubCrest}>
+                        <Text style={styles.clubInitial}>{club.shortCode}</Text>
+                      </View>
+                    )}
                     <View style={styles.clubInfo}>
                       <Text style={styles.clubName}>{club.name}</Text>
                       <Text style={styles.clubMeta}>
@@ -462,6 +530,8 @@ export function Onboarding() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: color.background },
   content: { padding: space.lg, gap: space.lg, paddingBottom: space.xl2 },
+  /** Ocupa a tela: a lista de mundos rola dentro, em vez de colapsar em zero. */
+  listaCheia: { flex: 1 },
   brand: { flexDirection: "row", alignItems: "center", gap: space.md },
   brandIcon: {
     width: 56,

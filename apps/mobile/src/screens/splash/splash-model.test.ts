@@ -44,7 +44,47 @@ describe("deriveSplashDecision", () => {
     clientContractVersion: "v1",
     hasActiveControl: true as boolean | null,
     hasAccount: true as boolean | null,
+    hasWorld: true as boolean | null,
   };
+
+  describe("sem mundo escolhido (R-208)", () => {
+    it("vai à lista de mundos sem esperar a identidade", () => {
+      // O impasse que isto resolve: a identidade é escopada em MUNDO, e sem
+      // mundo ela nunca resolve. Esperar por ela aqui prendia o app em
+      // "carregando" para sempre — o mundo vem da lista, e a lista está no
+      // onboarding, que só se alcança depois desta decisão.
+      expect(
+        deriveSplashDecision({
+          ...base,
+          hasWorld: false,
+          hasActiveControl: null,
+        }),
+      ).toEqual({ kind: "route", to: "/onboarding" });
+    });
+
+    it("espera enquanto a escolha persistida ainda está sendo lida", () => {
+      // `null` = o disco não respondeu ainda. Rotear agora mandaria à lista
+      // quem já tinha mundo escolhido, num piscar.
+      expect(
+        deriveSplashDecision({ ...base, hasWorld: null }),
+      ).toEqual({ kind: "loading" });
+    });
+
+    it("login vem antes do mundo: sem conta, vai ao login", () => {
+      expect(
+        deriveSplashDecision({ ...base, hasAccount: false, hasWorld: false }),
+      ).toEqual({ kind: "route", to: "/entrar" });
+    });
+
+    it("contrato incompatível vence a falta de mundo", () => {
+      const decisao = deriveSplashDecision({
+        ...base,
+        hasWorld: false,
+        serverContractVersion: "v2",
+      });
+      expect(decisao.kind).toBe("upgrade-required");
+    });
+  });
 
   it("carrega enquanto a sessão está conectando", () => {
     expect(deriveSplashDecision({ ...base, status: "connecting" })).toEqual({

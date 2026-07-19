@@ -55,7 +55,10 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
     }
     const names = await this.clubNames(gameWorldId, [...ids]);
 
-    const toItem = (m: (typeof finished)[number], isFinished: boolean): MatchListItem => ({
+    const toItem = (
+      m: (typeof finished)[number],
+      isFinished: boolean,
+    ): MatchListItem => ({
       matchId: m.id,
       roundNumber: m.roundNumber ?? 0,
       homeClubId: m.homeClubId,
@@ -64,6 +67,12 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
       awayClubName: names.get(m.awayClubId)?.name ?? "—",
       homeShortCode: names.get(m.homeClubId)?.shortCode ?? "",
       awayShortCode: names.get(m.awayClubId)?.shortCode ?? "",
+      homeClubPrimaryColor: names.get(m.homeClubId)?.primaryColor ?? null,
+      homeClubSecondaryColor: names.get(m.homeClubId)?.secondaryColor ?? null,
+      homeClubCrestTemplateId: names.get(m.homeClubId)?.crestTemplateId ?? null,
+      awayClubPrimaryColor: names.get(m.awayClubId)?.primaryColor ?? null,
+      awayClubSecondaryColor: names.get(m.awayClubId)?.secondaryColor ?? null,
+      awayClubCrestTemplateId: names.get(m.awayClubId)?.crestTemplateId ?? null,
       homeGoals: isFinished ? m.homeGoals : null,
       awayGoals: isFinished ? m.awayGoals : null,
       finished: isFinished,
@@ -86,7 +95,11 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
         events: {
           orderBy: { eventSequence: "asc" },
           include: {
-            player: { include: { person: { select: { firstName: true, lastName: true } } } },
+            player: {
+              include: {
+                person: { select: { firstName: true, lastName: true } },
+              },
+            },
           },
         },
       },
@@ -97,7 +110,8 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
       match.homeClubId,
       match.awayClubId,
     ]);
-    const finished = match.runtimeStatus === "FINISHED" || match.runtimeStatus === "PROCESSED";
+    const finished =
+      match.runtimeStatus === "FINISHED" || match.runtimeStatus === "PROCESSED";
 
     const events: MatchFeedEvent[] = match.events.map((e) => ({
       sequence: e.eventSequence,
@@ -130,13 +144,44 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
   private async clubNames(
     gameWorldId: GameWorldId,
     clubIds: readonly string[],
-  ): Promise<Map<string, { name: string; shortCode: string }>> {
+  ): Promise<
+    Map<
+      string,
+      {
+        name: string;
+        shortCode: string;
+        primaryColor: string | null;
+        secondaryColor: string | null;
+        crestTemplateId: string | null;
+      }
+    >
+  > {
     const periods = await this.client.clubIdentityPeriod.findMany({
-      where: { gameWorldId, clubId: { in: [...clubIds] }, effectiveThrough: null },
-      select: { clubId: true, name: true, shortCode: true },
+      where: {
+        gameWorldId,
+        clubId: { in: [...clubIds] },
+        effectiveThrough: null,
+      },
+      select: {
+        clubId: true,
+        name: true,
+        shortCode: true,
+        primaryColor: true,
+        secondaryColor: true,
+        crestTemplateId: true,
+      },
     });
     return new Map(
-      periods.map((p) => [p.clubId, { name: p.name, shortCode: p.shortCode }]),
+      periods.map((period) => [
+        period.clubId,
+        {
+          name: period.name,
+          shortCode: period.shortCode,
+          primaryColor: period.primaryColor,
+          secondaryColor: period.secondaryColor,
+          crestTemplateId: period.crestTemplateId,
+        },
+      ]),
     );
   }
 }

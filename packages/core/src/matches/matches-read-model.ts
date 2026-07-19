@@ -16,6 +16,12 @@ export interface MatchListItem {
   readonly awayClubName: string;
   readonly homeShortCode: string;
   readonly awayShortCode: string;
+  readonly homeClubPrimaryColor: string | null;
+  readonly homeClubSecondaryColor: string | null;
+  readonly homeClubCrestTemplateId: string | null;
+  readonly awayClubPrimaryColor: string | null;
+  readonly awayClubSecondaryColor: string | null;
+  readonly awayClubCrestTemplateId: string | null;
   /** Placar; `null` quando ainda não jogaram (não é 0×0 empate). */
   readonly homeGoals: number | null;
   readonly awayGoals: number | null;

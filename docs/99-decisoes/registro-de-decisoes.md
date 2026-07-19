@@ -520,6 +520,39 @@ A liga era cravada na gênese (16 clubes, 30 rodadas, hardcoded). A spec §2 já
 
 A definição completa e as pendências vivem em [`competicoes-autoradas-2026-07-18.md`](competicoes-autoradas-2026-07-18.md).
 
+### R-208..R-210 — Seleção de mundo é lista viva, não constante de build · RATIFICADAS em 2026-07-19
+
+O mobile nunca selecionou mundo: `useWorldId()` (`apps/mobile/src/lib/world.ts:17-19`) devolvia uma constante de build (`EXPO_PUBLIC_WORLD_ID`), com UUID hardcoded de fallback em `config.ts:27` apontando para um mundo já inexistente. A tela `M-WORLD-PICK` e seu contrato (`GetAvailableWorlds`/`GetEntryEligibility`) estavam especificados desde o início e **nunca foram implementados** — a constante era o sintoma dessa ausência.
+
+- **R-208 — Seleção de mundo é lista viva, não constante de build.** O mundo ativo vem de escolha do usuário sobre lista servida pela API. `EXPO_PUBLIC_WORLD_ID` e o fallback hardcoded morrem. Sem mundo selecionado o app não consulta nada — a ausência leva a `M-WORLD-PICK`, não a dado fictício.
+- **R-209 — A vitrine de mundos é pública; a elegibilidade não.** `GetAvailableWorlds` responde sem autenticação, só com dados públicos (nome, temporada, tipo, nº de clubes, vagas). **Estende** o doc da tela, que previa só acesso pós-cadastro. Nada derivado de identidade vaza na rota pública.
+- **R-210 — Elegibilidade é pós-login e nunca revela a fórmula.** `GetEntryEligibility` exige sessão; o motivo do bloqueio é geral (`ENTRY_ELIGIBILITY_DENIED`/`ACCOUNT_COOLDOWN_ACTIVE`/`RELATED_ACCOUNT_BLOCKED`/`CLUB_ALREADY_CONTROLLED`), nunca a regra do anti-abuso (§2.9). Preserva INV-19.
+
+A definição completa e as pendências vivem em [`selecao-de-mundo-2026-07-19.md`](selecao-de-mundo-2026-07-19.md).
+
+### R-212..R-215 — Treino e base: o schema cede à doc · RATIFICADAS em 2026-07-19
+
+Treino está integralmente especificado (fórmula em `02-sistema-de-jogadores.md:307-322`, R-02/R-12/R-13/R-113) e integralmente **não implementado** — zero linhas. Base está em ~20%. Ao começar, quatro pontos onde o schema contradiz a doc; quem cede é o schema.
+
+- **R-212 — Accrual é por `attributeCode`, não por grupo.** As colunas `technicalGain`/`physicalGain`/`mentalGain` de `TrainingPlayerEntry` contradizem R-188/R-179 ("com 4 grupos, treino não tem sobre o que operar"). Viram **projeção de leitura** derivada do accrual por `rollupAttributes`; desenvolvimento nunca se escreve nelas.
+- **R-213 — Potencial em três camadas.** `Player.potentialAbility` (Int único) vira o **natural**; **aproveitável** e **funcional** são derivados (§4:203-213). O clamp de `applyAttributeChange` passa a comparar contra o aproveitável — é ele que a R-12 limita (40/55/70/85/95%).
+- **R-214 — `TrainingPlan` ganha `version`.** A rastreabilidade exige `expectedVersion` e a INV-31 o cobre, mas a coluna não existia: concorrência otimista declarada e não implementável.
+- **R-215 — Nomes de command do golden path se alinham ao registry real.** `golden-path-registry.ts:43,49` declarava `player:set-training`/`player:generate-youth`/`player:promote-youth` — nenhum existe. Passa a `training:set-plan`, `youth:generate-class`, `youth:promote-player`, e o registry **não cita command que não existe**.
+
+- **R-216 — A linha de base do desenvolvimento é fixada na virada de temporada.** `Player.baselineAbility` é o ponto de onde a margem de crescimento é medida; o aproveitável é `base + (natural − base) × rendimento` e o clamp trava nele. Estrutura ruim **atrasa**, não limita para sempre: a cada virada a margem é remedida, então talento em clube pequeno não morre ali — demora. Derruba a trava B-07.
+
+A definição completa e as pendências vivem em [`treino-e-base-2026-07-19.md`](treino-e-base-2026-07-19.md).
+
+### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
+
+Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
+
+- **R-211 — A gênese atribui identidade visual determinística por `(seed, índice)`.** `generateClubVisualIdentity` (`packages/core/src/clubs/visual-identity-generator.ts`) sorteia template de escudo, kits de casa/fora e três cores distintas de uma **paleta canônica fechada** — sorteio livre em RGB produz bege e pastel lavado, que num escudo de 42px viram borrão. Stream isolada por contexto (`club-visual-identity:<índice>`): mudar a paleta não altera o elenco gerado.
+
+Mora no **domínio**, não no cliente: se o mobile sorteasse cores localmente, dois aparelhos mostrariam escudos diferentes para o mesmo clube e o replay não reproduziria o que o jogador viu. O cliente renderiza o SVG pelo `templateId`; quem decide é o mundo.
+
+Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis e o jogador sobrescreve ao personalizar (BC-003). Mundo semeado antes da R-211 mantém clube sem identidade, e a tela cai no placeholder em vez de inventar escudo no cliente.
+
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-207 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-216 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).

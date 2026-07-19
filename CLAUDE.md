@@ -176,7 +176,7 @@ Quando o usuário pede explicitamente um **loop autônomo** (`/loop`, "roda sozi
 
 > ⚠️ Só o item **Persistência** foi reverificado em 2026-07-18. Os demais são de 2026-07-16 e podem ter envelhecido — confirme no código antes de citar qualquer número daqui.
 
-- **Backend/domínio:** os 12 bounded contexts, o kernel, eventing/sagas, automação e calibração estão implementados e testados; a API expõe ~148 commands. Gate verde (445 testes / 92 arquivos).
+- **Backend/domínio:** a API expõe **36 commands** (`registeredCommandTypes()`, verificado 2026-07-19) — não os "~148" que este doc afirmava, número anterior à R-175, que removeu 12 contextos de mega-agregado. **12 dos 16 golden paths citam commands que ainda não existem** (partida, mercado inteiro, financeiro, infraestrutura, narrativa): o `GOLDEN_PATH_REGISTRY` é mapa do jogo projetado, não do construído. A dívida está declarada e travada por catraca em `apps/api/test/golden-path-commands.test.ts` — dívida nova quebra o teste.
 - **Persistência:** **Postgres via Prisma, materializado** (verificado 2026-07-18). `packages/persistence/src/` tem 50 arquivos `prisma-*.ts` (repositórios, read models, units of work); `prisma/schema.prisma` tem 83 models e `prisma/migrations/` tem 28 migrations. O adapter JSON **não existe mais** — `json-world-repository.ts` foi removido; qualquer doc que o cite está desatualizado. Detalhes de conexão e reset no §9.
 - **Cliente mobile:** ~11 de 114 telas têm alguma UI (quase todas parciais). Mapa honesto no artefato de cobertura (§5.1).
 - **Admin:** 7 páginas cobrindo os fluxos AF-00…AF-09.

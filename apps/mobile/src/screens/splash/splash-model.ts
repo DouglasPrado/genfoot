@@ -25,6 +25,8 @@ export interface SplashInput {
   readonly clientContractVersion: string;
   /** null enquanto a projeção de identidade não resolveu. */
   readonly hasActiveControl: boolean | null;
+  /** Mundo escolhido? `null` = a escolha persistida ainda está sendo lida. */
+  readonly hasWorld: boolean | null;
   /** Conta do provedor conectada neste aparelho; null enquanto carrega. */
   readonly hasAccount: boolean | null;
   /** A projeção de identidade falhou (erro/offline), mesmo com sessão aberta. */
@@ -72,6 +74,7 @@ export function deriveSplashDecision(input: SplashInput): SplashDecision {
     serverContractVersion,
     clientContractVersion,
     hasActiveControl,
+    hasWorld,
     hasAccount,
     identityFailed = false,
   } = input;
@@ -94,6 +97,20 @@ export function deriveSplashDecision(input: SplashInput): SplashDecision {
   // não se olha clube.
   if (hasAccount === null) return { kind: "loading" };
   if (!hasAccount) return { kind: "route", to: "/entrar" };
+
+  /**
+   * O MUNDO vem antes da identidade do jogo (R-208).
+   *
+   * Sem esta checagem o app trava: `hasActiveControl` sai de uma query escopada
+   * em mundo, que sem mundo escolhido nunca resolve — e o mundo se escolhe na
+   * lista, que vive no onboarding, que só se alcança depois desta decisão. O
+   * splash esperava para sempre por um dado que dependia dele ter decidido.
+   *
+   * `null` é "ainda lendo a escolha do disco", não "não tem": rotear nesse
+   * instante mandaria à lista quem já escolheu, num piscar.
+   */
+  if (hasWorld === null) return { kind: "loading" };
+  if (!hasWorld) return { kind: "route", to: "/onboarding" };
 
   if (identityFailed) return { kind: "network-error" };
   if (hasActiveControl === null) return { kind: "loading" };

@@ -1,8 +1,11 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
+import type { RulesetVersion } from "@grinta/shared";
 
 import { Squad } from "../clubs/squad.js";
 import type { SquadRepository } from "../clubs/squad-repository.js";
 import { MAX_SQUAD_SIZE } from "../genesis/player-generation.js";
+import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
+import type { YouthPromotedEvent } from "../players/player-lifecycle-types.js";
 
 /**
  * O UnitOfWork da promoção (C8): os dois elencos — base e profissional — no MESMO
@@ -25,6 +28,13 @@ export interface PromoteYouthInput {
   readonly clubId: string;
   readonly playerId: string;
   readonly occurredOn: string;
+  /** Versão do ruleset no momento — carimbada no evento. Default de dev. */
+  readonly rulesetVersion?: RulesetVersion;
+}
+
+export interface PromoteYouthResult {
+  readonly playerId: string;
+  readonly event: YouthPromotedEvent;
 }
 
 /**
@@ -37,7 +47,7 @@ export class PromoteYouthPlayer {
 
   public execute(
     input: PromoteYouthInput,
-  ): Promise<Result<{ playerId: string }, DomainError>> {
+  ): Promise<Result<PromoteYouthResult, DomainError>> {
     return run(this.unitOfWork, async (repos) => {
       const worldId = input.gameWorldId as never;
       const clubId = input.clubId as never;
@@ -57,6 +67,25 @@ export class PromoteYouthPlayer {
           new DomainError(
             "PLAYER_NOT_IN_YOUTH",
             "O jogador não está na base deste clube.",
+          ),
+        );
+      }
+
+      // Gate específico da rastreabilidade §30, checado ANTES de mexer nos
+      // elencos: o agregado recusaria com `SQUAD_CAPACITY_EXCEEDED` genérico,
+      // mas a tela (M-PROMOTE) precisa do código próprio para orientar o gestor
+      // a abrir vaga antes (vender/emprestar).
+      //
+      // Gateia no teto TOTAL (MAX_SQUAD_SIZE=250, R-193). Um limite de elenco
+      // PRINCIPAL menor — o que de fato apertaria a promoção — não está definido
+      // no domínio; é decisão de produto pendente. Enquanto isso o gate existe e
+      // é correto, só raramente dispara.
+      if (firstTeam.memberships.length >= MAX_SQUAD_SIZE) {
+        return fail(
+          new DomainError(
+            "SQUAD_SIZE_LIMIT_EXCEEDED",
+            "O elenco profissional está cheio; abra vaga antes de promover.",
+            { limit: MAX_SQUAD_SIZE },
           ),
         );
       }
@@ -84,7 +113,24 @@ export class PromoteYouthPlayer {
       await repos.squads.saveSquad(loadedYouth.value.snapshot(), youthSquad.version);
       await repos.squads.saveSquad(loadedFirst.value.snapshot(), firstTeam.version);
 
-      return succeed({ playerId: input.playerId });
+      // Idempotência por (jogador, data): promover o mesmo jovem no mesmo dia do
+      // mundo dá a mesma chave, então o efeito oficial não duplica (INV-37).
+      const idempotencyKey = `youth-promote:${input.playerId}:${input.occurredOn}`;
+      const event: YouthPromotedEvent = {
+        id: deterministicUuidV7({
+          worldSeed: input.gameWorldId,
+          context: idempotencyKey,
+          timestampMilliseconds: 0,
+        }) as never,
+        type: "YouthPromoted",
+        gameWorldId: input.gameWorldId as never,
+        playerId: input.playerId as never,
+        worldDate: input.occurredOn,
+        rulesetVersion: (input.rulesetVersion ?? "1.0.0") as RulesetVersion,
+        idempotencyKey,
+      };
+
+      return succeed({ playerId: input.playerId, event });
     });
   }
 }

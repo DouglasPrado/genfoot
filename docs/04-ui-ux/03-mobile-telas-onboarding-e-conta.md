@@ -48,11 +48,11 @@ Telas de autenticação, entrada no mundo, escolha/criação de clube, revisão 
 ## `M-WORLD-PICK` — Seleção de mundo / tipo de liga
 
 - **Objetivo:** escolher em qual mundo jogar.
-- **Como se chega:** pós-cadastro; usuário sem clube; "entrar em outro mundo".
+- **Como se chega:** **sem login** (vitrine, R-209); pós-cadastro; usuário sem clube; "entrar em outro mundo".
 - **Layout:** lista de mundos + filtro por **tipo de liga**.
-- **Componentes e dados:** por mundo: nome, temporada atual, tipo (**Liga nova** / **Em andamento** / **Temática/especial**), nº de clubes, vagas, elegibilidade do usuário. `Chip` de tipo; `Badge` de vagas.
-- **Ações:** **Selecionar mundo** → verifica elegibilidade/vagas → `M-CLUB-PICK` ou `M-CLUB-CREATE`.
-- **Estados:** vazio ("nenhum mundo disponível"); **bloqueado** por cooldown/conta relacionada com motivo geral; *loading* da lista (cursor).
+- **Componentes e dados:** por mundo: nome, temporada atual, tipo (**Liga nova** / **Em andamento** / **Temática/especial**), nº de clubes, vagas — **públicos, visíveis sem login** (`GetAvailableWorlds`, R-209). A **elegibilidade do usuário** só aparece autenticado (`GetEntryEligibility`, R-210); deslogado, o card não exibe selo nem motivo. `Chip` de tipo; `Badge` de vagas.
+- **Ações:** **Selecionar mundo** → deslogado, leva a `M-LOGIN`/`M-SIGNUP`; autenticado, verifica elegibilidade/vagas → `M-CLUB-PICK` ou `M-CLUB-CREATE`.
+- **Estados:** vazio ("nenhum mundo disponível"); **deslogado** (lista pública, sem selo de elegibilidade); **bloqueado** por cooldown/conta relacionada com motivo geral (só autenticado); *loading* da lista (cursor).
 - **Referências:** [`09-anti-abuso §2.9`](../01-game-design/09-anti-abuso-e-onboarding.md); [`03-multiplayer-e-mundos`](../02-tecnico/03-multiplayer-e-mundos.md). **Fechado:** tipos e limites de ligas temáticas definidos em R-55.
 
 ## `M-CLUB-PICK` — Assumir clube existente

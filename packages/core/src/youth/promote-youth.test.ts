@@ -119,4 +119,47 @@ describe("PromoteYouthPlayer — subir da base ao profissional (C8)", () => {
       world.squads.get(SquadCategory.FIRST_TEAM)!.memberships,
     ).toHaveLength(2);
   });
+
+  it("recusa com SQUAD_SIZE_LIMIT_EXCEEDED quando o profissional está cheio (§30)", () => {
+    // O código específico da rastreabilidade §30, não o genérico do agregado:
+    // a tela precisa distinguir "elenco cheio" de outras recusas para orientar
+    // o gestor (vender/emprestar antes de promover).
+    const world = new FakeWorld();
+    // Enche até o teto DEFINIDO (MAX_SQUAD_SIZE=250, R-193). Um limite de elenco
+    // PRINCIPAL menor não existe no código — é decisão pendente (ver relatório).
+    const cheio = Array.from({ length: 250 }, (_, i) => `p${i}`);
+    world.squads.set(
+      SquadCategory.YOUTH_ACADEMY,
+      squad("youth-1", SquadCategory.YOUTH_ACADEMY, [JOVEM]),
+    );
+    world.squads.set(
+      SquadCategory.FIRST_TEAM,
+      squad("first-1", SquadCategory.FIRST_TEAM, cheio),
+    );
+    return new PromoteYouthPlayer(fakeUnitOfWork(world))
+      .execute(input)
+      .then((result) => {
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.error.code).toBe("SQUAD_SIZE_LIMIT_EXCEEDED");
+        // a base não perdeu o jovem — recusa é atômica
+        expect(
+          world.squads.get(SquadCategory.YOUTH_ACADEMY)!.memberships,
+        ).toHaveLength(1);
+      });
+  });
+
+  it("emite YouthPromoted com a chave de idempotência (§30, INV-37)", async () => {
+    const world = arrange();
+    const result = await new PromoteYouthPlayer(fakeUnitOfWork(world)).execute({
+      ...input,
+      rulesetVersion: "1.0.0" as never,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.event.type).toBe("YouthPromoted");
+    expect(result.value.event.playerId).toBe(JOVEM);
+    // idempotência por (jogador, data): repetir a promoção no mesmo dia dá a
+    // mesma chave — o efeito oficial não duplica.
+    expect(result.value.event.idempotencyKey).toContain(JOVEM);
+  });
 });

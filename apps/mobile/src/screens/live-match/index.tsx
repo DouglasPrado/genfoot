@@ -26,7 +26,7 @@ import {
 import { useMobileRealtime } from "@/lib/realtime";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldId, useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 import {
   COACH_ACTIONS,
@@ -68,7 +68,7 @@ interface MatchesProjection {
 
 /** GP-007: acompanhamento de partidas exclusivamente pelo snapshot oficial. */
 export function LiveMatch() {
-  const worldId = useWorldId();
+  const worldId = useRequiredWorldId();
   const { client, contractVersion, status } = useSession();
   const worldQuery = useWorldQuery<{ readonly currentDate: string }>("world");
   const matchQuery = useWorldQuery<MatchesProjection>("matches-detail");

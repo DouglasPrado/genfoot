@@ -1,3 +1,4 @@
+import type { PlayerDevelopmentReadModel } from "@grinta/persistence";
 import type {
   ClubReadModel,
   CompetitionReadModel,
@@ -10,6 +11,7 @@ import type {
   MarketReadModel,
   MatchesReadModel,
   WorldClockRepository,
+  TrainingPlanRepository,
   SquadReadModel,
   WorldReadModel,
 } from "@grinta/core";
@@ -32,6 +34,7 @@ import { parseGameWorldId } from "@grinta/shared";
 import type { Request } from "express";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import { Public } from "../auth/public.decorator.js";
 import { ApiException } from "../common/standard-error.js";
 import {
   GAME_WORLD_REPOSITORY,
@@ -43,6 +46,8 @@ import {
   COMPETITION_READ_MODEL,
   MATCHES_READ_MODEL,
   WORLD_CLOCK_REPOSITORY,
+  TRAINING_PLAN_REPOSITORY,
+  PLAYER_DEVELOPMENT_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
   NARRATIVE_READ_MODEL,
@@ -95,6 +100,10 @@ export class QueriesController {
     private readonly matchesReadModel: MatchesReadModel,
     @Inject(WORLD_CLOCK_REPOSITORY)
     private readonly worldClock: WorldClockRepository,
+    @Inject(TRAINING_PLAN_REPOSITORY)
+    private readonly trainingPlanRepository: TrainingPlanRepository,
+    @Inject(PLAYER_DEVELOPMENT_READ_MODEL)
+    private readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel,
     @Inject(MARKET_READ_MODEL)
     private readonly marketReadModel: MarketReadModel,
     @Inject(FANBASE_READ_MODEL)
@@ -129,7 +138,20 @@ export class QueriesController {
    * Vem ANTES de `@Get(":worldId")` de propósito: o Nest casa na ordem de
    * declaração, e depois dela "worlds" seria lido como um `worldId` inválido.
    */
-  @ApiOperation({ summary: "Lista os mundos existentes" })
+  /**
+   * PÚBLICA (R-209): a vitrine de mundos responde sem token. Quem abre o app
+   * pela primeira vez vê o jogo existindo antes de criar conta.
+   *
+   * Seguro porque nada aqui deriva de identidade: `listWorlds` recebe
+   * `accountId` da SESSÃO, que sem token é `null`, e `myParticipation` sai
+   * `null` para todos. A elegibilidade continua exigindo login (R-210).
+   *
+   * Esta rota não é world-scoped, então não perde autorização de escopo ao
+   * virar pública — `enforceWorldScope` é no-op sem sessão, e replicar
+   * `@Public()` numa rota `:worldId` abriria os dados de um mundo a qualquer um.
+   */
+  @ApiOperation({ summary: "Lista os mundos existentes (público)" })
+  @Public()
   @Get()
   async list(
     @Req() request: Request & AuthenticatedRequest,
@@ -278,6 +300,8 @@ export class QueriesController {
         competitionReadModel: this.competitionReadModel,
         matchesReadModel: this.matchesReadModel,
         worldClock: this.worldClock,
+        trainingPlanRepository: this.trainingPlanRepository,
+        playerDevelopmentReadModel: this.playerDevelopmentReadModel,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,
         narrativeReadModel: this.narrativeReadModel,

@@ -48,6 +48,7 @@ export * from "./clubs/club-repository.js";
 export * from "./clubs/club-types.js";
 export * from "./clubs/club-bootstrap.js";
 export * from "./clubs/visual-identity-catalog.js";
+export * from "./clubs/visual-identity-generator.js";
 export * from "./clubs/squad.js";
 export * from "./clubs/squad-repository.js";
 export * from "./clubs/infrastructure-project.js";
@@ -68,6 +69,7 @@ export * from "./matches/match-kernel.js";
 export * from "./matches/match-types.js";
 // O grid canônico do GDD §2 (R-188) e a derivação do overall (R-09).
 export * from "./players/player-attributes.js";
+export * from "./players/potential-layers.js";
 export * from "./players/player-repository.js";
 export * from "./players/squad-read-model.js";
 export * from "./players/player.js";
@@ -148,3 +150,13 @@ export * from "./automation/save-automation.js";
 export * from "./automation/run-autopilot.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";
+
+// Treino — a fórmula de evolução do §6 (R-212).
+export * from "./training/development-gain.js";
+export * from "./training/training-types.js";
+export * from "./training/set-training-plan.js";
+export * from "./training/training-accrual.js";
+export * from "./training/apply-accruals.js";
+export * from "./training/accrue-club-training.js";
+export * from "./training/apply-season-accruals.js";
+export * from "./players/player-development-view.js";

@@ -17,14 +17,17 @@ export const API_BASE_URL: string =
  */
 export const DEV_SUBJECT = "mobile-dev-player";
 
-/**
- * Mundo padrão consultado pelo app. Configurável via EXPO_PUBLIC_WORLD_ID.
- * O default aponta para o mundo demo semeado localmente (create → genesis →
- * activate; ver apps/api/scripts/seed-demo-world.mjs). Quando o mundo não
- * existe/está indisponível, as telas caem no estado apropriado (sem dado vivo).
- */
-export const DEFAULT_WORLD_ID: string =
-  process.env.EXPO_PUBLIC_WORLD_ID ?? "019f65eb-9ba4-707d-aa7c-426ceb5ea41b";
+// `DEFAULT_WORLD_ID` morreu com a R-208.
+//
+// Era `process.env.EXPO_PUBLIC_WORLD_ID ?? "019f65eb-..."` — um mundo fixado no
+// BUILD, com UUID hardcoded de fallback apontando para um mundo que havia muito
+// não existia. Quando o mundo do env sumia do banco, o app consultava o fantasma
+// em silêncio e a tela quebrava sem dizer por quê: o fallback silencioso que o
+// §5 do CLAUDE.md proíbe.
+//
+// O mundo agora é ESCOLHA do jogador sobre a lista que a API serve, persistida
+// em `lib/world-selection.tsx`. Sem escolha, `useWorldId()` devolve `null` e o
+// app não consulta nada — a ausência leva à lista, não a um chute.
 
 /** Clube controlado no mundo demo; a seleção persistida da conta terá precedência. */
 export const MANAGED_CLUB_ID: string | null =

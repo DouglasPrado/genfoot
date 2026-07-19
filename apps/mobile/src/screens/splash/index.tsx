@@ -9,6 +9,7 @@ import { useAuth } from "@clerk/expo";
 import { WorldLoading } from "@/components/world-loading";
 import { useSession } from "@/lib/session";
 import { useWorldQuery } from "@/lib/world";
+import { useWorldSelection } from "@/lib/world-selection";
 import { color, display, fontSize, fontWeight, space } from "@/theme";
 import type { MobileIdentityProjection } from "@/screens/onboarding/onboarding-model";
 import { bootSteps } from "./boot-model";
@@ -24,6 +25,7 @@ const CLIENT_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
 export function SplashScreen() {
   const router = useRouter();
   const { session, status, contractVersion, retry } = useSession();
+  const worldSelection = useWorldSelection();
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const identityQuery = useWorldQuery<MobileIdentityProjection>(
     session === null ? null : "identity-detail",
@@ -51,6 +53,8 @@ export function SplashScreen() {
     serverContractVersion: contractVersion,
     clientContractVersion: CONTRACT_VERSION,
     hasActiveControl,
+    // `loading` do disco vira `null`: "ainda não sei", não "não tem".
+    hasWorld: worldSelection.loading ? null : worldSelection.worldId !== null,
     // null enquanto o Clerk carrega: decidir agora mandaria ao login quem já
     // tem conta, num piscar.
     hasAccount: clerkLoaded ? isSignedIn : null,

@@ -12,7 +12,9 @@ import type {
   NarrativeReadModel,
   StaffReadModel,
   InboxReadModel,
+  TrainingPlanRepository,
 } from "@grinta/core";
+import type { PlayerDevelopmentReadModel } from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
@@ -44,6 +46,9 @@ export interface QueryContext {
   readonly inboxReadModel: InboxReadModel;
   /** MUNDO-V4 — o relógio do mundo, para o admin ler a config e o próximo tick. */
   readonly worldClock: WorldClockRepository;
+  /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
+  readonly trainingPlanRepository: TrainingPlanRepository;
+  readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
 }
 
 /**
@@ -83,6 +88,44 @@ const handlers: Record<string, QueryHandler> = {
   },
   "world-clock": async ({ worldClock }, worldId) =>
     succeed(await worldClock.getClock(worldId)),
+  "training-plan": async ({ trainingPlanRepository }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
+    if (clubId === null || seasonId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "training-plan exige os parâmetros clubId e seasonId.",
+          { params: ["clubId", "seasonId"] },
+        ),
+      );
+    }
+    // `null` é resposta legítima: clube sem plano na temporada. A tela cai no
+    // estado vazio (M-TRAINING sem foco definido), não em erro.
+    const plan = await trainingPlanRepository.findByClubSeason(
+      worldId,
+      clubId,
+      seasonId,
+    );
+    return succeed({ plan });
+  },
+  "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {
+    const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
+    if (playerId === null || seasonId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "player-development exige os parâmetros playerId e seasonId.",
+          { params: ["playerId", "seasonId"] },
+        ),
+      );
+    }
+    // `null` = jogador inexistente no mundo; a tela cai no estado vazio.
+    return succeed({
+      development: await playerDevelopmentReadModel.view(worldId, playerId, seasonId),
+    });
+  },
   "match-detail": async ({ matchesReadModel }, worldId, params) => {
     const matchId = typeof params.matchId === "string" ? params.matchId : null;
     if (matchId === null) {

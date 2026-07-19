@@ -53,6 +53,12 @@ export class PrismaWorldReadModel implements WorldReadModel {
       return {
         id: row.id,
         seed: row.seed,
+        // O NOME que o admin definiu (`world:set-identity`). Anulável: mundo
+        // semeado nasce sem ele, e a tela cai no `seed`. Sem este campo a
+        // `M-WORLD-PICK` mostrava identificador técnico ("grinta-demo") ao
+        // jogador, e a listagem do admin buscava o detalhe de cada mundo só
+        // para tê-lo — N+1 requisições por uma coluna.
+        name: row.name,
         status: row.status,
         // Só a data: o domínio não conhece hora (R-177).
         currentDate: row.currentDate.toISOString().slice(0, 10),

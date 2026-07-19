@@ -7,6 +7,12 @@ import {
   PrismaLedgerReadModel,
   PrismaClubFinanceReadModel,
   PrismaCompetitionReadModel,
+  PrismaTrainingPlanRepository,
+  PrismaTrainingContextReader,
+  PrismaAccrualContextReader,
+  PrismaAccrualBufferWriter,
+  PrismaSeasonAccrualUnitOfWork,
+  PrismaPlayerDevelopmentReadModel,
   PrismaMatchesReadModel,
   PrismaMarketReadModel,
   PrismaFanbaseReadModel,
@@ -44,6 +50,12 @@ import {
   LEDGER_READ_MODEL,
   CLUB_FINANCE_READ_MODEL,
   COMPETITION_READ_MODEL,
+  TRAINING_PLAN_REPOSITORY,
+  TRAINING_CONTEXT_READER,
+  TRAINING_ACCRUAL_CONTEXT_READER,
+  TRAINING_ACCRUAL_BUFFER_WRITER,
+  SEASON_ACCRUAL_UNIT_OF_WORK,
+  PLAYER_DEVELOPMENT_READ_MODEL,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
@@ -144,6 +156,42 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaClubFinanceReadModel =>
         new PrismaClubFinanceReadModel(client),
+    },
+    {
+      provide: TRAINING_PLAN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTrainingPlanRepository =>
+        new PrismaTrainingPlanRepository(client),
+    },
+    {
+      provide: TRAINING_CONTEXT_READER,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTrainingContextReader =>
+        new PrismaTrainingContextReader(client),
+    },
+    {
+      provide: TRAINING_ACCRUAL_CONTEXT_READER,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaAccrualContextReader =>
+        new PrismaAccrualContextReader(client),
+    },
+    {
+      provide: TRAINING_ACCRUAL_BUFFER_WRITER,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaAccrualBufferWriter =>
+        new PrismaAccrualBufferWriter(client),
+    },
+    {
+      provide: SEASON_ACCRUAL_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaSeasonAccrualUnitOfWork =>
+        new PrismaSeasonAccrualUnitOfWork(client),
+    },
+    {
+      provide: PLAYER_DEVELOPMENT_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPlayerDevelopmentReadModel =>
+        new PrismaPlayerDevelopmentReadModel(client),
     },
     {
       provide: COMPETITION_READ_MODEL,
@@ -328,6 +376,12 @@ import {
     SELL_UNIT_OF_WORK,
     LIST_UNIT_OF_WORK,
     COMPETITION_UNIT_OF_WORK,
+    TRAINING_PLAN_REPOSITORY,
+    TRAINING_CONTEXT_READER,
+    TRAINING_ACCRUAL_CONTEXT_READER,
+    TRAINING_ACCRUAL_BUFFER_WRITER,
+    SEASON_ACCRUAL_UNIT_OF_WORK,
+    PLAYER_DEVELOPMENT_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
     CLUB_CONTROL_REPOSITORY,
