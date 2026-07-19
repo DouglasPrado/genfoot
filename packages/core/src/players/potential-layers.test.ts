@@ -13,12 +13,29 @@ describe("STRUCTURE_YIELD (R-12)", () => {
 });
 
 describe("derivePotentialLayers — aproveitável", () => {
+  it("mede a margem da LINHA DE BASE, não da habilidade atual (R-216)", () => {
+    // A trava B-07 era esta: medindo da habilidade atual, o teto sobe a cada
+    // ganho e converge para o natural. Da base fixa, ele trava de verdade.
+    const aoLongoDaTemporada = [50, 55, 60, 65].map(
+      (currentAbility) =>
+        derivePotentialLayers({
+          natural: 80,
+          baselineAbility: 50,
+          currentAbility,
+          structureLevel: 3,
+        }).usable,
+    );
+    expect(new Set(aoLongoDaTemporada).size).toBe(1);
+    expect(aoLongoDaTemporada[0]).toBe(71); // 50 + 30×0,70
+  });
+
   it("aplica o rendimento sobre a MARGEM, não sobre o teto", () => {
     // R-12: "potencial para evoluir 10 pontos aproveita 4 com comissão nível 1".
     // Multiplicar o teto (50×0,40=20) daria um aproveitável ABAIXO da
     // habilidade atual — o jogador regrediria por ter estrutura ruim.
     const camadas = derivePotentialLayers({
       natural: 60,
+      baselineAbility: 50,
       currentAbility: 50,
       structureLevel: 1,
     });
@@ -29,7 +46,7 @@ describe("derivePotentialLayers — aproveitável", () => {
     // 04-estrutura-do-clube-e-staff.md:258-264 — é a validação cruzada da
     // fórmula contra números que o doc publicou.
     const em = (structureLevel: number) =>
-      derivePotentialLayers({ natural: 85, currentAbility: 35, structureLevel })
+      derivePotentialLayers({ natural: 85, baselineAbility: 35, currentAbility: 35, structureLevel })
         .usable;
     expect(em(1)).toBe(55); // doc: 55–65
     expect(em(3)).toBe(70); // doc: 70–80
@@ -40,6 +57,7 @@ describe("derivePotentialLayers — aproveitável", () => {
     // Estrutura ruim atrasa a evolução; não apaga o que o jogador já é.
     const camadas = derivePotentialLayers({
       natural: 40,
+      baselineAbility: 70,
       currentAbility: 70,
       structureLevel: 1,
     });
@@ -49,6 +67,7 @@ describe("derivePotentialLayers — aproveitável", () => {
   it("nunca ultrapassa o natural, nem com estrutura máxima", () => {
     const camadas = derivePotentialLayers({
       natural: 80,
+      baselineAbility: 40,
       currentAbility: 40,
       structureLevel: 5,
     });
@@ -61,11 +80,13 @@ describe("derivePotentialLayers — aproveitável", () => {
     expect(PROVISIONAL_STRUCTURE_LEVEL).toBe(3);
     const semNivel = derivePotentialLayers({
       natural: 85,
+      baselineAbility: 35,
       currentAbility: 35,
       structureLevel: null,
     });
     const nivelTres = derivePotentialLayers({
       natural: 85,
+      baselineAbility: 35,
       currentAbility: 35,
       structureLevel: 3,
     });
@@ -89,6 +110,7 @@ describe("derivePotentialLayers — funcional", () => {
   it("iguala o aproveitável quando a função é neutra", () => {
     const camadas = derivePotentialLayers({
       natural: 82,
+      baselineAbility: 60,
       currentAbility: 60,
       structureLevel: 3,
       roleFit: 0,
@@ -102,6 +124,7 @@ describe("derivePotentialLayers — funcional", () => {
     // a posição errada escondia.
     const camadas = derivePotentialLayers({
       natural: 82,
+      baselineAbility: 82,
       currentAbility: 82,
       structureLevel: 5,
       roleFit: 1,
@@ -112,6 +135,7 @@ describe("derivePotentialLayers — funcional", () => {
   it("cai abaixo do aproveitável com função errada", () => {
     const camadas = derivePotentialLayers({
       natural: 82,
+      baselineAbility: 60,
       currentAbility: 60,
       structureLevel: 3,
       roleFit: -1,
@@ -122,6 +146,7 @@ describe("derivePotentialLayers — funcional", () => {
   it("nunca cai abaixo da habilidade atual, nem na pior função", () => {
     const camadas = derivePotentialLayers({
       natural: 82,
+      baselineAbility: 70,
       currentAbility: 70,
       structureLevel: 1,
       roleFit: -1,
@@ -135,6 +160,7 @@ describe("derivePotentialLayers — bordas", () => {
     expect(() =>
       derivePotentialLayers({
         natural: 80,
+        baselineAbility: 40,
         currentAbility: 40,
         structureLevel: 0,
       }),
@@ -142,6 +168,7 @@ describe("derivePotentialLayers — bordas", () => {
     expect(() =>
       derivePotentialLayers({
         natural: 80,
+        baselineAbility: 40,
         currentAbility: 40,
         structureLevel: 6,
       }),
@@ -152,6 +179,7 @@ describe("derivePotentialLayers — bordas", () => {
     expect(() =>
       derivePotentialLayers({
         natural: 80,
+        baselineAbility: 40,
         currentAbility: 40,
         structureLevel: 3,
         roleFit: 2,
@@ -162,6 +190,7 @@ describe("derivePotentialLayers — bordas", () => {
   it("é determinístico", () => {
     const entrada = {
       natural: 77,
+      baselineAbility: 41,
       currentAbility: 41,
       structureLevel: 4,
       roleFit: 0.5,
@@ -174,6 +203,7 @@ describe("derivePotentialLayers — bordas", () => {
   it("devolve inteiros — atributo e habilidade são inteiros no grid", () => {
     const camadas = derivePotentialLayers({
       natural: 85,
+      baselineAbility: 35,
       currentAbility: 35,
       structureLevel: 5,
       roleFit: 0.3,

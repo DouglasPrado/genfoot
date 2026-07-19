@@ -88,6 +88,8 @@ export interface PlayerLifecycleSnapshot {
   readonly attributes: PlayerAttributes;
   readonly currentAbility: number;
   readonly potentialAbility: number;
+  /** Habilidade de onde a margem de crescimento é medida (R-216). */
+  readonly baselineAbility: number;
   readonly dynamicState: PlayerDynamicState;
   readonly trainingFocus?: PlayerAttributeCode;
   readonly youthProspect?: boolean;

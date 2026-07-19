@@ -48,6 +48,10 @@ function aggregate(slot: number): PlayerAggregateSnapshot {
         generated.position,
         generated.attributes,
       ),
+      baselineAbility: derivePlayerOverall(
+        generated.position,
+        generated.attributes,
+      ),
       potentialAbility: generated.potentialAbility,
       dynamicState: {
         morale: 50,

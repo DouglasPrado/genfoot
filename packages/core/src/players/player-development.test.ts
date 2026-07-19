@@ -52,6 +52,7 @@ function jogador(
     attributes: base,
     currentAbility: 50,
     potentialAbility: 80,
+    baselineAbility: 50,
     dynamicState: {
       morale: 50, confidence: 50, happiness: 50, fatigue: 0, matchSharpness: 50,
     },
@@ -104,14 +105,13 @@ describe("applyAttributeChange — teto pelo APROVEITÁVEL (R-213)", () => {
     expect(player.snapshot().attributes.marking).toBe(56);
   });
 
-  it("bloqueia ganho quando a habilidade já atingiu o teto (hoje: o NATURAL)", () => {
-    // O teto ainda é o natural, não o aproveitável — trava B-07. A R-213 exige
-    // o aproveitável, mas ele depende de uma linha de base estável que o schema
-    // não guarda; ligá-lo sem ela faria o teto subir junto com a habilidade e
-    // não travaria nada. Este teste fixa o comportamento REAL de hoje, e vai
-    // mudar quando a coluna existir.
+  it("bloqueia ganho no APROVEITÁVEL, não no natural (R-213/R-216)", () => {
+    // Base 50, natural 80, estrutura provisória nível 3 → aproveitável 71.
+    // Chegando a 71, nada mais entra sem melhorar a estrutura ou virar a
+    // temporada — é isso que a M-PLAYER-DEV precisa explicar quando o jogador
+    // pergunta "por que estagnou?".
     const player = carregar(
-      jogador({ currentAbility: 80, potentialAbility: 80 }),
+      jogador({ currentAbility: 71, potentialAbility: 80, baselineAbility: 50 }),
     );
     const antes = player.snapshot().attributes.marking;
     const resultado = evoluir(player, 60);

@@ -81,6 +81,7 @@ export class PrismaPlayerRepository implements PlayerRepository {
         generatedAtSeasonNumber: row.generatedAtSeasonNumber ?? 1,
         attributes: readAttributes(row.attributes),
         currentAbility: row.currentAbility,
+        baselineAbility: row.baselineAbility,
         potentialAbility: row.potentialAbility,
         dynamicState: {
           morale: row.morale,
@@ -139,6 +140,7 @@ export class PrismaPlayerRepository implements PlayerRepository {
             player.primaryPosition,
             player.attributes,
           ),
+          baselineAbility: player.baselineAbility,
           potentialAbility: player.potentialAbility,
           morale: player.dynamicState.morale,
           confidence: player.dynamicState.confidence,

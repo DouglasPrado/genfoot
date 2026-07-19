@@ -83,11 +83,43 @@ validação cruzada contra a tabela do doc), mas **não está ligado ao clamp**.
 o natural, como antes. Preferiu-se o erro antigo e visível ao erro novo disfarçado de
 regra cumprida.
 
-**Para destravar:** uma coluna de linha de base — candidata natural é
-`PlayerDevelopment.baselineAbility`, junto de `lastDevelopmentAt`, que já existe e também
-nunca foi escrita. Exige decisão sobre quando ela é fixada (entrada no clube? virada de
-temporada?), e isso muda o significado da R-12: se for por temporada, a estrutura ruim
-atrasa; se for por passagem no clube, ela limita de vez.
+**DESTRAVADA pela R-216** (abaixo).
+
+## R-216 — A linha de base é fixada na virada de temporada
+
+`Player.baselineAbility` guarda a habilidade de onde a **margem de crescimento** é medida.
+O potencial aproveitável passa a ser `base + (natural − base) × rendimento`, e o clamp de
+`Player.applyAttributeChange` trava nele.
+
+**A base é reescrita a cada virada de temporada**, no passo 7 — o mesmo onde o accrual é
+aplicado (INV-29/R-113). Uma passada toca as duas coisas.
+
+**Consequência de jogo, e ela é a razão da escolha:** estrutura ruim **atrasa**, não
+limita para sempre. Um talento de potencial 85 num clube nível 1 evolui pouco por
+temporada, mas a cada virada a margem é remedida do que ele virou — com tempo, ele ainda
+se aproxima do teto. Talento em clube pequeno **não morre ali**; demora. A transferência
+vira aceleração, não salvação.
+
+A alternativa considerada (fixar na entrada no clube) tornaria a estrutura uma sentença:
+o mesmo jogador morreria em 55–65 e só uma venda o libertaria. Mais dramático, e
+descartado.
+
+**Onde a coluna ficou, e por que não onde eu havia proposto.** A candidata era
+`PlayerDevelopment.baselineAbility`. Ao implementar, a tabela mostrou-se **vazia — zero
+linhas** — com todas as colunas obrigatórias sem default: a base lá nasceria ausente para
+todo jogador e a trava seguiria de pé com outra cara. Ficou em `Player`, ao lado de
+`currentAbility`/`potentialAbility`, e os 1.400 jogadores existentes receberam a
+habilidade atual como base.
+
+**Prova:** `potential-layers.test.ts` fixa que o aproveitável **não muda** enquanto a
+habilidade sobe (50 → 55 → 60 → 65 dão o mesmo teto 71), e reproduz a tabela publicada em
+`04-estrutura-do-clube-e-staff.md:258-264` — potencial 85, base 35 → **55 / 70 / 83** nos
+níveis 1 / 3 / 5, contra as faixas 55–65 / 70–80 / 80–88 do doc.
+
+**Segue pendente:** `structureLevel` ainda não é conhecido no clamp e cai no provisório
+(nível 3). Hoje clube nível 1 e nível 5 rendem igual — a curva da R-12 existe e está
+testada, mas ninguém lhe passa o nível real. Destravar exige os níveis de CT, que a R-197
+já registra como ausentes.
 
 ## R-214 — `TrainingPlan` ganha `version`
 

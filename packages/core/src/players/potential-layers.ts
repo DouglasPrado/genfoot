@@ -50,6 +50,15 @@ const ROLE_UPSIDE = 4;
 
 interface PotentialInput {
   readonly natural: number;
+  /**
+   * A habilidade de onde a MARGEM é medida (R-216).
+   *
+   * Fixada na virada de temporada, não a cada ganho — foi a trava B-07:
+   * medindo da habilidade atual, o teto subia junto com o jogador e convergia
+   * para o natural, e a R-12 não travava nada. Ausente, cai na habilidade
+   * atual (comportamento de jogador recém-criado, cuja base é o que ele é).
+   */
+  readonly baselineAbility?: number;
   readonly currentAbility: number;
   /** Nível do núcleo de formação (1..5), ou `null` para o provisório. */
   readonly structureLevel?: number | null;
@@ -79,11 +88,12 @@ export function derivePotentialLayers(input: PotentialInput): PotentialLayers {
   // R-12: "potencial para evoluir 10 pontos aproveita 4 com comissão nível 1".
   // Aplicá-lo ao teto daria aproveitável ABAIXO da habilidade atual — o jogador
   // regrediria por ter estrutura ruim, que não é o que o doc descreve.
-  const margem = Math.max(0, natural - currentAbility);
+  const baseline = input.baselineAbility ?? currentAbility;
+  const margem = Math.max(0, natural - baseline);
   const yieldFactor = STRUCTURE_YIELD[level - 1]!;
   const usable = Math.min(
     natural,
-    Math.round(currentAbility + margem * yieldFactor),
+    Math.round(baseline + margem * yieldFactor),
   );
 
   // Função errada encolhe a margem aproveitável; função ideal a estende acima

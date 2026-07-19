@@ -1336,6 +1336,12 @@ model Player {
   availability            PlayerAvailability     @default(AVAILABLE) // M-02: disponibilidade esportiva (separada da carreira em `status`)
   currentAbility          Int
   potentialAbility        Int
+  // R-216: a habilidade de onde a MARGEM de crescimento é medida. Sem ela o
+  // aproveitável (R-12) era recalculado da habilidade atual, que sobe a cada
+  // ganho — o teto subia junto e não travava nada (trava B-07).
+  // Reescrita no passo 7 da virada de temporada, junto da aplicação do accrual
+  // (INV-29): estrutura ruim ATRASA o jogador, não o limita de vez.
+  baselineAbility         Int
   /// Dinheiro do jogador — NULO até C9 existir (R-189).
   ///
   /// Eram NOT NULL, e isso tornava impossível materializar um jogador sem

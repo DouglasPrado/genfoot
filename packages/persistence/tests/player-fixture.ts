@@ -41,6 +41,7 @@ export function playerAggregate(
       generatedAtSeasonNumber: 1,
       attributes: generated.attributes,
       currentAbility: derivePlayerOverall(generated.position, generated.attributes),
+      baselineAbility: derivePlayerOverall(generated.position, generated.attributes),
       potentialAbility: generated.potentialAbility,
       dynamicState: {
         morale: 50,

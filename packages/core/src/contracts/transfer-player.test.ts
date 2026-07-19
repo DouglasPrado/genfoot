@@ -249,6 +249,7 @@ function arrange(buyerCashMultiplier: number) {
       generatedAtSeasonNumber: 1,
       attributes: target.attributes,
       currentAbility: overall,
+      baselineAbility: overall,
       potentialAbility: overall,
       dynamicState: {
         morale: 50,
