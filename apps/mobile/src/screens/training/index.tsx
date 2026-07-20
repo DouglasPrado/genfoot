@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -63,6 +63,10 @@ import {
   type PlanFocus,
 } from "@/screens/training-plan/training-plan-model";
 import {
+  formatCountdown,
+  sessionCountdown,
+} from "@/screens/training-session/session-countdown";
+import {
   buildStartSessionPayload,
   buildTrainingRows,
   summarizeTraining,
@@ -116,6 +120,11 @@ interface TrainingPlanProjection {
     readonly intensity: number;
     readonly version: number;
   } | null;
+}
+
+interface WorldClockProjection {
+  readonly realSecondsPerDay: number | null;
+  readonly nextTickAt: string | null;
 }
 
 /** Rótulo PT dos atributos que a tela oferece como foco. */
@@ -197,6 +206,18 @@ export function Training() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const plan = planQuery.data?.plan ?? null;
+  // O relógio do mundo alimenta a contagem regressiva das sessões.
+  const clockQuery = useWorldQuery<WorldClockProjection>("world-clock");
+  // Relógio de parede que tica a cada segundo — só efeito de view (a lógica da
+  // contagem é pura, em session-countdown). Ligado só quando há sessão ativa.
+  const anyTraining = (sessionsQuery.data?.sessions.length ?? 0) > 0;
+  const [nowMs, setNowMs] = useState(() => Date.parse(new Date().toISOString()));
+  useEffect(() => {
+    if (!anyTraining) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [anyTraining]);
+  const nowIso = new Date(nowMs).toISOString();
   // A escalação corrente (R-220 Fase 1): a formação existe? Sem ela não se
   // treina a formação, e o backend recusaria com NO_LINEUP_TO_TRAIN.
   const lineupQuery = useWorldQuery<{ lineup: { formation: string } | null }>(
@@ -682,6 +703,12 @@ export function Training() {
             </Text>
           </Card>
 
+          {/* Bloco da EQUIPE — treino que vale para o grupo todo. */}
+          <View style={styles.sectionHeaderRow}>
+            <Icon name="people" size={16} color={color.primary} />
+            <Text style={styles.sectionHeader}>TREINO DA EQUIPE</Text>
+          </View>
+
           {/* ENTROSAMENTO (R-220 Fase 3): treinar a formação entrosa o grupo. */}
           {managedClub !== null
             ? (() => {
@@ -861,6 +888,12 @@ export function Training() {
             </View>
           </Card>
 
+          {/* Bloco INDIVIDUAL — uma sessão por jogador. */}
+          <View style={styles.sectionHeaderRow}>
+            <Icon name="person" size={16} color={color.primary} />
+            <Text style={styles.sectionHeader}>TREINO INDIVIDUAL</Text>
+          </View>
+
           {/* Listagem PADRÃO — mesma row do elenco: camisa, posição, nome/idade,
               overall + status do treino. Tocar abre o card, onde treina/coleta. */}
           <Card>
@@ -887,13 +920,38 @@ export function Training() {
                     <Text style={styles.name} numberOfLines={1}>
                       {row.name}
                     </Text>
-                    <Text style={styles.meta} numberOfLines={1}>
-                      {row.state === "TRAINING" && row.session !== null
-                        ? `Treinando · ${row.session.elapsedDays}/${row.session.durationDays} dias`
-                        : row.state === "BLOCKED"
+                    {row.state === "TRAINING" && row.session !== null ? (
+                      (() => {
+                        const cd = sessionCountdown({
+                          realSecondsPerDay:
+                            clockQuery.data?.realSecondsPerDay ?? null,
+                          nextTickAt: clockQuery.data?.nextTickAt ?? null,
+                          elapsedDays: row.session.elapsedDays,
+                          durationDays: row.session.durationDays,
+                          nowIso,
+                        });
+                        return (
+                          <Text style={styles.meta} numberOfLines={1}>
+                            Treinando{" "}
+                            <Text style={styles.metaSkill}>
+                              {attributeLabel(row.session.attributeCode)}
+                            </Text>
+                            {" · "}
+                            {cd.complete
+                              ? "pronto para coletar"
+                              : cd.secondsRemaining === null
+                                ? `faltam ${cd.daysRemaining} dia(s)`
+                                : `faltam ${formatCountdown(cd.secondsRemaining)}`}
+                          </Text>
+                        );
+                      })()
+                    ) : (
+                      <Text style={styles.meta} numberOfLines={1}>
+                        {row.state === "BLOCKED"
                           ? (row.blockedLabel ?? "Indisponível")
                           : "Disponível"}
-                    </Text>
+                      </Text>
+                    )}
                   </View>
                   {row.state === "TRAINING" ? (
                     <Text style={styles.rowStatusTraining}>●</Text>
@@ -1227,6 +1285,20 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   meta: { color: color.textMuted, fontSize: fontSize.xs },
+  metaSkill: { color: color.primary, fontWeight: fontWeight.bold as "700" },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    marginTop: space.sm,
+    marginBottom: space.xs,
+  },
+  sectionHeader: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+  },
   ovr: {
     minWidth: 32,
     textAlign: "right",

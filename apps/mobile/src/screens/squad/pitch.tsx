@@ -7,8 +7,10 @@ import Svg, {
   LinearGradient,
   Stop,
 } from "react-native-svg";
+import { Icon } from "@/components/icon";
 import { PlayerAvatar } from "@/components/player-avatar";
 import { color, radius, fontWeight } from "@/theme";
+import { isMedicalBlock, lineupBlock } from "./availability-model";
 import type { SquadPlayer, PositionGroup } from "./squad-data";
 import type { Slot } from "./formations";
 
@@ -165,6 +167,10 @@ function Token({
   const { xv, yv, depth } = project(slot.x, slot.y);
   const scale = lerp(0.9, 1.16, depth);
   const fit = player?.fitness ?? 0;
+  // Impedimento do jogador escalado. Amarelo é o médico (lesão/recuperação);
+  // os demais (suspenso, convocado, em treino) ficam neutros pra não competir.
+  const block = player ? lineupBlock(player.availability) : null;
+  const medical = isMedicalBlock(block);
   return (
     <Pressable
       onPress={onPress}
@@ -172,7 +178,9 @@ function Token({
       accessibilityLabel={
         player === undefined
           ? `Posição ${slot.role} vazia`
-          : `${player.name}, ${slot.role}, overall ${player.ovr}`
+          : `${player.name}, ${slot.role}, overall ${player.ovr}${
+              block === null ? "" : `. ${block.reason}`
+            }`
       }
       accessibilityState={{ selected }}
       style={[
@@ -183,13 +191,33 @@ function Token({
       <View
         style={[
           styles.photo,
-          { borderColor: selected ? color.primary : tint },
+          {
+            borderColor: medical
+              ? color.warning
+              : selected
+                ? color.primary
+                : tint,
+          },
           selected ? styles.photoSelected : null,
         ]}
       >
         {player ? (
           <PlayerAvatar size={PHOTO - 4} radius={(PHOTO - 4) / 2} />
         ) : null}
+        {block === null ? null : (
+          <View
+            style={[
+              styles.blockBadge,
+              medical ? styles.blockBadgeMedical : styles.blockBadgeNeutral,
+            ]}
+          >
+            <Icon
+              name={medical ? "medkit" : "warning"}
+              size={11}
+              color={medical ? color.warning : color.textMuted}
+            />
+          </View>
+        )}
         <View style={styles.numberBadge}>
           <Text style={styles.numberText}>{player?.number ?? "?"}</Text>
         </View>
@@ -294,6 +322,27 @@ const styles = StyleSheet.create({
     color: color.text,
     fontSize: 11,
     fontWeight: fontWeight.black as "800",
+  },
+  // Canto inferior-esquerdo da foto: livre do número (topo-esq), da função
+  // (topo-dir) e do OVR (base, centrado em 9..35 dos 44px da foto).
+  blockBadge: {
+    position: "absolute",
+    bottom: -4,
+    left: -10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blockBadgeMedical: {
+    backgroundColor: "#2a2109",
+    borderColor: color.warning,
+  },
+  blockBadgeNeutral: {
+    backgroundColor: color.backgroundElevated,
+    borderColor: color.border,
   },
   ovrBadge: {
     position: "absolute",

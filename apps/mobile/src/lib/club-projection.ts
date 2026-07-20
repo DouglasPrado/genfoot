@@ -173,6 +173,8 @@ export interface MobileRosterProjection {
     readonly age: number;
     readonly morale: number;
     readonly fitness: number;
+    /** `PlayerAvailability` do domínio — lesão, suspensão, treino (R-190). */
+    readonly availability?: string;
     /** Rollup de 4 grupos (RosterView.groups). `goalkeeping` null fora do gol. */
     readonly groups?: {
       readonly technical: number;
@@ -218,6 +220,9 @@ export function squadPlayersFromRoster(
         fitness: player.fitness,
         form: "steady",
         morale: player.morale,
+        // Sem o campo na resposta, o honesto é "disponível desconhecido" — e
+        // AVAILABLE é o que o domínio dá a todo jogador recém-materializado.
+        availability: player.availability ?? "AVAILABLE",
         contractYears: 0,
         starter: player.shirtNumber <= 11,
         groups: player.groups ?? null,
