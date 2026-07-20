@@ -215,6 +215,14 @@ export function Training() {
     managedClub === null ? null : "roster",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
+  // A BASE (C8): os jovens também podem treinar (individual e em grupo) — o
+  // domínio de treino aceita qualquer playerId APTO, sem filtro de categoria.
+  // Aditiva: se a leitura da base falhar, a tela mostra só o profissional (não
+  // inventa). A query `youth` tem a MESMA forma da `roster`.
+  const youthQuery = useWorldQuery<RosterProjection>(
+    managedClub === null ? null : "youth",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const sessionsQuery = useWorldQuery<TrainingSessionsProjection>(
     managedClub === null ? null : "training-sessions",
     managedClub === null ? undefined : { clubId: managedClub.id },
@@ -266,16 +274,30 @@ export function Training() {
     () => new Set((lineup?.starters ?? []).map((s) => s.playerId)),
     [lineup],
   );
+  // O POOL de treino: profissional + base juntos. Treino (individual e grupo)
+  // opera sobre os dois; a formação/plano coletivo seguem só o profissional.
+  const allPlayers = useMemo(
+    () => [
+      ...(rosterQuery.data?.players ?? []),
+      ...(youthQuery.data?.players ?? []),
+    ],
+    [rosterQuery.data, youthQuery.data],
+  );
+  // Quais ids são da BASE — para marcar a linha/opção com o selo "BASE".
+  const youthIds = useMemo(
+    () => new Set((youthQuery.data?.players ?? []).map((p) => p.playerId)),
+    [youthQuery.data],
+  );
   // Quem está APTO — o único conjunto que o backend aceita no treino em grupo
   // (senão recusa com PLAYER_NOT_AVAILABLE). Lesionado/suspenso/em treino fora.
   const availableIds = useMemo(
     () =>
       new Set(
-        (rosterQuery.data?.players ?? [])
+        allPlayers
           .filter((p) => p.availability === "AVAILABLE")
           .map((p) => p.playerId),
       ),
-    [rosterQuery.data],
+    [allPlayers],
   );
   // A sessão de treino em GRUPO ativa (R-220.2): cronometrada, com participantes.
   const groupQuery = useWorldQuery<GroupSessionProjection>(
@@ -320,19 +342,17 @@ export function Training() {
   const rows = useMemo(
     () =>
       buildTrainingRows(
-        rosterQuery.data?.players ?? [],
+        allPlayers,
         sessionsQuery.data?.sessions ?? [],
         worldDate,
       ),
-    [rosterQuery.data, sessionsQuery.data, worldDate],
+    [allPlayers, sessionsQuery.data, worldDate],
   );
   const summary = useMemo(() => summarizeTraining(rows), [rows]);
 
   const attributesOf = useCallback(
     (playerId: string): readonly { code: string; value: number }[] => {
-      const player = rosterQuery.data?.players.find(
-        (p) => p.playerId === playerId,
-      );
+      const player = allPlayers.find((p) => p.playerId === playerId);
       const grid = player?.attributes ?? null;
       if (grid === null) return [];
       return Object.entries(grid)
@@ -341,12 +361,13 @@ export function Training() {
         // Menor primeiro: é onde sobra mais espaço para crescer.
         .sort((a, b) => a.value - b.value);
     },
-    [rosterQuery.data],
+    [allPlayers],
   );
 
   const refresh = useCallback(() => {
     clubQuery.refetch();
     rosterQuery.refetch();
+    youthQuery.refetch();
     sessionsQuery.refetch();
     planQuery.refetch();
     lineupQuery.refetch();
@@ -354,6 +375,7 @@ export function Training() {
   }, [
     clubQuery.refetch,
     rosterQuery.refetch,
+    youthQuery.refetch,
     sessionsQuery.refetch,
     planQuery.refetch,
     lineupQuery.refetch,
@@ -411,6 +433,7 @@ export function Training() {
         ) {
           setPicking(null);
           rosterQuery.refetch();
+          youthQuery.refetch();
           sessionsQuery.refetch();
         }
       });
@@ -422,6 +445,7 @@ export function Training() {
       worldId,
       toast,
       rosterQuery.refetch,
+      youthQuery.refetch,
       sessionsQuery.refetch,
     ],
   );
@@ -959,9 +983,8 @@ export function Training() {
                             cd.complete || cd.daysRemaining < groupSession.durationDays;
                           const names = groupSession.participantIds.map(
                             (id) =>
-                              (rosterQuery.data?.players ?? []).find(
-                                (p) => p.playerId === id,
-                              )?.name ?? "—",
+                              allPlayers.find((p) => p.playerId === id)?.name ??
+                              "—",
                           );
                           return (
                             <View style={styles.teamBlock}>
@@ -1017,9 +1040,8 @@ export function Training() {
                           // SEM SESSÃO: montar e iniciar o treino em grupo.
                           const draftNames = [...groupParticipants].map(
                             (id) =>
-                              (rosterQuery.data?.players ?? []).find(
-                                (p) => p.playerId === id,
-                              )?.name ?? "—",
+                              allPlayers.find((p) => p.playerId === id)?.name ??
+                              "—",
                           );
                           return (
                             <View style={styles.teamBlock}>
@@ -1251,6 +1273,9 @@ export function Training() {
                       <Text style={styles.name} numberOfLines={1}>
                         {row.name}
                       </Text>
+                      {youthIds.has(row.playerId) ? (
+                        <Text style={styles.baseTag}>BASE</Text>
+                      ) : null}
                       <AvailabilityFlag availability={row.availability} />
                     </View>
                     {row.state === "TRAINING" && row.session !== null ? (
@@ -1397,8 +1422,7 @@ export function Training() {
       >
         {(() => {
           const player =
-            rosterQuery.data?.players.find((p) => p.playerId === inspectId) ??
-            null;
+            allPlayers.find((p) => p.playerId === inspectId) ?? null;
           const row = rows.find((r) => r.playerId === inspectId) ?? null;
           const session = row?.session ?? null;
           const busy = actingId === inspectId;
@@ -1666,7 +1690,7 @@ export function Training() {
               aparecem marcados e não podem ser escolhidos.
             </Text>
             <ScrollView style={styles.modalList}>
-              {[...(rosterQuery.data?.players ?? [])]
+              {[...allPlayers]
                 // Aptos primeiro; indisponíveis no fim, para a escolha ficar limpa.
                 .sort(
                   (a, b) =>
@@ -1676,6 +1700,7 @@ export function Training() {
                 .map((p) => {
                   const badge = availabilityBadge(p.availability);
                   const unavailable = badge !== null;
+                  const isBase = youthIds.has(p.playerId);
                   const on = groupParticipants.has(p.playerId) && !unavailable;
                   return (
                     <Pressable
@@ -1722,6 +1747,7 @@ export function Training() {
                       >
                         {p.name}
                       </Text>
+                      {isBase ? <Text style={styles.baseTag}>BASE</Text> : null}
                       {unavailable ? (
                         <Text
                           style={[
@@ -2178,6 +2204,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     fontWeight: fontWeight.black as "800",
     letterSpacing: 0.3,
+  },
+  baseTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.primary,
+    borderWidth: 1,
+    borderColor: color.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
   modalCancel: { alignItems: "center", paddingVertical: space.md },
   modalCancelText: {
