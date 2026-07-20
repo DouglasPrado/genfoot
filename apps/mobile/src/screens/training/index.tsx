@@ -16,6 +16,8 @@ import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
 import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
+import { useToast } from "@/components/toast";
+import { commandFeedback } from "@/lib/command-feedback";
 import {
   selectManagedClub,
   type ClubPortfolioProjection,
@@ -132,10 +134,10 @@ const attributeLabel = (code: string): string => ATTRIBUTE_LABEL[code] ?? code;
 export function Training() {
   const { session, status, client, contractVersion } = useSession();
   const worldId = useRequiredWorldId();
+  const toast = useToast();
   const [picking, setPicking] = useState<TrainingRow | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
-  const [planError, setPlanError] = useState<string | null>(null);
 
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
@@ -261,6 +263,8 @@ export function Training() {
        * despachante não.
        */
       idempotencyKey: string,
+      /** O que o toast diz quando dá certo (contextual: iniciar vs coletar). */
+      successText: string,
     ) => {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
@@ -284,6 +288,10 @@ export function Training() {
       }).then((result) => {
         setTracking(result);
         setActingId(null);
+        // Toast claro em TODO desfecho — o jogador nunca fica sem saber o que
+        // aconteceu. A mensagem já vem traduzida (nada de código cru na tela).
+        const fb = commandFeedback(result, successText);
+        if (fb !== null) toast.show(fb);
         if (
           result.status === CommandTrackingStatus.ACCEPTED ||
           result.status === CommandTrackingStatus.APPLIED
@@ -299,6 +307,7 @@ export function Training() {
       client,
       contractVersion,
       worldId,
+      toast,
       rosterQuery.refetch,
       sessionsQuery.refetch,
     ],
@@ -312,9 +321,15 @@ export function Training() {
         playerId: row.playerId,
         attributeCode,
       });
-      if ("error" in payload) return;
+      if ("error" in payload) {
+        toast.show({ tone: "error", text: "Escolha um atributo para treinar." });
+        return;
+      }
       if (worldDate === "") {
-        setPlanError("Sem a data do mundo não é possível iniciar o treino com segurança.");
+        toast.show({
+          tone: "error",
+          text: "Sem a data do mundo não dá para iniciar o treino. Recarregue.",
+        });
         return;
       }
       // Uma sessão por jogador por DIA lógico. Amanhã ele treina de novo.
@@ -327,9 +342,10 @@ export function Training() {
           target: `${row.playerId}:${attributeCode}`,
           occasion: onDay(worldDate),
         }),
+        `Treino iniciado: ${row.name}.`,
       );
     },
-    [managedClub, dispatch, worldDate],
+    [managedClub, dispatch, worldDate, toast],
   );
 
   const collectSession = useCallback(
@@ -340,7 +356,10 @@ export function Training() {
         sessionsQuery.data?.sessions.find((s) => s.playerId === row.playerId)?.id ??
         null;
       if (sessionId === null) {
-        setPlanError("Sessão não encontrada na leitura — recarregue antes de coletar.");
+        toast.show({
+          tone: "error",
+          text: "Sessão não encontrada. Recarregue antes de coletar.",
+        });
         return;
       }
       dispatch(
@@ -352,9 +371,10 @@ export function Training() {
           target: row.playerId,
           occasion: onEntity(sessionId),
         }),
+        `Ganho coletado: ${row.name} voltou ao elenco.`,
       );
     },
-    [dispatch, sessionsQuery.data],
+    [dispatch, sessionsQuery.data, toast],
   );
 
   /** Grava o plano COLETIVO: um foco e uma carga para o grupo inteiro. */
@@ -371,15 +391,15 @@ export function Training() {
       expectedVersion: plan?.version ?? null,
     });
     if ("error" in payload) {
-      // Recusa própria da tela, com o motivo — não um branch vazio.
-      setPlanError(
-        payload.error === "NO_PLAYERS"
-          ? "Um plano sem jogador não treina ninguém."
-          : "O plano precisa de um nome.",
-      );
+      toast.show({
+        tone: "error",
+        text:
+          payload.error === "NO_PLAYERS"
+            ? "Um plano sem jogador não treina ninguém."
+            : "O plano precisa de um nome.",
+      });
       return;
     }
-    setPlanError(null);
     /**
      * A chave carrega o CONTEÚDO do plano, não só a versão.
      *
@@ -416,6 +436,8 @@ export function Training() {
       correlationId: `mobile:${idempotencyKey}`,
     }).then((result) => {
       setTracking(result);
+      const fb = commandFeedback(result, "Plano do elenco salvo.");
+      if (fb !== null) toast.show(fb);
       if (
         result.status === CommandTrackingStatus.ACCEPTED ||
         result.status === CommandTrackingStatus.APPLIED
@@ -443,18 +465,22 @@ export function Training() {
       return;
     }
     if (!trainState.enabled) {
-      setPlanError(
-        trainState.kind === "unreadable"
-          ? "Não foi possível ler a escalação. Recarregue antes de treinar."
-          : "Monte a escalação antes de treinar a formação.",
-      );
+      toast.show({
+        tone: "error",
+        text:
+          trainState.kind === "unreadable"
+            ? "Não foi possível ler a escalação. Recarregue antes de treinar."
+            : "Monte a escalação antes de treinar a formação.",
+      });
       return;
     }
     if (worldDate === "") {
-      setPlanError("Sem a data do mundo não é possível treinar com segurança.");
+      toast.show({
+        tone: "error",
+        text: "Sem a data do mundo não dá para treinar. Recarregue.",
+      });
       return;
     }
-    setPlanError(null);
     const idempotencyKey = commandIdempotencyKey({
       commandType: "training:train-formation",
       target: managedClub.id,
@@ -477,6 +503,8 @@ export function Training() {
       correlationId: `mobile:${idempotencyKey}`,
     }).then((result) => {
       setTracking(result);
+      const fb = commandFeedback(result, "Formação treinada — entrosamento subiu.");
+      if (fb !== null) toast.show(fb);
       if (
         result.status === CommandTrackingStatus.ACCEPTED ||
         result.status === CommandTrackingStatus.APPLIED
@@ -502,9 +530,10 @@ export function Training() {
       }
       const commandType = "morale:talk-to-squad";
       if (worldDate === "") {
-        setPlanError(
-          "Sem a data do mundo não é possível registrar a conversa com segurança.",
-        );
+        toast.show({
+          tone: "error",
+          text: "Sem a data do mundo não dá para conversar. Recarregue.",
+        });
         return;
       }
       const idempotencyKey = talkIdempotencyKey({
@@ -530,6 +559,8 @@ export function Training() {
         correlationId: `mobile:${idempotencyKey}`,
       }).then((result) => {
         setTracking(result);
+        const fb = commandFeedback(result, "Conversa com o elenco registrada.");
+        if (fb !== null) toast.show(fb);
         if (
           result.status === CommandTrackingStatus.ACCEPTED ||
           result.status === CommandTrackingStatus.APPLIED
@@ -773,9 +804,6 @@ export function Training() {
                     : "PLANO SALVO"}
               </Text>
             </Pressable>
-            {planError !== null ? (
-              <Text style={styles.error}>{planError}</Text>
-            ) : null}
           </Card>
 
           <Card>
