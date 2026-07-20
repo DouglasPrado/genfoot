@@ -44,6 +44,11 @@ import {
   type TalkStance,
 } from "@/screens/talk/talk-model";
 import {
+  canTrainFormation,
+  cohesionBadge,
+  cohesionMatchModifier,
+} from "@/screens/training-plan/cohesion-model";
+import {
   FOCUS_OPTIONS,
   buildSetPlanPayload,
   clampIntensity,
@@ -161,6 +166,13 @@ export function Training() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const plan = planQuery.data?.plan ?? null;
+  // A escalação corrente (R-220 Fase 1): a formação existe? Sem ela não se
+  // treina a formação, e o backend recusaria com NO_LINEUP_TO_TRAIN.
+  const lineupQuery = useWorldQuery<{ lineup: { formation: string } | null }>(
+    managedClub === null ? null : "lineup",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const hasLineup = lineupQuery.data?.lineup != null;
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
@@ -217,11 +229,13 @@ export function Training() {
     rosterQuery.refetch();
     sessionsQuery.refetch();
     planQuery.refetch();
+    lineupQuery.refetch();
   }, [
     clubQuery.refetch,
     rosterQuery.refetch,
     sessionsQuery.refetch,
     planQuery.refetch,
+    lineupQuery.refetch,
   ]);
 
   /** Despacha start/collect. O efeito oficial é a query voltando, não o retorno. */
@@ -416,6 +430,59 @@ export function Training() {
     planQuery.refetch,
   ]);
 
+  /** Treina a formação → sobe o entrosamento (R-220 Fase 3). Uma vez por dia. */
+  const trainFormation = useCallback(() => {
+    if (managedClub === null || client === null || contractVersion === null) {
+      return;
+    }
+    if (!canTrainFormation({ hasLineup })) {
+      setPlanError("Monte a escalação antes de treinar a formação.");
+      return;
+    }
+    if (worldDate === "") {
+      setPlanError("Sem a data do mundo não é possível treinar com segurança.");
+      return;
+    }
+    setPlanError(null);
+    const idempotencyKey = commandIdempotencyKey({
+      commandType: "training:train-formation",
+      target: managedClub.id,
+      occasion: onDay(worldDate),
+    });
+    setTracking({
+      status: CommandTrackingStatus.SUBMITTING,
+      commandId: null,
+      resource: null,
+      correlationId: `mobile:${idempotencyKey}`,
+      errorCode: null,
+    });
+    void submitTrackedCommand(client, {
+      clientContractVersion: "v1",
+      serverContractVersion: contractVersion,
+      commandType: "training:train-formation",
+      worldId,
+      payload: { clubId: managedClub.id },
+      idempotencyKey,
+      correlationId: `mobile:${idempotencyKey}`,
+    }).then((result) => {
+      setTracking(result);
+      if (
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED
+      ) {
+        clubQuery.refetch();
+      }
+    });
+  }, [
+    managedClub,
+    client,
+    contractVersion,
+    worldId,
+    worldDate,
+    hasLineup,
+    clubQuery.refetch,
+  ]);
+
   /** Conversa com o ELENCO — move a forma de todo mundo de uma vez. */
   const talkToSquad = useCallback(
     (stance: TalkStance) => {
@@ -542,6 +609,57 @@ export function Training() {
                 : "Nenhuma sessão em andamento."}
             </Text>
           </Card>
+
+          {/* ENTROSAMENTO (R-220 Fase 3): treinar a formação entrosa o grupo. */}
+          {managedClub !== null
+            ? (() => {
+                const badge = cohesionBadge(managedClub.cohesion);
+                const mod = cohesionMatchModifier(managedClub.cohesion);
+                return (
+                  <Card>
+                    <Text style={styles.cardTitle}>ENTROSAMENTO</Text>
+                    <View style={styles.cohesionRow}>
+                      <Text
+                        style={[
+                          styles.cohesionValue,
+                          badge.tone === "up" && { color: color.success },
+                          badge.tone === "down" && { color: color.warning },
+                        ]}
+                      >
+                        {badge.value}
+                      </Text>
+                      <View style={styles.cohesionInfo}>
+                        <Text style={styles.cohesionLabel}>{badge.label}</Text>
+                        <Text style={styles.summaryHint}>
+                          Na partida: {mod >= 0 ? `+${mod}` : mod} de força
+                          coletiva. Sobe jogando e treinando a formação.
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      onPress={trainFormation}
+                      disabled={!hasLineup}
+                      accessibilityRole="button"
+                      accessibilityLabel="Treinar a formação"
+                      accessibilityState={{ disabled: !hasLineup }}
+                      style={[styles.savePlan, !hasLineup && styles.actionBusy]}
+                    >
+                      <Text style={styles.actionText}>
+                        {hasLineup
+                          ? "TREINAR A FORMAÇÃO"
+                          : "MONTE A ESCALAÇÃO PRIMEIRO"}
+                      </Text>
+                    </Pressable>
+                    {!hasLineup ? (
+                      <Text style={styles.summaryHint}>
+                        Defina os titulares em Elenco ▸ Formação Tática para
+                        treinar o grupo.
+                      </Text>
+                    ) : null}
+                  </Card>
+                );
+              })()
+            : null}
 
           {/* O plano COLETIVO: um foco e uma carga para o grupo. */}
           <Card>
@@ -953,6 +1071,24 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
     letterSpacing: 0.3,
     marginBottom: space.xs,
+  },
+  cohesionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.lg,
+    marginTop: space.sm,
+  },
+  cohesionValue: {
+    color: color.primary,
+    fontSize: 40,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  cohesionInfo: { flex: 1, gap: 2 },
+  cohesionLabel: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
   focusGrid: {
     flexDirection: "row",

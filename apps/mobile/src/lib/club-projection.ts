@@ -25,6 +25,8 @@ export interface MobileClubProjection {
   readonly name: string;
   readonly shortCode: string;
   readonly reputationBand: number;
+  /** Entrosamento do time (R-220 Fase 3): 0..100. `club-detail` o expõe. */
+  readonly cohesion: number;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
   /** `null` quando o clube ainda não foi personalizado (BC-003). */

@@ -23,6 +23,7 @@ const activeClub = {
   name: "Jardim Atlético",
   shortCode: "JAT",
   reputationBand: 2,
+  cohesion: 50,
   stadiumName: "Estádio do Jardim",
   stadiumCapacity: 18_500,
   primaryColor: null,
