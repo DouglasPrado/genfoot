@@ -10,6 +10,7 @@ import {
 import type { GeneratedPlayer } from "../genesis/genesis-types.js";
 
 import { derivePlayerOverall } from "./player-attributes.js";
+import { clampForm, decayedForm } from "./match-form.js";
 import { derivePotentialLayers } from "./potential-layers.js";
 import {
   PlayerAvailability,
@@ -58,6 +59,7 @@ export class Player {
           fatigue: 0,
           matchSharpness: 50,
         },
+        formaModifier: 0,
         lastProcessedOn: worldDate,
         version: 1,
       }),
@@ -121,9 +123,12 @@ export class Player {
         matchSharpness: Math.max(0, dynamicState.matchSharpness - 1),
       };
     }
+    // A forma sara sozinha: decai ao neutro com os dias (R-221 Fase 2b).
+    const formaModifier = decayedForm(this.state.formaModifier ?? 0, days);
     this.state = {
       ...this.state,
       dynamicState,
+      formaModifier,
       lastProcessedOn: target,
       version: this.state.version + 1,
     };
@@ -283,6 +288,35 @@ export class Player {
   /** A fadiga corrente (0..100). */
   public get fatigue(): number {
     return this.state.dynamicState.fatigue;
+  }
+
+  /** A forma corrente (± transiente, R-221 Fase 2b). Ausente = 0. */
+  public get formaModifier(): number {
+    return this.state.formaModifier ?? 0;
+  }
+
+  /**
+   * Habilidade EFETIVA (R-221): núcleo + forma, presa em 0..100. É o que a
+   * partida, a tela e o mercado leem — contínua dentro da temporada.
+   */
+  public effectiveAbility(): number {
+    return Math.max(0, Math.min(100, this.state.currentAbility + this.formaModifier));
+  }
+
+  /**
+   * Move a forma por um evento de partida/decisão (R-221 Fase 2b), tetada em
+   * ±FORM_MAX. `delta` pode ser ± (derrota puxa pra baixo). O núcleo não é
+   * tocado — a forma é a camada que sobe e desce e depois decai (`processUntil`).
+   */
+  public applyMatchForm(delta: number): void {
+    if (delta === 0) return;
+    const next = clampForm(this.formaModifier + delta);
+    if (next === this.formaModifier) return;
+    this.state = {
+      ...this.state,
+      formaModifier: next,
+      version: this.state.version + 1,
+    };
   }
 
   /**

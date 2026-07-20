@@ -91,6 +91,7 @@ export class PrismaPlayerRepository implements PlayerRepository {
           fatigue: row.fatigue,
           matchSharpness: row.matchSharpness,
         },
+        formaModifier: row.formaModifier,
         lastProcessedOn: isoDate(row.lastProcessedOn),
         version: row.version,
       },
@@ -149,6 +150,7 @@ export class PrismaPlayerRepository implements PlayerRepository {
           happiness: player.dynamicState.happiness,
           fatigue: player.dynamicState.fatigue,
           matchSharpness: player.dynamicState.matchSharpness,
+          formaModifier: player.formaModifier ?? 0,
           lastProcessedOn: new Date(`${player.lastProcessedOn}T00:00:00.000Z`),
           version: player.version,
           attributes: { create: writeAttributes(player.attributes) },
@@ -186,6 +188,7 @@ export class PrismaPlayerRepository implements PlayerRepository {
         happiness: player.dynamicState.happiness,
         fatigue: player.dynamicState.fatigue,
         matchSharpness: player.dynamicState.matchSharpness,
+        formaModifier: player.formaModifier ?? 0,
         lastProcessedOn: new Date(`${player.lastProcessedOn}T00:00:00.000Z`),
         version: player.version,
       },
@@ -199,6 +202,23 @@ export class PrismaPlayerRepository implements PlayerRepository {
       where: { playerId: player.id },
       data: writeAttributes(player.attributes),
     });
+  }
+
+  public async decayForma(
+    gameWorldId: GameWorldId,
+    days: number,
+  ): Promise<void> {
+    if (!Number.isSafeInteger(days) || days <= 0) return;
+    // Move cada forma `days` em direção a 0, sem cruzar (GREATEST/LEAST). Em
+    // massa: a forma é transiente e ninguém a disputa em paralelo.
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = CASE
+        WHEN "formaModifier" > 0 THEN GREATEST(0, "formaModifier" - ${days})
+        WHEN "formaModifier" < 0 THEN LEAST(0, "formaModifier" + ${days})
+        ELSE 0 END
+      WHERE "gameWorldId" = ${gameWorldId}::uuid AND "formaModifier" <> 0
+    `;
   }
 }
 

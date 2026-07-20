@@ -62,6 +62,9 @@ class MemoryPlayerRepo implements PlayerRepository {
     this.store.set(snap.player.id, snap);
     return Promise.resolve();
   }
+  decayForma() {
+    return Promise.resolve();
+  }
 }
 
 class MemoryAccrualStore implements SeasonAccrualStore {

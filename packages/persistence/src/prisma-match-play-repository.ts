@@ -1,8 +1,11 @@
-import type {
-  MatchPlayRepository,
-  ScheduledMatchWithStrength,
-  ScorerCandidate,
-  SimulatedMatchResult,
+import {
+  FORM_MAX,
+  matchFormDelta,
+  type MatchOutcome,
+  type MatchPlayRepository,
+  type ScheduledMatchWithStrength,
+  type ScorerCandidate,
+  type SimulatedMatchResult,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -118,6 +121,12 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       // FINISHED) não duplica nada.
       if (count === 0) continue;
 
+      // A FORMA (R-221 Fase 2b): o resultado move a forma de quem jogou —
+      // vencedor sobe, perdedor desce; artilheiro embala. Aplicado uma vez (só
+      // na transição para FINISHED, count>0). Atalho de SQL clamped, como a
+      // força: a forma é stat transiente, não agregado disputado.
+      await this.applyMatchForma(gameWorldId, result);
+
       // O manifesto de replay (C5-V2): reproduz a partida bit a bit (doc 15
       // §3.1). Vale para TODA partida jogada, inclusive 0×0. Reescrito por
       // matchId (unique) — reprocessar não duplica.
@@ -230,10 +239,80 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
   }
 
   /**
-   * A força de cada clube (R-220 Fase 1): dos 11 ESCALADOS quando há escalação,
-   * ponderados por `fillQuality` (fora de posição rende menos); senão, a média
-   * do elenco FIRST_TEAM (o comportamento antigo, para mundos sem escalação não
-   * quebrarem). A escalação tem precedência — é o que o treinador pôs em campo.
+   * Move a forma dos jogadores pelo resultado da partida (R-221 Fase 2b): base
+   * do resultado para o elenco de cada clube + bônus por gol ao artilheiro.
+   */
+  private async applyMatchForma(
+    gameWorldId: GameWorldId,
+    result: SimulatedMatchResult,
+  ): Promise<void> {
+    const clubs = await this.client.match.findUnique({
+      where: { id: result.matchId },
+      select: { homeClubId: true, awayClubId: true },
+    });
+    if (clubs === null) return;
+    const homeOutcome: MatchOutcome =
+      result.homeGoals > result.awayGoals
+        ? "WIN"
+        : result.homeGoals < result.awayGoals
+          ? "LOSS"
+          : "DRAW";
+    const awayOutcome: MatchOutcome =
+      homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW";
+    const homeBase = matchFormDelta({ outcome: homeOutcome, goalsScored: 0 });
+    const awayBase = matchFormDelta({ outcome: awayOutcome, goalsScored: 0 });
+    await this.applyClubForma(gameWorldId, clubs.homeClubId, homeBase);
+    await this.applyClubForma(gameWorldId, clubs.awayClubId, awayBase);
+    // Bônus do artilheiro = o delta a mais além da base (goals × bônus por gol).
+    for (const s of result.homeScorers) {
+      await this.applyPlayerForma(
+        s.playerId,
+        matchFormDelta({ outcome: homeOutcome, goalsScored: s.goals }) - homeBase,
+      );
+    }
+    for (const s of result.awayScorers) {
+      await this.applyPlayerForma(
+        s.playerId,
+        matchFormDelta({ outcome: awayOutcome, goalsScored: s.goals }) - awayBase,
+      );
+    }
+  }
+
+  private async applyClubForma(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    delta: number,
+  ): Promise<void> {
+    if (delta === 0) return;
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+      WHERE id IN (
+        SELECT sm."playerId" FROM "SquadMembership" sm
+        JOIN "Squad" s ON s.id = sm."squadId"
+        WHERE s."gameWorldId" = ${gameWorldId}::uuid
+          AND s."clubId" = ${clubId}::uuid AND s.category = 'FIRST_TEAM'
+      )
+    `;
+  }
+
+  private async applyPlayerForma(
+    playerId: string,
+    delta: number,
+  ): Promise<void> {
+    if (delta === 0) return;
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+      WHERE id = ${playerId}::uuid
+    `;
+  }
+
+  /**
+   * A força de cada clube: dos 11 ESCALADOS quando há escalação (R-220 Fase 1),
+   * ponderados por `fillQuality`; senão, a média do elenco FIRST_TEAM. A força
+   * usa a habilidade EFETIVA — núcleo + forma, presa em 0..100 (R-221 Fase 2b):
+   * um time em alta rende mais, em baixa rende menos, na mesma partida.
    */
   private async clubStrengths(
     gameWorldId: GameWorldId,
@@ -241,7 +320,7 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
     const [squadRows, lineupRows] = await Promise.all([
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT s."clubId" AS "clubId",
-               ROUND(AVG(p."currentAbility"))::int AS strength
+               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier"))))::int AS strength
         FROM "Squad" s
         JOIN "SquadMembership" sm ON sm."squadId" = s.id
         JOIN "Player" p ON p.id = sm."playerId"
@@ -251,7 +330,7 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       `,
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT cl."clubId" AS "clubId",
-               ROUND(AVG(p."currentAbility" * cls."fillQuality"))::int AS strength
+               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier")) * cls."fillQuality"))::int AS strength
         FROM "ClubLineup" cl
         JOIN "ClubLineupStarter" cls ON cls."lineupId" = cl.id
         JOIN "Player" p ON p.id = cls."playerId"

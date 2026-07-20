@@ -56,5 +56,14 @@ export interface PlayerRepository {
     snapshot: PlayerAggregateSnapshot,
     expectedVersion: number | null,
   ): Promise<void>;
+
+  /**
+   * Decai a FORMA de todos os jogadores do mundo em direção ao neutro (0) por
+   * `days` dias (R-221 Fase 2b): a forma sara sozinha com o tempo. Atualização em
+   * massa — a forma é um stat transiente, não um agregado disputado; rodá-la por
+   * jogador seria caro e sem ganho. Idempotente no sentido de que decair 0 dias é
+   * no-op e a forma nunca cruza o neutro.
+   */
+  decayForma(gameWorldId: GameWorldId, days: number): Promise<void>;
 }
 

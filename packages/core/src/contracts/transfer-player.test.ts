@@ -81,6 +81,7 @@ function fakePlayers(world: FakeWorld): PlayerRepository {
   return {
     findPlayerById: (_w, id) => Promise.resolve(world.players.get(id) ?? null),
     savePlayer: () => Promise.resolve(),
+    decayForma: () => Promise.resolve(),
   };
 }
 

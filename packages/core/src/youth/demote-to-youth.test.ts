@@ -60,6 +60,7 @@ function fakeUnitOfWork(world: FakeWorld): DemoteToYouthUnitOfWork {
       } as unknown as PlayerAggregateSnapshot);
     },
     savePlayer: () => Promise.resolve(),
+    decayForma: () => Promise.resolve(),
   };
   const squads: SquadRepository = {
     findFirstTeamSquad: () =>

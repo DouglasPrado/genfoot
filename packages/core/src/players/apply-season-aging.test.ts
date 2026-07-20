@@ -54,6 +54,9 @@ class MemPlayers implements PlayerRepository {
     this.store.set(s.player.id, s);
     return Promise.resolve();
   }
+  decayForma() {
+    return Promise.resolve();
+  }
 }
 
 class MemRoster implements SeasonAgingRoster {

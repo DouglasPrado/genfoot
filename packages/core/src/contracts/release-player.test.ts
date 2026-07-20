@@ -81,6 +81,7 @@ function fakePlayers(world: FakeWorld): PlayerRepository {
       world.savedPlayer = snapshot;
       return Promise.resolve();
     },
+    decayForma: () => Promise.resolve(),
   };
 }
 
