@@ -51,6 +51,30 @@ Telas de moral do elenco, torcida, rivalidades, imprensa/coletiva, conversas com
 - **Estados:** árvore e modulação por perfil mental/`CoachTrust` definidas em R-96.
 - **Referências:** [`07-ia §3.4, §6`](../01-game-design/07-inteligencia-artificial.md); [`11-torcida §7`](../01-game-design/11-torcida-imprensa-e-narrativa.md).
 
+### Acréscimo R-221 — elogiar/criticar: a decisão que move a FORMA
+
+> Alinhamento à decisão [R-221](../99-decisoes/desenvolvimento-dinamico-2026-07-19.md), ratificada em 2026-07-19. Descreve **o que a decisão ratifica e o que o código já implementa**.
+
+A R-221 dá à conversa um efeito **mecânico** que ela não tinha: a conversa é uma das três coisas que movem o atributo vivo (treino, partida, **decisão**).
+
+- **Duas posturas (`TalkStance`):** **elogiar** (`PRAISE`, embala) e **criticar** (`CRITICIZE`, cobra). São as únicas ratificadas.
+- **Dois alvos, dois commands:**
+  - `morale:talk-to-player` — payload `clubId`, `playerId`, `stance`. Move a forma **daquele jogador**; devolve a forma resultante.
+  - `morale:talk-to-squad` — payload `clubId`, `stance`. Move a forma de **todo o elenco profissional** do clube de uma vez.
+- **O efeito é sobre a FORMA, não sobre o núcleo.** Elogiar/criticar **não** altera o que o jogador conquistou treinando: soma um delta ± à camada **transiente**, tetada em ± um máximo, e essa camada **decai de volta ao neutro** com o tempo. Ou seja: a conversa dá um empurrão temporário, nunca um dano (nem um presente) permanente — é a garantia anti-espiral da R-221. A leitura do efeito aparece em `M-PLAYER-DEV` (`player-development`), onde núcleo, forma e efetiva são mostrados separados.
+- **Erros:** jogador inexistente → `PLAYER_NOT_FOUND`; postura fora do enum é recusada na validação de payload (código comum `COMMAND_PAYLOAD_INVALID`, `apps/api/src/commands/command-registry.ts:198`).
+- **Nenhum dos dois commands publica evento de domínio** — o stream recebe só `CommandAccepted`, e o efeito oficial se lê recarregando a query.
+- **Idempotência:** a chave usada pelo cliente é estável por **(command, alvo, postura)** — repetir a mesma conversa não multiplica o efeito.
+
+**A árvore de conversa da R-96 continua NÃO implementada — é escopo separado.** Nada do que esta seção descreve acima cobre: motivo da conversa (pedir aumento, minutos, renovação, forçar saída, conflito, liderança, despedida de ídolo), **perfil mental** do jogador, modulação por `CoachTrust`, opções de resposta em árvore, registro de **promessa** ou consequência sobre a relação. Elogiar/criticar é um passo único e plano, não a conversa da R-96.
+
+**Não decidido (falta ratificar):**
+
+- **Não decidido:** as **magnitudes** do delta de forma por postura — calibração VAL-001, declarada no código como não-constante-de-doc.
+- **Não decidido:** o **risco** da conversa (a crítica que sai pela culatra por personalidade/temperamento). Hoje o efeito é determinístico e igual para todos; o refinamento por perfil mental não foi ratificado.
+- **Não decidido:** como (e se) elogiar/criticar interage com a **moral** de `M-MORALE` e com a árvore da R-96 quando ela existir — são duas leituras do mesmo gesto sem contrato entre si.
+- **Não decidido:** se `morale:talk-to-squad` deveria distinguir **titulares** de reservas — o efeito hoje alcança o elenco profissional inteiro.
+
 ## `M-FEED` — Feed de eventos / narrativa
 
 - **Objetivo:** dar vida ao mundo com acontecimentos e histórias.

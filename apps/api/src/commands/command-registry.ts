@@ -941,7 +941,15 @@ const handlers: Record<string, CommandHandler> = {
     } as never);
   },
 
-  /** Moral — conversa com o ELENCO: move a forma de todos os titulares (R-221 2c). */
+  /**
+   * Moral — conversa com o ELENCO: move a forma de TODO o elenco profissional
+   * (R-221 2c).
+   *
+   * Dizia "titulares" e estava errado: `nudgeClubForma` alcança o squad
+   * `FIRST_TEAM` inteiro, não a escalação. O comando é `talk-to-squad` — squad é
+   * elenco, não time titular —, e conversa de vestiário atingir só quem joga
+   * seria a regra estranha. O comentário é que estava fora, não o código.
+   */
   "morale:talk-to-squad": async ({ worlds, playerRepository, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

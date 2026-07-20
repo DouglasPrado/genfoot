@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>d161b13</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>681c6f8</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -687,12 +687,11 @@
         <p><b>Não é trava — é armadilha de leitura, e fica registrada para não voltar a enganar.</b> A trava que estava aqui (gate vermelho + 26 falhas na suíte de Postgres) <b>caiu por inteiro</b>; o histórico está no Registro abaixo.<br><br><b>O que sobra é uma distinção que precisa ficar visível:</b> a suíte de Postgres lê <code>TEST_DATABASE_URL</code>, nunca <code>DATABASE_URL</code> (a separação existe porque a suíte dá <code>TRUNCATE ... CASCADE</code> e já apagou o banco de dev uma vez). Sem a variável, esses testes <b>se pulam anunciando o motivo</b> e o gate fecha verde com <span class="num">~200</span> testes pulados — <b>sem atravessar banco nenhum</b>.<br><br><b>Verde por skip não prova persistência.</b> Ao mexer em repositório, read model, query ou migration, o gate só vale com o banco: <code>TEST_DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta_test?schema=public" pnpm test</code>. Referência de saúde (2026-07-20): <b>142 arquivos / 1262 testes, tudo passando, zero pulado</b>. Receita e diagnóstico de schema atrasado documentados em <code>CLAUDE.md §9</code>.</p>
       </div>
       <div class="blocker">
-        <h3>As specs de UX são anteriores à R-221 — três telas nascem amarelas por definição</h3>
-        <p><b>Trava nova.</b> O atributo vivo (R-221) entrou no domínio, mas os docs das telas que deveriam mostrá-lo ainda descrevem o mundo anterior:</p>
-        <p><code>M-TRAINING</code> (<code>05-mobile-telas-elenco-jogador-treino-medicina.md:79-85</code>) não documenta <b>iniciar</b> nem <b>coletar</b> sessão, não documenta o jogador <b>indisponível</b> durante o treino, nem o <b>ganho parcial</b> por interrupção.<br>
-        <code>M-PLAYER-DEV</code> (mesmo arquivo, <code>:46-52</code>) não documenta <b>núcleo</b> vs. <b>forma</b> vs. <b>habilidade efetiva</b>.<br>
-        <code>M-CONVO</code> (<code>11-mobile-telas-comunicacao-torcida-moral.md:45-52</code>) não documenta <b>elogiar/criticar</b> nem o efeito sobre a forma.</p>
-        <p><b>Impede:</b> as três telas não têm como "cumprir o doc por inteiro" (§5.1, condição 0) — construí-las hoje é construir contra uma spec vencida. Nascem <b>amarelas por definição</b> até a spec ser atualizada.</p>
+        <h3>Specs alinhadas à R-221 — sobrou a fila de ratificação (15 pontos)</h3>
+        <p><b>CAIU a parte que impedia certificar tela.</b> Os docs das três telas foram alinhados à R-221 — que já estava <b>ratificada</b> (<code>99-decisoes/desenvolvimento-dinamico-2026-07-19.md</code>), então isto foi alinhamento de spec, não decisão nova. <code>M-TRAINING</code> ganhou o treino de sessão (iniciar/coletar, jogador indisponível enquanto treina, coleta parcial) e o plano coletivo real; <code>M-PLAYER-DEV</code> ganhou núcleo/forma/efetiva e as três camadas com o headroom; <code>M-CONVO</code> ganhou elogiar/criticar com o efeito sobre a FORMA. O doc 23 ganhou a seção 2.8 com as linhas 50–52, que <code>M-PLAYER-DEV</code> e a sessão não tinham. <b>Agora existe doc contra o qual medir completude</b> — a condição 0 do §5.1 deixou de ser impossível.</p>
+        <p><b>Um erro foi pego na revisão e vale registrar:</b> a primeira versão do texto citava um errorCode <code>VALIDATION_FAILED</code> que <b>não existe</b> — o real é <code>COMMAND_PAYLOAD_INVALID</code> (<code>command-registry.ts:198</code>). Nome plausível, inventado. Todos os demais códigos citados foram conferidos um a um na fonte antes de entrar.</p>
+        <p><b>O que SOBROU (e é trabalho do dono, não meu):</b> as specs agora carregam <span class="num">15</span> linhas <b>"Não decidido"</b> — pontos que a R-221 explicitamente não fecha e que ninguém pode inventar. Os que mais pesam: o <b>piso da queda</b> do atributo ("a definir" na própria decisão); a <b>amplitude e o decaimento</b> da forma e as magnitudes de sessão/conversa (calibração VAL-001, não constante de doc); o <b>nível real de estrutura</b> e o <code>roleFit</code>, sem os quais a camada funcional não se distingue da aproveitável e clube nível 1 rende igual ao nível 5; os <b>alertas de sobrecarga</b> que a spec antiga já prometia sem regra nem dado; e se a R-221 deve <b>emitir eventos de domínio</b> — hoje nenhum dos commands publica evento, então <b>não há trilha auditável</b> do movimento do atributo, e a tela só sabe o que mudou recarregando a query.</p>
+        <p><b>Impede:</b> não impede mais construir nem certificar as três telas. Impede fechar a <em>explicabilidade</em> que a spec de <code>M-PLAYER-DEV</code> pede ("por que estagnou/evoluiu") — sem evento, não há histórico a mostrar.</p>
       </div>
       <div class="blocker">
         <h3>Duas telas não têm contrato decidido na rastreabilidade</h3>
