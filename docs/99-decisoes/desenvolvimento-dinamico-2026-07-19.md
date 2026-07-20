@@ -1,6 +1,6 @@
 # Desenvolvimento dinâmico e instantâneo (R-221)
 
-**Data:** 2026-07-19 · **Status:** RATIFICADA (direção); um ponto aberto (permanência da queda) · **Escopo:** desenvolvimento do jogador, emenda à R-113/INV-29
+**Data:** 2026-07-19 · **Status:** RATIFICADA · **Escopo:** desenvolvimento do jogador, emenda à R-113/INV-29
 
 ## Contexto
 
@@ -48,19 +48,22 @@ imediatamente), não bufferizada até a virada.
 - **Determinismo (R-182):** todo delta é determinístico por evento
   (`SeededRandom`/id do evento); reprocessar o mesmo evento não reaplica.
 
-## O ponto AINDA aberto — a permanência da QUEDA (pergunta ao dono)
+## A permanência da QUEDA — RESOLVIDO: decai (forma) sobre um núcleo permanente
 
-Subir por treino é permanente (até o teto). A pergunta que muda o feel: quando
-uma **partida ruim ou uma decisão** empurra o atributo PRA BAIXO, isso é
+O dono escolheu **decai/sara**. O modelo é de **duas camadas**, e a habilidade
+efetiva (o que a partida, a tela e o mercado leem) é a soma delas:
 
-- **permanente** (fica até o jogador reconquistar treinando) — punição dura,
-  cada jogo pesa de verdade; ou
-- **temporário/decai** (uma queda que sara sozinha com o tempo — modelo de
-  "forma") — mais perdoador.
+- **Núcleo permanente** — movido PRA CIMA pelo **treino**, com teto no potencial
+  aproveitável (R-216). Nunca cai sozinho; um mau momento não destrói o que foi
+  conquistado treinando.
+- **Forma (transiente)** — movida ± por **partidas e decisões**, e **decai** de
+  volta ao neutro com o tempo. Jogo bom dá pico temporário; jogo ruim dá vale
+  temporário. Sara sozinha.
 
-Isso decide se um mau momento marca o jogador de vez ou passa. Resolver antes de
-escrever a Fase 2, porque muda o modelo (um número vivo único vs. núcleo lento +
-camada de forma).
+`abilidadeEfetiva = núcleo + forma`. Assim há progresso permanente (treino) E
+reatividade instantânea (partida/decisão), sem espiral punitiva — um jogador ruim
+não afunda de vez por uma sequência ruim; a forma volta. Amplitude da forma e a
+velocidade de decaimento são calibração minha (VAL-001).
 
 ## Reescopo do programa
 
