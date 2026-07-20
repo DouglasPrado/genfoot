@@ -941,6 +941,11 @@ export function Training() {
                         // Regressivo: a barra mostra o que RESTA e esvazia com o
                         // tempo (100% cheia → 0% ao completar).
                         const remaining = cd.complete ? 0 : 100 - pct;
+                        // Cor da posição do jogador — a faixa cinza sumia no card
+                        // cinza. Faixa esmaecida, regressão sólida na mesma cor.
+                        const tint = positionGroupTint(
+                          sectorOf(row.primaryPosition),
+                        );
                         return (
                           <>
                             <Text style={styles.meta} numberOfLines={1}>
@@ -957,13 +962,15 @@ export function Training() {
                                   ? `faltam ${cd.daysRemaining} dia(s)`
                                   : `faltam ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
-                            {/* Faixa 100% de fundo; regressão em cima, esvaziando. */}
-                            <View style={styles.cdTrack}>
+                            {/* Faixa 100% (cor da posição, esmaecida); regressão
+                                em cima, sólida, esvaziando. */}
+                            <View
+                              style={[styles.cdTrack, { backgroundColor: `${tint}33` }]}
+                            >
                               <View
                                 style={[
                                   styles.cdFill,
-                                  { width: `${remaining}%` },
-                                  cd.complete && styles.cdFillDone,
+                                  { width: `${remaining}%`, backgroundColor: tint },
                                 ]}
                               />
                             </View>
@@ -1138,6 +1145,9 @@ export function Training() {
                                 clockQuery.data?.realSecondsPerDay ?? null,
                             });
                             const remaining = cd.complete ? 0 : 100 - pct;
+                            const tint = positionGroupTint(
+                              sectorOf(player.primaryPosition),
+                            );
                             return (
                               <>
                                 {/* Tempo ACIMA da barra. */}
@@ -1148,13 +1158,21 @@ export function Training() {
                                       ? `faltam ${cd.daysRemaining} dia(s) lógicos`
                                       : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
                                 </Text>
-                                {/* Faixa 100%; regressão em cima, esvaziando. */}
-                                <View style={styles.cdTrackLarge}>
+                                {/* Faixa 100% (cor da posição, esmaecida);
+                                    regressão em cima, sólida, esvaziando. */}
+                                <View
+                                  style={[
+                                    styles.cdTrackLarge,
+                                    { backgroundColor: `${tint}33` },
+                                  ]}
+                                >
                                   <View
                                     style={[
                                       styles.cdFill,
-                                      { width: `${remaining}%` },
-                                      cd.complete && styles.cdFillDone,
+                                      {
+                                        width: `${remaining}%`,
+                                        backgroundColor: tint,
+                                      },
                                     ]}
                                   />
                                 </View>
@@ -1365,16 +1383,13 @@ const styles = StyleSheet.create({
   cdTrack: {
     height: 6,
     borderRadius: radius.pill,
-    backgroundColor: color.surface,
     overflow: "hidden",
     marginTop: 3,
   },
-  cdFill: { height: "100%", backgroundColor: color.primary },
-  cdFillDone: { backgroundColor: color.success },
+  cdFill: { height: "100%" },
   cdTrackLarge: {
     height: 8,
     borderRadius: radius.pill,
-    backgroundColor: color.surface,
     overflow: "hidden",
     marginTop: space.xs,
   },
