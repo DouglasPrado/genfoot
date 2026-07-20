@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>e20d79e</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>8253f1d</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -511,7 +511,7 @@
         <span class="arch-id">L-M03</span>
         <span class="arch-name">Perfil e detalhe — hero, tabs, seções</span>
         <span class="risk low">Risco baixo</span>
-        <span class="arch-count"><b>2</b> parciais / 36</span>
+        <span class="arch-count"><b>3</b> parciais / 36</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-HOME</span><span class="chip-d">Home — contadores read-only, sem drill-in nem decisão</span><span class="tag">parcial</span></div>
@@ -520,7 +520,7 @@
         <div class="chip missing"><span class="chip-id">M-PLAYER-ATTRS</span><span class="chip-d">Atributos detalhados</span></div>
         <div class="chip missing"><span class="chip-id">M-PLAYER-DEV</span><span class="chip-d">Desenvolvimento / histórico de evolução</span></div>
         <div class="chip missing"><span class="chip-id">M-ROLES</span><span class="chip-d">Papéis, hierarquia e liderança</span></div>
-        <div class="chip missing"><span class="chip-id">M-TRAINING</span><span class="chip-d">Treino do elenco</span></div>
+        <div class="chip partial"><span class="chip-id">M-TRAINING</span><span class="chip-d">Sessões de treino do elenco em <code>/elenco/treino</code>, sobre as queries <code>roster</code> + <code>training-sessions</code>: estados IDLE/TREINANDO/BLOQUEADO, escolha do atributo-foco, progresso em dias e coleta (parcial inclusive). Não fecha: <b>não foi exercitada no app rodando</b> e a spec é anterior à R-221 — ela não documenta iniciar/coletar sessão, então não há doc contra o qual declarar completude. Falta também o foco COLETIVO e a carga que a spec pede (foco por área, intensidade, recuperação, alertas de sobrecarga)</span><span class="tag">aguardando confirmação + falta plano coletivo</span></div>
         <div class="chip missing"><span class="chip-id">M-MEDICAL-CASE</span><span class="chip-d">Caso de lesão / reabilitação</span></div>
         <div class="chip missing"><span class="chip-id">M-YOUTH-PLAYER</span><span class="chip-d">Ficha do jovem</span></div>
         <div class="chip missing"><span class="chip-id">M-NEXTMATCH</span><span class="chip-d">Próxima partida (central do jogo)</span></div>
@@ -700,7 +700,7 @@
       </div>
       <div class="blocker">
         <h3>Onde fica a entrada do Treino — conflito de navegação não resolvido</h3>
-        <p><b>Trava nova.</b> <code>01-navegacao-e-arquitetura-de-informacao.md:27</code> põe o Treino na stack da aba <b>ELENCO</b> (Elenco ▸ Ficha ▸ Treino ▸ Medicina ▸ Base), e o próprio <code>M-TRAINING</code> diz "Como se chega: aba Elenco". O dono, porém, descreveu o treino como estando <b>dentro do clube</b>. E a tela do Clube (<code>apps/mobile/src/screens/club/index.tsx</code>) <b>não tem abas</b> — é um <code>ScrollView</code> de cards, sem lugar previsto para essa entrada. <b>Impede:</b> construir a navegação do treino sem escolher por conta própria entre o doc e o pedido do dono. <b>Decisão pendente do dono.</b></p>
+        <p><b>Trava nova.</b> <code>01-navegacao-e-arquitetura-de-informacao.md:27</code> põe o Treino na stack da aba <b>ELENCO</b> (Elenco ▸ Ficha ▸ Treino ▸ Medicina ▸ Base), e o próprio <code>M-TRAINING</code> diz "Como se chega: aba Elenco". O dono, porém, descreveu o treino como estando <b>dentro do clube</b>. E a tela do Clube (<code>apps/mobile/src/screens/club/index.tsx</code>) <b>não tem abas</b> — é um <code>ScrollView</code> de cards, sem lugar previsto para essa entrada. <b>Resolvido provisoriamente, sem escolher por ninguém:</b> a tela vive em <code>/elenco/treino</code>, onde o doc a põe, e o Clube ganhou um <b>card de atalho</b> para ela — o dono acha o treino onde procurava, e o doc não é contrariado. O comentário no código (<code>apps/mobile/src/screens/club/index.tsx</code>) diz que o card é atalho e sai sem quebrar nada. <b>A trava continua listada</b> porque a decisão de arquitetura segue pendente: se o Treino deve mesmo morar no Clube, é o doc de navegação que precisa mudar — não o app. <b>Decisão pendente do dono.</b></p>
       </div>
       <div class="blocker">
         <h3>O app não tem navegação de detalhe</h3>
@@ -746,6 +746,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-20</span>
+        <span class="log-text"><b>A primeira UI do atributo vivo: <code>M-TRAINING</code> sai de ausente para 🟡 PARCIAL (aguardando confirmação).</b> A tela vive em <code>/elenco/treino</code> (<code>apps/mobile/src/screens/training/index.tsx</code>), sobre as queries oficiais <code>roster</code> + <code>training-sessions</code> — a segunda criada horas antes justamente porque o estado TREINANDO era inobservável. Estados <b>IDLE / TREINANDO / BLOQUEADO</b> por jogador, escolha do atributo-foco (menor primeiro: é onde sobra espaço para crescer), progresso em dias e coleta. <b>Lógica pura testada ANTES de existir</b>: os 7 casos novos foram vistos falhando com <code>buildTrainingRows is not a function</code>, e só então implementados — progresso <b>tetado na duração</b> (coletar antes do fim rende parcial, passar do fim não rende além), sessão de jogador fora do elenco <b>ignorada</b> (linha fantasma seria a tela inventando jogador), resumo zerado em elenco vazio em vez de <code>NaN</code>. A data é a do <b>mundo</b> (<code>asOf</code>), nunca <code>Date.now()</code> — senão o progresso mostrado divergiria do ganho que a coleta aplica. <b>Por que NÃO é verde:</b> não foi exercitada no app rodando, e a spec de <code>M-TRAINING</code> é anterior à R-221 — ela não documenta iniciar/coletar sessão, então <b>não existe doc contra o qual declarar completude</b>; além disso falta o <b>plano coletivo</b> que a spec pede (foco por área, carga, recuperação, alertas de sobrecarga). Gate completo <b>com banco</b>: <code>lint=0 typecheck=0 test=0 build=0</code>, 142 arquivos / <b>1269</b> testes. Navegação: trava do conflito Clube-vs-Elenco <b>resolvida provisoriamente</b> (tela no Elenco + card de atalho no Clube), mas segue listada — a decisão de arquitetura é do dono.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-20</span>
         <span class="log-text"><b>A suíte de Postgres passou a rodar de verdade: 142 arquivos / 1262 testes, tudo passando, zero pulado.</b> A trava aberta horas antes (26 falhas em <code>GenerateWorldGenesis</code>, <code>PrismaPlayerRepository</code>, <code>PrismaSquadRepository</code>, <code>queries.e2e</code>) <b>caiu por inteiro</b>, e a causa não era código: <b>não havia bug nenhum</b>. O <code>grinta_test</code> estava <span class="num">8</span> migrations atrás do disco (27 aplicadas de 35) e num híbrido de <code>db push</code> + migrations — o <code>migrate deploy</code> travava com <code>P3009</code>/<code>P3018</code> ("<code>championshipId</code> já existe", "<code>ClubLineup</code> já existe"). <b>Marcar as migrations como aplicadas foi recusado de propósito:</b> os objetos existiam, mas os <em>drops de FK</em> da mesma migration não tinham acontecido, e "resolver" assim deixaria o schema divergindo do que o código espera <em>em silêncio</em> — o otimismo que o §5 proíbe. Reconstruído do zero via <code>migrate reset</code> <b>com consentimento explícito do dono</b> (§9), escopo apresentado antes: 5 GameWorld / 3 UserAccount de resíduo, só em <code>grinta_test</code>; o banco de dev <code>grinta</code> foi conferido depois e seguia com os <b>23 mundos intactos</b>. Receita de preparo e diagnóstico de schema atrasado documentados em <code>CLAUDE.md §9</code>, para a próxima pessoa não gastar a mesma hora. <b>Nenhuma tela mudou de cor</b> — isto é infraestrutura de prova, não UI.</span>
