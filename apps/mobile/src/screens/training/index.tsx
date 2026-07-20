@@ -57,6 +57,7 @@ import {
   talkIdempotencyKey,
   type TalkStance,
 } from "@/screens/talk/talk-model";
+import { availabilityBadge } from "@/screens/roster-list/roster-model";
 import {
   cohesionBadge,
   cohesionMatchModifier,
@@ -265,15 +266,32 @@ export function Training() {
     () => new Set((lineup?.starters ?? []).map((s) => s.playerId)),
     [lineup],
   );
+  // Quem está APTO — o único conjunto que o backend aceita no treino em grupo
+  // (senão recusa com PLAYER_NOT_AVAILABLE). Lesionado/suspenso/em treino fora.
+  const availableIds = useMemo(
+    () =>
+      new Set(
+        (rosterQuery.data?.players ?? [])
+          .filter((p) => p.availability === "AVAILABLE")
+          .map((p) => p.playerId),
+      ),
+    [rosterQuery.data],
+  );
   // A sessão de treino em GRUPO ativa (R-220.2): cronometrada, com participantes.
   const groupQuery = useWorldQuery<GroupSessionProjection>(
     managedClub === null ? null : "group-training-session",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const groupSession = groupQuery.data?.session ?? null;
-  // Rascunho dos participantes do PRÓXIMO treino em grupo. Default = titulares.
+  // Rascunho dos participantes do PRÓXIMO treino em grupo. Default = titulares
+  // APTOS: um titular lesionado/suspenso não pode entrar, então nunca é o padrão
+  // (era o que fazia o start recusar em silêncio antes de o usuário poder mexer).
+  const defaultParticipants = useMemo(
+    () => new Set([...starterIds].filter((id) => availableIds.has(id))),
+    [starterIds, availableIds],
+  );
   const [groupDraft, setGroupDraft] = useState<Set<string> | null>(null);
-  const groupParticipants = groupDraft ?? starterIds;
+  const groupParticipants = groupDraft ?? defaultParticipants;
 
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
@@ -636,9 +654,11 @@ export function Training() {
       toast.show({ tone: "error", text: "Monte a formação antes de treinar em grupo." });
       return;
     }
-    const ids = [...groupParticipants];
+    // Filtro defensivo: só APTOS vão ao backend. Mesmo que um indisponível tenha
+    // sobrado no rascunho, ele não pode entrar — o start recusaria o lote todo.
+    const ids = [...groupParticipants].filter((id) => availableIds.has(id));
     if (ids.length === 0) {
-      toast.show({ tone: "error", text: "Escolha ao menos um jogador para o grupo." });
+      toast.show({ tone: "error", text: "Escolha ao menos um jogador APTO para o grupo." });
       return;
     }
     if (worldDate === "") {
@@ -678,6 +698,7 @@ export function Training() {
     worldDate,
     lineup,
     groupParticipants,
+    availableIds,
     toast,
     groupQuery.refetch,
     rosterQuery.refetch,
@@ -1021,7 +1042,7 @@ export function Training() {
                               </View>
                               <Pressable
                                 onPress={() => {
-                                  setGroupDraft(new Set(starterIds));
+                                  setGroupDraft(new Set(defaultParticipants));
                                   setParticipantsOpen(true);
                                 }}
                                 accessibilityRole="button"
@@ -1641,17 +1662,25 @@ export function Training() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>QUEM TREINA EM GRUPO</Text>
             <Text style={styles.modalHint}>
-              Só jogadores disponíveis entram. Quem já treina individualmente não
-              aparece — os dois treinos se excluem.
+              Só APTOS entram. Os indisponíveis (lesão, suspensão, já em treino)
+              aparecem marcados e não podem ser escolhidos.
             </Text>
             <ScrollView style={styles.modalList}>
-              {(rosterQuery.data?.players ?? [])
-                .filter((p) => p.availability === "AVAILABLE")
+              {[...(rosterQuery.data?.players ?? [])]
+                // Aptos primeiro; indisponíveis no fim, para a escolha ficar limpa.
+                .sort(
+                  (a, b) =>
+                    Number(b.availability === "AVAILABLE") -
+                    Number(a.availability === "AVAILABLE"),
+                )
                 .map((p) => {
-                  const on = groupParticipants.has(p.playerId);
+                  const badge = availabilityBadge(p.availability);
+                  const unavailable = badge !== null;
+                  const on = groupParticipants.has(p.playerId) && !unavailable;
                   return (
                     <Pressable
                       key={p.playerId}
+                      disabled={unavailable}
                       onPress={() => {
                         const next = new Set(groupParticipants);
                         if (on) next.delete(p.playerId);
@@ -1659,21 +1688,59 @@ export function Training() {
                         setGroupDraft(next);
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel={`${on ? "Remover" : "Adicionar"} ${p.name}`}
-                      accessibilityState={{ selected: on }}
-                      style={styles.attrRow}
+                      accessibilityLabel={
+                        unavailable
+                          ? `${p.name} indisponível: ${badge.label}`
+                          : `${on ? "Remover" : "Adicionar"} ${p.name}`
+                      }
+                      accessibilityState={{
+                        selected: on,
+                        disabled: unavailable,
+                      }}
+                      style={[styles.attrRow, unavailable && styles.rowDisabled]}
                     >
                       <Icon
-                        name="checkmark-circle"
+                        name={unavailable ? "warning" : "checkmark-circle"}
                         size={18}
-                        color={on ? color.primary : color.textFaint}
+                        color={
+                          unavailable
+                            ? badge.tone === "danger"
+                              ? color.danger
+                              : color.warning
+                            : on
+                              ? color.primary
+                              : color.textFaint
+                        }
                       />
-                      <Text style={[styles.attrName, { flex: 1, marginLeft: space.sm }]}>
+                      <Text
+                        style={[
+                          styles.attrName,
+                          { flex: 1, marginLeft: space.sm },
+                          unavailable && { color: color.textMuted },
+                        ]}
+                        numberOfLines={1}
+                      >
                         {p.name}
                       </Text>
-                      <Text style={styles.attrValue}>
-                        {p.primaryPosition} · {p.overall}
-                      </Text>
+                      {unavailable ? (
+                        <Text
+                          style={[
+                            styles.statusTag,
+                            {
+                              color:
+                                badge.tone === "danger"
+                                  ? color.danger
+                                  : color.warning,
+                            },
+                          ]}
+                        >
+                          {badge.label}
+                        </Text>
+                      ) : (
+                        <Text style={styles.attrValue}>
+                          {p.primaryPosition} · {p.overall}
+                        </Text>
+                      )}
                     </Pressable>
                   );
                 })}
@@ -2094,16 +2161,23 @@ const styles = StyleSheet.create({
   modalList: { marginVertical: space.sm },
   attrRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: space.sm,
     borderBottomWidth: 1,
     borderBottomColor: color.border,
   },
+  rowDisabled: { opacity: 0.6 },
   attrName: { color: color.text, fontSize: fontSize.sm },
   attrValue: {
     color: color.textMuted,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
+  },
+  statusTag: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.3,
   },
   modalCancel: { alignItems: "center", paddingVertical: space.md },
   modalCancelText: {
