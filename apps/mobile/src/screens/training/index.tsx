@@ -548,14 +548,16 @@ export function Training() {
     ],
   );
 
+  // NÃO alimentamos `command` no estado de tela: um command ACCEPTED é
+  // não-terminal (fica pendente até um evento confirmar o efeito), e este app
+  // não tem essa confirmação — então gatear a TELA INTEIRA em "processing" pelo
+  // status do command a prendia em "processando…" para sempre depois do TREINAR.
+  // O feedback do command é INLINE (spinner no botão via actingId, texto de erro
+  // em REJECTED), como na tela do Clube. O efeito oficial chega pelo refetch.
   const screenState = deriveScreenState({
     session: status,
     hasCachedData:
       clubQuery.isStale || rosterQuery.isStale || sessionsQuery.isStale,
-    command: tracking?.status,
-    domainError:
-      tracking?.status === CommandTrackingStatus.REJECTED &&
-      tracking.errorCode !== null,
     query:
       clubQuery.state === "loading" ||
       rosterQuery.state === "loading" ||

@@ -167,13 +167,14 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
     [managedClub, client, contractVersion, worldId, playerId, worldDate, devQuery.refetch],
   );
 
+  // NÃO alimentamos `command` no estado de tela: ACCEPTED é não-terminal e este
+  // app não tem confirmação de efeito, então gatear a tela pelo status do
+  // command a prendia em "processando…" para sempre depois de elogiar/criticar.
+  // O feedback é inline (botões com busy, texto de erro em REJECTED); o efeito
+  // chega pelo refetch da query. Mesmo padrão da tela do Clube.
   const screenState = deriveScreenState({
     session: status,
     hasCachedData: devQuery.isStale,
-    command: tracking?.status,
-    domainError:
-      tracking?.status === CommandTrackingStatus.REJECTED &&
-      tracking.errorCode !== null,
     query:
       devQuery.state === "loading"
         ? "loading"
