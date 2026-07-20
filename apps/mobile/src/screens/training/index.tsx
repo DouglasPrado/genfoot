@@ -508,7 +508,7 @@ export function Training() {
           target: row.playerId,
           occasion: onEntity(sessionId),
         }),
-        `Ganho coletado: ${row.name} voltou ao elenco.`,
+        `${row.name} liberado do treino e de volta ao elenco.`,
       );
     },
     [dispatch, sessionsQuery.data, toast],
@@ -899,8 +899,8 @@ export function Training() {
               <Summary label="BLOQUEADOS" value={summary.blocked} tone="warning" />
             </View>
             <Text style={styles.summaryHint}>
-              {summary.collectable > 0
-                ? `${summary.collectable} sessão(ões) podem ser coletadas agora — coletar antes do fim rende ganho parcial.`
+              {summary.training > 0
+                ? `${summary.training} em treino — o ganho é aplicado e cada um volta ao elenco sozinho na virada do dia.`
                 : "Nenhuma sessão em andamento."}
             </Text>
           </Card>
@@ -1311,13 +1311,14 @@ export function Training() {
                                 {attributeLabel(row.session.attributeCode)}
                               </Text>
                             </Text>
-                            {/* Tempo ACIMA da barra. */}
+                            {/* Tempo ACIMA da barra. Na virada do dia o jogador é
+                                liberado sozinho, com o ganho aplicado. */}
                             <Text style={styles.cdTime} numberOfLines={1}>
                               {cd.complete
-                                ? "pronto para coletar"
+                                ? "pronto — vira apto na virada"
                                 : cd.secondsRemaining === null
-                                  ? `faltam ${cd.daysRemaining} dia(s)`
-                                  : `faltam ${formatCountdown(cd.secondsRemaining)}`}
+                                  ? `apto em ${cd.daysRemaining} dia(s)`
+                                  : `apto em ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
                             {/* Faixa 100% (cor da posição, esmaecida); progresso
                                 em cima, sólido, enchendo até o fim do treino. */}
@@ -1510,16 +1511,16 @@ export function Training() {
                             );
                             return (
                               <>
-                                {/* Tempo ACIMA da barra. */}
+                                {/* Tempo ACIMA da barra — conta até a virada. */}
                                 <Text style={styles.cdTimeLarge}>
                                   {cd.complete
-                                    ? "completo — colete o ganho"
+                                    ? "pronto — vira apto na virada do dia"
                                     : cd.secondsRemaining === null
-                                      ? `faltam ${cd.daysRemaining} dia(s) lógicos`
-                                      : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                                      ? `apto em ${cd.daysRemaining} dia(s) lógicos`
+                                      : `apto em ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
                                 </Text>
                                 {/* Faixa 100% (cor da posição, esmaecida);
-                                    progresso em cima, sólido, enchendo até o fim. */}
+                                    progresso em cima, sólido, enchendo até a virada. */}
                                 <View
                                   style={[
                                     styles.cdTrackLarge,
@@ -1537,8 +1538,8 @@ export function Training() {
                                   />
                                 </View>
                                 <Text style={styles.summaryHint}>
-                                  {session.elapsedDays}/{session.durationDays}{" "}
-                                  dias treinados
+                                  Na virada do dia lógico o ganho é aplicado e ele
+                                  volta ao elenco sozinho — não precisa coletar.
                                 </Text>
                               </>
                             );
@@ -1559,24 +1560,32 @@ export function Training() {
                         </Text>
                       )}
 
-                      {/* AÇÃO no card: treinar ou coletar, conforme o estado. */}
+                      {/* AÇÃO no card. Sob o modelo de 1 dia, o ganho vem na
+                          virada; coletar ANTES só serve para liberar já — e aí
+                          perde o ganho do dia. Por isso o rótulo é honesto. */}
                       {row !== null && row.state === "TRAINING" ? (
-                        <Pressable
-                          onPress={() => collectSession(row)}
-                          disabled={busy}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Coletar treino de ${row.name}`}
-                          accessibilityState={{ disabled: busy }}
-                          style={[
-                            styles.cardAction,
-                            styles.cardActionCollect,
-                            busy && styles.actionBusy,
-                          ]}
-                        >
-                          <Text style={styles.cardActionText}>
-                            {busy ? "…" : "COLETAR TREINO"}
+                        <>
+                          <Pressable
+                            onPress={() => collectSession(row)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Liberar ${row.name} do treino agora`}
+                            accessibilityState={{ disabled: busy }}
+                            style={[
+                              styles.cardAction,
+                              styles.cardActionCollect,
+                              busy && styles.actionBusy,
+                            ]}
+                          >
+                            <Text style={styles.cardActionText}>
+                              {busy ? "…" : "LIBERAR AGORA"}
+                            </Text>
+                          </Pressable>
+                          <Text style={styles.summaryHint}>
+                            Libera na hora, mas perde o ganho deste dia (ele viria
+                            na virada). Deixe treinando para o ganho valer.
                           </Text>
-                        </Pressable>
+                        </>
                       ) : row !== null &&
                         row.state === "IDLE" &&
                         starterIds.has(row.playerId) ? (
