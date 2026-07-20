@@ -134,6 +134,15 @@ interface WorldClockProjection {
   readonly nextTickAt: string | null;
 }
 
+interface GroupSessionProjection {
+  readonly session: {
+    readonly formation: string;
+    readonly participantIds: readonly string[];
+    readonly startDate: string;
+    readonly durationDays: number;
+  } | null;
+}
+
 /** Rótulo PT dos atributos que a tela oferece como foco. */
 const ATTRIBUTE_LABEL: Readonly<Record<string, string>> = {
   finishing: "Finalização",
@@ -181,6 +190,7 @@ export function Training() {
   const [picking, setPicking] = useState<TrainingRow | null>(null);
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [formationOpen, setFormationOpen] = useState(false);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
@@ -254,17 +264,16 @@ export function Training() {
     () => new Set((lineup?.starters ?? []).map((s) => s.playerId)),
     [lineup],
   );
-  // Os participantes do treino da equipe, com nome (para a lista da tela).
-  const participants = useMemo(() => {
-    const byId = new Map(
-      (rosterQuery.data?.players ?? []).map((p) => [p.playerId, p]),
-    );
-    return (lineup?.starters ?? []).map((s) => ({
-      playerId: s.playerId,
-      slotPosition: s.slotPosition,
-      name: byId.get(s.playerId)?.name ?? "—",
-    }));
-  }, [lineup, rosterQuery.data]);
+  // A sessão de treino em GRUPO ativa (R-220.2): cronometrada, com participantes.
+  const groupQuery = useWorldQuery<GroupSessionProjection>(
+    managedClub === null ? null : "group-training-session",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const groupSession = groupQuery.data?.session ?? null;
+  // Rascunho dos participantes do PRÓXIMO treino em grupo. Default = titulares.
+  const [groupDraft, setGroupDraft] = useState<Set<string> | null>(null);
+  const groupParticipants = groupDraft ?? starterIds;
+
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
@@ -322,12 +331,14 @@ export function Training() {
     sessionsQuery.refetch();
     planQuery.refetch();
     lineupQuery.refetch();
+    groupQuery.refetch();
   }, [
     clubQuery.refetch,
     rosterQuery.refetch,
     sessionsQuery.refetch,
     planQuery.refetch,
     lineupQuery.refetch,
+    groupQuery.refetch,
   ]);
 
   /** Despacha start/collect. O efeito oficial é a query voltando, não o retorno. */
@@ -542,68 +553,6 @@ export function Training() {
     planQuery.refetch,
   ]);
 
-  /** Treina a formação → sobe o entrosamento (R-220 Fase 3). Uma vez por dia. */
-  const trainFormation = useCallback(() => {
-    if (managedClub === null || client === null || contractVersion === null) {
-      return;
-    }
-    if (!trainState.enabled) {
-      toast.show({
-        tone: "error",
-        text:
-          trainState.kind === "unreadable"
-            ? "Não foi possível ler a escalação. Recarregue antes de treinar."
-            : "Monte a escalação antes de treinar a formação.",
-      });
-      return;
-    }
-    if (worldDate === "") {
-      toast.show({
-        tone: "error",
-        text: "Sem a data do mundo não dá para treinar. Recarregue.",
-      });
-      return;
-    }
-    const idempotencyKey = commandIdempotencyKey({
-      commandType: "training:train-formation",
-      target: managedClub.id,
-      occasion: onDay(worldDate),
-    });
-    setTracking({
-      status: CommandTrackingStatus.SUBMITTING,
-      commandId: null,
-      resource: null,
-      correlationId: `mobile:${idempotencyKey}`,
-      errorCode: null,
-    });
-    void submitTrackedCommand(client, {
-      clientContractVersion: "v1",
-      serverContractVersion: contractVersion,
-      commandType: "training:train-formation",
-      worldId,
-      payload: { clubId: managedClub.id },
-      idempotencyKey,
-      correlationId: `mobile:${idempotencyKey}`,
-    }).then((result) => {
-      setTracking(result);
-      const fb = commandFeedback(result, "Formação treinada — entrosamento subiu.");
-      if (fb !== null) toast.show(fb);
-      if (
-        result.status === CommandTrackingStatus.ACCEPTED ||
-        result.status === CommandTrackingStatus.APPLIED
-      ) {
-        clubQuery.refetch();
-      }
-    });
-  }, [
-    managedClub,
-    client,
-    contractVersion,
-    worldId,
-    worldDate,
-    trainState,
-    clubQuery.refetch,
-  ]);
 
   /**
    * Muda a formação da equipe (item 5). Reusa `assignToFormation` do elenco para
@@ -676,6 +625,107 @@ export function Training() {
       clubQuery.refetch,
     ],
   );
+
+  /** Inicia o treino em GRUPO cronometrado (R-220.2) com os participantes escolhidos. */
+  const startGroupTraining = useCallback(() => {
+    if (managedClub === null || client === null || contractVersion === null) {
+      return;
+    }
+    if (lineup === null) {
+      toast.show({ tone: "error", text: "Monte a formação antes de treinar em grupo." });
+      return;
+    }
+    const ids = [...groupParticipants];
+    if (ids.length === 0) {
+      toast.show({ tone: "error", text: "Escolha ao menos um jogador para o grupo." });
+      return;
+    }
+    if (worldDate === "") {
+      toast.show({ tone: "error", text: "Sem a data do mundo não dá para iniciar. Recarregue." });
+      return;
+    }
+    const idempotencyKey = commandIdempotencyKey({
+      commandType: "training:start-group-session",
+      target: managedClub.id,
+      occasion: onDay(worldDate),
+    });
+    void submitTrackedCommand(client, {
+      clientContractVersion: "v1",
+      serverContractVersion: contractVersion,
+      commandType: "training:start-group-session",
+      worldId,
+      payload: { clubId: managedClub.id, formation: lineup.formation, participantIds: ids },
+      idempotencyKey,
+      correlationId: `mobile:${idempotencyKey}`,
+    }).then((result) => {
+      const fb = commandFeedback(result, "Treino em grupo iniciado.");
+      if (fb !== null) toast.show(fb);
+      if (
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED
+      ) {
+        setGroupDraft(null);
+        groupQuery.refetch();
+        rosterQuery.refetch();
+      }
+    });
+  }, [
+    managedClub,
+    client,
+    contractVersion,
+    worldId,
+    worldDate,
+    lineup,
+    groupParticipants,
+    toast,
+    groupQuery.refetch,
+    rosterQuery.refetch,
+  ]);
+
+  /** Coleta o treino em grupo — sobe o entrosamento e libera os participantes. */
+  const collectGroupTraining = useCallback(() => {
+    if (managedClub === null || client === null || contractVersion === null) {
+      return;
+    }
+    // Ocasião = a sessão de grupo (identificada pelo início). Coletar de novo a
+    // mesma sessão dedupe; a próxima sessão é outra ocasião.
+    const idempotencyKey = commandIdempotencyKey({
+      commandType: "training:collect-group-session",
+      target: managedClub.id,
+      occasion: onEntity(`${managedClub.id}:${groupSession?.startDate ?? "none"}`),
+    });
+    void submitTrackedCommand(client, {
+      clientContractVersion: "v1",
+      serverContractVersion: contractVersion,
+      commandType: "training:collect-group-session",
+      worldId,
+      payload: { clubId: managedClub.id },
+      idempotencyKey,
+      correlationId: `mobile:${idempotencyKey}`,
+    }).then((result) => {
+      const fb = commandFeedback(result, "Treino em grupo coletado — entrosamento subiu.");
+      if (fb !== null) toast.show(fb);
+      if (
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED
+      ) {
+        groupQuery.refetch();
+        rosterQuery.refetch();
+        clubQuery.refetch();
+      }
+    });
+  }, [
+    managedClub,
+    client,
+    contractVersion,
+    worldId,
+    worldDate,
+    groupSession,
+    toast,
+    groupQuery.refetch,
+    rosterQuery.refetch,
+    clubQuery.refetch,
+  ]);
 
   /** Conversa com o ELENCO — move a forma de todo mundo de uma vez. */
   const talkToSquad = useCallback(
@@ -853,75 +903,171 @@ export function Training() {
                       />
                     </View>
 
-                    {/* Formação + quem participa do treino da equipe. */}
-                    {lineup !== null ? (
-                      <View style={styles.teamBlock}>
-                        <View style={styles.teamHeadRow}>
-                          <Text style={styles.teamFormation}>
-                            {lineup.formation}
-                          </Text>
-                          <Pressable
-                            onPress={() => setFormationOpen(true)}
-                            accessibilityRole="button"
-                            accessibilityLabel="Mudar a formação"
-                            accessibilityState={{}}
-                            style={styles.changeFormationBtn}
-                          >
-                            <Icon name="grid" size={13} color={color.primary} />
-                            <Text style={styles.changeFormationText}>
-                              MUDAR FORMAÇÃO
-                            </Text>
-                          </Pressable>
-                        </View>
-                        <Text style={styles.summaryHint}>
-                          {participants.length} participantes:
-                        </Text>
-                        <View style={styles.participantWrap}>
-                          {participants.map((p) => (
-                            <View key={p.playerId} style={styles.participantChip}>
-                              <Text style={styles.participantPos}>
-                                {p.slotPosition}
+                    {groupSession !== null
+                      ? (() => {
+                          // SESSÃO EM ANDAMENTO: barra de TEMPO + coletar.
+                          const cd = sessionCountdown({
+                            realSecondsPerDay:
+                              clockQuery.data?.realSecondsPerDay ?? null,
+                            nextTickAt: clockQuery.data?.nextTickAt ?? null,
+                            elapsedDays: Math.min(
+                              Math.max(
+                                0,
+                                Math.floor(
+                                  (Date.parse(`${worldDate || groupSession.startDate}T00:00:00Z`) -
+                                    Date.parse(`${groupSession.startDate}T00:00:00Z`)) /
+                                    86_400_000,
+                                ),
+                              ),
+                              groupSession.durationDays,
+                            ),
+                            durationDays: groupSession.durationDays,
+                            nowIso,
+                          });
+                          const pct = countdownProgressPercent({
+                            secondsRemaining: cd.secondsRemaining,
+                            elapsedDays: cd.daysRemaining
+                              ? groupSession.durationDays - cd.daysRemaining
+                              : groupSession.durationDays,
+                            durationDays: groupSession.durationDays,
+                            realSecondsPerDay:
+                              clockQuery.data?.realSecondsPerDay ?? null,
+                          });
+                          const collectable =
+                            cd.complete || cd.daysRemaining < groupSession.durationDays;
+                          const names = groupSession.participantIds.map(
+                            (id) =>
+                              (rosterQuery.data?.players ?? []).find(
+                                (p) => p.playerId === id,
+                              )?.name ?? "—",
+                          );
+                          return (
+                            <View style={styles.teamBlock}>
+                              <View style={styles.teamHeadRow}>
+                                <Text style={styles.teamFormation}>
+                                  {groupSession.formation}
+                                </Text>
+                                <Text style={styles.rowStatusTeam}>
+                                  ● treinando
+                                </Text>
+                              </View>
+                              <Text style={styles.cdTimeLarge}>
+                                {cd.complete
+                                  ? "completo — colete o entrosamento"
+                                  : cd.secondsRemaining === null
+                                    ? `faltam ${cd.daysRemaining} dia(s) lógicos`
+                                    : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
                               </Text>
-                              <Text style={styles.participantName} numberOfLines={1}>
-                                {p.name}
+                              <View style={styles.cohTrack}>
+                                <View
+                                  style={[
+                                    styles.cohFill,
+                                    { width: `${cd.complete ? 100 : pct}%` },
+                                    cd.complete && { backgroundColor: color.success },
+                                  ]}
+                                />
+                              </View>
+                              <Text style={styles.summaryHint}>
+                                {names.length} participantes: {names.join(", ")}
                               </Text>
+                              <Pressable
+                                onPress={collectGroupTraining}
+                                disabled={!collectable}
+                                accessibilityRole="button"
+                                accessibilityLabel="Coletar treino em grupo"
+                                accessibilityState={{ disabled: !collectable }}
+                                style={[
+                                  styles.savePlan,
+                                  { backgroundColor: color.success },
+                                  !collectable && styles.actionBusy,
+                                ]}
+                              >
+                                <Text style={styles.actionText}>
+                                  {collectable
+                                    ? "COLETAR ENTROSAMENTO"
+                                    : "AINDA NÃO RENDEU"}
+                                </Text>
+                              </Pressable>
                             </View>
-                          ))}
-                        </View>
-                      </View>
-                    ) : null}
-
-                    <Pressable
-                      onPress={trainFormation}
-                      disabled={!trainState.enabled}
-                      accessibilityRole="button"
-                      accessibilityLabel="Treinar a formação"
-                      accessibilityState={{ disabled: !trainState.enabled }}
-                      style={[
-                        styles.savePlan,
-                        !trainState.enabled && styles.actionBusy,
-                      ]}
-                    >
-                      <Text style={styles.actionText}>
-                        {trainState.kind === "ready"
-                          ? "TREINAR A FORMAÇÃO"
-                          : trainState.kind === "no-lineup"
-                            ? "MONTE A ESCALAÇÃO PRIMEIRO"
-                            : "LENDO A ESCALAÇÃO…"}
-                      </Text>
-                    </Pressable>
-                    {trainState.kind === "no-lineup" ? (
-                      <Pressable
-                        onPress={() => setFormationOpen(true)}
-                        accessibilityRole="button"
-                        accessibilityLabel="Escolher formação"
-                        accessibilityState={{}}
-                      >
-                        <Text style={[styles.summaryHint, { color: color.primary }]}>
-                          Toque para escolher a formação e montar a escalação.
-                        </Text>
-                      </Pressable>
-                    ) : null}
+                          );
+                        })()
+                      : (() => {
+                          // SEM SESSÃO: montar e iniciar o treino em grupo.
+                          const draftNames = [...groupParticipants].map(
+                            (id) =>
+                              (rosterQuery.data?.players ?? []).find(
+                                (p) => p.playerId === id,
+                              )?.name ?? "—",
+                          );
+                          return (
+                            <View style={styles.teamBlock}>
+                              <View style={styles.teamHeadRow}>
+                                <Text style={styles.teamFormation}>
+                                  {lineup?.formation ?? "—"}
+                                </Text>
+                                <Pressable
+                                  onPress={() => setFormationOpen(true)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Mudar a formação"
+                                  accessibilityState={{}}
+                                  style={styles.changeFormationBtn}
+                                >
+                                  <Icon name="grid" size={13} color={color.primary} />
+                                  <Text style={styles.changeFormationText}>
+                                    MUDAR FORMAÇÃO
+                                  </Text>
+                                </Pressable>
+                              </View>
+                              <Pressable
+                                onPress={() => {
+                                  setGroupDraft(new Set(starterIds));
+                                  setParticipantsOpen(true);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Escolher participantes"
+                                accessibilityState={{}}
+                              >
+                                <Text style={styles.summaryHint}>
+                                  {groupParticipants.size} participantes (toque para
+                                  escolher): {draftNames.slice(0, 4).join(", ")}
+                                  {draftNames.length > 4 ? "…" : ""}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={startGroupTraining}
+                                disabled={!hasLineup || groupParticipants.size === 0}
+                                accessibilityRole="button"
+                                accessibilityLabel="Iniciar treino em grupo"
+                                accessibilityState={{
+                                  disabled: !hasLineup || groupParticipants.size === 0,
+                                }}
+                                style={[
+                                  styles.savePlan,
+                                  (!hasLineup || groupParticipants.size === 0) &&
+                                    styles.actionBusy,
+                                ]}
+                              >
+                                <Text style={styles.actionText}>
+                                  {hasLineup
+                                    ? "INICIAR TREINO EM GRUPO"
+                                    : "MONTE A ESCALAÇÃO PRIMEIRO"}
+                                </Text>
+                              </Pressable>
+                              {!hasLineup ? (
+                                <Pressable
+                                  onPress={() => setFormationOpen(true)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Escolher formação"
+                                  accessibilityState={{}}
+                                >
+                                  <Text style={[styles.summaryHint, { color: color.primary }]}>
+                                    Toque para escolher a formação e montar a escalação.
+                                  </Text>
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          );
+                        })()}
                   </Card>
                 );
               })()
@@ -1475,6 +1621,69 @@ export function Training() {
               style={styles.modalCancel}
             >
               <Text style={styles.modalCancelText}>CANCELAR</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Escolher os participantes do treino em grupo — só disponíveis entram. */}
+      <Modal
+        visible={participantsOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setParticipantsOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>QUEM TREINA EM GRUPO</Text>
+            <Text style={styles.modalHint}>
+              Só jogadores disponíveis entram. Quem já treina individualmente não
+              aparece — os dois treinos se excluem.
+            </Text>
+            <ScrollView style={styles.modalList}>
+              {(rosterQuery.data?.players ?? [])
+                .filter((p) => p.availability === "AVAILABLE")
+                .map((p) => {
+                  const on = groupParticipants.has(p.playerId);
+                  return (
+                    <Pressable
+                      key={p.playerId}
+                      onPress={() => {
+                        const next = new Set(groupParticipants);
+                        if (on) next.delete(p.playerId);
+                        else next.add(p.playerId);
+                        setGroupDraft(next);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${on ? "Remover" : "Adicionar"} ${p.name}`}
+                      accessibilityState={{ selected: on }}
+                      style={styles.attrRow}
+                    >
+                      <Icon
+                        name="checkmark-circle"
+                        size={18}
+                        color={on ? color.primary : color.textFaint}
+                      />
+                      <Text style={[styles.attrName, { flex: 1, marginLeft: space.sm }]}>
+                        {p.name}
+                      </Text>
+                      <Text style={styles.attrValue}>
+                        {p.primaryPosition} · {p.overall}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            <Pressable
+              onPress={() => setParticipantsOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar participantes"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>
+                PRONTO ({groupParticipants.size})
+              </Text>
             </Pressable>
           </View>
         </View>
