@@ -18,6 +18,7 @@ import type {
 import type {
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
+  GroupTrainingSessionsReadModel,
   WorldSeasonReadModel,
   YouthIntakeReadModel,
 } from "@grinta/persistence";
@@ -58,6 +59,7 @@ export interface QueryContext {
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
   readonly worldSeasonReadModel: WorldSeasonReadModel;
+  readonly groupTrainingSessionsReadModel: GroupTrainingSessionsReadModel;
   readonly youthIntakeReadModel: YouthIntakeReadModel;
   /** Tática — a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
   readonly clubLineupRepository: LineupRepository;
@@ -167,6 +169,22 @@ const handlers: Record<string, QueryHandler> = {
     // estado vazio (todos disponíveis), não em erro.
     return succeed({
       sessions: await trainingSessionsReadModel.activeByClub(worldId, clubId),
+    });
+  },
+  "group-training-session": async ({ groupTrainingSessionsReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "group-training-session exige o parâmetro clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    // `null` = clube sem treino em grupo ativo. A tela cai no estado vazio.
+    return succeed({
+      session: await groupTrainingSessionsReadModel.activeByClub(worldId, clubId),
     });
   },
   "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {

@@ -1,6 +1,7 @@
 import type {
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
+  GroupTrainingSessionsReadModel,
   WorldSeasonReadModel,
   YouthIntakeReadModel,
 } from "@grinta/persistence";
@@ -56,6 +57,7 @@ import {
   CLUB_LINEUP_REPOSITORY,
   PLAYER_DEVELOPMENT_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
+  GROUP_TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   YOUTH_INTAKE_READ_MODEL,
   MARKET_READ_MODEL,
@@ -120,6 +122,8 @@ export class QueriesController {
     private readonly trainingSessionsReadModel: TrainingSessionsReadModel,
     @Inject(WORLD_SEASON_READ_MODEL)
     private readonly worldSeasonReadModel: WorldSeasonReadModel,
+    @Inject(GROUP_TRAINING_SESSIONS_READ_MODEL)
+    private readonly groupTrainingSessionsReadModel: GroupTrainingSessionsReadModel,
     @Inject(YOUTH_INTAKE_READ_MODEL)
     private readonly youthIntakeReadModel: YouthIntakeReadModel,
     @Inject(MARKET_READ_MODEL)
@@ -323,6 +327,7 @@ export class QueriesController {
         playerDevelopmentReadModel: this.playerDevelopmentReadModel,
         trainingSessionsReadModel: this.trainingSessionsReadModel,
         worldSeasonReadModel: this.worldSeasonReadModel,
+        groupTrainingSessionsReadModel: this.groupTrainingSessionsReadModel,
         youthIntakeReadModel: this.youthIntakeReadModel,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,

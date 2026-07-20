@@ -121,8 +121,10 @@ describe.skipIf(!hasDatabase)(
       "training:apply-season",
       "training:apply-season-aging",
       // Treino de sessão instantâneo (R-221 Fase 2a): inicia e coleta.
+      "training:collect-group-session",
       "training:collect-session",
       "training:set-plan",
+      "training:start-group-session",
       "training:start-session",
       // R-220 Fase 3: treinar a formação sobe o entrosamento do time.
       "training:train-formation",
@@ -159,7 +161,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(47);
+    expect(response.body.commandCount).toBe(49);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -176,6 +178,7 @@ describe.skipIf(!hasDatabase)(
       "fanbase",
       // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
       "finance-snapshot",
+      "group-training-session",
       "identity",
       "identity-detail",
       // A caixa de entrada (C12, M-HOME): pendências do clube.

@@ -1776,6 +1776,22 @@ model TrainingSession {
   @@index([playerId, active])
 }
 
+/// Sessão de treino em GRUPO (R-220.2): o time treina uma formação por um tempo
+/// e entrosa. Uma ativa por clube; os participantes ficam indisponíveis.
+model GroupTrainingSession {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  formation      String
+  participantIds String[] @db.Uuid
+  startDate      DateTime
+  durationDays   Int
+  active         Boolean  @default(true)
+  version        Int      @default(1)
+
+  @@index([gameWorldId, clubId, active])
+}
+
 /// Presença operacional no elenco — NÃO substitui contrato/registro/empréstimo.
 model Squad {
   id               String            @id @default(uuid(7)) @db.Uuid

@@ -16,6 +16,8 @@ import {
   PrismaTrainingSessionsReadModel,
   PrismaWorldSeasonReadModel,
   PrismaCohesionTrainingUnitOfWork,
+  PrismaGroupTrainingSessionUnitOfWork,
+  PrismaGroupTrainingSessionsReadModel,
   PrismaPlayerRepository,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
@@ -69,6 +71,8 @@ import {
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   COHESION_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_SESSIONS_READ_MODEL,
   PLAYER_REPOSITORY,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
@@ -242,6 +246,18 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTrainingSessionUnitOfWork =>
         new PrismaTrainingSessionUnitOfWork(client),
+    },
+    {
+      provide: GROUP_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaGroupTrainingSessionUnitOfWork =>
+        new PrismaGroupTrainingSessionUnitOfWork(client),
+    },
+    {
+      provide: GROUP_TRAINING_SESSIONS_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaGroupTrainingSessionsReadModel =>
+        new PrismaGroupTrainingSessionsReadModel(client),
     },
     {
       provide: COHESION_TRAINING_UNIT_OF_WORK,
@@ -468,6 +484,8 @@ import {
     SEASON_LIFECYCLE_REPOSITORY,
     TRAINING_SESSION_UNIT_OF_WORK,
     COHESION_TRAINING_UNIT_OF_WORK,
+    GROUP_TRAINING_UNIT_OF_WORK,
+    GROUP_TRAINING_SESSIONS_READ_MODEL,
     CLUB_LINEUP_REPOSITORY,
     LINEUP_CONTEXT_READER,
     PLAYER_REPOSITORY,

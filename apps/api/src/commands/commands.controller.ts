@@ -38,6 +38,7 @@ import type {
   SeasonLifecycleRepository,
   TrainingSessionUnitOfWork,
   CohesionTrainingUnitOfWork,
+  GroupTrainingSessionUnitOfWork,
   LineupRepository,
   LineupContextReader,
   PlayerRepository,
@@ -77,6 +78,7 @@ import {
   SEASON_LIFECYCLE_REPOSITORY,
   TRAINING_SESSION_UNIT_OF_WORK,
   COHESION_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_UNIT_OF_WORK,
   CLUB_LINEUP_REPOSITORY,
   LINEUP_CONTEXT_READER,
   PLAYER_REPOSITORY,
@@ -151,6 +153,8 @@ export class CommandsController {
     private readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork,
     @Inject(COHESION_TRAINING_UNIT_OF_WORK)
     private readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork,
+    @Inject(GROUP_TRAINING_UNIT_OF_WORK)
+    private readonly groupTrainingUnitOfWork: GroupTrainingSessionUnitOfWork,
     @Inject(CLUB_LINEUP_REPOSITORY)
     private readonly clubLineupRepository: LineupRepository,
     @Inject(LINEUP_CONTEXT_READER)
@@ -319,6 +323,7 @@ export class CommandsController {
         seasonLifecycle: this.seasonLifecycle,
         trainingSessionUnitOfWork: this.trainingSessionUnitOfWork,
         cohesionTrainingUnitOfWork: this.cohesionTrainingUnitOfWork,
+        groupTrainingUnitOfWork: this.groupTrainingUnitOfWork,
         clubLineupRepository: this.clubLineupRepository,
         lineupContextReader: this.lineupContextReader,
         playerRepository: this.playerRepository,

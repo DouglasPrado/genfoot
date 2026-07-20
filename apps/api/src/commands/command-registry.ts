@@ -66,6 +66,9 @@ import {
   type TrainingSessionUnitOfWork,
   type CohesionTrainingUnitOfWork,
   TrainFormationCohesion,
+  StartGroupTrainingSession,
+  CollectGroupTrainingSession,
+  type GroupTrainingSessionUnitOfWork,
   type LineupRepository,
   type LineupContextReader,
   SetClubLineup,
@@ -155,6 +158,7 @@ export interface CommandContext {
   /** R-221 Fase 2a — treino de sessão com progresso instantâneo. */
   readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork;
   readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork;
+  readonly groupTrainingUnitOfWork: GroupTrainingSessionUnitOfWork;
   /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
@@ -503,6 +507,16 @@ const setLineupPayload = z.object({
 });
 
 const trainFormationPayload = z.object({
+  clubId: z.string().uuid(),
+});
+
+const startGroupTrainingPayload = z.object({
+  clubId: z.string().uuid(),
+  formation: z.string(),
+  participantIds: z.array(z.string().uuid()),
+});
+
+const collectGroupTrainingPayload = z.object({
   clubId: z.string().uuid(),
 });
 
@@ -951,6 +965,51 @@ const handlers: Record<string, CommandHandler> = {
     );
     if (!result.ok) return result;
     return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  /** Treino em GRUPO: inicia a sessão cronometrada da formação (R-220.2). */
+  "training:start-group-session": async ({
+    worlds,
+    groupTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = startGroupTrainingPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new StartGroupTrainingSession(
+      groupTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      formation: parsed.data.formation,
+      participantIds: parsed.data.participantIds,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `group-training:${result.value.session.id}` });
+  },
+
+  /** Treino em GRUPO: coleta — sobe o entrosamento e libera os participantes. */
+  "training:collect-group-session": async ({
+    worlds,
+    groupTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = collectGroupTrainingPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new CollectGroupTrainingSession(
+      groupTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      worldDate: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` } as never);
   },
 
   /** Moral — conversa do treinador: elogiar/criticar move a FORMA (R-221 2c). */
