@@ -7,7 +7,7 @@ import {
 import { Player } from "../players/player.js";
 import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 
-import { SESSION_DURATION_DAYS } from "./training-session.js";
+import { INDIVIDUAL_SESSION_DURATION_DAYS } from "./training-session.js";
 import type {
   TrainingSessionSnapshot,
   TrainingSessionUnitOfWork,
@@ -96,7 +96,7 @@ export class StartTrainingSession {
         playerId: input.playerId,
         attributeCode: input.attributeCode,
         startDate: input.worldDate,
-        durationDays: SESSION_DURATION_DAYS,
+        durationDays: INDIVIDUAL_SESSION_DURATION_DAYS,
         active: true,
         version: 1,
       };

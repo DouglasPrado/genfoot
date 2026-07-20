@@ -16,6 +16,7 @@ import {
 import type { PlayerAggregateSnapshot, PlayerRepository } from "../players/player-repository.js";
 
 import { CollectTrainingSession } from "./collect-training-session.js";
+import { SettleDueTrainingSessions } from "./settle-due-training-sessions.js";
 import { StartTrainingSession } from "./start-training-session.js";
 import type {
   TrainingSessionRepositories,
@@ -89,6 +90,9 @@ class MemSessions implements TrainingSessionRepository {
   public current: TrainingSessionSnapshot | null = null;
   public findActiveByPlayer(): Promise<TrainingSessionSnapshot | null> {
     return Promise.resolve(this.current?.active ? this.current : null);
+  }
+  public findAllActive(): Promise<readonly TrainingSessionSnapshot[]> {
+    return Promise.resolve(this.current?.active ? [this.current] : []);
   }
   /** Espelha o banco: o id existe mesmo depois da sessão ser coletada. */
   public existsWithId(_gameWorldId: string, id: string): Promise<boolean> {
@@ -253,5 +257,57 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
     });
     const after = players.agg.player.attributes.shortPassing;
     expect(after).toBe(before); // sem headroom, sem ganho
+  });
+});
+
+describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lógico)", () => {
+  const base = {
+    gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
+    attributeCode: "shortPassing", worldSeed: SEED,
+  } as const;
+
+  it("NO MESMO dia a sessão NÃO é settlada — jogador segue indisponível", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    const r = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-01", rulesetVersion: RULESET,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.settledCount).toBe(0);
+    expect(sessions.current?.active).toBe(true);
+    expect(players.agg.player.availability).toBe(PlayerAvailability.UNAVAILABLE);
+  });
+
+  it("NA VIRADA (dia seguinte) a sessão settla SOZINHA: ganho aplicado, jogador APTO, sessão fechada", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    const before = players.agg.player.attributes.shortPassing as number;
+    const r = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-02", rulesetVersion: RULESET,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.settledCount).toBe(1);
+    expect(sessions.current?.active).toBe(false);
+    expect(players.agg.player.availability).toBe(PlayerAvailability.AVAILABLE);
+    expect(players.agg.player.attributes.shortPassing as number).toBeGreaterThan(before);
+  });
+
+  it("reavançar não settla de novo — a sessão já está inativa (idempotente)", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-02", rulesetVersion: RULESET,
+    });
+    const again = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-03", rulesetVersion: RULESET,
+    });
+    expect(again.ok).toBe(true);
+    if (again.ok) expect(again.value.settledCount).toBe(0);
   });
 });

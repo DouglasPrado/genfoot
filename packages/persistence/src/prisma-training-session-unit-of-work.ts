@@ -67,6 +67,25 @@ export class PrismaTrainingSessionRepository
     };
   }
 
+  public async findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly TrainingSessionSnapshot[]> {
+    const rows = await this.client.trainingSession.findMany({
+      where: { gameWorldId, active: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      gameWorldId: row.gameWorldId,
+      clubId: row.clubId,
+      playerId: row.playerId,
+      attributeCode: row.attributeCode,
+      startDate: isoDate(row.startDate),
+      durationDays: row.durationDays,
+      active: row.active,
+      version: row.version,
+    }));
+  }
+
   public async existsWithId(
     gameWorldId: string,
     id: string,

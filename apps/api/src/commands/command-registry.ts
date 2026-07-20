@@ -42,6 +42,7 @@ import {
   ApplySeasonAging,
   StartTrainingSession,
   CollectTrainingSession,
+  SettleDueTrainingSessions,
   TalkToPlayer,
   TalkStance,
   talkStanceFormDelta,
@@ -615,6 +616,30 @@ async function applySeasonTurns(
   });
 }
 
+/**
+ * Liberação do treino de sessão na VIRADA do dia (decisão do dono 2026-07-20,
+ * emenda à R-220.2 / destrava a Trava B-08). Roda DEPOIS de avançar o relógio,
+ * nos dois caminhos (`world:advance-day` / `world:advance-days`): toda sessão
+ * individual que cumpriu sua duração (1 dia) é coletada — ganho aplicado, jogador
+ * liberado — sem coleta manual. Idempotente (a sessão vira inativa ao settlar).
+ */
+async function settleDueTraining(
+  deps: Pick<CommandContext, "trainingSessionUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  await new SettleDueTrainingSessions(deps.trainingSessionUnitOfWork).execute({
+    gameWorldId: world.worldId,
+    worldSeed: world.seed,
+    worldDate: world.currentDate,
+    rulesetVersion: world.rulesetVersion as never,
+  });
+}
+
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
@@ -799,6 +824,7 @@ const handlers: Record<string, CommandHandler> = {
     seasonFinanceUnitOfWork,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    trainingSessionUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -855,6 +881,18 @@ const handlers: Record<string, CommandHandler> = {
         rulesetVersion: advanced.value.world.rulesetVersion,
       },
       closedNumbers,
+    );
+    // Virada do dia: libera quem terminou o treino de sessão (1 dia). Como o
+    // avanço pode pular vários dias, uma sessão que venceu no meio é settlada
+    // aqui na data final — o ganho é tetado na duração, então não infla.
+    await settleDueTraining(
+      { trainingSessionUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
     );
 
     return succeed({
@@ -1602,6 +1640,7 @@ const handlers: Record<string, CommandHandler> = {
     matchPlay,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    trainingSessionUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1632,6 +1671,16 @@ const handlers: Record<string, CommandHandler> = {
           rulesetVersion: after.value.snapshot.rulesetVersion,
         },
         result.value.seasonsClosed,
+      );
+      // Virada do dia: libera quem terminou o treino de sessão (1 dia).
+      await settleDueTraining(
+        { trainingSessionUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
       );
     }
     return succeed({ resource: `world:${world.value.worldId}` });

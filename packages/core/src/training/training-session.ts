@@ -18,6 +18,14 @@ const DAY_MS = 86_400_000;
 /** Uma sessão dura 7 dias lógicos por padrão — janela de treino de uma semana. */
 export const SESSION_DURATION_DAYS = 7;
 
+/**
+ * Treino INDIVIDUAL dura 1 dia lógico (decisão do dono, 2026-07-20, emenda à
+ * R-220.2): treina hoje → indisponível hoje; na VIRADA do dia o ganho é aplicado
+ * e o jogador volta a apto SOZINHO, sem coleta manual (o settle roda no avanço
+ * de dia). O grupo/entrosamento seguem `SESSION_DURATION_DAYS`.
+ */
+export const INDIVIDUAL_SESSION_DURATION_DAYS = 1;
+
 /** Fadiga somada ao tirar do treino e jogar no MESMO dia lógico. */
 export const SAME_DAY_FATIGUE_PENALTY = 20;
 

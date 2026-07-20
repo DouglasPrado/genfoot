@@ -15,8 +15,15 @@ export const SESSION_FOCUSED_QUALITY = 1;
 export const SESSION_COMPETITIVE_MINUTES = 0.6;
 /** Headroom (teto − atual) que satura o fator de potencial restante em 1. */
 export const SESSION_MAX_HEADROOM = 40;
-/** Concentração da sessão: sem ela o ganho diário renderia < 1 ponto, invisível. */
-export const SESSION_INTENSITY = 12;
+/**
+ * Concentração da sessão: sem ela o ganho diário renderia < 1 ponto, invisível.
+ * Recalibrado de 12→84 quando a sessão INDIVIDUAL virou de 1 dia (decisão do dono
+ * 2026-07-20). Princípio: uma sessão de 1 dia rende o que a sessão inteira rendia
+ * antes (a duração caiu de 7→1, então a concentração sobe ×7: 12×7=84), tetada no
+ * clamp de +6 por coleta. Assim treinar UM dia mexe no atributo de forma visível.
+ * VAL-001 — magnitude/velocidade de evolução a confirmar pelo dono.
+ */
+export const SESSION_INTENSITY = 84;
 /** O clamp por aplicação de `applyAttributeChange` (player.ts): +6 por vez. */
 export const SESSION_MAX_GAIN_PER_COLLECT = 6;
 

@@ -168,6 +168,7 @@ export * from "./training/training-session-types.js";
 export * from "./training/train-formation-cohesion.js";
 export * from "./training/start-training-session.js";
 export * from "./training/collect-training-session.js";
+export * from "./training/settle-due-training-sessions.js";
 export * from "./training/group-training-session-types.js";
 export * from "./training/start-group-training-session.js";
 export * from "./training/collect-group-training-session.js";

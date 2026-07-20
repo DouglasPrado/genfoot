@@ -27,6 +27,14 @@ export interface TrainingSessionRepository {
     playerId: string,
   ): Promise<TrainingSessionSnapshot | null>;
   /**
+   * Todas as sessões ATIVAS do mundo — para o settle na virada do dia
+   * (`SettleDueTrainingSessions`), que encerra as que já cumpriram a duração e
+   * libera o jogador. Sem isto, a única forma de liberar era a coleta manual.
+   */
+  findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly TrainingSessionSnapshot[]>;
+  /**
    * Existe sessão com este id — ATIVA OU NÃO?
    *
    * O id é determinístico por (mundo, jogador, data lógica), então duas sessões
