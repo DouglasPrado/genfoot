@@ -1,0 +1,621 @@
+import { useCallback, useMemo, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
+
+import { CommandTrackingStatus } from "@grinta/core";
+
+import { Card } from "@/components/card";
+import { Icon } from "@/components/icon";
+import { Refresh } from "@/components/refresh";
+import { ScreenStatePanel } from "@/components/screen-state-panel";
+import {
+  selectManagedClub,
+  type ClubPortfolioProjection,
+} from "@/lib/club-projection";
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
+import { deriveScreenState } from "@/lib/screen-state";
+import { useSession } from "@/lib/session";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
+import {
+  deriveOnboardingStep,
+  type MobileIdentityProjection,
+} from "@/screens/onboarding/onboarding-model";
+import {
+  buildStartSessionPayload,
+  buildTrainingRows,
+  summarizeTraining,
+  type TrainingRow,
+} from "@/screens/training-session/training-session-model";
+import { color, fontSize, fontWeight, radius, space } from "@/theme";
+
+interface RosterPlayer {
+  readonly playerId: string;
+  readonly shirtNumber: number;
+  readonly name: string;
+  readonly primaryPosition: string;
+  readonly overall: number;
+  readonly availability: string;
+  readonly attributes?: Record<string, number | null> | null;
+}
+
+interface RosterProjection {
+  readonly players: readonly RosterPlayer[];
+}
+
+interface ActiveSession {
+  readonly playerId: string;
+  readonly attributeCode: string;
+  readonly startDate: string;
+  readonly durationDays: number;
+}
+
+interface TrainingSessionsProjection {
+  readonly sessions: readonly ActiveSession[];
+}
+
+/** Rótulo PT dos atributos que a tela oferece como foco. */
+const ATTRIBUTE_LABEL: Readonly<Record<string, string>> = {
+  finishing: "Finalização",
+  shortPassing: "Passe curto",
+  longPassing: "Passe longo",
+  dribbling: "Drible",
+  crossing: "Cruzamento",
+  marking: "Marcação",
+  tackling: "Desarme",
+  heading: "Cabeceio",
+  pace: "Velocidade",
+  stamina: "Resistência",
+  strength: "Força",
+  agility: "Agilidade",
+  vision: "Visão de jogo",
+  composure: "Frieza",
+  positioning: "Posicionamento",
+  reflexes: "Reflexos",
+  handling: "Defesa (mãos)",
+  diving: "Elasticidade",
+};
+
+const attributeLabel = (code: string): string => ATTRIBUTE_LABEL[code] ?? code;
+
+/**
+ * Treino (M-TRAINING) — o elenco e o estado de treino de cada jogador.
+ *
+ * Toda a decisão (estado da sessão, progresso, payload) vive em
+ * `training-session-model.ts` e é testada lá. Aqui só renderiza e despacha.
+ */
+export function Training() {
+  const { session, status, client, contractVersion } = useSession();
+  const worldId = useRequiredWorldId();
+  const [picking, setPicking] = useState<TrainingRow | null>(null);
+  const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+
+  const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
+  const identityQuery =
+    useWorldQuery<MobileIdentityProjection>("identity-detail");
+  const onboarding =
+    session === null
+      ? null
+      : deriveOnboardingStep(
+          identityQuery.state === "ready" ? identityQuery.data : null,
+          session.accountId,
+          clubQuery.asOf ?? "",
+        );
+  const managedClub = selectManagedClub(
+    clubQuery.data,
+    onboarding?.kind === "complete" ? onboarding.clubId : null,
+  );
+  const rosterQuery = useWorldQuery<RosterProjection>(
+    managedClub === null ? null : "roster",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const sessionsQuery = useWorldQuery<TrainingSessionsProjection>(
+    managedClub === null ? null : "training-sessions",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+
+  // A data do MUNDO — nunca Date.now(). O progresso mostrado tem que bater com
+  // o que a coleta rende no servidor.
+  const worldDate = clubQuery.asOf ?? "";
+
+  const rows = useMemo(
+    () =>
+      buildTrainingRows(
+        rosterQuery.data?.players ?? [],
+        sessionsQuery.data?.sessions ?? [],
+        worldDate,
+      ),
+    [rosterQuery.data, sessionsQuery.data, worldDate],
+  );
+  const summary = useMemo(() => summarizeTraining(rows), [rows]);
+
+  const attributesOf = useCallback(
+    (playerId: string): readonly { code: string; value: number }[] => {
+      const player = rosterQuery.data?.players.find(
+        (p) => p.playerId === playerId,
+      );
+      const grid = player?.attributes ?? null;
+      if (grid === null) return [];
+      return Object.entries(grid)
+        .filter((entry): entry is [string, number] => typeof entry[1] === "number")
+        .map(([code, value]) => ({ code, value }))
+        // Menor primeiro: é onde sobra mais espaço para crescer.
+        .sort((a, b) => a.value - b.value);
+    },
+    [rosterQuery.data],
+  );
+
+  const refresh = useCallback(() => {
+    clubQuery.refetch();
+    rosterQuery.refetch();
+    sessionsQuery.refetch();
+  }, [clubQuery.refetch, rosterQuery.refetch, sessionsQuery.refetch]);
+
+  /** Despacha start/collect. O efeito oficial é a query voltando, não o retorno. */
+  const dispatch = useCallback(
+    (
+      commandType: string,
+      playerId: string,
+      payload: Record<string, unknown>,
+    ) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const idempotencyKey = `${commandType}:${managedClub.id}:${playerId}`;
+      setActingId(playerId);
+      setTracking({
+        status: CommandTrackingStatus.SUBMITTING,
+        commandId: null,
+        resource: null,
+        correlationId: `mobile:${idempotencyKey}`,
+        errorCode: null,
+      });
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType,
+        worldId,
+        payload,
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setTracking(result);
+        setActingId(null);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          setPicking(null);
+          rosterQuery.refetch();
+          sessionsQuery.refetch();
+        }
+      });
+    },
+    [
+      managedClub,
+      client,
+      contractVersion,
+      worldId,
+      rosterQuery.refetch,
+      sessionsQuery.refetch,
+    ],
+  );
+
+  const startSession = useCallback(
+    (row: TrainingRow, attributeCode: string) => {
+      if (managedClub === null) return;
+      const payload = buildStartSessionPayload({
+        clubId: managedClub.id,
+        playerId: row.playerId,
+        attributeCode,
+      });
+      if ("error" in payload) return;
+      dispatch("training:start-session", row.playerId, {
+        ...payload,
+      });
+    },
+    [managedClub, dispatch],
+  );
+
+  const collectSession = useCallback(
+    (row: TrainingRow) => {
+      dispatch("training:collect-session", row.playerId, {
+        playerId: row.playerId,
+      });
+    },
+    [dispatch],
+  );
+
+  const screenState = deriveScreenState({
+    session: status,
+    hasCachedData:
+      clubQuery.isStale || rosterQuery.isStale || sessionsQuery.isStale,
+    command: tracking?.status,
+    domainError:
+      tracking?.status === CommandTrackingStatus.REJECTED &&
+      tracking.errorCode !== null,
+    query:
+      clubQuery.state === "loading" ||
+      rosterQuery.state === "loading" ||
+      sessionsQuery.state === "loading"
+        ? "loading"
+        : clubQuery.state === "offline" ||
+            rosterQuery.state === "offline" ||
+            sessionsQuery.state === "offline"
+          ? "offline"
+          : clubQuery.state === "error" ||
+              rosterQuery.state === "error" ||
+              sessionsQuery.state === "error"
+            ? "error"
+            : "ready",
+  });
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar ao elenco"
+          accessibilityState={{}}
+          hitSlop={8}
+          style={styles.back}
+        >
+          <Icon name="arrow-back" size={22} color={color.text} />
+        </Pressable>
+        <Text style={styles.headerTitle}>TREINO</Text>
+        <View style={styles.back} />
+      </View>
+
+      {screenState !== "success" || managedClub === null ? (
+        <View style={styles.content}>
+          <ScreenStatePanel
+            state={screenState === "success" ? "empty" : screenState}
+            title={managedClub === null ? "SEM CLUBE" : undefined}
+            body={
+              managedClub === null
+                ? "Conclua a escolha de clube para treinar o elenco."
+                : undefined
+            }
+            onRetry={refresh}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<Refresh onRefresh={refresh} />}
+        >
+          <Card>
+            <View style={styles.summary}>
+              <Summary label="TREINANDO" value={summary.training} tone="primary" />
+              <Summary label="LIVRES" value={summary.idle} tone="text" />
+              <Summary label="BLOQUEADOS" value={summary.blocked} tone="warning" />
+            </View>
+            <Text style={styles.summaryHint}>
+              {summary.collectable > 0
+                ? `${summary.collectable} sessão(ões) podem ser coletadas agora — coletar antes do fim rende ganho parcial.`
+                : "Nenhuma sessão em andamento."}
+            </Text>
+          </Card>
+
+          {tracking?.status === CommandTrackingStatus.REJECTED ? (
+            <Text style={styles.error}>
+              {tracking.errorCode ?? "COMMAND_REJECTED"}
+            </Text>
+          ) : null}
+
+          {rows.length === 0 ? (
+            <Text style={styles.empty}>
+              O elenco está vazio — não há ninguém para treinar.
+            </Text>
+          ) : (
+            rows.map((row) => (
+              <TrainingCard
+                key={row.playerId}
+                row={row}
+                busy={actingId === row.playerId}
+                onStart={() => setPicking(row)}
+                onCollect={() => collectSession(row)}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
+
+      <Modal
+        visible={picking !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPicking(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>
+              FOCO DO TREINO — {picking?.name ?? ""}
+            </Text>
+            <Text style={styles.modalHint}>
+              O menor atributo aparece primeiro: é onde sobra mais espaço para
+              crescer.
+            </Text>
+            <ScrollView style={styles.modalList}>
+              {picking === null ? null : attributesOf(picking.playerId).length ===
+                0 ? (
+                <Text style={styles.empty}>
+                  Este jogador não tem grade de atributos na leitura do elenco —
+                  não há foco a escolher.
+                </Text>
+              ) : (
+                attributesOf(picking.playerId).map((attr) => (
+                  <Pressable
+                    key={attr.code}
+                    onPress={() => startSession(picking, attr.code)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Treinar ${attributeLabel(attr.code)}`}
+                    accessibilityState={{}}
+                    style={styles.attrRow}
+                  >
+                    <Text style={styles.attrName}>
+                      {attributeLabel(attr.code)}
+                    </Text>
+                    <Text style={styles.attrValue}>{attr.value}</Text>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+            <Pressable
+              onPress={() => setPicking(null)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar escolha de foco"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>CANCELAR</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+function Summary({
+  label,
+  value,
+  tone,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly tone: "primary" | "text" | "warning";
+}) {
+  return (
+    <View style={styles.summaryBox}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.summaryValue,
+          tone === "primary" && { color: color.primary },
+          tone === "warning" && { color: color.warning },
+        ]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function TrainingCard({
+  row,
+  busy,
+  onStart,
+  onCollect,
+}: {
+  readonly row: TrainingRow;
+  readonly busy: boolean;
+  readonly onStart: () => void;
+  readonly onCollect: () => void;
+}) {
+  return (
+    <Card>
+      <View style={styles.playerRow}>
+        <Text style={styles.shirt}>{row.shirtNumber}</Text>
+        <View style={styles.playerInfo}>
+          <Text style={styles.playerName}>{row.name}</Text>
+          <Text style={styles.playerMeta}>
+            {row.primaryPosition} · {row.overall}
+          </Text>
+        </View>
+
+        {row.state === "BLOCKED" ? (
+          <Text style={styles.blocked}>{row.blockedLabel}</Text>
+        ) : row.state === "TRAINING" && row.session !== null ? (
+          <Pressable
+            onPress={onCollect}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`Coletar treino de ${row.name}`}
+            accessibilityState={{ disabled: busy }}
+            style={[styles.action, styles.actionCollect, busy && styles.actionBusy]}
+          >
+            <Text style={styles.actionText}>
+              {busy ? "…" : "COLETAR"}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={onStart}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={`Treinar ${row.name}`}
+            accessibilityState={{ disabled: busy }}
+            style={[styles.action, busy && styles.actionBusy]}
+          >
+            <Text style={styles.actionText}>{busy ? "…" : "TREINAR"}</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {row.session === null ? null : (
+        <View style={styles.progressBlock}>
+          <Text style={styles.progressLabel}>
+            {attributeLabel(row.session.attributeCode)} ·{" "}
+            {row.session.elapsedDays}/{row.session.durationDays} dias
+            {row.session.complete ? " · completo" : " · parcial"}
+          </Text>
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${Math.round(
+                    (row.session.elapsedDays / row.session.durationDays) * 100,
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: color.background },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+  },
+  back: { width: 32, alignItems: "flex-start" },
+  headerTitle: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
+  content: { padding: space.lg, gap: space.md, paddingBottom: space.xl4 },
+  summary: { flexDirection: "row", gap: space.sm },
+  summaryBox: {
+    flex: 1,
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.sm,
+    padding: space.md,
+    gap: 2,
+  },
+  summaryLabel: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.3,
+  },
+  summaryValue: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  summaryHint: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    marginTop: space.sm,
+  },
+  error: {
+    color: color.danger,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  empty: { color: color.textMuted, fontSize: fontSize.sm },
+  playerRow: { flexDirection: "row", alignItems: "center", gap: space.md },
+  shirt: {
+    color: color.textFaint,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    width: 28,
+  },
+  playerInfo: { flex: 1, gap: 2 },
+  playerName: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  playerMeta: { color: color.textMuted, fontSize: fontSize.xs },
+  blocked: {
+    color: color.warning,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  action: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  actionCollect: { backgroundColor: color.success },
+  actionBusy: { opacity: 0.5 },
+  actionText: {
+    color: color.background,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  progressBlock: { marginTop: space.md, gap: space.xs },
+  progressLabel: { color: color.textMuted, fontSize: fontSize.xs },
+  progressTrack: {
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    overflow: "hidden",
+  },
+  progressFill: { height: 4, backgroundColor: color.primary },
+  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#0008" },
+  modalSheet: {
+    backgroundColor: color.backgroundElevated,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: space.lg,
+    gap: space.sm,
+    maxHeight: "80%",
+  },
+  modalTitle: {
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  modalHint: { color: color.textMuted, fontSize: fontSize.xs },
+  modalList: { marginVertical: space.sm },
+  attrRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: space.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: color.border,
+  },
+  attrName: { color: color.text, fontSize: fontSize.sm },
+  attrValue: {
+    color: color.textMuted,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  modalCancel: { alignItems: "center", paddingVertical: space.md },
+  modalCancelText: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+});
