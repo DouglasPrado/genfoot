@@ -1,8 +1,11 @@
-import type {
-  MatchPlayRepository,
-  ScheduledMatchWithStrength,
-  ScorerCandidate,
-  SimulatedMatchResult,
+import {
+  FORM_MAX,
+  matchFormDelta,
+  type MatchOutcome,
+  type MatchPlayRepository,
+  type ScheduledMatchWithStrength,
+  type ScorerCandidate,
+  type SimulatedMatchResult,
 } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
@@ -118,6 +121,12 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       // FINISHED) não duplica nada.
       if (count === 0) continue;
 
+      // A FORMA (R-221 Fase 2b): o resultado move a forma de quem jogou —
+      // vencedor sobe, perdedor desce; artilheiro embala. Aplicado uma vez (só
+      // na transição para FINISHED, count>0). Atalho de SQL clamped, como a
+      // força: a forma é stat transiente, não agregado disputado.
+      await this.applyMatchForma(gameWorldId, result);
+
       // O manifesto de replay (C5-V2): reproduz a partida bit a bit (doc 15
       // §3.1). Vale para TODA partida jogada, inclusive 0×0. Reescrito por
       // matchId (unique) — reprocessar não duplica.
@@ -227,6 +236,76 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       );
     }
     return byClub;
+  }
+
+  /**
+   * Move a forma dos jogadores pelo resultado da partida (R-221 Fase 2b): base
+   * do resultado para o elenco de cada clube + bônus por gol ao artilheiro.
+   */
+  private async applyMatchForma(
+    gameWorldId: GameWorldId,
+    result: SimulatedMatchResult,
+  ): Promise<void> {
+    const clubs = await this.client.match.findUnique({
+      where: { id: result.matchId },
+      select: { homeClubId: true, awayClubId: true },
+    });
+    if (clubs === null) return;
+    const homeOutcome: MatchOutcome =
+      result.homeGoals > result.awayGoals
+        ? "WIN"
+        : result.homeGoals < result.awayGoals
+          ? "LOSS"
+          : "DRAW";
+    const awayOutcome: MatchOutcome =
+      homeOutcome === "WIN" ? "LOSS" : homeOutcome === "LOSS" ? "WIN" : "DRAW";
+    const homeBase = matchFormDelta({ outcome: homeOutcome, goalsScored: 0 });
+    const awayBase = matchFormDelta({ outcome: awayOutcome, goalsScored: 0 });
+    await this.applyClubForma(gameWorldId, clubs.homeClubId, homeBase);
+    await this.applyClubForma(gameWorldId, clubs.awayClubId, awayBase);
+    // Bônus do artilheiro = o delta a mais além da base (goals × bônus por gol).
+    for (const s of result.homeScorers) {
+      await this.applyPlayerForma(
+        s.playerId,
+        matchFormDelta({ outcome: homeOutcome, goalsScored: s.goals }) - homeBase,
+      );
+    }
+    for (const s of result.awayScorers) {
+      await this.applyPlayerForma(
+        s.playerId,
+        matchFormDelta({ outcome: awayOutcome, goalsScored: s.goals }) - awayBase,
+      );
+    }
+  }
+
+  private async applyClubForma(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    delta: number,
+  ): Promise<void> {
+    if (delta === 0) return;
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+      WHERE id IN (
+        SELECT sm."playerId" FROM "SquadMembership" sm
+        JOIN "Squad" s ON s.id = sm."squadId"
+        WHERE s."gameWorldId" = ${gameWorldId}::uuid
+          AND s."clubId" = ${clubId}::uuid AND s.category = 'FIRST_TEAM'
+      )
+    `;
+  }
+
+  private async applyPlayerForma(
+    playerId: string,
+    delta: number,
+  ): Promise<void> {
+    if (delta === 0) return;
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+      WHERE id = ${playerId}::uuid
+    `;
   }
 
   /**

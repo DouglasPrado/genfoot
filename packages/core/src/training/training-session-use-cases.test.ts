@@ -78,6 +78,9 @@ class MemPlayers implements PlayerRepository {
     this.agg = snapshot;
     return Promise.resolve();
   }
+  public decayForma(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 class MemSessions implements TrainingSessionRepository {
   public current: TrainingSessionSnapshot | null = null;

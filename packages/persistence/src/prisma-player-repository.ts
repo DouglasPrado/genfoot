@@ -203,6 +203,23 @@ export class PrismaPlayerRepository implements PlayerRepository {
       data: writeAttributes(player.attributes),
     });
   }
+
+  public async decayForma(
+    gameWorldId: GameWorldId,
+    days: number,
+  ): Promise<void> {
+    if (!Number.isSafeInteger(days) || days <= 0) return;
+    // Move cada forma `days` em direção a 0, sem cruzar (GREATEST/LEAST). Em
+    // massa: a forma é transiente e ninguém a disputa em paralelo.
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = CASE
+        WHEN "formaModifier" > 0 THEN GREATEST(0, "formaModifier" - ${days})
+        WHEN "formaModifier" < 0 THEN LEAST(0, "formaModifier" + ${days})
+        ELSE 0 END
+      WHERE "gameWorldId" = ${gameWorldId}::uuid AND "formaModifier" <> 0
+    `;
+  }
 }
 
 // ─── auxiliares ──────────────────────────────────────────────────────────────

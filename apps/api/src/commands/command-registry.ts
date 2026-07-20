@@ -758,12 +758,16 @@ const handlers: Record<string, CommandHandler> = {
     seasonFinanceUnitOfWork,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    playerRepository,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const parsed = advanceDaysPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    // R-221 Fase 2b: a forma sara com o tempo — decai pelos dias avançados.
+    await playerRepository.decayForma(world.value.worldId, parsed.data.days);
 
     const advanced = await new AdvanceWorldDays(worlds).execute(
       world.value.worldId,
@@ -1432,10 +1436,14 @@ const handlers: Record<string, CommandHandler> = {
     matchPlay,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    playerRepository,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
+    // R-221 Fase 2b: a forma decai um dia. Antes de jogar o dia, para a partida
+    // do dia já ler a forma decaída.
+    await playerRepository.decayForma(world.value.worldId, 1);
     const result = await new AdvanceWorldOneDay({
       worlds,
       competitionUnitOfWork,
