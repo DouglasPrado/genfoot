@@ -50,6 +50,7 @@ export class Player {
         // Jogador nasce com a base igual ao que ele é: a margem daqui para
         // frente é o que a estrutura do clube vai render (R-216).
         baselineAbility: derivePlayerOverall(player.primaryPosition, player.attributes),
+        lastAgedSeasonId: null,
         dynamicState: {
           morale: 50,
           confidence: 50,
@@ -239,6 +240,37 @@ export class Player {
     this.state = {
       ...this.state,
       baselineAbility: this.state.currentAbility,
+      version: this.state.version + 1,
+    };
+  }
+
+  /**
+   * Encerra a carreira (R-217): `careerStatus` → `RETIRED`.
+   *
+   * Idempotente: aposentar quem já está aposentado é no-op, não incrementa
+   * versão à toa. Chamado na virada de temporada quando o roll de aposentadoria
+   * decide. A "pessoa persistente vira funcionário" (§17/PLY-018) é outro passo,
+   * fora daqui.
+   */
+  public retire(): void {
+    if (this.state.careerStatus === PlayerCareerStatus.RETIRED) return;
+    this.state = {
+      ...this.state,
+      careerStatus: PlayerCareerStatus.RETIRED,
+      version: this.state.version + 1,
+    };
+  }
+
+  /** Já envelhecido nesta temporada? A virada pula quem já foi (R-217, INV-29). */
+  public wasAgedIn(seasonId: string): boolean {
+    return this.state.lastAgedSeasonId === seasonId;
+  }
+
+  /** Marca a temporada envelhecida — a trava de idempotência da virada. */
+  public markAged(seasonId: string): void {
+    this.state = {
+      ...this.state,
+      lastAgedSeasonId: seasonId,
       version: this.state.version + 1,
     };
   }

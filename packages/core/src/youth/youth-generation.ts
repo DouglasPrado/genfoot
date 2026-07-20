@@ -96,6 +96,7 @@ export function deriveClubYouth(input: {
         // Derivada na gravação (R-09) dos atributos rebaixados.
         currentAbility: 0,
         baselineAbility: 0,
+        lastAgedSeasonId: null,
         potentialAbility,
         dynamicState: {
           morale: 50,

@@ -55,6 +55,7 @@ export function buildPlayersFromGenesis(
         // Derivado na gravação (R-09); aqui só semeia o snapshot.
         currentAbility: 0,
         baselineAbility: 0,
+        lastAgedSeasonId: null,
         potentialAbility: player.potentialAbility,
         dynamicState: {
           morale: 50,

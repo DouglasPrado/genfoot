@@ -52,6 +52,7 @@ function aggregate(slot: number): PlayerAggregateSnapshot {
         generated.position,
         generated.attributes,
       ),
+      lastAgedSeasonId: null,
       potentialAbility: generated.potentialAbility,
       dynamicState: {
         morale: 50,

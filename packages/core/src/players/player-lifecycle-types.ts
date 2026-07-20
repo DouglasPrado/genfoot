@@ -90,6 +90,8 @@ export interface PlayerLifecycleSnapshot {
   readonly potentialAbility: number;
   /** Habilidade de onde a margem de crescimento é medida (R-216). */
   readonly baselineAbility: number;
+  /** Última temporada envelhecida — trava de idempotência da virada (R-217). */
+  readonly lastAgedSeasonId: string | null;
   readonly dynamicState: PlayerDynamicState;
   readonly trainingFocus?: PlayerAttributeCode;
   readonly youthProspect?: boolean;

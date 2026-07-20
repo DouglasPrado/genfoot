@@ -250,6 +250,7 @@ function arrange(buyerCashMultiplier: number) {
       attributes: target.attributes,
       currentAbility: overall,
       baselineAbility: overall,
+      lastAgedSeasonId: null,
       potentialAbility: overall,
       dynamicState: {
         morale: 50,
