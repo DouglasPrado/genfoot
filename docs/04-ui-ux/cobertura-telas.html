@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>4d66b51</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>a3d9ad0</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -682,6 +682,18 @@
     <p class="sub">As telas ausentes não são só trabalho de UI. Três coisas precisam existir antes — ou em paralelo.</p>
 
     <div class="blockers">
+      <div class="blocker">
+        <h3>O bug de idempotência eterna vaza para além do treino — 4 telas suspeitas</h3>
+        <p><b>Trava nova, achada varrendo TODO o app depois de a mesma classe render 4 defeitos no treino.</b> A lição do treino (chave sem escopo de ocasião → o servidor deduplica para sempre → funcionalidade de USO ÚNICO, com <code>ALREADY_APPLIED</code> silencioso) foi centralizada em <code>commandIdempotencyKey</code> (<code>apps/mobile/src/lib/idempotency.ts</code>). Mas as telas fora da R-221 ainda montam a chave à mão, e várias têm o defeito:</p>
+        <p><b>Uso único confirmado (ação REPETÍVEL + chave eterna):</b><br>
+        · <code>youth/index.tsx:105</code> — <code>promote:${'{'}club{'}'}:${'{'}player{'}'}</code>. Existe o ciclo promover→rebaixar→promover (<code>youth:promote-player</code> + <code>youth:demote-player</code>): a 2ª promoção do mesmo jogador volta ALREADY_APPLIED e não faz nada.<br>
+        · <code>squad/index.tsx:270</code> — <code>demote:${'{'}club{'}'}:${'{'}player{'}'}</code>, o outro lado do mesmo ciclo.<br>
+        · <code>market/index.tsx:192</code> — <code>sign:${'{'}club{'}'}:${'{'}player{'}'}</code>. Existe contratar→vender→recontratar (<code>market:sign-player</code> + <code>market:sell-player</code>): recontratar o mesmo jogador seria descartado.<br>
+        · <code>roster-list/index.tsx:124</code> — <code>${'{'}commandType{'}'}:${'{'}club{'}'}:${'{'}player{'}'}</code>, no ramo de rebaixar (dispensar pode ser terminal; rebaixar não é).</p>
+        <p><b>Classe-do-plano (versão sem conteúdo):</b> <code>squad/index.tsx:337</code> — <code>lineup:${'{'}squad{'}'}:${'{'}version{'}'}:${'{'}index{'}'}</code>: se o refetch pós-troca falha, a versão fica velha e duas substituições diferentes no mesmo índice colidem — a segunda some (idêntico ao bug do plano de treino).</p>
+        <p><b>Sem defeito (bem escopadas):</b> <code>live-match/index.tsx:115,212</code> — chaveadas por <code>nextSequence</code>/<code>currentTick</code>, que mudam a cada ação.</p>
+        <p><b>Por que NÃO consertei já:</b> são telas de OUTRO programa (mercado, base, elenco), fora da R-221 deste loop; cada command exige julgar terminal-vs-repetível e prova por HTTP própria; e a "ocasião" certa aqui não é o dia lógico (como na conversa) mas a versão/transição do jogador — decisão de design por tela. <b>Impede:</b> confiar que promover, contratar, rebaixar e substituir funcionam mais de uma vez na vida de um clube. Migrar essas telas para <code>commandIdempotencyKey</code> com a ocasião correta é a saída.</p>
+      </div>
       <div class="blocker">
         <h3>Cuidado permanente: <code>pnpm test</code> sem <code>TEST_DATABASE_URL</code> é verde vazio</h3>
         <p><b>Não é trava — é armadilha de leitura, e fica registrada para não voltar a enganar.</b> A trava que estava aqui (gate vermelho + 26 falhas na suíte de Postgres) <b>caiu por inteiro</b>; o histórico está no Registro abaixo.<br><br><b>O que sobra é uma distinção que precisa ficar visível:</b> a suíte de Postgres lê <code>TEST_DATABASE_URL</code>, nunca <code>DATABASE_URL</code> (a separação existe porque a suíte dá <code>TRUNCATE ... CASCADE</code> e já apagou o banco de dev uma vez). Sem a variável, esses testes <b>se pulam anunciando o motivo</b> e o gate fecha verde com <span class="num">~200</span> testes pulados — <b>sem atravessar banco nenhum</b>.<br><br><b>Verde por skip não prova persistência.</b> Ao mexer em repositório, read model, query ou migration, o gate só vale com o banco: <code>TEST_DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta_test?schema=public" pnpm test</code>. Referência de saúde (2026-07-20): <b>142 arquivos / 1262 testes, tudo passando, zero pulado</b>. Receita e diagnóstico de schema atrasado documentados em <code>CLAUDE.md §9</code>.</p>
