@@ -171,6 +171,8 @@ describe("API command catalog integrity (e2e)", () => {
       "inbox",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
+      // A escalação corrente do clube (M-LINEUP, R-220 Fase 1): recorte por clubId.
+      "lineup",
       // O mercado (M-06): scout dos jogadores do mundo, com valor estimado.
       "market",
       // O detalhe de uma partida (C5-V1): placar + feed de eventos, por matchId.
@@ -179,6 +181,8 @@ describe("API command catalog integrity (e2e)", () => {
       "matches",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
       "narrative",
+      // O desenvolvimento do jogador (M-PLAYER-DEV, R-216): ganho/base por atributo.
+      "player-development",
       // O elenco (M-03): recorte fino por clubId. Faltava aqui — eu registrei o
       // handler e não atualizei esta lista, o mesmo descuido do club:apply-identity.
       "roster",
@@ -186,10 +190,14 @@ describe("API command catalog integrity (e2e)", () => {
       "staff",
       // Os artilheiros do mundo (C7-V5): projeção dos PlayerMatchStats.
       "top-scorers",
+      // O plano de treino do clube na temporada (M-TRAINING, R-214).
+      "training-plan",
       // O relógio do mundo (MUNDO-V4): config do tempo e próximo tick, para o admin.
       "world-clock",
       // A base (C8): os jovens em formação, recorte por clubId.
       "youth",
+      // A safra de captação (M-YOUTH-INTAKE, R-218): candidatos com banda de scout.
+      "youth-intake",
     ]);
   });
 
