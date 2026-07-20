@@ -67,6 +67,7 @@ interface RosterProjection {
 }
 
 interface ActiveSession {
+  readonly id: string;
   readonly playerId: string;
   readonly attributeCode: string;
   readonly startDate: string;
@@ -223,11 +224,20 @@ export function Training() {
       commandType: string,
       playerId: string,
       payload: Record<string, unknown>,
+      /**
+       * A chave vem PRONTA de quem chama, escopada à ocasião.
+       *
+       * Era montada aqui como `${commandType}:${clubId}:${playerId}` — eterna.
+       * Como o servidor deduplica por ela, o SEGUNDO ciclo de treino do mesmo
+       * jogador voltava ALREADY_APPLIED: cada jogador podia treinar uma vez, e
+       * nunca mais. Quem chama sabe qual é a ocasião (o dia, a sessão); este
+       * despachante não.
+       */
+      idempotencyKey: string,
     ) => {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
       }
-      const idempotencyKey = `${commandType}:${managedClub.id}:${playerId}`;
       setActingId(playerId);
       setTracking({
         status: CommandTrackingStatus.SUBMITTING,
@@ -276,20 +286,40 @@ export function Training() {
         attributeCode,
       });
       if ("error" in payload) return;
-      dispatch("training:start-session", row.playerId, {
-        ...payload,
-      });
+      if (worldDate === "") {
+        setPlanError("Sem a data do mundo não é possível iniciar o treino com segurança.");
+        return;
+      }
+      // Uma sessão por jogador por DIA lógico. Amanhã ele treina de novo.
+      dispatch(
+        "training:start-session",
+        row.playerId,
+        { ...payload },
+        `training:start-session:${row.playerId}:${attributeCode}:${worldDate}`,
+      );
     },
-    [managedClub, dispatch],
+    [managedClub, dispatch, worldDate],
   );
 
   const collectSession = useCallback(
     (row: TrainingRow) => {
-      dispatch("training:collect-session", row.playerId, {
-        playerId: row.playerId,
-      });
+      // Escopo = a SESSÃO. Coletar duas vezes a mesma sessão é o mesmo efeito;
+      // a sessão da semana que vem é outra ocasião e tem que valer.
+      const sessionId =
+        sessionsQuery.data?.sessions.find((s) => s.playerId === row.playerId)?.id ??
+        null;
+      if (sessionId === null) {
+        setPlanError("Sessão não encontrada na leitura — recarregue antes de coletar.");
+        return;
+      }
+      dispatch(
+        "training:collect-session",
+        row.playerId,
+        { playerId: row.playerId },
+        `training:collect-session:${sessionId}`,
+      );
     },
-    [dispatch],
+    [dispatch, sessionsQuery.data],
   );
 
   /** Grava o plano COLETIVO: um foco e uma carga para o grupo inteiro. */

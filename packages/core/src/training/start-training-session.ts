@@ -101,6 +101,20 @@ export class StartTrainingSession {
         version: 1,
       };
 
+      // O id é determinístico por (mundo, jogador, data lógica): um jogador tem
+      // no máximo UMA sessão por dia. Sem esta checagem, tentar a segunda no
+      // mesmo dia estourava a unicidade do Prisma e chegava na tela como
+      // COMMAND_EXECUTION_FAILED com stack — erro técnico no lugar de regra.
+      if (await sessions.existsWithId(input.gameWorldId, session.id)) {
+        return fail(
+          new DomainError(
+            "TRAINING_SESSION_ALREADY_TODAY",
+            "Este jogador já teve uma sessão de treino hoje.",
+            { playerId: input.playerId, worldDate: input.worldDate },
+          ),
+        );
+      }
+
       await sessions.save(session, null);
       await players.savePlayer(
         { player: player.snapshot(), person: snapshot.person },
