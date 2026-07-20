@@ -198,6 +198,9 @@ describe("API command catalog integrity (e2e)", () => {
       "top-scorers",
       // O plano de treino do clube na temporada (M-TRAINING, R-214).
       "training-plan",
+      // As sessões de treino ATIVAS do clube (R-221 Fase 2a). Sem ela o estado
+      // TREINANDO era inobservável: só o caminho "iniciar" era alcançável.
+      "training-sessions",
       // O relógio do mundo (MUNDO-V4): config do tempo e próximo tick, para o admin.
       "world-clock",
       // A base (C8): os jovens em formação, recorte por clubId.

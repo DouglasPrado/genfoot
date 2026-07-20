@@ -15,7 +15,11 @@ import type {
   TrainingPlanRepository,
   LineupRepository,
 } from "@grinta/core";
-import type { PlayerDevelopmentReadModel, YouthIntakeReadModel } from "@grinta/persistence";
+import type {
+  PlayerDevelopmentReadModel,
+  TrainingSessionsReadModel,
+  YouthIntakeReadModel,
+} from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
 
 /**
@@ -50,6 +54,7 @@ export interface QueryContext {
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
+  readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   readonly youthIntakeReadModel: YouthIntakeReadModel;
   /** Tática — a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
   readonly clubLineupRepository: LineupRepository;
@@ -128,6 +133,23 @@ const handlers: Record<string, QueryHandler> = {
       seasonId,
     );
     return succeed({ plan });
+  },
+  "training-sessions": async ({ trainingSessionsReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "training-sessions exige o parâmetro clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    // Lista VAZIA é resposta legítima: clube sem ninguém treinando. A tela cai no
+    // estado vazio (todos disponíveis), não em erro.
+    return succeed({
+      sessions: await trainingSessionsReadModel.activeByClub(worldId, clubId),
+    });
   },
   "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {
     const playerId = typeof params.playerId === "string" ? params.playerId : null;
