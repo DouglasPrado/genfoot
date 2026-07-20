@@ -42,6 +42,8 @@ import {
   ApplySeasonAging,
   StartTrainingSession,
   CollectTrainingSession,
+  TalkToPlayer,
+  TalkStance,
   seasonIdFor,
   generateYouthClass,
   TrainingFocus,
@@ -467,6 +469,12 @@ const accrueDayPayload = z.object({
   seasonId: z.string().uuid(),
 });
 
+const talkToPlayerPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  stance: z.nativeEnum(TalkStance),
+});
+
 const startSessionPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
@@ -885,6 +893,25 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /** Moral — conversa do treinador: elogiar/criticar move a FORMA (R-221 2c). */
+  "morale:talk-to-player": async ({ worlds, playerRepository, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = talkToPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new TalkToPlayer(playerRepository).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      stance: parsed.data.stance,
+    });
+    if (!result.ok) return result;
+    return succeed({
+      resource: `player:${parsed.data.playerId}`,
+      forma: result.value.formaModifier,
+    } as never);
   },
 
   /** Treino de sessão — inicia; o jogador some do jogo enquanto treina (R-221 2a). */
