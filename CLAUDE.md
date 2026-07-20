@@ -202,6 +202,27 @@ DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta?schema=public" \
   ./packages/persistence/node_modules/.bin/prisma <comando>
 ```
 
+### O banco de TESTE (`grinta_test`) — sem ele o gate é verde vazio
+
+A suíte de Postgres (e2e da API + `packages/persistence/tests/`) lê **`TEST_DATABASE_URL`**, nunca `DATABASE_URL` — a separação existe porque a suíte dá `TRUNCATE ... CASCADE` e já apagou o banco de dev uma vez (ver o comentário em `packages/persistence/tests/postgres.harness.ts`).
+
+Sem a variável, esses testes **se pulam anunciando o motivo**, e `pnpm test` fecha verde com ~200 testes pulados. Verde por skip não prova persistência: rode o gate com o banco quando mexer em repositório, read model, query ou migration.
+
+```bash
+TEST_DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta_test?schema=public" pnpm test
+```
+
+Referência do que é "saudável" (verificado 2026-07-20): **142 arquivos / 1262 testes, tudo passando, zero pulado.**
+
+**Se aparecerem falhas em massa (genesis, player/squad repository), é schema desatualizado, não bug.** O `grinta_test` já esteve num híbrido de `db push` + migrations, e o `migrate deploy` travava com "objeto já existe" (P3009/P3018). Conferir antes de qualquer coisa:
+
+```bash
+PGPASSWORD=grinta psql -h localhost -p 5433 -U grinta -d grinta_test \
+  -tAc 'SELECT count(*) FILTER (WHERE finished_at IS NOT NULL) FROM _prisma_migrations;'
+```
+
+Se o número for menor que a contagem de `prisma/migrations/`, o banco está atrás. **Não marque migration como aplicada para "destravar"** — isso deixa o schema divergindo do que o código espera, em silêncio. `grinta_test` é descartável: reconstrua do zero via `migrate reset` (§ regra de consentimento abaixo continua valendo).
+
 **Checar o estado antes de agir** — migration criada não é migration aplicada:
 
 ```bash
