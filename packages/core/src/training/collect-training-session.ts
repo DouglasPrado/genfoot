@@ -6,8 +6,8 @@ import { Player } from "../players/player.js";
 import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 import { derivePotentialLayers } from "../players/potential-layers.js";
 
-import { computeDevelopmentGain, GAIN_SCALE } from "./development-gain.js";
-import { sessionElapsedDays, sessionGainMilli } from "./training-session.js";
+import { projectSessionGainPoints } from "./session-gain.js";
+import { sessionElapsedDays } from "./training-session.js";
 import type {
   TrainingSessionSnapshot,
   TrainingSessionUnitOfWork,
@@ -23,24 +23,10 @@ import type {
  * aproveitável (R-216). O jogador volta a ficar disponível e sai cansado
  * (o treino fatiga).
  *
- * Calibração minha (VAL-001), não constante de doc: os fatores fixos da sessão,
- * o intervalo de headroom e a fadiga por dia.
+ * A fórmula do ganho vive agora em `session-gain` (pura, compartilhada com a
+ * projeção da tela). Aqui sobra só a fadiga por dia, que é efeito da coleta.
  */
-const BASE_LEARNING_RATE = 0.6;
-const FOCUSED_QUALITY = 1;
-const COMPETITIVE_MINUTES = 0.6;
-/** Headroom (teto − atual) que satura o fator de potencial restante em 1. */
-const MAX_HEADROOM = 40;
 const TRAINING_FATIGUE_PER_DAY = 3;
-/**
- * Concentração da sessão (R-221): a fórmula canônica (`development-gain`) foi
- * calibrada para accrual de TEMPORADA — por dia ela rende migalhas, e uma sessão
- * de dias renderia < 1 ponto, invisível. O treino de sessão é uma atividade
- * concentrada e o progresso é INSTANTÂNEO e VISÍVEL (R-221), então o ganho da
- * sessão é multiplicado por este fator. O clamp ±6 de `applyAttributeChange`
- * ainda teta o salto de uma sessão. Calibração minha (VAL-001).
- */
-const SESSION_INTENSITY = 12;
 
 export interface CollectTrainingSessionInput {
   readonly gameWorldId: string;
@@ -57,7 +43,6 @@ export interface CollectTrainingSessionResult {
   readonly complete: boolean;
 }
 
-const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 
 /** Idade em anos cheios de uma data de nascimento até a data corrente. */
 function ageOn(birthDate: string, worldDate: string): number {
@@ -115,29 +100,18 @@ export class CollectTrainingSession {
           baselineAbility: snapshot.player.baselineAbility,
           currentAbility: snapshot.player.currentAbility,
         }).usable;
-        const remainingPotential = clamp01(
-          (ceiling - snapshot.player.currentAbility) / MAX_HEADROOM,
-        );
-        const dailyGainMilli = computeDevelopmentGain({
-          baseLearningRate: BASE_LEARNING_RATE,
-          remainingPotential,
-          trainingFocus: FOCUSED_QUALITY,
-          trainingQuality: FOCUSED_QUALITY,
-          compatibility: FOCUSED_QUALITY,
-          competitiveMinutes: COMPETITIVE_MINUTES,
+        // A MESMA conta que a projeção da tela usa (session-gain), para que o que
+        // o jogador vê antes de coletar bata com o que a coleta aplica.
+        gainPoints = projectSessionGainPoints({
+          attributeCurrentValue: current,
+          usableCeiling: ceiling,
+          currentAbility: snapshot.player.currentAbility,
+          morale: snapshot.player.dynamicState.morale,
+          fatigue: snapshot.player.dynamicState.fatigue,
           age: ageOn(snapshot.person.birthDate, input.worldDate),
-          morale: clamp01(snapshot.player.dynamicState.morale / 100),
-          fatigue: clamp01(snapshot.player.dynamicState.fatigue / 100),
-          injury: 0,
-          negativePressure: 0,
+          elapsedDays,
+          durationDays: session.durationDays,
         });
-        const gainMilli =
-          sessionGainMilli({
-            dailyGainMilli,
-            elapsedDays,
-            durationDays: session.durationDays,
-          }) * SESSION_INTENSITY;
-        gainPoints = Math.round(gainMilli / GAIN_SCALE);
         if (gainPoints > 0) {
           const applied = player.applyAttributeChange({
             historyId: deterministicUuidV7({
