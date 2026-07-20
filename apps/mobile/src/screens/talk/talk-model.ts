@@ -1,4 +1,4 @@
-import { commandIdempotencyKey, onDay } from "../../lib/idempotency.js";
+import { commandIdempotencyKey, onDay } from "../../lib/idempotency";
 
 /**
  * Modelo puro da conversa/decisão (R-221 Fase 2c, mobile). Seleção de postura e
