@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   cohesionBadge,
   cohesionMatchModifier,
-  canTrainFormation,
+  formationTrainState,
 } from "./cohesion-model.js";
 
 describe("cohesion-model (M-TRAINING, entrosamento R-220 Fase 3)", () => {
@@ -33,9 +33,27 @@ describe("cohesion-model (M-TRAINING, entrosamento R-220 Fase 3)", () => {
     expect(cohesionBadge(-10).value).toBe(0);
   });
 
-  it("só pode treinar a formação com escalação montada", () => {
-    // O backend recusa com NO_LINEUP_TO_TRAIN; a tela não oferece o botão morto.
-    expect(canTrainFormation({ hasLineup: true })).toBe(true);
-    expect(canTrainFormation({ hasLineup: false })).toBe(false);
+  it("escalação LEGÍVEL e presente → pode treinar", () => {
+    const s = formationTrainState({ lineupReadable: true, hasLineup: true });
+    expect(s.kind).toBe("ready");
+    expect(s.enabled).toBe(true);
+  });
+
+  it("escalação LEGÍVEL e ausente → 'monte a escalação', sem culpar leitura", () => {
+    const s = formationTrainState({ lineupReadable: true, hasLineup: false });
+    expect(s.kind).toBe("no-lineup");
+    expect(s.enabled).toBe(false);
+  });
+
+  it("escalação NÃO LEGÍVEL → NÃO afirma que falta escalação — é falha de leitura", () => {
+    // O bug que isto previne: erro/carregamento virava "monte a escalação",
+    // mandando o dono criar uma que talvez já exista.
+    const s = formationTrainState({ lineupReadable: false, hasLineup: false });
+    expect(s.kind).toBe("unreadable");
+    expect(s.enabled).toBe(false);
+    // hasLineup é ignorado quando não é legível — não se confia num dado que
+    // veio de leitura falha.
+    const s2 = formationTrainState({ lineupReadable: false, hasLineup: true });
+    expect(s2.kind).toBe("unreadable");
   });
 });

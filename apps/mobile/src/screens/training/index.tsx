@@ -44,9 +44,9 @@ import {
   type TalkStance,
 } from "@/screens/talk/talk-model";
 import {
-  canTrainFormation,
   cohesionBadge,
   cohesionMatchModifier,
+  formationTrainState,
 } from "@/screens/training-plan/cohesion-model";
 import {
   FOCUS_OPTIONS,
@@ -172,7 +172,13 @@ export function Training() {
     managedClub === null ? null : "lineup",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
-  const hasLineup = lineupQuery.data?.lineup != null;
+  // "Sem escalação" e "não consegui ler a escalação" são coisas diferentes: só
+  // a leitura CONCLUÍDA autoriza afirmar que não há escalação (senão a tela
+  // mandaria montar uma que talvez já exista).
+  const lineupReadable =
+    lineupQuery.state === "ready" || lineupQuery.state === "empty";
+  const hasLineup = lineupReadable && lineupQuery.data?.lineup != null;
+  const trainState = formationTrainState({ lineupReadable, hasLineup });
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
@@ -435,8 +441,12 @@ export function Training() {
     if (managedClub === null || client === null || contractVersion === null) {
       return;
     }
-    if (!canTrainFormation({ hasLineup })) {
-      setPlanError("Monte a escalação antes de treinar a formação.");
+    if (!trainState.enabled) {
+      setPlanError(
+        trainState.kind === "unreadable"
+          ? "Não foi possível ler a escalação. Recarregue antes de treinar."
+          : "Monte a escalação antes de treinar a formação.",
+      );
       return;
     }
     if (worldDate === "") {
@@ -479,7 +489,7 @@ export function Training() {
     contractVersion,
     worldId,
     worldDate,
-    hasLineup,
+    trainState,
     clubQuery.refetch,
   ]);
 
@@ -638,19 +648,24 @@ export function Training() {
                     </View>
                     <Pressable
                       onPress={trainFormation}
-                      disabled={!hasLineup}
+                      disabled={!trainState.enabled}
                       accessibilityRole="button"
                       accessibilityLabel="Treinar a formação"
-                      accessibilityState={{ disabled: !hasLineup }}
-                      style={[styles.savePlan, !hasLineup && styles.actionBusy]}
+                      accessibilityState={{ disabled: !trainState.enabled }}
+                      style={[
+                        styles.savePlan,
+                        !trainState.enabled && styles.actionBusy,
+                      ]}
                     >
                       <Text style={styles.actionText}>
-                        {hasLineup
+                        {trainState.kind === "ready"
                           ? "TREINAR A FORMAÇÃO"
-                          : "MONTE A ESCALAÇÃO PRIMEIRO"}
+                          : trainState.kind === "no-lineup"
+                            ? "MONTE A ESCALAÇÃO PRIMEIRO"
+                            : "LENDO A ESCALAÇÃO…"}
                       </Text>
                     </Pressable>
-                    {!hasLineup ? (
+                    {trainState.kind === "no-lineup" ? (
                       <Text style={styles.summaryHint}>
                         Defina os titulares em Elenco ▸ Formação Tática para
                         treinar o grupo.

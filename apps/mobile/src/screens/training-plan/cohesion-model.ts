@@ -36,11 +36,28 @@ export function cohesionMatchModifier(cohesion: number): number {
   return Math.round(((c - COHESION_START) / COHESION_START) * COHESION_MOD_MAX);
 }
 
+export type FormationTrainKind = "ready" | "no-lineup" | "unreadable";
+
+export interface FormationTrainState {
+  readonly kind: FormationTrainKind;
+  readonly enabled: boolean;
+}
+
 /**
- * O treino de formação só vale com escalação montada — não se treina uma
- * formação que não existe. O backend recusa com `NO_LINEUP_TO_TRAIN`; a tela
- * não oferece um botão que já se sabe que vai falhar.
+ * O estado do botão "treinar a formação", distinguindo os três casos que a
+ * versão ingênua confundia.
+ *
+ * O bug que isto previne: `hasLineup = data?.lineup != null` dá `false` também
+ * quando a query está CARREGANDO ou FALHOU — e a tela então afirmava "monte a
+ * escalação", mandando o dono criar uma escalação que pode já existir. Só se
+ * pode dizer "não há escalação" quando a leitura FOI feita. Fora disso, a
+ * honestidade é "não consegui ler", não "não existe".
  */
-export function canTrainFormation(input: { readonly hasLineup: boolean }): boolean {
-  return input.hasLineup;
+export function formationTrainState(input: {
+  readonly lineupReadable: boolean;
+  readonly hasLineup: boolean;
+}): FormationTrainState {
+  if (!input.lineupReadable) return { kind: "unreadable", enabled: false };
+  if (!input.hasLineup) return { kind: "no-lineup", enabled: false };
+  return { kind: "ready", enabled: true };
 }
