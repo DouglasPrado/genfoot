@@ -5,6 +5,7 @@ import { composePlayerDevelopmentView } from "./player-development-view.js";
 const RAW = {
   playerId: "019b76da-a800-72ca-9ec5-f37f87ff4d3a",
   currentAbility: 50,
+  formaModifier: 0,
   baselineAbility: 40,
   naturalPotential: 90,
   accruals: [
@@ -14,6 +15,17 @@ const RAW = {
 };
 
 describe("composePlayerDevelopmentView (§31, M-PLAYER-DEV)", () => {
+  it("expõe núcleo, forma e habilidade efetiva (R-221)", () => {
+    expect(composePlayerDevelopmentView(RAW).effectiveAbility).toBe(50); // forma 0
+    const up = composePlayerDevelopmentView({ ...RAW, formaModifier: 7 });
+    expect(up.formaModifier).toBe(7);
+    expect(up.effectiveAbility).toBe(57); // núcleo 50 + forma 7
+    const down = composePlayerDevelopmentView({ ...RAW, formaModifier: -8 });
+    expect(down.effectiveAbility).toBe(42);
+    const capped = composePlayerDevelopmentView({ ...RAW, currentAbility: 98, formaModifier: 9 });
+    expect(capped.effectiveAbility).toBe(100); // preso em 0..100
+  });
+
   it("expõe as três camadas de potencial (R-213)", () => {
     const v = composePlayerDevelopmentView(RAW);
     expect(v.potential.natural).toBe(90);

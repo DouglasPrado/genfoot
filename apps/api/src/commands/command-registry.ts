@@ -44,6 +44,7 @@ import {
   CollectTrainingSession,
   TalkToPlayer,
   TalkStance,
+  talkStanceFormDelta,
   seasonIdFor,
   generateYouthClass,
   TrainingFocus,
@@ -472,6 +473,11 @@ const accrueDayPayload = z.object({
 const talkToPlayerPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
+  stance: z.nativeEnum(TalkStance),
+});
+
+const talkToSquadPayload = z.object({
+  clubId: z.string().uuid(),
   stance: z.nativeEnum(TalkStance),
 });
 
@@ -912,6 +918,20 @@ const handlers: Record<string, CommandHandler> = {
       resource: `player:${parsed.data.playerId}`,
       forma: result.value.formaModifier,
     } as never);
+  },
+
+  /** Moral — conversa com o ELENCO: move a forma de todos os titulares (R-221 2c). */
+  "morale:talk-to-squad": async ({ worlds, playerRepository, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = talkToSquadPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    await playerRepository.nudgeClubForma(
+      world.value.worldId,
+      parsed.data.clubId,
+      talkStanceFormDelta(parsed.data.stance),
+    );
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   /** Treino de sessão — inicia; o jogador some do jogo enquanto treina (R-221 2a). */

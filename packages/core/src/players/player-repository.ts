@@ -65,5 +65,16 @@ export interface PlayerRepository {
    * no-op e a forma nunca cruza o neutro.
    */
   decayForma(gameWorldId: GameWorldId, days: number): Promise<void>;
+
+  /**
+   * Move a FORMA de todo o elenco FIRST_TEAM de um clube por `delta` (± ),
+   * tetada em ±FORM_MAX (R-221 Fase 2c — team-talk). Em massa, como a decayForma:
+   * a conversa com o elenco é um efeito de time, não um agregado por vez.
+   */
+  nudgeClubForma(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    delta: number,
+  ): Promise<void>;
 }
 

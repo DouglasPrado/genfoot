@@ -65,6 +65,9 @@ class MemoryPlayerRepo implements PlayerRepository {
   decayForma() {
     return Promise.resolve();
   }
+  nudgeClubForma() {
+    return Promise.resolve();
+  }
 }
 
 class MemoryAccrualStore implements SeasonAccrualStore {

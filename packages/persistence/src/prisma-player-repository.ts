@@ -1,4 +1,5 @@
 import {
+  FORM_MAX,
   GOALKEEPING_ATTRIBUTES,
   MENTAL_ATTRIBUTES,
   PHYSICAL_ATTRIBUTES,
@@ -218,6 +219,24 @@ export class PrismaPlayerRepository implements PlayerRepository {
         WHEN "formaModifier" < 0 THEN LEAST(0, "formaModifier" + ${days})
         ELSE 0 END
       WHERE "gameWorldId" = ${gameWorldId}::uuid AND "formaModifier" <> 0
+    `;
+  }
+
+  public async nudgeClubForma(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    delta: number,
+  ): Promise<void> {
+    if (!Number.isSafeInteger(delta) || delta === 0) return;
+    await this.client.$executeRaw`
+      UPDATE "Player"
+      SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+      WHERE id IN (
+        SELECT sm."playerId" FROM "SquadMembership" sm
+        JOIN "Squad" s ON s.id = sm."squadId"
+        WHERE s."gameWorldId" = ${gameWorldId}::uuid
+          AND s."clubId" = ${clubId}::uuid AND s.category = 'FIRST_TEAM'
+      )
     `;
   }
 }

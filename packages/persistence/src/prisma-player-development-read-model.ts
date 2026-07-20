@@ -35,6 +35,7 @@ export class PrismaPlayerDevelopmentReadModel
       select: {
         id: true,
         currentAbility: true,
+        formaModifier: true,
         baselineAbility: true,
         potentialAbility: true,
       },
@@ -53,6 +54,7 @@ export class PrismaPlayerDevelopmentReadModel
     return composePlayerDevelopmentView({
       playerId: player.id,
       currentAbility: player.currentAbility,
+      formaModifier: player.formaModifier,
       baselineAbility: player.baselineAbility,
       naturalPotential: player.potentialAbility,
       accruals: accruals.map((a) => ({

@@ -108,6 +108,7 @@ describe("API command catalog integrity (e2e)", () => {
       "market:sign-player",
       // R-221 Fase 2c: a decisão (elogiar/criticar) move a forma.
       "morale:talk-to-player",
+      "morale:talk-to-squad",
       // X-001: o usuário registra presença no mundo (heartbeat).
       "presence:heartbeat",
       // R-220 Fase 1: a escalação corrente do clube (M-LINEUP).
@@ -153,7 +154,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(45);
+    expect(response.body.commandCount).toBe(46);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

@@ -57,6 +57,9 @@ class MemPlayers implements PlayerRepository {
   decayForma() {
     return Promise.resolve();
   }
+  nudgeClubForma() {
+    return Promise.resolve();
+  }
 }
 
 class MemRoster implements SeasonAgingRoster {

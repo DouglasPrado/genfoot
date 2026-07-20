@@ -82,6 +82,7 @@ function fakePlayers(world: FakeWorld): PlayerRepository {
       return Promise.resolve();
     },
     decayForma: () => Promise.resolve(),
+    nudgeClubForma: () => Promise.resolve(),
   };
 }
 

@@ -21,7 +21,12 @@ export interface PendingGain {
 
 export interface PlayerDevelopmentView {
   readonly playerId: string;
+  /** O NÚCLEO permanente (R-221): sobe por treino, não cai sozinho. */
   readonly currentAbility: number;
+  /** A FORMA ± transiente (R-221): move por partida/decisão, decai. */
+  readonly formaModifier: number;
+  /** O que a partida/tela/mercado leem: núcleo + forma, preso em 0..100. */
+  readonly effectiveAbility: number;
   readonly potential: {
     readonly natural: number;
     readonly usable: number;
@@ -33,6 +38,7 @@ export interface PlayerDevelopmentView {
 export interface PlayerDevelopmentRaw {
   readonly playerId: string;
   readonly currentAbility: number;
+  readonly formaModifier: number;
   readonly baselineAbility: number;
   readonly naturalPotential: number;
   readonly accruals: readonly {
@@ -62,6 +68,11 @@ export function composePlayerDevelopmentView(
   return {
     playerId: raw.playerId,
     currentAbility: raw.currentAbility,
+    formaModifier: raw.formaModifier,
+    effectiveAbility: Math.max(
+      0,
+      Math.min(100, raw.currentAbility + raw.formaModifier),
+    ),
     potential: {
       natural: layers.natural,
       usable: layers.usable,
