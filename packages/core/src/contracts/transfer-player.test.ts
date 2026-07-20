@@ -161,6 +161,7 @@ function fakeUnitOfWork(world: FakeWorld): TransferUnitOfWork {
     contracts: fakeContracts(world),
     narratives: fakeNarratives(world),
     notifications: fakeNotifications(world),
+    clubCohesion: { applyTransferHit: () => Promise.resolve() },
   };
   return {
     run: async (work) => {

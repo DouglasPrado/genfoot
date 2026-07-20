@@ -44,6 +44,13 @@ export interface TransferRepositories {
   readonly narratives: NarrativeRepository;
   /** C12 — a caixa de entrada do clube recebe a pendência, no mesmo commit. */
   readonly notifications: NotificationRepository;
+  /** R-220 Fase 3 — o entrosamento do comprador leva um baque: cara nova desajusta. */
+  readonly clubCohesion: ClubCohesionRepository;
+}
+
+/** Escreve o entrosamento (coesão) de um clube — o baque da transferência (R-220.1). */
+export interface ClubCohesionRepository {
+  applyTransferHit(gameWorldId: string, clubId: string): Promise<void>;
 }
 
 export interface TransferUnitOfWork {
@@ -285,6 +292,13 @@ export class SignPlayer {
           feeMinor: input.feeMinor,
           occurredOn: input.occurredOn,
         }),
+      );
+
+      // ── R-220 Fase 3: a contratação sacode o coletivo do comprador — a coesão
+      // cai (cohesionAfterTransfer), no MESMO commit. O time reentrosa jogando.
+      await repos.clubCohesion.applyTransferHit(
+        input.gameWorldId,
+        input.buyingClubId,
       );
 
       return succeed({

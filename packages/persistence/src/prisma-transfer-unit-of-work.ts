@@ -1,4 +1,9 @@
-import type { TransferRepositories, TransferUnitOfWork } from "@grinta/core";
+import {
+  COHESION_TRANSFER_HIT,
+  type ClubCohesionRepository,
+  type TransferRepositories,
+  type TransferUnitOfWork,
+} from "@grinta/core";
 
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
@@ -39,5 +44,21 @@ function bind(tx: Prisma.TransactionClient): TransferRepositories {
     contracts: new PrismaContractRepository(tx),
     narratives: new PrismaNarrativeRepository(tx),
     notifications: new PrismaNotificationRepository(tx),
+    clubCohesion: new PrismaClubCohesionRepository(tx),
   };
+}
+
+/** O baque de coesão da transferência (R-220 Fase 3): cai, piso 0. */
+class PrismaClubCohesionRepository implements ClubCohesionRepository {
+  public constructor(private readonly tx: Prisma.TransactionClient) {}
+
+  public async applyTransferHit(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<void> {
+    await this.tx.$executeRaw`
+      UPDATE "Club" SET "cohesion" = GREATEST(0, "cohesion" - ${COHESION_TRANSFER_HIT})
+      WHERE "gameWorldId" = ${gameWorldId}::uuid AND id = ${clubId}::uuid
+    `;
+  }
 }
