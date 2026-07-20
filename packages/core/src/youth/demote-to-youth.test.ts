@@ -61,6 +61,7 @@ function fakeUnitOfWork(world: FakeWorld): DemoteToYouthUnitOfWork {
     },
     savePlayer: () => Promise.resolve(),
     decayForma: () => Promise.resolve(),
+    nudgeClubForma: () => Promise.resolve(),
   };
   const squads: SquadRepository = {
     findFirstTeamSquad: () =>

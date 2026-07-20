@@ -284,6 +284,24 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
     delta: number,
   ): Promise<void> {
     if (delta === 0) return;
+    // Quem "jogou" leva a forma: os ESCALADOS quando há escalação (mesma base da
+    // força, R-220 Fase 1), senão o elenco FIRST_TEAM. Sem escalação, o clube
+    // ainda representa com o time principal.
+    const hasLineup = await this.client.clubLineup.count({
+      where: { gameWorldId, clubId },
+    });
+    if (hasLineup > 0) {
+      await this.client.$executeRaw`
+        UPDATE "Player"
+        SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))
+        WHERE id IN (
+          SELECT cls."playerId" FROM "ClubLineupStarter" cls
+          JOIN "ClubLineup" cl ON cl.id = cls."lineupId"
+          WHERE cl."gameWorldId" = ${gameWorldId}::uuid AND cl."clubId" = ${clubId}::uuid
+        )
+      `;
+      return;
+    }
     await this.client.$executeRaw`
       UPDATE "Player"
       SET "formaModifier" = LEAST(${FORM_MAX}, GREATEST(${-FORM_MAX}, "formaModifier" + ${delta}))

@@ -81,6 +81,9 @@ class MemPlayers implements PlayerRepository {
   public decayForma(): Promise<void> {
     return Promise.resolve();
   }
+  public nudgeClubForma(): Promise<void> {
+    return Promise.resolve();
+  }
 }
 class MemSessions implements TrainingSessionRepository {
   public current: TrainingSessionSnapshot | null = null;

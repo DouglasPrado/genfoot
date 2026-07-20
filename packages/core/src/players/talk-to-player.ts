@@ -30,6 +30,11 @@ const STANCE_FORM: Record<TalkStance, number> = {
   CRITICIZE: -3,
 };
 
+/** O delta de forma de uma postura de conversa — reusado pelo team-talk (2c). */
+export function talkStanceFormDelta(stance: TalkStance): number {
+  return STANCE_FORM[stance];
+}
+
 export interface TalkToPlayerInput {
   readonly gameWorldId: string;
   readonly clubId: string;
