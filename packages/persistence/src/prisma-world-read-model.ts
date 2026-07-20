@@ -64,6 +64,17 @@ export class PrismaWorldReadModel implements WorldReadModel {
         currentDate: row.currentDate.toISOString().slice(0, 10),
         startDate: row.startDate.toISOString().slice(0, 10),
         rulesetVersion: row.rulesetVersion,
+        /**
+         * A temporada CORRENTE. Anulável de propósito: mundo semeado nasce sem
+         * ela, e 2 dos 24 mundos de desenvolvimento estão nesse estado.
+         *
+         * Sem este campo o cliente não tinha como montar plano de treino:
+         * `training:set-plan` e a query `training-plan` exigem `seasonId`, e
+         * NENHUMA query o devolvia — a tela precisaria adivinhar um uuid. Com o
+         * campo, ela lê; e quando vem `null`, ela pode DIZER que o mundo ainda
+         * não tem temporada, em vez de falhar sem explicação.
+         */
+        currentSeasonId: row.currentSeasonId,
         clubCount: row._count.clubs,
         openSlots: row._count.clubs - tomados,
         myParticipation:

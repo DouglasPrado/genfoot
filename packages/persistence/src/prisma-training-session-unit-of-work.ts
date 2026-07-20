@@ -67,6 +67,17 @@ export class PrismaTrainingSessionRepository
     };
   }
 
+  public async existsWithId(
+    gameWorldId: string,
+    id: string,
+  ): Promise<boolean> {
+    const row = await this.client.trainingSession.findFirst({
+      where: { gameWorldId, id },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   public async save(
     session: TrainingSessionSnapshot,
     expectedVersion: number | null,

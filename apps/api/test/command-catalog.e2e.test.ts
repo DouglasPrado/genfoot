@@ -12,10 +12,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registeredCommandTypes } from "../src/commands/command-registry.js";
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
+import { hasDatabase, skipReason } from "./postgres.guard.js";
 
 const VALID_STATUSES = new Set(["ACCEPTED", "ALREADY_APPLIED", "REJECTED"]);
 
-describe("API command catalog integrity (e2e)", () => {
+describe.skipIf(!hasDatabase)(
+  `API command catalog integrity (e2e)${hasDatabase ? "" : ` — PULADO: ${skipReason}`}`,
+  () => {
   let app: INestApplication;
   let dataDirectory: string;
   let worldId = "";
@@ -121,6 +124,8 @@ describe("API command catalog integrity (e2e)", () => {
       "training:collect-session",
       "training:set-plan",
       "training:start-session",
+      // R-220 Fase 3: treinar a formação sobe o entrosamento do time.
+      "training:train-formation",
       "world:activate",
       // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
       "world:advance-day",
@@ -154,7 +159,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(46);
+    expect(response.body.commandCount).toBe(47);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -198,6 +203,9 @@ describe("API command catalog integrity (e2e)", () => {
       "top-scorers",
       // O plano de treino do clube na temporada (M-TRAINING, R-214).
       "training-plan",
+      // As sessões de treino ATIVAS do clube (R-221 Fase 2a). Sem ela o estado
+      // TREINANDO era inobservável: só o caminho "iniciar" era alcançável.
+      "training-sessions",
       // O relógio do mundo (MUNDO-V4): config do tempo e próximo tick, para o admin.
       "world-clock",
       // A base (C8): os jovens em formação, recorte por clubId.

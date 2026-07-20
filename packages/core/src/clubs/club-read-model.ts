@@ -18,6 +18,8 @@ export interface ClubListItemView {
   readonly regionId: string;
   readonly status: string;
   readonly reputationBand: number;
+  /** Entrosamento do time (R-220 Fase 3): 0..100. Sobe jogando e treinando. */
+  readonly cohesion: number;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
   /**

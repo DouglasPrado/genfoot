@@ -19,6 +19,7 @@ function player(
     fitness: 100,
     form: "steady",
     morale: 70,
+    availability: "AVAILABLE",
     contractYears: 0,
     starter: false,
     groups: { technical: 70, physical: 70, mental: 70, goalkeeping: null },

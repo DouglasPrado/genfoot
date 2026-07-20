@@ -24,6 +24,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
+import { commandIdempotencyKey, onDay } from "@/lib/idempotency";
 import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import {
   deriveOnboardingStep,
@@ -102,7 +103,18 @@ export function Youth() {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
       }
-      const idempotencyKey = `promote:${managedClub.id}:${p.playerId}`;
+      // Chave por DIA lógico, não eterna. A versão anterior
+      // (`promote:${club}:${player}`) fazia o servidor deduplicar para sempre:
+      // um jovem promovido, rebaixado e promovido de novo tinha a 2ª promoção
+      // descartada em silêncio (ALREADY_APPLIED). Sem a data do mundo não há
+      // ocasião — não despacha, em vez de gravar chave permanente.
+      const worldDate = clubQuery.asOf ?? "";
+      if (worldDate === "") return;
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "youth:promote-player",
+        target: p.playerId,
+        occasion: onDay(worldDate),
+      });
       setPromotingId(p.playerId);
       void submitTrackedCommand(client, {
         clientContractVersion: "v1",
@@ -124,7 +136,7 @@ export function Youth() {
         }
       });
     },
-    [client, contractVersion, managedClub, worldId, youthQuery],
+    [client, contractVersion, managedClub, worldId, clubQuery.asOf, youthQuery],
   );
 
   const players = useMemo(

@@ -26,6 +26,16 @@ export interface TrainingSessionRepository {
     gameWorldId: string,
     playerId: string,
   ): Promise<TrainingSessionSnapshot | null>;
+  /**
+   * Existe sessão com este id — ATIVA OU NÃO?
+   *
+   * O id é determinístico por (mundo, jogador, data lógica), então duas sessões
+   * do mesmo jogador no mesmo dia colidem. Sem esta pergunta, o domínio achava
+   * que podia criar (a anterior fora coletada, logo `findActiveByPlayer` dava
+   * null) e a colisão estourava como violação de unicidade do Prisma — erro
+   * TÉCNICO vazando na tela onde devia haver regra de negócio.
+   */
+  existsWithId(gameWorldId: string, id: string): Promise<boolean>;
   save(
     session: TrainingSessionSnapshot,
     expectedVersion: number | null,

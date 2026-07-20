@@ -64,6 +64,8 @@ import {
   type SeasonAgingUnitOfWork,
   type SeasonLifecycleRepository,
   type TrainingSessionUnitOfWork,
+  type CohesionTrainingUnitOfWork,
+  TrainFormationCohesion,
   type LineupRepository,
   type LineupContextReader,
   SetClubLineup,
@@ -152,6 +154,7 @@ export interface CommandContext {
   readonly seasonLifecycle: SeasonLifecycleRepository;
   /** R-221 Fase 2a — treino de sessão com progresso instantâneo. */
   readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork;
+  readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork;
   /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
@@ -499,9 +502,19 @@ const setLineupPayload = z.object({
   expectedVersion: z.number().int().nullable(),
 });
 
+const trainFormationPayload = z.object({
+  clubId: z.string().uuid(),
+});
+
 const trainingPlanPayload = z.object({
   clubId: z.string().uuid(),
-  seasonId: z.string().uuid(),
+  /**
+   * OPCIONAL (espelha `player-development` e a query `training-plan`, R-221):
+   * omitido → o handler materializa/resolve a temporada corrente do mundo. O
+   * mobile não conhece o season, e exigi-lo aqui tornava o plano coletivo
+   * inconstruível: nenhuma query devolvia esse uuid para a tela mandar de volta.
+   */
+  seasonId: z.string().uuid().optional(),
   name: z.string(),
   focus: z.nativeEnum(TrainingFocus),
   intensity: z.number().int(),
@@ -876,19 +889,34 @@ const handlers: Record<string, CommandHandler> = {
     worlds,
     trainingPlanRepository,
     trainingContextReader,
+    seasonLifecycle,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const parsed = trainingPlanPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
+    // seasonId omitido → materializa/resolve a temporada corrente (R-219). É
+    // idempotente por (mundo, número), então chamar aqui não duplica nem reabre
+    // temporada fechada — e conserta o mundo que nasceu sem `currentSeasonId`,
+    // estado em que 2 dos 24 mundos de desenvolvimento se encontram.
+    const seasonId =
+      parsed.data.seasonId ??
+      (
+        await seasonLifecycle.ensureCurrentSeason({
+          gameWorldId: world.value.worldId,
+          worldSeed: world.value.snapshot.seed,
+          startDate: world.value.snapshot.startDate,
+          currentDate: world.value.snapshot.currentDate,
+        })
+      ).currentSeasonId;
     const result = await new SetTrainingPlan(
       trainingPlanRepository,
       trainingContextReader,
     ).execute({
       gameWorldId: world.value.worldId,
       clubId: parsed.data.clubId,
-      seasonId: parsed.data.seasonId,
+      seasonId,
       worldSeed: world.value.snapshot.seed,
       occurredOn: world.value.snapshot.currentDate,
       name: parsed.data.name,
@@ -899,6 +927,30 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /**
+   * Treino da formação como fonte de ENTROSAMENTO (R-220 Fase 3): põe os
+   * titulares para treinar a formação escolhida e sobe a coesão do time — o
+   * meio-termo que faltava entre "jogar partida" (sobe) e "transferência" (cai).
+   */
+  "training:train-formation": async ({
+    worlds,
+    cohesionTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = trainFormationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await cohesionTrainingUnitOfWork.run((repos) =>
+      new TrainFormationCohesion(repos.lineup, repos.cohesion).execute({
+        gameWorldId: world.value.worldId,
+        clubId: parsed.data.clubId,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   /** Moral — conversa do treinador: elogiar/criticar move a FORMA (R-221 2c). */
@@ -920,7 +972,15 @@ const handlers: Record<string, CommandHandler> = {
     } as never);
   },
 
-  /** Moral — conversa com o ELENCO: move a forma de todos os titulares (R-221 2c). */
+  /**
+   * Moral — conversa com o ELENCO: move a forma de TODO o elenco profissional
+   * (R-221 2c).
+   *
+   * Dizia "titulares" e estava errado: `nudgeClubForma` alcança o squad
+   * `FIRST_TEAM` inteiro, não a escalação. O comando é `talk-to-squad` — squad é
+   * elenco, não time titular —, e conversa de vestiário atingir só quem joga
+   * seria a regra estranha. O comentário é que estava fora, não o código.
+   */
   "morale:talk-to-squad": async ({ worlds, playerRepository, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

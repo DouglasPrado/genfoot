@@ -90,6 +90,10 @@ class MemSessions implements TrainingSessionRepository {
   public findActiveByPlayer(): Promise<TrainingSessionSnapshot | null> {
     return Promise.resolve(this.current?.active ? this.current : null);
   }
+  /** Espelha o banco: o id existe mesmo depois da sessão ser coletada. */
+  public existsWithId(_gameWorldId: string, id: string): Promise<boolean> {
+    return Promise.resolve(this.current?.id === id);
+  }
   public save(session: TrainingSessionSnapshot): Promise<void> {
     this.current = session;
     return Promise.resolve();
@@ -111,6 +115,57 @@ describe("StartTrainingSession", () => {
     expect(r.ok).toBe(true);
     expect(sessions.current?.active).toBe(true);
     expect(players.agg.player.availability).toBe(PlayerAvailability.UNAVAILABLE);
+  });
+
+  /**
+   * O id da sessão é determinístico por (mundo, jogador, data lógica). Antes
+   * desta guarda, tentar a segunda sessão no MESMO dia — com a primeira já
+   * coletada, logo sem sessão ativa — passava pelo domínio e morria na
+   * unicidade do Prisma, chegando na tela como COMMAND_EXECUTION_FAILED com
+   * stack trace. Erro técnico no lugar de regra de negócio.
+   */
+  it("recusa segunda sessão no MESMO dia, mesmo com a primeira já coletada", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    const args = {
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
+      attributeCode: "shortPassing", worldSeed: SEED, worldDate: "2026-03-01",
+    } as const;
+    const primeira = await new StartTrainingSession(uow).execute(args);
+    expect(primeira.ok).toBe(true);
+    // A sessão é encerrada (como a coleta faz) — não há mais sessão ATIVA.
+    if (sessions.current !== null) {
+      sessions.current = { ...sessions.current, active: false };
+    }
+    // Jogador de volta ao elenco, disponível: é o estado exato depois da coleta.
+    const liberado = new MemPlayers(aggregate());
+    const segunda = await new StartTrainingSession(
+      uowOf(sessions, liberado),
+    ).execute(args);
+    expect(segunda.ok).toBe(false);
+    if (!segunda.ok) {
+      expect(segunda.error.code).toBe("TRAINING_SESSION_ALREADY_TODAY");
+    }
+  });
+
+  it("no dia SEGUINTE a sessão vale de novo — a guarda é por dia, não para sempre", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    const base = {
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
+      attributeCode: "shortPassing", worldSeed: SEED,
+    } as const;
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    if (sessions.current !== null) {
+      sessions.current = { ...sessions.current, active: false };
+    }
+    const liberado = new MemPlayers(aggregate());
+    const amanha = await new StartTrainingSession(
+      uowOf(sessions, liberado),
+    ).execute({ ...base, worldDate: "2026-03-02" });
+    expect(amanha.ok).toBe(true);
   });
 
   it("recusa segunda sessão enquanto uma está ativa", async () => {

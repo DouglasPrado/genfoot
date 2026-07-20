@@ -24,9 +24,69 @@ describe("talk-model (R-221 2c mobile)", () => {
       .toEqual({ clubId: "c", stance: "CRITICIZE" });
   });
 
-  it("idempotência estável por alvo+postura", () => {
-    const k = talkIdempotencyKey({ commandType: "morale:talk-to-player", targetId: "p", stance: "PRAISE" });
-    expect(k).toBe("morale:talk-to-player:p:PRAISE");
-    expect(k).toBe(talkIdempotencyKey({ commandType: "morale:talk-to-player", targetId: "p", stance: "PRAISE" }));
+  /**
+   * A chave é escopada ao DIA LÓGICO do mundo.
+   *
+   * Antes era estável por (command, alvo, postura) e só. Provado contra a API
+   * real: o segundo elogio ao mesmo jogador voltava `ALREADY_APPLIED` e a forma
+   * NÃO se movia (5 → 8 → 8). Ou seja, o treinador podia elogiar cada jogador
+   * exatamente UMA VEZ, para sempre — o botão morria no primeiro toque.
+   *
+   * Chave eterna não é idempotência, é uso único. Idempotência é "repetir a
+   * MESMA conversa não multiplica o efeito"; conversar de novo amanhã é uma
+   * conversa nova, e tem que valer.
+   */
+  it("repetir no MESMO dia do mundo dedupe — um efeito por conversa", () => {
+    const args = {
+      commandType: "morale:talk-to-player",
+      targetId: "p",
+      stance: "PRAISE",
+      worldDate: "2026-01-09",
+    } as const;
+    expect(talkIdempotencyKey(args)).toBe(talkIdempotencyKey(args));
+    // Formato PRESO de propósito: mudá-lo sem querer faz todas as chaves em voo
+    // virarem outras, e um efeito já aplicado poderia ser aplicado de novo.
+    expect(talkIdempotencyKey(args)).toBe(
+      "morale:talk-to-player:p:PRAISE:day:2026-01-09",
+    );
+  });
+
+  it("no dia SEGUINTE a conversa vale de novo — não é botão de uso único", () => {
+    const hoje = talkIdempotencyKey({
+      commandType: "morale:talk-to-player",
+      targetId: "p",
+      stance: "PRAISE",
+      worldDate: "2026-01-09",
+    });
+    const amanha = talkIdempotencyKey({
+      commandType: "morale:talk-to-player",
+      targetId: "p",
+      stance: "PRAISE",
+      worldDate: "2026-01-10",
+    });
+    expect(hoje).not.toBe(amanha);
+  });
+
+  it("posturas e alvos diferentes não colidem no mesmo dia", () => {
+    const base = {
+      commandType: "morale:talk-to-player",
+      worldDate: "2026-01-09",
+    } as const;
+    const elogio = talkIdempotencyKey({ ...base, targetId: "p", stance: "PRAISE" });
+    const critica = talkIdempotencyKey({ ...base, targetId: "p", stance: "CRITICIZE" });
+    const outro = talkIdempotencyKey({ ...base, targetId: "q", stance: "PRAISE" });
+    expect(new Set([elogio, critica, outro]).size).toBe(3);
+  });
+
+  it("sem data do mundo a chave NÃO vira eterna — recusa em vez de deduplicar para sempre", () => {
+    // Data ausente é falha de leitura, não licença para gravar chave permanente.
+    expect(() =>
+      talkIdempotencyKey({
+        commandType: "morale:talk-to-player",
+        targetId: "p",
+        stance: "PRAISE",
+        worldDate: "",
+      }),
+    ).toThrow();
   });
 });

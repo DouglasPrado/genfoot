@@ -15,6 +15,7 @@ Este documento **fecha os passos 11 e 12** da auditoria de prontidão: (11) a **
    - [2.5 Finanças e diretoria (MF-13/16)](#25-finanças-e-diretoria-mf-1316)
    - [2.6 Estrutura e estádio (MF-14/23)](#26-estrutura-e-estádio-mf-1423)
    - [2.7 Comunicação, medicina, loja e suporte (MF-12/18/19/24/25)](#27-comunicação-medicina-loja-e-suporte-mf-1218192425)
+   - [2.8 Desenvolvimento vivo do jogador (R-221 · MF-17/MF-18)](#28-desenvolvimento-vivo-do-jogador-r-221--mf-17mf-18)
 3. [Specs de fluxos críticos](#3-specs-de-fluxos-críticos)
    - [3.1 MF-01 — Onboarding (SAGA-03)](#31-mf-01--onboarding-saga-03)
    - [3.2 MF-05 — Central / ciclo semanal](#32-mf-05--central--ciclo-semanal)
@@ -60,7 +61,7 @@ Este documento **fecha os passos 11 e 12** da auditoria de prontidão: (11) a **
 |---|--------------|-----------------|---------|-----------|-----------------------------|----------------------|---------------|
 | 7 | `M-HOME` — abrir Central | `GetClubDashboard`, `GetPendingDecisions`, `GetAgenda` | — (leitura) | — | projeções (leitura) | — | INV-35 (read-only) |
 | 8 | `M-DECISIONS` — responder diretoria | `GetBoardMessage` | `RespondToBoard` (baixo) | `BoardResponded`, `BoardPromiseMade` | `BoardPromise`/`ClubCommunication` · resposta única | `BOARD_MESSAGE_NOT_FOUND`, `BOARD_RESPONSE_INVALID`, `RESPONSE_WINDOW_CLOSED` | INV-32 |
-| 9 | `M-TRAINING` — ajustar treino | `GetTrainingPlan`, `GetSquadCondition` | `SetTrainingPlan` ✔ (baixo) | `TrainingPlanSet`, `TrainingPlayerEntryUpdated` | `TrainingPlan` · `expectedVersion` | `TRAINING_PLAN_INVALID`, `PLAYER_NOT_IN_SQUAD`, `PLAYER_UNDER_MEDICAL_RESTRICTION` | INV-30/31 |
+| 9 | `M-TRAINING` — ajustar treino (plano coletivo) | `GetTrainingPlan` → **`training-plan`** (`clubId` obrigatório; `seasonId` **opcional** — omitido, resolve a temporada corrente, R-221), `GetSquadCondition` | `SetTrainingPlan` ✔ (baixo) → **`training:set-plan`** | `TrainingPlanSet`, `TrainingPlayerEntryUpdated` — **produzidos pelo domínio, não publicados pela API** (o handler devolve só `resource`; o stream recebe `CommandAccepted`) | `TrainingPlan` · `expectedVersion` | `TRAINING_PLAN_INVALID`, `PLAYER_NOT_IN_SQUAD`, `PLAYER_UNDER_MEDICAL_RESTRICTION`, `QUERY_PARAM_REQUIRED` (query sem `clubId`) | INV-30/31 |
 | 10 | `M-TACTICS` — definir tática padrão | `GetTactics`, `GetSquad` | `SetTactics` ✔ (baixo) | `TacticsSet` | `MatchTacticalPlan`/plano padrão · `expectedVersion` | `INVALID_FORMATION`, `PLAYER_NOT_IN_SQUAD`, `LINEUP_LOCKED` | INV-31 |
 | 11 | `M-AUTOMATIONS`/`M-AUTOMATION-EDIT` — delegar | `GetAutomations`, `GetAutomationRule` | `SaveAutomation` / `ToggleAutomation` ✔ (médio) | `AutomationSaved` (nova versão) / `AutomationToggled` | `AutomationRule` · `expectedVersion` | `AUTOMATION_RULE_INVALID`, `AUTOMATION_HIGH_RISK_NOT_DELEGABLE`, `AUTOMATION_CONFLICT`, `AUTOMATION_RULE_NOT_FOUND` | INV-17 |
 | 12 | `M-GAMEPLAN` — política offline da partida | `GetGamePlan`, `GetBench` | `SetGamePlan` (médio) | `GamePlanSet` | `MatchTacticalPlan`/`MatchRuntimeLease` · antes do lock | `GAME_PLAN_INVALID`, `AUTOMATION_HIGH_RISK_NOT_DELEGABLE`, `LINEUP_LOCKED` | INV-17 |
@@ -127,7 +128,20 @@ Este documento **fecha os passos 11 e 12** da auditoria de prontidão: (11) a **
 | 48 | `M-IDENTITY` — aplicar identidade | `GetIdentityAssets` | `ApplyClubIdentity` (baixo) | `ClubIdentityApplied`, `ClubIdentityPeriodOpened` | `Club`/`ClubIdentityPeriod` · `expectedVersion` | `IDENTITY_ASSET_LOCKED`, `IDENTITY_CHANGE_NOT_ALLOWED` | INV-22 |
 | 49 | `M-SUPPORT` — recorrer de bloqueio (MF-24) | `GetBlockedAction` | `SubmitAppeal` (baixo) | `AppealSubmitted`, `SupportTicketOpened` | `SupportTicket`/`AdministrativeCorrection` · idempotente | `APPEAL_TARGET_NOT_FOUND`, `APPEAL_ALREADY_OPEN` | INV-34 |
 
-> **Total: 49 ações mapeadas** (40 mutam estado via command; 9 são leituras que abrem a Central/partida/finanças e ancoram a projeção — incluídas porque um fluxo crítico começa nelas). Cobrem os commands `✔` dos MF-* e os derivados dos mesmos fluxos.
+### 2.8 Desenvolvimento vivo do jogador (R-221 · MF-17/MF-18)
+
+> Acréscimo de alinhamento à decisão [R-221](../99-decisoes/desenvolvimento-dinamico-2026-07-19.md) (ratificada em 2026-07-19), que emenda a R-113/INV-29: o desenvolvimento **não** espera a virada de temporada. Diferente das seções acima, as células de query/command aqui trazem os **identificadores reais** já implementados (`query-registry.ts` / `command-registry.ts`), não nomes lógicos.
+
+| # | Ação de tela | Query (leitura) | Command | Evento(s) | Estado/agregado · transição | errorCodes possíveis | Invariante(s) |
+|---|--------------|-----------------|---------|-----------|-----------------------------|----------------------|---------------|
+| 50 | `M-TRAINING-INDIV` (hospedada em `M-TRAINING`) — iniciar sessão de treino | `training-sessions` (`clubId` obrigatório; lista vazia = ninguém treinando), `roster` | `training:start-session` (baixo) — payload `clubId`, `playerId`, `attributeCode` | **não emite evento** (só `CommandAccepted` no stream) | `TrainingSession` (uma **ativa** por jogador) + `Player` · jogador passa a **indisponível** enquanto treina | `TRAINING_SESSION_ALREADY_ACTIVE`, `PLAYER_NOT_FOUND`, `ATTRIBUTE_NOT_APPLICABLE`, `PLAYER_NOT_AVAILABLE`, `QUERY_PARAM_REQUIRED` (query sem `clubId`) | — (R-221 emenda INV-29) |
+| 51 | `M-TRAINING-INDIV` (hospedada em `M-TRAINING`) — coletar sessão | `training-sessions` | `training:collect-session` (baixo) — payload `playerId` | **não emite evento** (só `CommandAccepted`); o efeito oficial se lê recarregando `training-sessions` e `player-development` | `TrainingSession` → encerrada + `Player` · ganho aplicado **na hora** no atributo, tetado pelo **potencial aproveitável** (R-216); jogador volta disponível e recebe fadiga. Coletar antes do fim rende **parcial** (proporcional aos dias treinados) | `NO_ACTIVE_TRAINING_SESSION`, `PLAYER_NOT_FOUND` | — (R-221 emenda INV-29) |
+| 52 | `M-PLAYER-DEV` — ler desenvolvimento (núcleo · forma · efetiva · camadas · ganhos pendentes) | `player-development` (`playerId` obrigatório; `seasonId` **opcional** — omitido, resolve a temporada corrente) | — (leitura; quem move os números é `training:collect-session` no **núcleo** e `morale:talk-to-player`/`morale:talk-to-squad` na **forma**) | — | leitura de `PlayerDevelopmentView` (`currentAbility` = núcleo · `formaModifier` = forma · `effectiveAbility` = soma presa em 0..100 · `potential.natural/usable/functional` · `pendingGains[]`) | `QUERY_PARAM_REQUIRED` (sem `playerId`); `development: null` = jogador inexistente → estado vazio, **não** erro | — |
+
+> **Não decidido:** nenhuma das três ações acima publica evento de domínio, então **não existe trilha auditável** do movimento do atributo no stream — a tela só sabe o que mudou recarregando a query. Se a R-221 deve emitir eventos (`Player…`) para feed/explicabilidade, isso **falta ratificar**.
+> **Não decidido:** as magnitudes envolvidas (duração da sessão, concentração, fadiga, amplitude e decaimento da forma, piso da queda) são **calibração VAL-001**, não constantes de doc.
+
+> **Total: 52 ações mapeadas** (42 mutam estado via command; 10 são leituras que abrem a Central/partida/finanças/desenvolvimento e ancoram a projeção — incluídas porque um fluxo crítico começa nelas). Cobrem os commands `✔` dos MF-* e os derivados dos mesmos fluxos.
 
 ---
 

@@ -1,3 +1,5 @@
+import { commandIdempotencyKey, onDay } from "../../lib/idempotency";
+
 /**
  * Modelo puro da conversa/decisão (R-221 Fase 2c, mobile). Seleção de postura e
  * montagem dos payloads dos commands morale:talk-to-player e morale:talk-to-squad.
@@ -32,11 +34,30 @@ export function buildTalkToSquadPayload(input: {
   return { clubId: input.clubId, stance: input.stance };
 }
 
-/** Chave de idempotência estável por (alvo, postura) — um efeito por conversa. */
+/**
+ * Chave de idempotência por (alvo, postura, DIA LÓGICO do mundo).
+ *
+ * O dia é o que impede a chave de virar botão de uso único. A versão anterior
+ * era estável por (alvo, postura) e só — e contra a API real o segundo elogio
+ * ao mesmo jogador voltava `ALREADY_APPLIED` com a forma parada (5 → 8 → 8).
+ * O treinador podia elogiar cada jogador UMA VEZ, para sempre.
+ *
+ * Idempotência é "repetir a MESMA conversa não multiplica o efeito", não
+ * "conversar uma vez na vida". Conversar de novo no dia seguinte é uma conversa
+ * nova e tem que valer.
+ *
+ * A data vem do mundo (`asOf`), nunca de `Date.now()`: chave derivada do relógio
+ * local mudaria à meia-noite do jogador, não à virada do dia lógico.
+ */
 export function talkIdempotencyKey(input: {
   readonly commandType: string;
   readonly targetId: string;
   readonly stance: TalkStance;
+  readonly worldDate: string;
 }): string {
-  return `${input.commandType}:${input.targetId}:${input.stance}`;
+  return commandIdempotencyKey({
+    commandType: input.commandType,
+    target: `${input.targetId}:${input.stance}`,
+    occasion: onDay(input.worldDate),
+  });
 }

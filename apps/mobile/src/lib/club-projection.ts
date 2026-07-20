@@ -25,6 +25,8 @@ export interface MobileClubProjection {
   readonly name: string;
   readonly shortCode: string;
   readonly reputationBand: number;
+  /** Entrosamento do time (R-220 Fase 3): 0..100. `club-detail` o expõe. */
+  readonly cohesion: number;
   readonly stadiumName: string;
   readonly stadiumCapacity: number;
   /** `null` quando o clube ainda não foi personalizado (BC-003). */
@@ -171,6 +173,8 @@ export interface MobileRosterProjection {
     readonly age: number;
     readonly morale: number;
     readonly fitness: number;
+    /** `PlayerAvailability` do domínio — lesão, suspensão, treino (R-190). */
+    readonly availability?: string;
     /** Rollup de 4 grupos (RosterView.groups). `goalkeeping` null fora do gol. */
     readonly groups?: {
       readonly technical: number;
@@ -216,6 +220,9 @@ export function squadPlayersFromRoster(
         fitness: player.fitness,
         form: "steady",
         morale: player.morale,
+        // Sem o campo na resposta, o honesto é "disponível desconhecido" — e
+        // AVAILABLE é o que o domínio dá a todo jogador recém-materializado.
+        availability: player.availability ?? "AVAILABLE",
         contractYears: 0,
         starter: player.shirtNumber <= 11,
         groups: player.groups ?? null,

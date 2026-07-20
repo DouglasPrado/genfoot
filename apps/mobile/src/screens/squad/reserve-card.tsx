@@ -8,6 +8,7 @@ import {
   type PositionFit,
   type StatComparison,
 } from "./substitution-model";
+import { isMedicalBlock, lineupBlock } from "./availability-model";
 import type { SquadPlayer, PlayerForm } from "./squad-data";
 
 const FORM: Record<PlayerForm, { icon: IconName; tint: string; label: string }> = {
@@ -74,6 +75,8 @@ export function ReserveCard({
   crest?: ClubCrestData | null;
 }) {
   const eligible = fit !== "none";
+  const block = lineupBlock(p.availability);
+  const medical = isMedicalBlock(block);
   const form = FORM[p.form];
   const ovr = compareStat(p.ovr, outgoing?.ovr);
   const fitCmp = compareStat(p.fitness, outgoing?.fitness);
@@ -119,6 +122,29 @@ export function ReserveCard({
           </View>
         )}
       </View>
+
+      {block === null ? null : (
+        <View
+          style={[
+            styles.blockNote,
+            medical ? styles.blockNoteMedical : styles.blockNoteNeutral,
+          ]}
+        >
+          <Icon
+            name={medical ? "medkit" : "warning"}
+            size={12}
+            color={medical ? color.warning : color.textMuted}
+          />
+          <Text
+            style={[
+              styles.blockNoteText,
+              medical ? styles.blockNoteTextMedical : null,
+            ]}
+          >
+            {block.reason}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.metaRow}>
         <Text style={styles.meta}>{p.age} anos</Text>
@@ -233,6 +259,22 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
     letterSpacing: 0.5,
   },
+  blockNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: 5,
+  },
+  blockNoteMedical: { backgroundColor: "#2a2109", borderColor: color.warning },
+  blockNoteNeutral: {
+    backgroundColor: color.surfaceRaised,
+    borderColor: color.border,
+  },
+  blockNoteText: { flex: 1, color: color.textMuted, fontSize: 10 },
+  blockNoteTextMedical: { color: color.warning },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   meta: { color: color.textMuted, fontSize: 10 },
   dot: { color: color.textFaint, fontSize: 10 },

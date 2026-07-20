@@ -61,6 +61,7 @@ export class PrismaClubReadModel implements ClubReadModel {
           regionId: row.regionId,
           status: row.status,
           reputationBand: row.reputationBand,
+          cohesion: row.cohesion,
           stadiumName: row.stadium?.name ?? "",
           stadiumCapacity: row.stadium?.capacity ?? 0,
           primaryColor: identity.primaryColor,

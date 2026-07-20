@@ -67,7 +67,12 @@ export function Login() {
       identifier: form.email.trim(),
       password: form.password,
     });
-    if (attempt.error) setErrors(mapLoginError(attempt.error));
+    if (attempt.error) {
+      // A causa VAI para o log. A tela mostra a versão humana; quem precisa
+      // saber se foi credencial, rede ou contrato é quem lê o log.
+      console.error("[login] senha recusada:", attempt.error);
+      setErrors(mapLoginError(attempt.error));
+    }
     // Sucesso não navega aqui: vira `complete` e o efeito finaliza.
   }, [busy, form, online, signIn]);
 
@@ -78,6 +83,7 @@ export function Login() {
     void (async () => {
       const done = await signIn.finalize();
       if (done.error) {
+        console.error("[login] finalize falhou:", done.error);
         setErrors(mapLoginError(done.error));
         finalizing.current = false;
         return;
@@ -97,6 +103,7 @@ export function Login() {
         router.replace("/");
       }
     } catch (e) {
+      console.error("[login] SSO Google falhou:", e);
       setErrors(mapLoginError(e));
     }
   }, [router, startSSOFlow]);

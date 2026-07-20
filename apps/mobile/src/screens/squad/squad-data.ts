@@ -26,6 +26,8 @@ export interface SquadPlayer {
   readonly fitness: number; // 0..100
   readonly form: PlayerForm;
   readonly morale: number; // 0..100
+  /** `PlayerAvailability` do domínio, cru. Interpretado por `availability-model`. */
+  readonly availability: string;
   readonly contractYears: number;
   readonly starter: boolean;
   /** Barras de habilidade do card (4 grupos reais). `null` se a query não trouxe. */

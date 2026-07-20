@@ -13,6 +13,9 @@ import {
   PrismaAccrualBufferWriter,
   PrismaSeasonAccrualUnitOfWork,
   PrismaPlayerDevelopmentReadModel,
+  PrismaTrainingSessionsReadModel,
+  PrismaWorldSeasonReadModel,
+  PrismaCohesionTrainingUnitOfWork,
   PrismaPlayerRepository,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
@@ -63,6 +66,9 @@ import {
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
   PLAYER_DEVELOPMENT_READ_MODEL,
+  TRAINING_SESSIONS_READ_MODEL,
+  WORLD_SEASON_READ_MODEL,
+  COHESION_TRAINING_UNIT_OF_WORK,
   PLAYER_REPOSITORY,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
@@ -208,6 +214,18 @@ import {
         new PrismaPlayerDevelopmentReadModel(client),
     },
     {
+      provide: TRAINING_SESSIONS_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaTrainingSessionsReadModel =>
+        new PrismaTrainingSessionsReadModel(client),
+    },
+    {
+      provide: WORLD_SEASON_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaWorldSeasonReadModel =>
+        new PrismaWorldSeasonReadModel(client),
+    },
+    {
       provide: SEASON_AGING_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaSeasonAgingUnitOfWork =>
@@ -224,6 +242,12 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTrainingSessionUnitOfWork =>
         new PrismaTrainingSessionUnitOfWork(client),
+    },
+    {
+      provide: COHESION_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaCohesionTrainingUnitOfWork =>
+        new PrismaCohesionTrainingUnitOfWork(client),
     },
     {
       provide: CLUB_LINEUP_REPOSITORY,
@@ -438,9 +462,12 @@ import {
     TRAINING_ACCRUAL_BUFFER_WRITER,
     SEASON_ACCRUAL_UNIT_OF_WORK,
     PLAYER_DEVELOPMENT_READ_MODEL,
+  TRAINING_SESSIONS_READ_MODEL,
+  WORLD_SEASON_READ_MODEL,
     SEASON_AGING_UNIT_OF_WORK,
     SEASON_LIFECYCLE_REPOSITORY,
     TRAINING_SESSION_UNIT_OF_WORK,
+    COHESION_TRAINING_UNIT_OF_WORK,
     CLUB_LINEUP_REPOSITORY,
     LINEUP_CONTEXT_READER,
     PLAYER_REPOSITORY,

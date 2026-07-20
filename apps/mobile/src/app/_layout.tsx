@@ -3,6 +3,7 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ToastProvider } from "@/components/toast";
 import { SessionProvider } from "@/lib/session";
 import { WorldSelectionProvider } from "@/lib/world-selection";
 import { color } from "@/theme";
@@ -30,14 +31,16 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SessionProvider>
           <WorldSelectionProvider>
-            <StatusBar style="light" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: color.background },
-                animation: "fade",
-              }}
-            />
+            <ToastProvider>
+              <StatusBar style="light" />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: color.background },
+                  animation: "fade",
+                }}
+              />
+            </ToastProvider>
           </WorldSelectionProvider>
         </SessionProvider>
       </SafeAreaProvider>

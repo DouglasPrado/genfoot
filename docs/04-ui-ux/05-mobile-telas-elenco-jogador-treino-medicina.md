@@ -51,6 +51,42 @@ A aba **Elenco**: lista do plantel, ficha completa do jogador (atributos, desenv
 - **Estados:** modo simples (direção: "mais técnico/físico…") vs. detalhado (deltas).
 - **Referências:** [`02-jogadores §4–8`](../01-game-design/02-sistema-de-jogadores.md); [`13-relatorios §4`](../01-game-design/13-relatorios-notificacoes-e-memoria.md).
 
+### Acréscimo R-221 — a habilidade viva: núcleo, forma e as três camadas
+
+> Alinhamento à decisão [R-221](../99-decisoes/desenvolvimento-dinamico-2026-07-19.md), ratificada em 2026-07-19. Descreve **o que a decisão ratifica e o que o código já implementa**.
+
+**A. A decomposição que a tela mostra**
+
+`habilidadeEfetiva = núcleo + forma`, presa em **0..100**. São **três números** sobre o mesmo jogador, e a tela mostra os três — mostrar só o efetivo esconde a explicação:
+
+- **Núcleo (permanente)** — o que o treino conquista. Sobe pela **coleta de sessão de treino**, com teto no **potencial aproveitável** (R-216). **Nunca cai sozinho**: um mau momento não destrói o que foi conquistado treinando.
+- **Forma (transiente, ±)** — move para cima **e para baixo** por **partida** (o desempenho realimenta: vitória/derrota e gols do jogador) e por **decisão** (a conversa do treinador, `M-CONVO`). **Decai de volta ao neutro (0)** com o tempo lógico — jogo bom dá um pico, jogo ruim um vale, e a forma **sara sozinha**. É tetada em ± um máximo.
+- **Efetiva** — a soma. É o número que a **partida, a tela e o mercado** leem, e ele muda **na hora**, dentro da temporada: alvo móvel, não foto estável (consequência aceita na decisão).
+
+**B. Potencial em três camadas e o headroom (R-213/R-216, exposto pela query)**
+
+- **Natural** — o teto bruto, quase imutável.
+- **Aproveitável** — o que a **estrutura atual** permite alcançar: a margem de crescimento (natural − linha de base) rendida pelo nível do núcleo de formação, nunca acima do natural nem abaixo do núcleo atual. **É o teto que o treino respeita.**
+- **Funcional** — o que rende **na função em que ele joga**; é a única camada que pode **superar o natural** (função ideal revela qualidade escondida), e função errada a encolhe sem desfazer o jogador.
+- **Headroom** = `aproveitável − núcleo`. É a resposta à pergunta que esta tela existe para responder — "por que estagnou?": headroom zero é estagnação **por estrutura**, não por falta de treino.
+
+**C. Ganhos pendentes**
+
+Além do que já foi aplicado, a view traz os **ganhos pendentes** por atributo: o ganho **projetado em pontos** se a virada fosse hoje, e a **contagem de evidência** (quantos dias de treino alimentaram aquele buffer). Lista vazia é estado legítimo — "nada acumulado" —, não erro.
+
+**D. Contrato**
+
+- **Query:** `player-development` — exige `playerId` (ausente → `QUERY_PARAM_REQUIRED`); `seasonId` é **opcional** (omitido, o servidor resolve a temporada corrente). `development: null` = jogador inexistente no mundo → estado vazio.
+- **Ações que movem os números desta tela:** `training:collect-session` (move o **núcleo**) e `morale:talk-to-player` (move a **forma**). Nenhuma delas publica evento de domínio — só `CommandAccepted`.
+
+**Não decidido (falta ratificar):**
+
+- **Não decidido:** a **amplitude** da forma e a **velocidade de decaimento** — a própria R-221 as declara calibração VAL-001.
+- **Não decidido:** o **piso** da queda ("a definir", R-221).
+- **Não decidido:** o **nível real de estrutura** e o **`roleFit`** que alimentariam as camadas aproveitável/funcional — o domínio usa hoje um nível **provisório fixo** e função neutra (dívida declarada na R-213). Enquanto isso, clube nível 1 e nível 5 rendem igual, e a camada **funcional** não se distingue da aproveitável.
+- **Não decidido:** a **curva por faixa etária**, as **inclinações naturais**, os **trade-offs (ganha X / perde Y)** e o `PlayerDevelopmentHistory` por passagem de clube listados acima — a R-221 não os cobre e a query não os devolve.
+- **Não decidido:** como a tela apresenta a **realimentação de partida** (2b) e as **decisões** (2c) como histórico explicável — existe o efeito, não existe trilha auditável por evento na leitura.
+
 ## `M-PLAYER-MEMORY` — Memória / trajetória
 
 - **Objetivo:** contar a história do jogador (base do apego e da narrativa).
@@ -84,6 +120,44 @@ A aba **Elenco**: lista do plantel, ficha completa do jogador (atributos, desenv
 - **Ações:** definir foco/carga (command `SetTrainingPlan`); agendar recuperação; abrir plano individual (`M-TRAINING-INDIV`).
 - **Estados:** aviso de fadiga alta; conflito com calendário apertado.
 - **Referências:** [`02-jogadores §6, §10, §18`](../01-game-design/02-sistema-de-jogadores.md); [`04-estrutura §3.2, §3.3, §3.8`](../01-game-design/04-estrutura-do-clube-e-staff.md).
+
+### Acréscimo R-221 — treino de SESSÃO e o plano coletivo como estão construídos
+
+> Alinhamento à decisão [R-221 — "o atributo do jogador é vivo"](../99-decisoes/desenvolvimento-dinamico-2026-07-19.md), ratificada em 2026-07-19. Descreve **o que a decisão ratifica e o que o código já implementa**; nada aqui é regra nova.
+
+**A. Plano coletivo (o que já existe)**
+
+- **Queries:** `training-plan` (exige `clubId`; `seasonId` é **opcional** — omitido, o servidor usa a temporada corrente do mundo). `plan: null` é resposta **legítima** — clube sem plano, ou mundo sem temporada corrente — e leva ao estado vazio ("sem foco definido"), não a erro.
+- **Command:** `training:set-plan`. Payload: `clubId`, `seasonId` (opcional), `name`, `focus`, `intensity`, `entries[]` (`playerId`, `focus`, `workload`), `expectedVersion`.
+- **Focos (9, enum `TrainingFocus`):** `PHYSICAL`, `TECHNICAL`, `TACTICAL`, `MENTAL`, `DEFENSIVE`, `OFFENSIVE`, `SET_PIECES`, `RECOVERY`, `INDIVIDUAL_ROLE`.
+- **Carga:** `intensity` do plano e `workload` de cada entrada são **inteiros de 0 a 100** (`MIN_INTENSITY`/`MAX_INTENSITY`).
+- **Recusas do domínio (a tela tem que ter estado para cada uma):** nome vazio, plano **sem nenhum jogador**, carga fora de 0..100 e jogador repetido → `TRAINING_PLAN_INVALID`; jogador fora do elenco → `PLAYER_NOT_IN_SQUAD`; jogador **sob restrição médica** com foco ≠ `RECOVERY` → `PLAYER_UNDER_MEDICAL_RESTRICTION` (a restrição é contra **carga**, não contra recuperação — o restrito entra no plano em `RECOVERY`); plano alterado desde a leitura → `AGGREGATE_VERSION_CONFLICT`.
+- **Excesso de agenda não bloqueia** (R-13): focos distintos acima da capacidade do CT reduzem o `qualityFactor` que o plano carrega, e o plano é aceito.
+
+**B. Treino de sessão — o motor do núcleo (R-221 Fase 2a)**
+
+- **Queries:** `training-sessions` (exige `clubId`; devolve as sessões **ativas** do clube). Lista **vazia é legítima** — ninguém treinando — e leva ao estado vazio, não a erro. A tela cruza com o elenco e com a **data lógica do mundo** (o progresso nunca vem do relógio do aparelho).
+- **Commands:** `training:start-session` (`clubId`, `playerId`, `attributeCode`) e `training:collect-session` (`playerId`).
+- **Estado por jogador (três, e todos alcançáveis):**
+  - **Disponível** — sem sessão ativa e `availability = AVAILABLE`: pode **iniciar**.
+  - **Treinando** — tem sessão ativa: **indisponível para o resto do jogo** enquanto treina (custo de oportunidade, anti-grind da R-221) e **coletável a qualquer momento**.
+  - **Bloqueado** — sem sessão ativa e indisponível por outro motivo (lesionado / suspenso / convocado / indisponível): não inicia, e a linha diz **por quê**.
+- **Uma sessão ativa por jogador.** Segunda tentativa → `TRAINING_SESSION_ALREADY_ACTIVE`. Atributo que não se aplica à posição → `ATTRIBUTE_NOT_APPLICABLE`. Jogador não disponível → `PLAYER_NOT_AVAILABLE`. Jogador inexistente → `PLAYER_NOT_FOUND`.
+- **Duração:** a sessão corre por uma duração em **dias lógicos do mundo** (`durationDays`, hoje 7 por padrão). O progresso mostrado é `dias decorridos`, **tetado na duração**.
+- **Coletar antes do fim rende PARCIAL.** O ganho é proporcional aos dias **efetivamente** treinados (3 de 7 dias rendem 3/7); passar da duração não rende além dela; zero dia, zero ganho. Não existe "tudo ou nada", e não se espera o fim para coletar.
+- **A coleta aplica o ganho NA HORA**, direto no atributo (não bufferiza até a virada de temporada — é a emenda da R-221 à R-113/INV-29), respeitando o **teto do potencial aproveitável** (R-216). O ganho reportado é o **efetivo depois do teto/clamp** — pode ser menor que o projetado, inclusive **zero**, e a tela tem que saber dizer isso.
+- **Ao coletar**, a sessão encerra, o jogador **volta a ficar disponível** e sai com **fadiga somada** (o treino fatiga, proporcional aos dias treinados). Sem sessão ativa → `NO_ACTIVE_TRAINING_SESSION`.
+- **Nenhum dos três commands publica evento de domínio**: o stream recebe só `CommandAccepted`. O efeito oficial é a **query voltando**, não o retorno do command.
+
+**Onde isto está implementado:** a tela `M-TRAINING` do mobile hospeda hoje **as duas** coisas — o plano coletivo e a lista de sessões individuais. O plano individual rico da `M-TRAINING-INDIV` (mentoria, treino de posição/função, arquétipos GK, projeção de ganho e trade-off) **não existe**; o que existe é o recorte de sessão descrito acima.
+
+**Não decidido (falta ratificar):**
+
+- **Não decidido:** o **piso** da queda do atributo — a R-221 diz "há um piso para baixo (a definir)".
+- **Não decidido:** as magnitudes do treino de sessão — duração padrão, fator de concentração da sessão, fadiga por dia, intervalo de headroom. Estão no código como **calibração VAL-001**, declarada como não-constante-de-doc.
+- **Não decidido:** como a tela **sugere** o `attributeCode` da sessão (hoje a escolha é do usuário; não há regra de recomendação ratificada).
+- **Não decidido:** os **alertas de sobrecarga / baixa carga** e o aviso de "conflito com calendário apertado" desta seção — não há regra ratificada que os dispare, nem dado que os alimente.
+- **Não decidido:** o **eixo/plano de treino de goleiros** e a modulação por **nível de comissão/CT** citados acima — o nível de estrutura é **provisório fixo** no domínio (`PROVISIONAL_STRUCTURE_LEVEL`), dívida declarada na R-213.
 
 ## `M-TRAINING-INDIV` — Plano individual de treino
 
