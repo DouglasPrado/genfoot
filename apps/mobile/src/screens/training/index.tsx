@@ -45,6 +45,12 @@ import {
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
 import {
+  FORMATION_KEYS,
+  assignToFormation,
+  type FormationKey,
+} from "@/screens/squad/formations";
+import type { PositionGroup, SquadPlayer } from "@/screens/squad/squad-data";
+import {
   buildTalkToSquadPayload,
   STANCE_OPTIONS,
   talkIdempotencyKey,
@@ -174,6 +180,7 @@ export function Training() {
   const toast = useToast();
   const [picking, setPicking] = useState<TrainingRow | null>(null);
   const [inspectId, setInspectId] = useState<string | null>(null);
+  const [formationOpen, setFormationOpen] = useState(false);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
@@ -219,9 +226,18 @@ export function Training() {
     return () => clearInterval(id);
   }, [anyTraining]);
   const nowIso = new Date(nowMs).toISOString();
-  // A escalação corrente (R-220 Fase 1): a formação existe? Sem ela não se
-  // treina a formação, e o backend recusaria com NO_LINEUP_TO_TRAIN.
-  const lineupQuery = useWorldQuery<{ lineup: { formation: string } | null }>(
+  // A escalação corrente (R-220 Fase 1): formação + titulares (quem participa do
+  // treino da EQUIPE). Sem ela o backend recusaria com NO_LINEUP_TO_TRAIN.
+  const lineupQuery = useWorldQuery<{
+    lineup: {
+      readonly formation: string;
+      readonly version: number;
+      readonly starters: readonly {
+        readonly playerId: string;
+        readonly slotPosition: string;
+      }[];
+    } | null;
+  }>(
     managedClub === null ? null : "lineup",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
@@ -230,8 +246,25 @@ export function Training() {
   // mandaria montar uma que talvez já exista).
   const lineupReadable =
     lineupQuery.state === "ready" || lineupQuery.state === "empty";
-  const hasLineup = lineupReadable && lineupQuery.data?.lineup != null;
+  const lineup = lineupQuery.data?.lineup ?? null;
+  const hasLineup = lineupReadable && lineup !== null;
   const trainState = formationTrainState({ lineupReadable, hasLineup });
+  // Quem está no treino da EQUIPE (titulares) NÃO pode treinar individualmente.
+  const starterIds = useMemo(
+    () => new Set((lineup?.starters ?? []).map((s) => s.playerId)),
+    [lineup],
+  );
+  // Os participantes do treino da equipe, com nome (para a lista da tela).
+  const participants = useMemo(() => {
+    const byId = new Map(
+      (rosterQuery.data?.players ?? []).map((p) => [p.playerId, p]),
+    );
+    return (lineup?.starters ?? []).map((s) => ({
+      playerId: s.playerId,
+      slotPosition: s.slotPosition,
+      name: byId.get(s.playerId)?.name ?? "—",
+    }));
+  }, [lineup, rosterQuery.data]);
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
@@ -572,6 +605,78 @@ export function Training() {
     clubQuery.refetch,
   ]);
 
+  /**
+   * Muda a formação da equipe (item 5). Reusa `assignToFormation` do elenco para
+   * alocar os melhores jogadores nos slots, e persiste com `tactics:set-lineup`.
+   */
+  const changeFormation = useCallback(
+    (key: FormationKey) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        setFormationOpen(false);
+        return;
+      }
+      const assignable: SquadPlayer[] = (rosterQuery.data?.players ?? []).map(
+        (p) =>
+          ({
+            id: p.playerId,
+            group: sectorOf(p.primaryPosition) as PositionGroup,
+            ovr: p.overall,
+          }) as SquadPlayer,
+      );
+      const starters = assignToFormation(assignable, key);
+      if (starters.length === 0) {
+        toast.show({
+          tone: "error",
+          text: "Elenco vazio — não há como montar a formação.",
+        });
+        setFormationOpen(false);
+        return;
+      }
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "tactics:set-lineup",
+        target: managedClub.id,
+        occasion: onRevision(lineup?.version ?? 0, key),
+      });
+      setFormationOpen(false);
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "tactics:set-lineup",
+        worldId,
+        payload: {
+          clubId: managedClub.id,
+          formation: key,
+          starters,
+          bench: [],
+          expectedVersion: lineup?.version ?? null,
+        },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        const fb = commandFeedback(result, `Formação ${key} montada.`);
+        if (fb !== null) toast.show(fb);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          lineupQuery.refetch();
+          clubQuery.refetch();
+        }
+      });
+    },
+    [
+      managedClub,
+      client,
+      contractVersion,
+      worldId,
+      rosterQuery.data,
+      lineup,
+      toast,
+      lineupQuery.refetch,
+      clubQuery.refetch,
+    ],
+  );
+
   /** Conversa com o ELENCO — move a forma de todo mundo de uma vez. */
   const talkToSquad = useCallback(
     (stance: TalkStance) => {
@@ -717,7 +822,7 @@ export function Training() {
                 const mod = cohesionMatchModifier(managedClub.cohesion);
                 return (
                   <Card>
-                    <Text style={styles.cardTitle}>ENTROSAMENTO</Text>
+                    <Text style={styles.cardTitle}>ENTROSAMENTO DO TIME</Text>
                     <View style={styles.cohesionRow}>
                       <Text
                         style={[
@@ -732,10 +837,60 @@ export function Training() {
                         <Text style={styles.cohesionLabel}>{badge.label}</Text>
                         <Text style={styles.summaryHint}>
                           Na partida: {mod >= 0 ? `+${mod}` : mod} de força
-                          coletiva. Sobe jogando e treinando a formação.
+                          coletiva.
                         </Text>
                       </View>
                     </View>
+                    {/* Barra do entrosamento do time (0..100). */}
+                    <View style={styles.cohTrack}>
+                      <View
+                        style={[
+                          styles.cohFill,
+                          { width: `${badge.value}%` },
+                          badge.tone === "down" && { backgroundColor: color.warning },
+                          badge.tone === "up" && { backgroundColor: color.success },
+                        ]}
+                      />
+                    </View>
+
+                    {/* Formação + quem participa do treino da equipe. */}
+                    {lineup !== null ? (
+                      <View style={styles.teamBlock}>
+                        <View style={styles.teamHeadRow}>
+                          <Text style={styles.teamFormation}>
+                            {lineup.formation}
+                          </Text>
+                          <Pressable
+                            onPress={() => setFormationOpen(true)}
+                            accessibilityRole="button"
+                            accessibilityLabel="Mudar a formação"
+                            accessibilityState={{}}
+                            style={styles.changeFormationBtn}
+                          >
+                            <Icon name="grid" size={13} color={color.primary} />
+                            <Text style={styles.changeFormationText}>
+                              MUDAR FORMAÇÃO
+                            </Text>
+                          </Pressable>
+                        </View>
+                        <Text style={styles.summaryHint}>
+                          {participants.length} participantes:
+                        </Text>
+                        <View style={styles.participantWrap}>
+                          {participants.map((p) => (
+                            <View key={p.playerId} style={styles.participantChip}>
+                              <Text style={styles.participantPos}>
+                                {p.slotPosition}
+                              </Text>
+                              <Text style={styles.participantName} numberOfLines={1}>
+                                {p.name}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+
                     <Pressable
                       onPress={trainFormation}
                       disabled={!trainState.enabled}
@@ -756,10 +911,16 @@ export function Training() {
                       </Text>
                     </Pressable>
                     {trainState.kind === "no-lineup" ? (
-                      <Text style={styles.summaryHint}>
-                        Defina os titulares em Elenco ▸ Formação Tática para
-                        treinar o grupo.
-                      </Text>
+                      <Pressable
+                        onPress={() => setFormationOpen(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Escolher formação"
+                        accessibilityState={{}}
+                      >
+                        <Text style={[styles.summaryHint, { color: color.primary }]}>
+                          Toque para escolher a formação e montar a escalação.
+                        </Text>
+                      </Pressable>
                     ) : null}
                   </Card>
                 );
@@ -981,7 +1142,9 @@ export function Training() {
                       <Text style={styles.meta} numberOfLines={1}>
                         {row.state === "BLOCKED"
                           ? (row.blockedLabel ?? "Indisponível")
-                          : "Disponível"}
+                          : starterIds.has(row.playerId)
+                            ? "No treino da equipe"
+                            : "Disponível"}
                       </Text>
                     )}
                   </View>
@@ -989,6 +1152,8 @@ export function Training() {
                     <Text style={styles.rowStatusTraining}>●</Text>
                   ) : row.state === "BLOCKED" ? (
                     <Text style={styles.rowStatusBlocked}>●</Text>
+                  ) : starterIds.has(row.playerId) ? (
+                    <Text style={styles.rowStatusTeam}>●</Text>
                   ) : null}
                   <Text style={styles.ovr}>{row.overall}</Text>
                 </Pressable>
@@ -1217,6 +1382,14 @@ export function Training() {
                             {busy ? "…" : "COLETAR TREINO"}
                           </Text>
                         </Pressable>
+                      ) : row !== null &&
+                        row.state === "IDLE" &&
+                        starterIds.has(row.playerId) ? (
+                        // Titular está no treino da EQUIPE — sem individual.
+                        <Text style={styles.summaryHint}>
+                          Está no treino da equipe (titular) — não pode treinar
+                          individualmente. Tire-o da escalação para liberar.
+                        </Text>
                       ) : row !== null && row.state === "IDLE" ? (
                         <Pressable
                           onPress={() => {
@@ -1251,6 +1424,60 @@ export function Training() {
             </View>
           );
         })()}
+      </Modal>
+
+      {/* Escolher a formação da equipe (item 5) — como na Formação Tática. */}
+      <Modal
+        visible={formationOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFormationOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>ESCOLHA A FORMAÇÃO</Text>
+            <Text style={styles.modalHint}>
+              Os melhores jogadores de cada posição entram na escalação. Treinar
+              nela sobe o entrosamento do time.
+            </Text>
+            <View style={styles.formationGrid}>
+              {FORMATION_KEYS.map((key) => {
+                const active = lineup?.formation === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => changeFormation(key)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Formação ${key}`}
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.formationChip,
+                      active && styles.formationChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.formationChipText,
+                        active && styles.formationChipTextActive,
+                      ]}
+                    >
+                      {key}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => setFormationOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar escolha de formação"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>CANCELAR</Text>
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1415,6 +1642,79 @@ const styles = StyleSheet.create({
   },
   rowStatusTraining: { color: color.primary, fontSize: 10 },
   rowStatusBlocked: { color: color.warning, fontSize: 10 },
+  rowStatusTeam: { color: color.info, fontSize: 10 },
+  cohTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    overflow: "hidden",
+    marginTop: space.sm,
+  },
+  cohFill: { height: "100%", backgroundColor: color.primary },
+  teamBlock: { marginTop: space.md, gap: space.xs },
+  teamHeadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  teamFormation: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 1,
+  },
+  changeFormationBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+  },
+  changeFormationText: {
+    color: color.primary,
+    fontSize: 10,
+    fontWeight: fontWeight.bold as "700",
+  },
+  participantWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
+  participantChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: color.background,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    maxWidth: "48%",
+  },
+  participantPos: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    minWidth: 22,
+  },
+  participantName: { color: color.text, fontSize: fontSize.xs, flexShrink: 1 },
+  formationGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: space.sm,
+    marginVertical: space.sm,
+  },
+  formationChip: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+  },
+  formationChipActive: { backgroundColor: color.primary },
+  formationChipText: {
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold as "700",
+  },
+  formationChipTextActive: { color: color.background },
   // Inspeção — estrutura do elenco: backdrop separado, card em View (slide roda).
   inspectRoot: { flex: 1 },
   inspectBackdrop: {

@@ -89,7 +89,10 @@ const GROUP_ORDER: Record<PositionGroup, number> = { GOL: 0, DEF: 1, MEI: 2, ATA
  * (guloso: cada slot pega o próximo jogador não usado do mesmo grupo; se faltar,
  * pega qualquer um). Retorna os ids alinhados aos slots de FORMATIONS[key].
  */
-export function assignToFormation(players: readonly SquadPlayer[], key: FormationKey): string[] {
+/** Só lê id/group/ovr — aceita qualquer objeto com esses três (não o SquadPlayer inteiro). */
+type AssignablePlayer = Pick<SquadPlayer, "id" | "group" | "ovr">;
+
+export function assignToFormation(players: readonly AssignablePlayer[], key: FormationKey): string[] {
   const slots = FORMATIONS[key];
   const pool = [...players].sort((a, b) => GROUP_ORDER[a.group] - GROUP_ORDER[b.group] || b.ovr - a.ovr);
   const used = new Set<string>();
