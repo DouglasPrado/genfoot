@@ -938,6 +938,9 @@ export function Training() {
                           realSecondsPerDay:
                             clockQuery.data?.realSecondsPerDay ?? null,
                         });
+                        // Regressivo: a barra mostra o que RESTA e esvazia com o
+                        // tempo (100% cheia → 0% ao completar).
+                        const remaining = cd.complete ? 0 : 100 - pct;
                         return (
                           <>
                             <Text style={styles.meta} numberOfLines={1}>
@@ -945,19 +948,21 @@ export function Training() {
                               <Text style={styles.metaSkill}>
                                 {attributeLabel(row.session.attributeCode)}
                               </Text>
-                              {" · "}
+                            </Text>
+                            {/* Tempo ACIMA da barra. */}
+                            <Text style={styles.cdTime} numberOfLines={1}>
                               {cd.complete
                                 ? "pronto para coletar"
                                 : cd.secondsRemaining === null
                                   ? `faltam ${cd.daysRemaining} dia(s)`
                                   : `faltam ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
-                            {/* Barra que avança em tempo real com a contagem. */}
+                            {/* Faixa 100% de fundo; regressão em cima, esvaziando. */}
                             <View style={styles.cdTrack}>
                               <View
                                 style={[
                                   styles.cdFill,
-                                  { width: `${pct}%` },
+                                  { width: `${remaining}%` },
                                   cd.complete && styles.cdFillDone,
                                 ]}
                               />
@@ -1132,25 +1137,30 @@ export function Training() {
                               realSecondsPerDay:
                                 clockQuery.data?.realSecondsPerDay ?? null,
                             });
+                            const remaining = cd.complete ? 0 : 100 - pct;
                             return (
                               <>
+                                {/* Tempo ACIMA da barra. */}
+                                <Text style={styles.cdTimeLarge}>
+                                  {cd.complete
+                                    ? "completo — colete o ganho"
+                                    : cd.secondsRemaining === null
+                                      ? `faltam ${cd.daysRemaining} dia(s) lógicos`
+                                      : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                                </Text>
+                                {/* Faixa 100%; regressão em cima, esvaziando. */}
                                 <View style={styles.cdTrackLarge}>
                                   <View
                                     style={[
                                       styles.cdFill,
-                                      { width: `${pct}%` },
+                                      { width: `${remaining}%` },
                                       cd.complete && styles.cdFillDone,
                                     ]}
                                   />
                                 </View>
                                 <Text style={styles.summaryHint}>
                                   {session.elapsedDays}/{session.durationDays}{" "}
-                                  dias treinados ·{" "}
-                                  {cd.complete
-                                    ? "completo — colete o ganho"
-                                    : cd.secondsRemaining === null
-                                      ? `faltam ${cd.daysRemaining} dia(s) lógicos`
-                                      : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                                  dias treinados
                                 </Text>
                               </>
                             );
@@ -1340,12 +1350,24 @@ const styles = StyleSheet.create({
   },
   meta: { color: color.textMuted, fontSize: fontSize.xs },
   metaSkill: { color: color.primary, fontWeight: fontWeight.bold as "700" },
+  cdTime: {
+    color: color.textMuted,
+    fontSize: 10,
+    fontWeight: fontWeight.bold as "700",
+    marginTop: 3,
+  },
+  cdTimeLarge: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+    marginTop: space.sm,
+  },
   cdTrack: {
-    height: 4,
+    height: 6,
     borderRadius: radius.pill,
     backgroundColor: color.surface,
     overflow: "hidden",
-    marginTop: 4,
+    marginTop: 3,
   },
   cdFill: { height: "100%", backgroundColor: color.primary },
   cdFillDone: { backgroundColor: color.success },
