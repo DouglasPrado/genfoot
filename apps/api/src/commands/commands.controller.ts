@@ -35,6 +35,7 @@ import type {
   AccrualBufferWriter,
   SeasonAccrualUnitOfWork,
   SeasonAgingUnitOfWork,
+  SeasonLifecycleRepository,
   PlayerRepository,
   AutomationUnitOfWork,
   WorldRepository,
@@ -69,6 +70,7 @@ import {
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
   SEASON_AGING_UNIT_OF_WORK,
+  SEASON_LIFECYCLE_REPOSITORY,
   PLAYER_REPOSITORY,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
@@ -135,6 +137,8 @@ export class CommandsController {
     private readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork,
     @Inject(SEASON_AGING_UNIT_OF_WORK)
     private readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork,
+    @Inject(SEASON_LIFECYCLE_REPOSITORY)
+    private readonly seasonLifecycle: SeasonLifecycleRepository,
     @Inject(PLAYER_REPOSITORY)
     private readonly playerRepository: PlayerRepository,
     @Inject(AUTOMATION_UNIT_OF_WORK)
@@ -296,6 +300,7 @@ export class CommandsController {
         accrualBufferWriter: this.accrualBufferWriter,
         seasonAccrualUnitOfWork: this.seasonAccrualUnitOfWork,
         seasonAgingUnitOfWork: this.seasonAgingUnitOfWork,
+        seasonLifecycle: this.seasonLifecycle,
         playerRepository: this.playerRepository,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,

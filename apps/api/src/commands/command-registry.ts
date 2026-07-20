@@ -40,6 +40,7 @@ import {
   AccrueClubTraining,
   ApplySeasonAccruals,
   ApplySeasonAging,
+  seasonIdFor,
   generateYouthClass,
   TrainingFocus,
   type ClubControlRepository,
@@ -56,6 +57,7 @@ import {
   type AccrualBufferWriter,
   type SeasonAccrualUnitOfWork,
   type SeasonAgingUnitOfWork,
+  type SeasonLifecycleRepository,
   type PlayerRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
@@ -137,6 +139,8 @@ export interface CommandContext {
   readonly accrualBufferWriter: AccrualBufferWriter;
   readonly seasonAccrualUnitOfWork: SeasonAccrualUnitOfWork;
   readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork;
+  /** R-219 — materialização da temporada como entidade do mundo. */
+  readonly seasonLifecycle: SeasonLifecycleRepository;
   readonly playerRepository: PlayerRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
@@ -498,6 +502,57 @@ async function loadWorld(
   return succeed({ worldId: worldId.value, snapshot: world.value });
 }
 
+/**
+ * A VIRADA de temporada (R-219/R-113): para cada temporada do mundo que fechou
+ * no avanço, aplica treino (accrual) e idade (declínio+aposentadoria) chaveados
+ * pelo id determinístico da temporada, e depois materializa a próxima ACTIVE e
+ * reaponta `currentSeasonId`. Idempotente em todos os passos — reavançar não
+ * reaplica. Compartilhado pelos dois caminhos de avanço (`world:advance-day` e
+ * `world:advance-days`) para não divergirem. Finanças NÃO entram aqui (o
+ * fechamento por clube é do handler plural, que tem o read model de clubes).
+ */
+async function applySeasonTurns(
+  deps: Pick<
+    CommandContext,
+    "seasonAccrualUnitOfWork" | "seasonAgingUnitOfWork" | "seasonLifecycle"
+  >,
+  world: {
+    readonly worldId: Parameters<ApplySeasonAccruals["execute"]>[0]["gameWorldId"];
+    readonly seed: string;
+    readonly startDate: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+  closedSeasonNumbers: readonly number[],
+): Promise<void> {
+  if (closedSeasonNumbers.length === 0) return;
+  const applyAccruals = new ApplySeasonAccruals(deps.seasonAccrualUnitOfWork);
+  const applyAging = new ApplySeasonAging(deps.seasonAgingUnitOfWork);
+  for (const number of closedSeasonNumbers) {
+    const closingSeasonId = seasonIdFor(world.seed, world.worldId, number);
+    await applyAccruals.execute({
+      gameWorldId: world.worldId,
+      seasonId: closingSeasonId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+    await applyAging.execute({
+      gameWorldId: world.worldId,
+      seasonId: closingSeasonId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  }
+  await deps.seasonLifecycle.ensureCurrentSeason({
+    gameWorldId: world.worldId,
+    worldSeed: world.seed,
+    startDate: world.startDate,
+    currentDate: world.currentDate,
+  });
+}
+
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
@@ -663,16 +718,26 @@ const handlers: Record<string, CommandHandler> = {
    */
   /**
    * Avança o relógio do mundo N dias (dev/admin). Ao cruzar a fronteira de
-   * temporada (`SeasonRolledOver`), roda o ENCERRAMENTO por clube: debita os
-   * custos da temporada que acabou no caixa de cada um (passo 14 do motor de
-   * virada). Cada débito é idempotente por (clube, temporada) — reavançar não
-   * cobra duas vezes. Sem receita materializada ainda, isso só drena o caixa: a
-   * insolvência progressiva é o comportamento assumido (R-45), não um bug.
+   * temporada (`SeasonRolledOver`), roda a VIRADA da temporada que acabou —
+   * sozinha, sem command manual (R-219/R-113):
+   *
+   * 1. treino: aplica o accrual da temporada e zera o buffer (INV-29);
+   * 2. idade: declínio físico + aposentadoria por idade (R-217);
+   * 3. finanças: debita os custos da temporada no caixa de cada clube (R-45);
+   * 4. materializa a próxima temporada `ACTIVE`, fecha as anteriores e reaponta
+   *    `currentSeasonId`.
+   *
+   * Cada passo é chaveado pela temporada que fechou (id determinístico) e é
+   * idempotente — reavançar não reaplica treino, não reenvelhece nem recobra. A
+   * captação e o contrato de formação NÃO entram aqui (C6/C9, fora de escopo).
    */
   "world:advance-days": async ({
     worlds,
     clubReadModel,
     seasonFinanceUnitOfWork,
+    seasonAccrualUnitOfWork,
+    seasonAgingUnitOfWork,
+    seasonLifecycle,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
@@ -686,30 +751,49 @@ const handlers: Record<string, CommandHandler> = {
     );
     if (!advanced.ok) return advanced;
 
+    const worldId = world.value.worldId;
+    const worldSeed = advanced.value.world.seed;
+    const worldDate = advanced.value.world.currentDate;
+
     const rollovers = advanced.value.events.filter(
       (event): event is Extract<WorldDomainEvent, { type: "SeasonRolledOver" }> =>
         event.type === "SeasonRolledOver",
     );
+    const closedNumbers = rollovers.map((r) => r.payload.seasonNumber);
     if (rollovers.length > 0) {
-      const worldView = await clubReadModel.worldView(world.value.worldId);
+      // Finanças: débito por clube da temporada que fechou (plural-only — este é
+      // o handler que tem o read model de clubes). Idempotente por (clube,
+      // temporada); uma falha num clube não derruba os outros nem a virada.
+      const worldView = await clubReadModel.worldView(worldId);
       const closer = new CloseSeasonFinances(seasonFinanceUnitOfWork);
-      for (const rollover of rollovers) {
+      for (const seasonNumber of closedNumbers) {
         for (const club of worldView.clubs) {
-          // Uma falha num clube não derruba a virada dos outros — o débito é
-          // por clube e idempotente; o que faltar reprocessa no próximo avanço.
           await closer.execute({
-            gameWorldId: world.value.worldId,
+            gameWorldId: worldId,
             clubId: club.id,
-            seasonNumber: rollover.payload.seasonNumber,
-            worldSeed: advanced.value.world.seed,
-            occurredOn: advanced.value.world.currentDate,
+            seasonNumber,
+            worldSeed,
+            occurredOn: worldDate,
           });
         }
       }
     }
+    // Treino + idade + materialização da próxima temporada (R-219), compartilhado
+    // com o caminho singular. No-op quando nenhuma fronteira foi cruzada.
+    await applySeasonTurns(
+      { seasonAccrualUnitOfWork, seasonAgingUnitOfWork, seasonLifecycle },
+      {
+        worldId,
+        seed: worldSeed,
+        startDate: advanced.value.world.startDate,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+      closedNumbers,
+    );
 
     return succeed({
-      resource: `world:${world.value.worldId}`,
+      resource: `world:${worldId}`,
       mutation: advanced.value,
     });
   },
@@ -1244,6 +1328,9 @@ const handlers: Record<string, CommandHandler> = {
     competitionUnitOfWork,
     competitionReadModel,
     matchPlay,
+    seasonAccrualUnitOfWork,
+    seasonAgingUnitOfWork,
+    seasonLifecycle,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
@@ -1255,10 +1342,27 @@ const handlers: Record<string, CommandHandler> = {
       matchPlay,
     }).execute({ gameWorldId: world.value.worldId });
     if (!result.ok) return result;
+    // R-219: se o dia cruzou a fronteira de temporada, roda a virada (treino +
+    // idade + materialização). Mesmo helper do caminho plural. Recarrega para o
+    // relógio já avançado.
+    const after = await loadWorld(worlds, envelope.worldId);
+    if (after.ok) {
+      await applySeasonTurns(
+        { seasonAccrualUnitOfWork, seasonAgingUnitOfWork, seasonLifecycle },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          startDate: after.value.snapshot.startDate,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+        result.value.seasonsClosed,
+      );
+    }
     return succeed({ resource: `world:${world.value.worldId}` });
   },
 
-  "world:activate": async ({ worlds, clubs, envelope }) => {
+  "world:activate": async ({ worlds, clubs, seasonLifecycle, envelope }) => {
     const raw = requireWorldId(envelope.worldId);
     if (!raw.ok) return raw;
     const worldId = parseGameWorldId(raw.value);
@@ -1267,6 +1371,16 @@ const handlers: Record<string, CommandHandler> = {
       worldId.value,
     );
     if (!result.ok) return result;
+    // R-219: a temporada nasce com o mundo. Materializa a Temporada 1 ACTIVE e
+    // aponta currentSeasonId ANTES de qualquer autoria de competição, para a
+    // competição ANEXAR-se a ela (o ensureSeasonId encontra esta linha).
+    const world = result.value.world;
+    await seasonLifecycle.ensureCurrentSeason({
+      gameWorldId: worldId.value,
+      worldSeed: world.seed,
+      startDate: world.startDate,
+      currentDate: world.currentDate,
+    });
     return succeed({
       resource: `world:${worldId.value}`,
       mutation: result.value,

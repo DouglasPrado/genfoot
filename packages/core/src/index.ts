@@ -35,6 +35,8 @@ export * from "./identity/identity-commands.js";
 // C2 — mundo. `GameWorld` é tabela (R-182); o `WorldScheduler` morreu com o
 // resto e volta quando o relógio precisar andar.
 export * from "./world/game-world.js";
+export * from "./world/season-lifecycle.js";
+export * from "./world/season-lifecycle-repository.js";
 export * from "./world/world-repository.js";
 export * from "./world/world-types.js";
 export * from "./world/world-use-cases.js";
