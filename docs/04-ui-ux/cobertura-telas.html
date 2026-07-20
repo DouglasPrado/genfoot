@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>450a9a9</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>78e11c7</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -728,6 +728,10 @@
     <div class="log">
       <div class="log-row">
         <span class="log-date">2026-07-19</span>
+        <span class="log-text"><b>ENTROSAMENTO entra: o time se entende jogando junto e desanda na transferência (R-220 Fase 3, provado por HTTP).</b> Entrega de <b>domínio + API</b> — nenhuma tela mudou de cor. A química de time da R-07 vira código, na estrutura ratificada (R-220.1): <b>pontuação de time</b> (<code>Club.cohesion</code> 0..100), não grafo de pares. Sobe <b>jogando junto</b> (a partida sobe a coesão dos dois clubes), <b>buffa a partida</b> — a força efetiva soma o modificador de coesão na faixa da R-15 (±6) — e <b>cai na transferência</b> (cara nova desajusta o coletivo, gancho novo no <code>TransferUnitOfWork</code>). <b>Prova ponta a ponta (0 falhas):</b> coesão nasce 50 → jogar → 54; time entrosado (100) rende <span class="num">base+6</span>, desentrosado (0) <span class="num">base−6</span> no snapshot; contratar derruba a coesão do comprador (50→38). 1045 testes. <b>Honesto:</b> magnitudes = calibração minha (VAL-001); falta a <b>queda por rotatividade de escalação/formação</b> (2c, R-33 TacticalConfusion) e o <b>treino coletivo-por-formação</b> como fonte de coesão — refinamentos declarados; destrava a leitura de <code>M-TEAMBALANCE</code> (dado existe), mas a UI não foi construída.</span>
+      </div>
+      <div class="log-row">
+        <span class="log-date">2026-07-20</span>
         <span class="log-text"><b>Follow-ups do atributo vivo: forma vai a quem jogou, aparece na leitura, e o team-talk (R-221 Programa 1, provado por HTTP).</b> Entrega de <b>domínio + API</b> — nenhuma tela mudou de cor. Três arestas fechadas sobre o atributo vivo: (1a) a partida agora aplica a forma aos <b>escalados</b> da <code>ClubLineup</code> (fallback FIRST_TEAM) — quem não jogou não embala; (1b) a query <code>player-development</code> passou a expor <code>formaModifier</code> e <code>effectiveAbility</code> (núcleo+forma), pra <code>M-PLAYER-DEV</code> mostrar a diferença; (1c) o command <code>morale:talk-to-squad</code> (elogiar/criticar o elenco) move a forma de todo o FIRST_TEAM de uma vez. <b>Prova ponta a ponta (0 falhas):</b> escala 11 → joga → só os 11 mudam de forma (reserva fica 0); team-talk PRAISE → elenco +3; a query devolve forma=3 e efetiva=núcleo+3. Catálogo em <b>46 commands</b>; 1040 testes. <b>Dívida declarada:</b> o <code>processUntil</code> (drift diário de fadiga/matchSharpness/moral) segue dormente em produção — só a forma decai hoje; ligá-lo ao avanço é caro/arriscado e fica de follow-up.</span>
       </div>
       <div class="log-row">
