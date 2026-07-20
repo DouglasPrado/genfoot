@@ -44,6 +44,13 @@ export interface AdvanceWorldDayResult {
   readonly competitionsHomologated: number;
   /** Ligas que encerraram e abriram a temporada seguinte (rollover, R-204). */
   readonly seasonsRolledOver: number;
+  /**
+   * Números das TEMPORADAS do mundo que fecharam neste avanço (R-219). Vem dos
+   * eventos `SeasonRolledOver` do relógio — é o gatilho da virada (treino,
+   * envelhecimento, materialização) que o handler aplica. Vazio quando nenhuma
+   * fronteira de temporada foi cruzada.
+   */
+  readonly seasonsClosed: readonly number[];
 }
 
 export class AdvanceWorldOneDay {
@@ -63,6 +70,13 @@ export class AdvanceWorldOneDay {
     const newDate = advanced.value.world.currentDate;
     // O seed é o do próprio mundo — sempre, não um parâmetro (determinismo R-182).
     const worldSeed = advanced.value.world.seed;
+    // As temporadas do MUNDO que fecharam neste avanço (R-219) — o gatilho da
+    // virada, que o handler aplica (treino/idade/materialização).
+    const seasonsClosed = advanced.value.events
+      .filter((event) => event.type === "SeasonRolledOver")
+      .map((event) =>
+        (event as { payload: { seasonNumber: number } }).payload.seasonNumber,
+      );
 
     // 2. Abrir as competições que chegaram na data de início.
     const all = await this.deps.competitionReadModel.listCompetitions(worldId);
@@ -147,6 +161,7 @@ export class AdvanceWorldOneDay {
       matchesPlayed: due.length,
       competitionsHomologated: homologated,
       seasonsRolledOver: rolledOver,
+      seasonsClosed,
     });
   }
 }
