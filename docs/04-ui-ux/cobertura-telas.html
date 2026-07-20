@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>8253f1d</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>7aec876</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -511,14 +511,14 @@
         <span class="arch-id">L-M03</span>
         <span class="arch-name">Perfil e detalhe — hero, tabs, seções</span>
         <span class="risk low">Risco baixo</span>
-        <span class="arch-count"><b>3</b> parciais / 36</span>
+        <span class="arch-count"><b>4</b> parciais / 36</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-HOME</span><span class="chip-d">Home — contadores read-only, sem drill-in nem decisão</span><span class="tag">parcial</span></div>
         <div class="chip missing"><span class="chip-id">M-DECISION-DETAIL</span><span class="chip-d">Detalhe de uma decisão</span></div>
         <div class="chip missing"><span class="chip-id">M-PLAYER</span><span class="chip-d">Ficha do jogador</span></div>
         <div class="chip missing"><span class="chip-id">M-PLAYER-ATTRS</span><span class="chip-d">Atributos detalhados</span></div>
-        <div class="chip missing"><span class="chip-id">M-PLAYER-DEV</span><span class="chip-d">Desenvolvimento / histórico de evolução</span></div>
+        <div class="chip partial"><span class="chip-id">M-PLAYER-DEV</span><span class="chip-d">Painel núcleo/forma em <code>/elenco/desenvolvimento/[playerId]</code> — a <b>primeira rota de detalhe do app</b>. Decompõe a habilidade EFETIVA em núcleo (permanente) + forma (transiente), com as três camadas de potencial, headroom até o teto e ganhos pendentes. Provado por HTTP: núcleo 59, forma +2, efetiva 61, jogador NO TETO. Não fecha: <b>não exercitada no app rodando</b>, spec anterior à R-221 (não documenta núcleo/forma), e falta a curva por faixa etária, as inclinações naturais e o histórico por passagem de clube que a spec pede</span><span class="tag">aguardando confirmação + falta curva/inclinações/histórico</span></div>
         <div class="chip missing"><span class="chip-id">M-ROLES</span><span class="chip-d">Papéis, hierarquia e liderança</span></div>
         <div class="chip partial"><span class="chip-id">M-TRAINING</span><span class="chip-d">Sessões de treino do elenco em <code>/elenco/treino</code>, sobre as queries <code>roster</code> + <code>training-sessions</code>: estados IDLE/TREINANDO/BLOQUEADO, escolha do atributo-foco, progresso em dias e coleta (parcial inclusive). Não fecha: <b>não foi exercitada no app rodando</b> e a spec é anterior à R-221 — ela não documenta iniciar/coletar sessão, então não há doc contra o qual declarar completude. Falta também o foco COLETIVO e a carga que a spec pede (foco por área, intensidade, recuperação, alertas de sobrecarga)</span><span class="tag">aguardando confirmação + falta plano coletivo</span></div>
         <div class="chip missing"><span class="chip-id">M-MEDICAL-CASE</span><span class="chip-d">Caso de lesão / reabilitação</span></div>
@@ -603,7 +603,7 @@
         <span class="arch-id">L-M06</span>
         <span class="arch-name">Alto risco — antes/depois, custos, recibo</span>
         <span class="risk irreversible">Irreversível</span>
-        <span class="arch-count"><b>3</b> parciais / 18</span>
+        <span class="arch-count"><b>4</b> parciais / 18</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-CLUB-LEAVE</span><span class="chip-d">Saída — confirma cooldown e verifica; é um Alert, não tela de consequência</span><span class="tag">parcial</span></div>
@@ -619,7 +619,7 @@
         <div class="chip missing"><span class="chip-id">M-STADIUM-WORKS</span><span class="chip-d">Obras do estádio</span></div>
         <div class="chip missing"><span class="chip-id">M-LICENSING</span><span class="chip-d">Licenciamento / interdição</span></div>
         <div class="chip missing"><span class="chip-id">M-PRESS</span><span class="chip-d">Imprensa / coletiva</span></div>
-        <div class="chip missing"><span class="chip-id">M-CONVO</span><span class="chip-d">Conversa com atleta</span></div>
+        <div class="chip partial"><span class="chip-id">M-CONVO</span><span class="chip-d">Elogiar/criticar movendo a FORMA — no painel do jogador (<code>morale:talk-to-player</code>) e na tela de treino para o elenco inteiro (<code>morale:talk-to-squad</code>). Provado por HTTP: elogiar levou a forma de +2 a +5 (efetiva 61→64) e criticar o elenco levou um terceiro jogador de +2 a −1, com o <b>núcleo parado em 59 nos dois casos</b>. Não fecha: <b>não exercitada no app rodando</b>, spec anterior à R-221 (não documenta elogiar/criticar), e falta tudo o que a spec pede de verdade — motivo da conversa, perfil mental, árvore de respostas da R-96, consequência exibida antes do CTA, promessas e renovação</span><span class="tag">aguardando confirmação + falta motivo/árvore/consequência</span></div>
         <div class="chip missing"><span class="chip-id">M-PUBLIC-PROMISES</span><span class="chip-d">Promessas públicas</span></div>
         <div class="chip partial"><span class="chip-id">M-IDENTITY</span><span class="chip-d">Rebranding — escudo, camisas, paleta, unicidade e confirmação com a penalidade de torcida</span><span class="tag">a mais completa</span></div>
         <div class="chip missing"><span class="chip-id">M-CLAUSES</span><span class="chip-d">Cláusulas e obrigações condicionais</span></div>
@@ -704,7 +704,7 @@
       </div>
       <div class="blocker">
         <h3>O app não tem navegação de detalhe</h3>
-        <p><b>Ainda trava.</b> As <span class="num">4</span> chamadas de rota do app continuam sendo <code>router.replace</code>: não existe um <code>&lt;Link&gt;</code>, um <code>router.push</code> nem uma rota de detalhe. O M-SPLASH abriu a primeira divisão real — <code>/</code> virou o splash e a home foi para <code>/inicio</code>, levando a árvore de 6 para <span class="num">7</span> rotas — mas empilhar tela sobre tela ainda é impossível. Ficha de jogador, detalhe de decisão, dossiê do adversário: nenhum tem para onde navegar. Continua pré-requisito de quase todo o L-M03.</p>
+        <p><b>CAIU.</b> A primeira <b>rota de detalhe</b> do app existe: <code>/elenco/desenvolvimento/[playerId]</code> (<code>apps/mobile/src/app/elenco/desenvolvimento/[playerId].tsx</code>), com parâmetro dinâmico lido por <code>useLocalSearchParams</code> e alcançada por <code>router.push</code> a partir da tela de treino. Empilhar tela sobre tela deixou de ser impossível — e o padrão está disponível para ficha de jogador, detalhe de decisão e dossiê do adversário, que antes não tinham para onde navegar.<br><br><b>O que isto NÃO resolve:</b> a rota existir não constrói as telas. As demais continuam ausentes; o que caiu foi o <em>pré-requisito</em> delas, não o trabalho. Também não há <code>&lt;Link&gt;</code> nem deep link restaurando a tab, que o critério do arquétipo L-M03 pede.</p>
       </div>
       <div class="blocker">
         <h3>Autenticação existe no cliente, mas a API ainda não a exige</h3>
@@ -746,6 +746,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-20</span>
+        <span class="log-text"><b>A camada de UI do atributo vivo fecha: <code>M-PLAYER-DEV</code> e <code>M-CONVO</code> entram 🟡 PARCIAIS, e a trava de navegação CAIU.</b> O painel núcleo/forma vive em <code>/elenco/desenvolvimento/[playerId]</code> — a <b>primeira rota de detalhe do app</b>, o que derruba a trava que dizia que empilhar tela sobre tela era impossível (só havia <code>router.replace</code>). Ele decompõe a habilidade EFETIVA em <b>núcleo</b> (permanente, sobe por treino) + <b>forma</b> (transiente, move por partida/decisão, decai) — a separação que existe justamente para impedir o falso bug "meu jogador caiu de 65 para 61". Elogiar/criticar entra no painel (jogador) e na tela de treino (elenco inteiro). <b>Prova por HTTP</b> no mundo demo: <code>player-development</code> → núcleo 59, forma +2, efetiva 61, jogador <b>no teto aproveitável</b> (estado real, não caminho feliz); <code>talk-to-player PRAISE</code> → forma +2→+5, efetiva 61→64; <code>talk-to-squad CRITICIZE</code> → um terceiro jogador +2→−1, efetiva 64→61. <b>O núcleo ficou parado em 59 nos dois casos</b> — a invariante da R-221, observada e não suposta. Gate completo <b>com banco</b>: <code>lint=0 typecheck=0 test=0 build=0</code>. <b>Por que as duas seguem amarelas:</b> nenhuma foi exercitada no app rodando por uma pessoa, e as specs são anteriores à R-221 — <code>M-PLAYER-DEV</code> não documenta núcleo/forma, <code>M-CONVO</code> não documenta elogiar/criticar, então <b>não há doc contra o qual declarar completude</b>. Falta muito do que as specs pedem: curva por faixa etária, inclinações naturais e histórico por passagem de clube num lado; motivo da conversa, perfil mental, árvore da R-96, consequência antes do CTA, promessas e renovação no outro.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-20</span>
         <span class="log-text"><b>A primeira UI do atributo vivo: <code>M-TRAINING</code> sai de ausente para 🟡 PARCIAL (aguardando confirmação).</b> A tela vive em <code>/elenco/treino</code> (<code>apps/mobile/src/screens/training/index.tsx</code>), sobre as queries oficiais <code>roster</code> + <code>training-sessions</code> — a segunda criada horas antes justamente porque o estado TREINANDO era inobservável. Estados <b>IDLE / TREINANDO / BLOQUEADO</b> por jogador, escolha do atributo-foco (menor primeiro: é onde sobra espaço para crescer), progresso em dias e coleta. <b>Lógica pura testada ANTES de existir</b>: os 7 casos novos foram vistos falhando com <code>buildTrainingRows is not a function</code>, e só então implementados — progresso <b>tetado na duração</b> (coletar antes do fim rende parcial, passar do fim não rende além), sessão de jogador fora do elenco <b>ignorada</b> (linha fantasma seria a tela inventando jogador), resumo zerado em elenco vazio em vez de <code>NaN</code>. A data é a do <b>mundo</b> (<code>asOf</code>), nunca <code>Date.now()</code> — senão o progresso mostrado divergiria do ganho que a coleta aplica. <b>Por que NÃO é verde:</b> não foi exercitada no app rodando, e a spec de <code>M-TRAINING</code> é anterior à R-221 — ela não documenta iniciar/coletar sessão, então <b>não existe doc contra o qual declarar completude</b>; além disso falta o <b>plano coletivo</b> que a spec pede (foco por área, carga, recuperação, alertas de sobrecarga). Gate completo <b>com banco</b>: <code>lint=0 typecheck=0 test=0 build=0</code>, 142 arquivos / <b>1269</b> testes. Navegação: trava do conflito Clube-vs-Elenco <b>resolvida provisoriamente</b> (tela no Elenco + card de atalho no Clube), mas segue listada — a decisão de arquitetura é do dono.</span>
