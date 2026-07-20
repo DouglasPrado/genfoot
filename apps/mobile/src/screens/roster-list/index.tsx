@@ -25,6 +25,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
+import { commandIdempotencyKey, onDay } from "@/lib/idempotency";
 import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
@@ -121,7 +122,17 @@ export function RosterList() {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
       }
-      const idempotencyKey = `${commandType}:${managedClub.id}:${playerId}`;
+      // Chave por DIA lógico, não eterna. `${commandType}:${club}:${player}`
+      // deduplicava para sempre: rebaixar um jogador, promovê-lo e rebaixá-lo de
+      // novo perdia a 2ª ação em silêncio. (Dispensar é terminal e o escopo
+      // diário não o atrapalha; rebaixar é que precisa destravar.)
+      const worldDate = clubQuery.asOf ?? "";
+      if (worldDate === "") return;
+      const idempotencyKey = commandIdempotencyKey({
+        commandType,
+        target: playerId,
+        occasion: onDay(worldDate),
+      });
       setActingId(playerId);
       void submitTrackedCommand(client, {
         clientContractVersion: "v1",
@@ -143,7 +154,7 @@ export function RosterList() {
         }
       });
     },
-    [client, contractVersion, managedClub, worldId, rosterQuery],
+    [client, contractVersion, managedClub, worldId, clubQuery.asOf, rosterQuery],
   );
 
   const players = useMemo(() => {

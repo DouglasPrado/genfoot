@@ -25,6 +25,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
+import { commandIdempotencyKey, onDay } from "@/lib/idempotency";
 import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import { previewDeal } from "@/screens/market/market-model";
 import {
@@ -189,7 +190,15 @@ export function Market() {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
       }
-      const idempotencyKey = `sign:${managedClub.id}:${p.playerId}`;
+      // Chave por DIA lógico, não eterna: contratar→vender→recontratar é ciclo
+      // legítimo, e `sign:${club}:${player}` fazia a recontratação sumir.
+      const worldDate = clubQuery.asOf ?? "";
+      if (worldDate === "") return;
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "market:sign-player",
+        target: p.playerId,
+        occasion: onDay(worldDate),
+      });
       setSigningId(p.playerId);
       setTracking({
         status: CommandTrackingStatus.SUBMITTING,

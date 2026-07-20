@@ -30,6 +30,7 @@ import {
 } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
+import { commandIdempotencyKey, onDay, onRevision } from "@/lib/idempotency";
 import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import {
   clearLineupDraft,
@@ -267,7 +268,15 @@ export function Squad() {
       if (managedClub === null || client === null || contractVersion === null) {
         return;
       }
-      const idempotencyKey = `demote:${managedClub.id}:${playerId}`;
+      // Chave por DIA lógico, não eterna: rebaixar→promover→rebaixar é ciclo
+      // legítimo, e `demote:${club}:${player}` fazia a 2ª descida sumir.
+      const worldDate = clubQuery.asOf ?? "";
+      if (worldDate === "") return;
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "youth:demote-player",
+        target: playerId,
+        occasion: onDay(worldDate),
+      });
       setDemotingId(playerId);
       void submitTrackedCommand(client, {
         clientContractVersion: "v1",
@@ -288,7 +297,7 @@ export function Squad() {
         }
       });
     },
-    [client, contractVersion, managedClub, worldId, rosterQuery],
+    [client, contractVersion, managedClub, worldId, clubQuery.asOf, rosterQuery],
   );
 
   const saveLineup = useCallback(() => {
@@ -311,6 +320,10 @@ export function Squad() {
           text: "Salvar",
           onPress: () => {
             const occurredAt = clubQuery.asOf ?? "2026-01-01";
+            // baseKey só para o correlationId (rastro), não para idempotência: a
+            // chave de cada command carrega o CONTEÚDO do movimento (via
+            // onRevision abaixo), senão duas substituições diferentes na mesma
+            // versão colidiam e a segunda sumia — a classe-do-plano.
             const baseKey = `lineup:${squad.id}:${squad.version}`;
             setSyncTracking({
               status: CommandTrackingStatus.SUBMITTING,
@@ -334,7 +347,15 @@ export function Squad() {
                     occurredAt,
                     command: { ...command, squadId: squad.id },
                   },
-                  idempotencyKey: `${baseKey}:${index}`,
+                  idempotencyKey: commandIdempotencyKey({
+                    commandType: "club:command",
+                    target: squad.id,
+                    occasion: onRevision(
+                      squad.version,
+                      index,
+                      JSON.stringify(command),
+                    ),
+                  }),
                   correlationId: `mobile:${baseKey}:${index}`,
                 });
                 if (
