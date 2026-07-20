@@ -110,6 +110,12 @@ describe("buildTrainingRows — junta elenco e sessões ativas (M-TRAINING)", ()
     expect(row?.blockedLabel).toBe("Lesionado");
   });
 
+  it("a linha carrega a availability crua — a flag de lesão/suspensão lê dela", () => {
+    const rows = buildTrainingRows(players, sessions, "2027-06-11");
+    expect(rows.find((r) => r.playerId === "p3")?.availability).toBe("INJURED");
+    expect(rows.find((r) => r.playerId === "p1")?.availability).toBe("AVAILABLE");
+  });
+
   it("sessão de jogador fora do elenco é ignorada, não vira linha fantasma", () => {
     const rows = buildTrainingRows(players, [
       { playerId: "sumiu", attributeCode: "pace", startDate: "2027-06-10", durationDays: 7 },

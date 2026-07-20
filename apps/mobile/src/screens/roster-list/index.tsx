@@ -5,6 +5,7 @@ import { router } from "expo-router";
 
 import { CommandTrackingStatus } from "@grinta/core";
 
+import { AvailabilityFlag } from "@/components/availability-flag";
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
 import { PositionBadge, positionGroupTint } from "@/components/position-badge";
@@ -43,6 +44,8 @@ interface RosterPlayer {
   readonly overall: number;
   readonly potential: number;
   readonly age: number;
+  /** `PlayerAvailability` cru — a flag de lesão/suspensão lê dele. */
+  readonly availability: string;
   readonly groups?: {
     readonly technical: number;
     readonly physical: number;
@@ -247,9 +250,12 @@ export function RosterList() {
                     tint={positionGroupTint(sectorOf(p.primaryPosition))}
                   />
                   <View style={styles.info}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {p.name}
-                    </Text>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <AvailabilityFlag availability={p.availability} />
+                    </View>
                     <Text style={styles.meta} numberOfLines={1}>
                       {p.age} anos
                     </Text>
@@ -411,7 +417,9 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   info: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
   name: {
+    flexShrink: 1,
     color: color.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",

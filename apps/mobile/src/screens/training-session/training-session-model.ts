@@ -67,6 +67,8 @@ export interface TrainingRow {
   readonly shirtNumber: number;
   readonly primaryPosition: string;
   readonly overall: number;
+  /** Availability crua (`PlayerAvailability`) — a flag de lesão/suspensão lê dela. */
+  readonly availability: string;
   readonly state: SessionState;
   /** `null` quando não há sessão ativa — a tela não inventa progresso. */
   readonly session: SessionProgress | null;
@@ -123,6 +125,7 @@ export function buildTrainingRows(
       shirtNumber: p.shirtNumber,
       primaryPosition: p.primaryPosition,
       overall: p.overall,
+      availability: p.availability,
       state,
       session:
         active === null
