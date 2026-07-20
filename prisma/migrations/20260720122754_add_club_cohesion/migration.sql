@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Club" ADD COLUMN     "cohesion" INTEGER NOT NULL DEFAULT 50;

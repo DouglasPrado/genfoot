@@ -1110,6 +1110,7 @@ model Club {
   fanBaseSize         Int             @default(0)
   boardPatience       Int             @default(50)
   pressureLevel       Int             @default(0)
+  cohesion            Int             @default(50) // R-220 Fase 3: entrosamento do time 0..100
   // Dinheiro do clube: pendente. `cashMinor` é PROJEÇÃO do razão (Decisão
   // 19.10) e não pode ser escrito por C3 — o clube nunca escreve LedgerEntry
   // (context map:78). Volta com C9, onde tem dono. `currencyId` espera a model

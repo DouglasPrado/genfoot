@@ -116,6 +116,7 @@ export * from "./competitions/standings.js";
 export * from "./competitions/season-outcome.js";
 export * from "./competitions/promotion-relegation.js";
 export * from "./competitions/season-rollover.js";
+export * from "./competitions/team-cohesion.js";
 export * from "./competitions/competition-read-model.js";
 export * from "./fanbase/fanbase-model.js";
 export * from "./fanbase/fanbase-repository.js";
