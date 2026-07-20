@@ -361,10 +361,17 @@ export function Training() {
         return;
       }
       const commandType = "morale:talk-to-squad";
+      if (worldDate === "") {
+        setPlanError(
+          "Sem a data do mundo não é possível registrar a conversa com segurança.",
+        );
+        return;
+      }
       const idempotencyKey = talkIdempotencyKey({
         commandType,
         targetId: managedClub.id,
         stance,
+        worldDate,
       });
       setTracking({
         status: CommandTrackingStatus.SUBMITTING,
@@ -396,6 +403,7 @@ export function Training() {
       client,
       contractVersion,
       worldId,
+      worldDate,
       rosterQuery.refetch,
     ],
   );

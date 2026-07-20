@@ -74,6 +74,7 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
   const { session, status, client, contractVersion } = useSession();
   const worldId = useRequiredWorldId();
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
+  const [talkBlocked, setTalkBlocked] = useState<string | null>(null);
 
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
@@ -96,6 +97,9 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
     { playerId },
   );
 
+  // A data LÓGICA do mundo — escopa a chave de idempotência da conversa.
+  const worldDate = clubQuery.asOf ?? "";
+
   const view = useMemo(
     () =>
       devQuery.data?.development == null
@@ -116,10 +120,20 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
         return;
       }
       const commandType = "morale:talk-to-player";
+      // Sem a data do mundo não dá para montar chave por ocasião — e chave
+      // eterna transforma a conversa em botão de uso único. Não despacha.
+      if (worldDate === "") {
+        setTalkBlocked(
+          "Sem a data do mundo não é possível registrar a conversa com segurança.",
+        );
+        return;
+      }
+      setTalkBlocked(null);
       const idempotencyKey = talkIdempotencyKey({
         commandType,
         targetId: playerId,
         stance,
+        worldDate,
       });
       setTracking({
         status: CommandTrackingStatus.SUBMITTING,
@@ -150,7 +164,7 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
         }
       });
     },
-    [managedClub, client, contractVersion, worldId, playerId, devQuery.refetch],
+    [managedClub, client, contractVersion, worldId, playerId, worldDate, devQuery.refetch],
   );
 
   const screenState = deriveScreenState({
@@ -302,6 +316,9 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
                 </Pressable>
               ))}
             </View>
+            {talkBlocked !== null ? (
+              <Text style={styles.error}>{talkBlocked}</Text>
+            ) : null}
             {tracking?.status === CommandTrackingStatus.REJECTED ? (
               <Text style={styles.error}>
                 {tracking.errorCode ?? "COMMAND_REJECTED"}

@@ -32,11 +32,33 @@ export function buildTalkToSquadPayload(input: {
   return { clubId: input.clubId, stance: input.stance };
 }
 
-/** Chave de idempotência estável por (alvo, postura) — um efeito por conversa. */
+/**
+ * Chave de idempotência por (alvo, postura, DIA LÓGICO do mundo).
+ *
+ * O dia é o que impede a chave de virar botão de uso único. A versão anterior
+ * era estável por (alvo, postura) e só — e contra a API real o segundo elogio
+ * ao mesmo jogador voltava `ALREADY_APPLIED` com a forma parada (5 → 8 → 8).
+ * O treinador podia elogiar cada jogador UMA VEZ, para sempre.
+ *
+ * Idempotência é "repetir a MESMA conversa não multiplica o efeito", não
+ * "conversar uma vez na vida". Conversar de novo no dia seguinte é uma conversa
+ * nova e tem que valer.
+ *
+ * A data vem do mundo (`asOf`), nunca de `Date.now()`: chave derivada do relógio
+ * local mudaria à meia-noite do jogador, não à virada do dia lógico.
+ */
 export function talkIdempotencyKey(input: {
   readonly commandType: string;
   readonly targetId: string;
   readonly stance: TalkStance;
+  readonly worldDate: string;
 }): string {
-  return `${input.commandType}:${input.targetId}:${input.stance}`;
+  if (input.worldDate.trim() === "") {
+    // Sem data, a única chave possível seria eterna — e chave eterna já causou o
+    // bug acima. Falhar alto é melhor que gravar uma que nunca mais destrava.
+    throw new Error(
+      "talkIdempotencyKey exige a data do mundo: sem ela a chave vira permanente.",
+    );
+  }
+  return `${input.commandType}:${input.targetId}:${input.stance}:${input.worldDate}`;
 }
