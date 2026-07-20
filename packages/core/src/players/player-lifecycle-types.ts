@@ -93,6 +93,12 @@ export interface PlayerLifecycleSnapshot {
   /** Última temporada envelhecida — trava de idempotência da virada (R-217). */
   readonly lastAgedSeasonId: string | null;
   readonly dynamicState: PlayerDynamicState;
+  /**
+   * A FORMA (R-221 Fase 2b): modificador ± transiente sobre a habilidade,
+   * movido por partida/decisão e que decai ao neutro. `habilidadeEfetiva =
+   * currentAbility + formaModifier`. Opcional: ausente = 0 (neutro).
+   */
+  readonly formaModifier?: number;
   readonly trainingFocus?: PlayerAttributeCode;
   readonly youthProspect?: boolean;
   readonly lastProcessedOn: string;

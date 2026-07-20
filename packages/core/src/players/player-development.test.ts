@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { WorldDate } from "@grinta/shared";
+
 import { Player } from "./player.js";
+import { FORM_MAX } from "./match-form.js";
 import { derivePotentialLayers } from "./potential-layers.js";
 import {
   PlayerAvailability,
@@ -196,5 +199,49 @@ describe("Player — sessão de treino (R-221 Fase 2a)", () => {
     p.addFatigue(0);
     p.addFatigue(-5);
     expect(p.snapshot().version).toBe(v); // no-op não incrementa versão
+  });
+});
+
+describe("Player — forma (R-221 Fase 2b)", () => {
+  it("habilidade efetiva = núcleo + forma", () => {
+    const p = carregar(jogador({ currentAbility: 60 }));
+    expect(p.effectiveAbility()).toBe(60); // forma 0
+    p.applyMatchForm(5);
+    expect(p.formaModifier).toBe(5);
+    expect(p.effectiveAbility()).toBe(65);
+    p.applyMatchForm(-8);
+    expect(p.formaModifier).toBe(-3);
+    expect(p.effectiveAbility()).toBe(57);
+  });
+
+  it("forma é tetada em ±FORM_MAX", () => {
+    const p = carregar(jogador());
+    p.applyMatchForm(999);
+    expect(p.formaModifier).toBe(FORM_MAX);
+    p.applyMatchForm(-999);
+    expect(p.formaModifier).toBe(-FORM_MAX);
+  });
+
+  it("delta zero é no-op (não incrementa versão)", () => {
+    const p = carregar(jogador());
+    const v = p.snapshot().version;
+    p.applyMatchForm(0);
+    expect(p.snapshot().version).toBe(v);
+  });
+
+  it("efetiva não vaza de 0..100", () => {
+    const alto = carregar(jogador({ currentAbility: 95, potentialAbility: 99 }));
+    alto.applyMatchForm(FORM_MAX);
+    expect(alto.effectiveAbility()).toBe(100);
+  });
+
+  it("a forma decai ao neutro com os dias (processUntil)", () => {
+    const p = carregar(jogador({ lastProcessedOn: "2026-03-01" }));
+    p.applyMatchForm(6);
+    expect(p.formaModifier).toBe(6);
+    const d = WorldDate.parse("2026-03-05"); // 4 dias
+    if (!d.ok) throw d.error;
+    p.processUntil(d.value);
+    expect(p.formaModifier).toBe(2); // 6 - 4*1
   });
 });

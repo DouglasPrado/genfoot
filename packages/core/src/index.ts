@@ -167,6 +167,7 @@ export * from "./training/start-training-session.js";
 export * from "./training/collect-training-session.js";
 export * from "./players/player-development-view.js";
 export * from "./players/age-decline.js";
+export * from "./players/match-form.js";
 export * from "./players/retirement-decision.js";
 export * from "./players/apply-season-aging.js";
 export * from "./youth/youth-class.js";
