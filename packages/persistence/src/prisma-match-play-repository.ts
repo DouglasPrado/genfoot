@@ -229,22 +229,43 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
     return byClub;
   }
 
-  /** O overall médio do elenco de cada clube do mundo. */
+  /**
+   * A força de cada clube (R-220 Fase 1): dos 11 ESCALADOS quando há escalação,
+   * ponderados por `fillQuality` (fora de posição rende menos); senão, a média
+   * do elenco FIRST_TEAM (o comportamento antigo, para mundos sem escalação não
+   * quebrarem). A escalação tem precedência — é o que o treinador pôs em campo.
+   */
   private async clubStrengths(
     gameWorldId: GameWorldId,
   ): Promise<Map<string, number>> {
-    const rows = await this.client.$queryRaw<
-      { clubId: string; strength: number }[]
-    >`
-      SELECT s."clubId" AS "clubId",
-             ROUND(AVG(p."currentAbility"))::int AS strength
-      FROM "Squad" s
-      JOIN "SquadMembership" sm ON sm."squadId" = s.id
-      JOIN "Player" p ON p.id = sm."playerId"
-      WHERE s."gameWorldId" = ${gameWorldId}::uuid
-        AND s.category = 'FIRST_TEAM'
-      GROUP BY s."clubId"
-    `;
-    return new Map(rows.map((row) => [row.clubId, Number(row.strength)]));
+    const [squadRows, lineupRows] = await Promise.all([
+      this.client.$queryRaw<{ clubId: string; strength: number }[]>`
+        SELECT s."clubId" AS "clubId",
+               ROUND(AVG(p."currentAbility"))::int AS strength
+        FROM "Squad" s
+        JOIN "SquadMembership" sm ON sm."squadId" = s.id
+        JOIN "Player" p ON p.id = sm."playerId"
+        WHERE s."gameWorldId" = ${gameWorldId}::uuid
+          AND s.category = 'FIRST_TEAM'
+        GROUP BY s."clubId"
+      `,
+      this.client.$queryRaw<{ clubId: string; strength: number }[]>`
+        SELECT cl."clubId" AS "clubId",
+               ROUND(AVG(p."currentAbility" * cls."fillQuality"))::int AS strength
+        FROM "ClubLineup" cl
+        JOIN "ClubLineupStarter" cls ON cls."lineupId" = cl.id
+        JOIN "Player" p ON p.id = cls."playerId"
+        WHERE cl."gameWorldId" = ${gameWorldId}::uuid
+        GROUP BY cl."clubId"
+      `,
+    ]);
+    // Base = média do elenco; a escalação sobrescreve onde existe.
+    const strengths = new Map(
+      squadRows.map((row) => [row.clubId, Number(row.strength)]),
+    );
+    for (const row of lineupRows) {
+      strengths.set(row.clubId, Number(row.strength));
+    }
+    return strengths;
   }
 }

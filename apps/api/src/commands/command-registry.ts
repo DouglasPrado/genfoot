@@ -58,6 +58,9 @@ import {
   type SeasonAccrualUnitOfWork,
   type SeasonAgingUnitOfWork,
   type SeasonLifecycleRepository,
+  type LineupRepository,
+  type LineupContextReader,
+  SetClubLineup,
   type PlayerRepository,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
@@ -141,6 +144,9 @@ export interface CommandContext {
   readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork;
   /** R-219 — materialização da temporada como entidade do mundo. */
   readonly seasonLifecycle: SeasonLifecycleRepository;
+  /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
+  readonly clubLineupRepository: LineupRepository;
+  readonly lineupContextReader: LineupContextReader;
   readonly playerRepository: PlayerRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
@@ -454,6 +460,14 @@ const applySeasonPayload = z.object({
 const accrueDayPayload = z.object({
   clubId: z.string().uuid(),
   seasonId: z.string().uuid(),
+});
+
+const setLineupPayload = z.object({
+  clubId: z.string().uuid(),
+  formation: z.string(),
+  starters: z.array(z.string().uuid()),
+  bench: z.array(z.string().uuid()),
+  expectedVersion: z.number().int().nullable(),
 });
 
 const trainingPlanPayload = z.object({
@@ -861,6 +875,38 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /** Tática — define a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
+  "tactics:set-lineup": async ({
+    worlds,
+    clubLineupRepository,
+    lineupContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = setLineupPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetClubLineup(
+      clubLineupRepository,
+      lineupContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      formation: parsed.data.formation,
+      starters: parsed.data.starters,
+      bench: parsed.data.bench,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    // Avisos de fora-de-posição viajam no envelope — a tela decide se alerta.
+    return succeed({
+      resource: `lineup:${result.value.lineup.id}`,
+      warnings: result.value.warnings,
+    } as never);
   },
 
   /** Treino — um dia de accrual: soma o ganho do plano ao buffer (R-212/R-113). */
