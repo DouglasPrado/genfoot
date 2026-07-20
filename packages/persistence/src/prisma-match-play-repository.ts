@@ -230,10 +230,10 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
   }
 
   /**
-   * A força de cada clube (R-220 Fase 1): dos 11 ESCALADOS quando há escalação,
-   * ponderados por `fillQuality` (fora de posição rende menos); senão, a média
-   * do elenco FIRST_TEAM (o comportamento antigo, para mundos sem escalação não
-   * quebrarem). A escalação tem precedência — é o que o treinador pôs em campo.
+   * A força de cada clube: dos 11 ESCALADOS quando há escalação (R-220 Fase 1),
+   * ponderados por `fillQuality`; senão, a média do elenco FIRST_TEAM. A força
+   * usa a habilidade EFETIVA — núcleo + forma, presa em 0..100 (R-221 Fase 2b):
+   * um time em alta rende mais, em baixa rende menos, na mesma partida.
    */
   private async clubStrengths(
     gameWorldId: GameWorldId,
@@ -241,7 +241,7 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
     const [squadRows, lineupRows] = await Promise.all([
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT s."clubId" AS "clubId",
-               ROUND(AVG(p."currentAbility"))::int AS strength
+               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier"))))::int AS strength
         FROM "Squad" s
         JOIN "SquadMembership" sm ON sm."squadId" = s.id
         JOIN "Player" p ON p.id = sm."playerId"
@@ -251,7 +251,7 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       `,
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT cl."clubId" AS "clubId",
-               ROUND(AVG(p."currentAbility" * cls."fillQuality"))::int AS strength
+               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier")) * cls."fillQuality"))::int AS strength
         FROM "ClubLineup" cl
         JOIN "ClubLineupStarter" cls ON cls."lineupId" = cl.id
         JOIN "Player" p ON p.id = cls."playerId"

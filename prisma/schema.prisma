@@ -1366,6 +1366,7 @@ model Player {
   happiness               Int                    @default(50)
   fatigue                 Int                    @default(0)
   matchSharpness          Int                    @default(50)
+  formaModifier           Int                    @default(0) // R-221 Fase 2b: forma ± transiente
   /// Até que dia do mundo o jogador já foi processado (`Player.processUntil`).
   ///
   /// Faltava: o agregado tinha o estado e o físico não tinha onde guardá-lo, e
