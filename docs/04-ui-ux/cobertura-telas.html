@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 17 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>dd06c8b</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-20</b> · commit <b>450a9a9</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -728,6 +728,10 @@
     <div class="log">
       <div class="log-row">
         <span class="log-date">2026-07-19</span>
+        <span class="log-text"><b>Follow-ups do atributo vivo: forma vai a quem jogou, aparece na leitura, e o team-talk (R-221 Programa 1, provado por HTTP).</b> Entrega de <b>domínio + API</b> — nenhuma tela mudou de cor. Três arestas fechadas sobre o atributo vivo: (1a) a partida agora aplica a forma aos <b>escalados</b> da <code>ClubLineup</code> (fallback FIRST_TEAM) — quem não jogou não embala; (1b) a query <code>player-development</code> passou a expor <code>formaModifier</code> e <code>effectiveAbility</code> (núcleo+forma), pra <code>M-PLAYER-DEV</code> mostrar a diferença; (1c) o command <code>morale:talk-to-squad</code> (elogiar/criticar o elenco) move a forma de todo o FIRST_TEAM de uma vez. <b>Prova ponta a ponta (0 falhas):</b> escala 11 → joga → só os 11 mudam de forma (reserva fica 0); team-talk PRAISE → elenco +3; a query devolve forma=3 e efetiva=núcleo+3. Catálogo em <b>46 commands</b>; 1040 testes. <b>Dívida declarada:</b> o <code>processUntil</code> (drift diário de fadiga/matchSharpness/moral) segue dormente em produção — só a forma decai hoje; ligá-lo ao avanço é caro/arriscado e fica de follow-up.</span>
+      </div>
+      <div class="log-row">
+        <span class="log-date">2026-07-20</span>
         <span class="log-text"><b>A DECISÃO move a forma — o ATRIBUTO VIVO fecha os três motores (R-221 Fase 2c, provada por HTTP).</b> Entrega de <b>domínio + API</b> — nenhuma tela mudou de cor. Última fatia do modelo vivo: o treinador conversa com o jogador (<code>morale:talk-to-player</code>) — <b>elogiar</b> embala a forma (+), <b>criticar</b> cobra (−), tetado em ±10, e a forma decai sozinha (2b). Com isso, os <b>três motores</b> do <code>habilidadeEfetiva = núcleo + forma</code> estão ligados: <b>treino</b> move o núcleo (2a), <b>partida</b> move a forma (2b), <b>decisão</b> move a forma (2c). Aplica pelo agregado (<code>Player.applyMatchForm</code> ganhou seu primeiro caller de produção — a 2b usava SQL) e reusa o <code>PLAYER_REPOSITORY</code> (sem provider novo). <b>Prova ponta a ponta (0 falhas):</b> PRAISE 0→<span class="num">+3</span>; CRITICIZE →<span class="num">−3</span>; teto <span class="num">+10</span>; decai 10→7 em 3 dias; jogador inexistente recusado. 1039 testes; catálogo em 45 commands. <b>Honesto:</b> magnitudes são calibração minha (VAL-001); crítica é determinística (sem backfire por personalidade — refinamento); <b>team-talk</b> (elogiar o elenco) fica de extensão; exposição da forma na tela é follow-up. O programa do ATRIBUTO VIVO (R-221) está completo no back-end; falta a UI que mostra núcleo/forma e as telas de treino/conversa.</span>
       </div>
       <div class="log-row">
