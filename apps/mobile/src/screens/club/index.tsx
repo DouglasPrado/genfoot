@@ -554,37 +554,12 @@ export function Club() {
         </Pressable>
 
         {/*
-          A doc de navegação (01-navegacao-e-arquitetura-de-informacao.md:27) põe
-          Treino na stack do ELENCO, e é lá que a tela vive (/elenco/treino).
-          Este card é só um atalho: o dono do produto procura treino a partir do
-          Clube, e uma entrada a mais não contradiz a doc — some do Clube sem
-          quebrar nada se a decisão mudar.
+          Treino NÃO fica aqui: a doc de navegação
+          (01-navegacao-e-arquitetura-de-informacao.md:27) o põe na stack do
+          ELENCO, e o dono confirmou testando — Clube ▸ Elenco ▸ Treino. O atalho
+          que existia neste ponto foi removido; a entrada única vive no hub do
+          Elenco (elenco-hub), como Formação, Base e Comissão.
         */}
-        <Pressable
-          onPress={() => router.push("/elenco/treino")}
-          accessibilityRole="button"
-          accessibilityLabel="Abrir treino"
-        >
-          <Card>
-            <SectionHeader
-              title="TREINO"
-              trailing={
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  <Text style={styles.openHint}>ABRIR</Text>
-                  <Icon name="chevron-forward" size={16} color={color.textMuted} />
-                </View>
-              }
-            />
-            <View style={styles.financeUnavailable}>
-              <Icon name="barbell" size={18} color={color.textMuted} />
-              <Text style={styles.financeUnavailableText}>
-                Sessões de treino do elenco: escolha o foco, acompanhe o
-                progresso e colete o ganho.
-              </Text>
-            </View>
-          </Card>
-        </Pressable>
-
         <Pressable
           onPress={() => router.push("/financas")}
           accessibilityRole="button"

@@ -60,6 +60,13 @@ const DESTINATIONS: readonly Destination[] = [
     route: "/elenco/comissao",
   },
   {
+    key: "treino",
+    icon: "barbell",
+    title: "Treino",
+    note: "Plano do elenco, sessões individuais e conversa",
+    route: "/elenco/treino",
+  },
+  {
     key: "base",
     icon: "school",
     title: "Base",
@@ -74,12 +81,6 @@ const SOON: readonly SoonDestination[] = [
     icon: "medkit",
     title: "Departamento Médico",
     note: "Lesões e reabilitação",
-  },
-  {
-    key: "treino",
-    icon: "barbell",
-    title: "Treino",
-    note: "Foco, carga e planos individuais",
   },
 ];
 
