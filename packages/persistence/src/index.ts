@@ -55,6 +55,7 @@ export * from "./prisma-season-aging-unit-of-work.js";
 export * from "./prisma-training-session-unit-of-work.js";
 export * from "./prisma-training-sessions-read-model.js";
 export * from "./prisma-world-season-read-model.js";
+export * from "./prisma-cohesion-training-unit-of-work.js";
 export * from "./prisma-season-lifecycle-repository.js";
 export * from "./prisma-club-lineup-repository.js";
 export * from "./prisma-youth-intake-read-model.js";

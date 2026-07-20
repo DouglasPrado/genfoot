@@ -164,6 +164,7 @@ export * from "./training/accrue-club-training.js";
 export * from "./training/apply-season-accruals.js";
 export * from "./training/training-session.js";
 export * from "./training/training-session-types.js";
+export * from "./training/train-formation-cohesion.js";
 export * from "./training/start-training-session.js";
 export * from "./training/collect-training-session.js";
 export * from "./players/player-development-view.js";

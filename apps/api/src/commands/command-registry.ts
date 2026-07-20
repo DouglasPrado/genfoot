@@ -64,6 +64,8 @@ import {
   type SeasonAgingUnitOfWork,
   type SeasonLifecycleRepository,
   type TrainingSessionUnitOfWork,
+  type CohesionTrainingUnitOfWork,
+  TrainFormationCohesion,
   type LineupRepository,
   type LineupContextReader,
   SetClubLineup,
@@ -152,6 +154,7 @@ export interface CommandContext {
   readonly seasonLifecycle: SeasonLifecycleRepository;
   /** R-221 Fase 2a — treino de sessão com progresso instantâneo. */
   readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork;
+  readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork;
   /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
@@ -497,6 +500,10 @@ const setLineupPayload = z.object({
   starters: z.array(z.string().uuid()),
   bench: z.array(z.string().uuid()),
   expectedVersion: z.number().int().nullable(),
+});
+
+const trainFormationPayload = z.object({
+  clubId: z.string().uuid(),
 });
 
 const trainingPlanPayload = z.object({
@@ -920,6 +927,30 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /**
+   * Treino da formação como fonte de ENTROSAMENTO (R-220 Fase 3): põe os
+   * titulares para treinar a formação escolhida e sobe a coesão do time — o
+   * meio-termo que faltava entre "jogar partida" (sobe) e "transferência" (cai).
+   */
+  "training:train-formation": async ({
+    worlds,
+    cohesionTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = trainFormationPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await cohesionTrainingUnitOfWork.run((repos) =>
+      new TrainFormationCohesion(repos.lineup, repos.cohesion).execute({
+        gameWorldId: world.value.worldId,
+        clubId: parsed.data.clubId,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` });
   },
 
   /** Moral — conversa do treinador: elogiar/criticar move a FORMA (R-221 2c). */

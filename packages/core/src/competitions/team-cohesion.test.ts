@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  COHESION_FORMATION_TRAINING_GAIN,
+  COHESION_MATCH_GAIN,
   COHESION_START,
+  cohesionAfterFormationTraining,
   cohesionAfterMatch,
   cohesionAfterTransfer,
   cohesionModifier,
@@ -37,5 +40,20 @@ describe("team-cohesion (R-220 Fase 3)", () => {
 
   it("time entrosado (alta coesão) rende mais que time desentrosado", () => {
     expect(cohesionModifier(90)).toBeGreaterThan(cohesionModifier(20));
+  });
+
+  it("treinar a formação SOBE a coesão, com teto 100", () => {
+    expect(cohesionAfterFormationTraining(50)).toBeGreaterThan(50);
+    expect(cohesionAfterFormationTraining(99)).toBe(100);
+  });
+
+  it("treinar entrosa MENOS que jogar de verdade — praticar não é competir", () => {
+    // Se treino rendesse igual ou mais que partida, ninguém precisaria jogar
+    // para entrosar, e o custo de rotatividade sumiria. Treino é o caminho lento.
+    expect(COHESION_FORMATION_TRAINING_GAIN).toBeLessThan(COHESION_MATCH_GAIN);
+    expect(COHESION_FORMATION_TRAINING_GAIN).toBeGreaterThan(0);
+    const partiu = cohesionAfterMatch(50);
+    const treinou = cohesionAfterFormationTraining(50);
+    expect(treinou - 50).toBeLessThan(partiu - 50);
   });
 });

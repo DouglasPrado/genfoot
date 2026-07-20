@@ -124,6 +124,8 @@ describe.skipIf(!hasDatabase)(
       "training:collect-session",
       "training:set-plan",
       "training:start-session",
+      // R-220 Fase 3: treinar a formação sobe o entrosamento do time.
+      "training:train-formation",
       "world:activate",
       // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
       "world:advance-day",
@@ -157,7 +159,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(46);
+    expect(response.body.commandCount).toBe(47);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
