@@ -187,6 +187,15 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
   });
 
   const busy = tracking?.status === CommandTrackingStatus.SUBMITTING;
+  /**
+   * A conversa só despacha com o clube identificado e a data do mundo lida.
+   *
+   * O painel de desenvolvimento (`devQuery`) pode carregar enquanto o
+   * `club-detail` falha — e aí `managedClub` é null. Sem este guard, os botões
+   * de elogiar/criticar PARECIAM ativos mas o `talk` saía em silêncio: um botão
+   * morto que não diz por quê. Desabilitados e com o motivo é honesto.
+   */
+  const canTalk = managedClub !== null && worldDate !== "";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -298,16 +307,16 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
                 <Pressable
                   key={option.stance}
                   onPress={() => talk(option.stance)}
-                  disabled={busy}
+                  disabled={busy || !canTalk}
                   accessibilityRole="button"
                   accessibilityLabel={option.label}
-                  accessibilityState={{ disabled: busy }}
+                  accessibilityState={{ disabled: busy || !canTalk }}
                   style={[
                     styles.stance,
                     option.tone === "up"
                       ? styles.stanceUp
                       : styles.stanceDown,
-                    busy && styles.stanceBusy,
+                    (busy || !canTalk) && styles.stanceBusy,
                   ]}
                 >
                   <Text style={styles.stanceText}>
@@ -316,6 +325,12 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
                 </Pressable>
               ))}
             </View>
+            {!canTalk ? (
+              <Text style={styles.hint}>
+                Conversa indisponível: dados do clube não puderam ser lidos.
+                Recarregue.
+              </Text>
+            ) : null}
             {talkBlocked !== null ? (
               <Text style={styles.error}>{talkBlocked}</Text>
             ) : null}
