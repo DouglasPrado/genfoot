@@ -938,9 +938,9 @@ export function Training() {
                           realSecondsPerDay:
                             clockQuery.data?.realSecondsPerDay ?? null,
                         });
-                        // Regressivo: a barra mostra o que RESTA e esvazia com o
-                        // tempo (100% cheia → 0% ao completar).
-                        const remaining = cd.complete ? 0 : 100 - pct;
+                        // Progressiva: a barra mostra o que JÁ PASSOU do treino
+                        // e enche com o tempo (0% → 100% cheia ao completar).
+                        const progress = cd.complete ? 100 : pct;
                         // Cor da posição do jogador — a faixa cinza sumia no card
                         // cinza. Faixa esmaecida, regressão sólida na mesma cor.
                         const tint = positionGroupTint(
@@ -962,15 +962,15 @@ export function Training() {
                                   ? `faltam ${cd.daysRemaining} dia(s)`
                                   : `faltam ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
-                            {/* Faixa 100% (cor da posição, esmaecida); regressão
-                                em cima, sólida, esvaziando. */}
+                            {/* Faixa 100% (cor da posição, esmaecida); progresso
+                                em cima, sólido, enchendo até o fim do treino. */}
                             <View
                               style={[styles.cdTrack, { backgroundColor: `${tint}33` }]}
                             >
                               <View
                                 style={[
                                   styles.cdFill,
-                                  { width: `${remaining}%`, backgroundColor: tint },
+                                  { width: `${progress}%`, backgroundColor: tint },
                                 ]}
                               />
                             </View>
@@ -1144,7 +1144,7 @@ export function Training() {
                               realSecondsPerDay:
                                 clockQuery.data?.realSecondsPerDay ?? null,
                             });
-                            const remaining = cd.complete ? 0 : 100 - pct;
+                            const progress = cd.complete ? 100 : pct;
                             const tint = positionGroupTint(
                               sectorOf(player.primaryPosition),
                             );
@@ -1159,7 +1159,7 @@ export function Training() {
                                       : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
                                 </Text>
                                 {/* Faixa 100% (cor da posição, esmaecida);
-                                    regressão em cima, sólida, esvaziando. */}
+                                    progresso em cima, sólido, enchendo até o fim. */}
                                 <View
                                   style={[
                                     styles.cdTrackLarge,
@@ -1170,7 +1170,7 @@ export function Training() {
                                     style={[
                                       styles.cdFill,
                                       {
-                                        width: `${remaining}%`,
+                                        width: `${progress}%`,
                                         backgroundColor: tint,
                                       },
                                     ]}
