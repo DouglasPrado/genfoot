@@ -38,6 +38,13 @@ export interface ActiveSessionLike {
   readonly attributeCode: string;
   readonly startDate: string;
   readonly durationDays: number;
+  /**
+   * Projeção do ganho, computada no SERVIDOR (o cliente não computa regra de
+   * domínio). Opcional para telas/testes que não a trazem.
+   */
+  readonly attributeCurrentValue?: number | null;
+  readonly projectedGainPoints?: number;
+  readonly projectedValue?: number | null;
 }
 
 export interface SessionProgress {
@@ -46,6 +53,12 @@ export interface SessionProgress {
   readonly elapsedDays: number;
   readonly durationDays: number;
   readonly complete: boolean;
+  /** Valor atual do atributo-foco; `null` quando o servidor não projetou. */
+  readonly attributeCurrentValue: number | null;
+  /** Ganho projetado pelo tempo já treinado (0 se não projetado). */
+  readonly projectedGainPoints: number;
+  /** Valor projetado (atual + ganho); `null` quando não há projeção. */
+  readonly projectedValue: number | null;
 }
 
 export interface TrainingRow {
@@ -119,6 +132,10 @@ export function buildTrainingRows(
               elapsedDays,
               durationDays: active.durationDays,
               complete: elapsedDays >= active.durationDays,
+              // Projeção vem do servidor (pass-through); ausente = sem projeção.
+              attributeCurrentValue: active.attributeCurrentValue ?? null,
+              projectedGainPoints: active.projectedGainPoints ?? 0,
+              projectedValue: active.projectedValue ?? null,
             },
       blockedLabel:
         state === "BLOCKED" ? (BLOCKED_LABEL[p.availability] ?? "Indisponível") : null,

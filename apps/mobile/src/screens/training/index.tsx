@@ -14,6 +14,10 @@ import { CommandTrackingStatus } from "@grinta/core";
 
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
+import {
+  PlayerSkillCard,
+  type PlayerSkillCardData,
+} from "@/components/player-skill-card";
 import { Refresh } from "@/components/refresh";
 import { ScreenStatePanel } from "@/components/screen-state-panel";
 import { useToast } from "@/components/toast";
@@ -72,7 +76,15 @@ interface RosterPlayer {
   readonly name: string;
   readonly primaryPosition: string;
   readonly overall: number;
+  readonly potential: number;
+  readonly age: number;
   readonly availability: string;
+  readonly groups?: {
+    readonly technical: number;
+    readonly physical: number;
+    readonly mental: number;
+    readonly goalkeeping: number | null;
+  } | null;
   readonly attributes?: Record<string, number | null> | null;
 }
 
@@ -86,6 +98,11 @@ interface ActiveSession {
   readonly attributeCode: string;
   readonly startDate: string;
   readonly durationDays: number;
+  readonly elapsedDays: number;
+  /** Projeção do ganho (R-221): o servidor computa com a fórmula da coleta. */
+  readonly attributeCurrentValue: number | null;
+  readonly projectedGainPoints: number;
+  readonly projectedValue: number | null;
 }
 
 interface TrainingSessionsProjection {
@@ -136,6 +153,7 @@ export function Training() {
   const worldId = useRequiredWorldId();
   const toast = useToast();
   const [picking, setPicking] = useState<TrainingRow | null>(null);
+  const [inspectId, setInspectId] = useState<string | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
@@ -851,6 +869,7 @@ export function Training() {
                 busy={actingId === row.playerId}
                 onStart={() => setPicking(row)}
                 onCollect={() => collectSession(row)}
+                onInspect={() => setInspectId(row.playerId)}
               />
             ))
           )}
@@ -909,6 +928,102 @@ export function Training() {
           </View>
         </View>
       </Modal>
+
+      {/* Card do jogador (o MESMO PlayerSkillCard do elenco/mercado) + a projeção
+          do treino: pontuação atual → onde ele chega pelo tempo já treinado. */}
+      <Modal
+        visible={inspectId !== null}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setInspectId(null)}
+      >
+        {(() => {
+          const player =
+            rosterQuery.data?.players.find((p) => p.playerId === inspectId) ??
+            null;
+          const row = rows.find((r) => r.playerId === inspectId) ?? null;
+          const session = row?.session ?? null;
+          return (
+            <Pressable
+              style={styles.inspectBackdrop}
+              onPress={() => setInspectId(null)}
+            >
+              <Pressable style={styles.inspectCard} onPress={() => undefined}>
+                {player === null ? (
+                  <Text style={styles.empty}>Jogador não encontrado.</Text>
+                ) : (
+                  <>
+                    <PlayerSkillCard
+                      data={
+                        {
+                          name: player.name,
+                          number: player.shirtNumber,
+                          position: player.primaryPosition,
+                          age: player.age,
+                          ovr: player.overall,
+                          pot: player.potential,
+                          groups: player.groups ?? null,
+                          attributes: player.attributes ?? null,
+                        } satisfies PlayerSkillCardData
+                      }
+                    />
+                    {session !== null && session.projectedValue !== null ? (
+                      <View style={styles.projectionBox}>
+                        <Text style={styles.cardTitle}>
+                          TREINANDO · {attributeLabel(session.attributeCode)}
+                        </Text>
+                        <View style={styles.projectionRow}>
+                          <Text style={styles.projCurrent}>
+                            {session.attributeCurrentValue}
+                          </Text>
+                          <Icon
+                            name="arrow-forward"
+                            size={18}
+                            color={color.textMuted}
+                          />
+                          <Text style={styles.projTarget}>
+                            {session.projectedValue}
+                          </Text>
+                          <Text style={styles.projDelta}>
+                            {session.projectedGainPoints > 0
+                              ? `+${session.projectedGainPoints}`
+                              : "sem ganho ainda"}
+                          </Text>
+                        </View>
+                        <Text style={styles.summaryHint}>
+                          {session.elapsedDays}/{session.durationDays} dias
+                          treinados. Coletar agora rende o ganho projetado; mais
+                          dias rendem mais (até o teto).
+                        </Text>
+                      </View>
+                    ) : session !== null ? (
+                      <Text style={styles.summaryHint}>
+                        Treinando {attributeLabel(session.attributeCode)} ·{" "}
+                        {session.elapsedDays}/{session.durationDays} dias. Ganho
+                        ainda não projetado.
+                      </Text>
+                    ) : (
+                      <Text style={styles.summaryHint}>
+                        Sem treino ativo. Toque em TREINAR na lista para iniciar
+                        uma sessão.
+                      </Text>
+                    )}
+                    <Pressable
+                      onPress={() => setInspectId(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Fechar card"
+                      accessibilityState={{}}
+                      style={styles.modalCancel}
+                    >
+                      <Text style={styles.modalCancelText}>FECHAR</Text>
+                    </Pressable>
+                  </>
+                )}
+              </Pressable>
+            </Pressable>
+          );
+        })()}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -943,26 +1058,28 @@ function TrainingCard({
   busy,
   onStart,
   onCollect,
+  onInspect,
 }: {
   readonly row: TrainingRow;
   readonly busy: boolean;
   readonly onStart: () => void;
   readonly onCollect: () => void;
+  readonly onInspect: () => void;
 }) {
   return (
     <Card>
       <View style={styles.playerRow}>
         <Text style={styles.shirt}>{row.shirtNumber}</Text>
         <Pressable
-          onPress={() => router.push(`/elenco/desenvolvimento/${row.playerId}`)}
+          onPress={onInspect}
           accessibilityRole="button"
-          accessibilityLabel={`Ver desenvolvimento de ${row.name}`}
+          accessibilityLabel={`Ver card de ${row.name}`}
           accessibilityState={{}}
           style={styles.playerInfo}
         >
           <Text style={styles.playerName}>{row.name}</Text>
           <Text style={styles.playerMeta}>
-            {row.primaryPosition} · {row.overall} · ver desenvolvimento
+            {row.primaryPosition} · {row.overall} · ver card
           </Text>
         </Pressable>
 
@@ -1115,6 +1232,46 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
     letterSpacing: 0.3,
     marginBottom: space.xs,
+  },
+  inspectBackdrop: {
+    flex: 1,
+    backgroundColor: "#000A",
+    justifyContent: "center",
+    padding: space.lg,
+  },
+  inspectCard: {
+    backgroundColor: color.backgroundElevated,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: space.md,
+  },
+  projectionBox: {
+    backgroundColor: color.background,
+    borderRadius: radius.md,
+    padding: space.md,
+    gap: space.xs,
+  },
+  projectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  projCurrent: {
+    color: color.textMuted,
+    fontSize: 28,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  projTarget: {
+    color: color.success,
+    fontSize: 28,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+  },
+  projDelta: {
+    color: color.success,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
   cohesionRow: {
     flexDirection: "row",
