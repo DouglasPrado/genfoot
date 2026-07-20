@@ -14,13 +14,13 @@ import {
 describe("formações canônicas", () => {
   it("toda formação tem exatamente 11 slots", () => {
     for (const name of Object.keys(CANONICAL_FORMATIONS) as FormationName[]) {
-      expect(formationSlots(name)).toHaveLength(11);
+      expect(formationSlots(name)!).toHaveLength(11);
     }
   });
 
   it("toda formação tem exatamente um goleiro", () => {
     for (const name of Object.keys(CANONICAL_FORMATIONS) as FormationName[]) {
-      const gks = formationSlots(name).filter((p) => p === PlayerPosition.GK);
+      const gks = formationSlots(name)!.filter((p) => p === PlayerPosition.GK);
       expect(gks).toHaveLength(1);
     }
   });

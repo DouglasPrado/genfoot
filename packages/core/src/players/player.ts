@@ -275,6 +275,53 @@ export class Player {
     };
   }
 
+  /** A disponibilidade corrente — a escalação e o treino a consultam. */
+  public get availability(): PlayerAvailability {
+    return this.state.availability;
+  }
+
+  /** A fadiga corrente (0..100). */
+  public get fatigue(): number {
+    return this.state.dynamicState.fatigue;
+  }
+
+  /**
+   * Entra numa sessão de treino (R-221 Fase 2a): fica INDISPONÍVEL. Só transita
+   * de AVAILABLE — lesionado/suspenso não entra em treino de sessão por aqui.
+   * Retorna se transitou (o caso de uso recusa quem já não está disponível).
+   */
+  public beginTraining(): boolean {
+    if (this.state.availability !== PlayerAvailability.AVAILABLE) return false;
+    this.state = {
+      ...this.state,
+      availability: PlayerAvailability.UNAVAILABLE,
+      version: this.state.version + 1,
+    };
+    return true;
+  }
+
+  /** Sai do treino: volta a ficar disponível. Só de UNAVAILABLE. */
+  public endTraining(): void {
+    if (this.state.availability !== PlayerAvailability.UNAVAILABLE) return;
+    this.state = {
+      ...this.state,
+      availability: PlayerAvailability.AVAILABLE,
+      version: this.state.version + 1,
+    };
+  }
+
+  /** Soma fadiga (teto 100). O treino cansa (R-221 Fase 2a); ≤0 é no-op. */
+  public addFatigue(amount: number): void {
+    if (amount <= 0) return;
+    const fatigue = Math.min(100, this.state.dynamicState.fatigue + amount);
+    if (fatigue === this.state.dynamicState.fatigue) return;
+    this.state = {
+      ...this.state,
+      dynamicState: { ...this.state.dynamicState, fatigue },
+      version: this.state.version + 1,
+    };
+  }
+
   public snapshot(): PlayerLifecycleSnapshot {
     return this.state;
   }

@@ -36,6 +36,7 @@ import type {
   SeasonAccrualUnitOfWork,
   SeasonAgingUnitOfWork,
   SeasonLifecycleRepository,
+  TrainingSessionUnitOfWork,
   LineupRepository,
   LineupContextReader,
   PlayerRepository,
@@ -73,6 +74,7 @@ import {
   SEASON_ACCRUAL_UNIT_OF_WORK,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
+  TRAINING_SESSION_UNIT_OF_WORK,
   CLUB_LINEUP_REPOSITORY,
   LINEUP_CONTEXT_READER,
   PLAYER_REPOSITORY,
@@ -143,6 +145,8 @@ export class CommandsController {
     private readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork,
     @Inject(SEASON_LIFECYCLE_REPOSITORY)
     private readonly seasonLifecycle: SeasonLifecycleRepository,
+    @Inject(TRAINING_SESSION_UNIT_OF_WORK)
+    private readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork,
     @Inject(CLUB_LINEUP_REPOSITORY)
     private readonly clubLineupRepository: LineupRepository,
     @Inject(LINEUP_CONTEXT_READER)
@@ -309,6 +313,7 @@ export class CommandsController {
         seasonAccrualUnitOfWork: this.seasonAccrualUnitOfWork,
         seasonAgingUnitOfWork: this.seasonAgingUnitOfWork,
         seasonLifecycle: this.seasonLifecycle,
+        trainingSessionUnitOfWork: this.trainingSessionUnitOfWork,
         clubLineupRepository: this.clubLineupRepository,
         lineupContextReader: this.lineupContextReader,
         playerRepository: this.playerRepository,

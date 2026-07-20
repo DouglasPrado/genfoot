@@ -162,3 +162,39 @@ describe("Player.retire — fim de carreira (R-217)", () => {
     expect(p.snapshot().version).toBe(v);
   });
 });
+
+describe("Player — sessão de treino (R-221 Fase 2a)", () => {
+  it("beginTraining torna indisponível e transita só de AVAILABLE", () => {
+    const p = carregar(jogador());
+    expect(p.availability).toBe(PlayerAvailability.AVAILABLE);
+    expect(p.beginTraining()).toBe(true);
+    expect(p.availability).toBe(PlayerAvailability.UNAVAILABLE);
+    // já indisponível: não transita de novo
+    expect(p.beginTraining()).toBe(false);
+  });
+
+  it("endTraining volta a ficar disponível", () => {
+    const p = carregar(jogador());
+    p.beginTraining();
+    p.endTraining();
+    expect(p.availability).toBe(PlayerAvailability.AVAILABLE);
+  });
+
+  it("beginTraining não pega quem não está disponível (ex.: lesionado)", () => {
+    const p = carregar(jogador({ availability: PlayerAvailability.INJURED }));
+    expect(p.beginTraining()).toBe(false);
+    expect(p.availability).toBe(PlayerAvailability.INJURED);
+  });
+
+  it("addFatigue soma com teto 100 e ignora ≤0", () => {
+    const p = carregar(jogador({ dynamicState: { morale: 50, confidence: 50, happiness: 50, fatigue: 0, matchSharpness: 50 } }));
+    p.addFatigue(20);
+    expect(p.fatigue).toBe(20);
+    p.addFatigue(90);
+    expect(p.fatigue).toBe(100); // teto
+    const v = p.snapshot().version;
+    p.addFatigue(0);
+    p.addFatigue(-5);
+    expect(p.snapshot().version).toBe(v); // no-op não incrementa versão
+  });
+});

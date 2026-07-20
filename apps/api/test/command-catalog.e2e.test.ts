@@ -114,7 +114,10 @@ describe("API command catalog integrity (e2e)", () => {
       "training:accrue-day",
       "training:apply-season",
       "training:apply-season-aging",
+      // Treino de sessão instantâneo (R-221 Fase 2a): inicia e coleta.
+      "training:collect-session",
       "training:set-plan",
+      "training:start-session",
       "world:activate",
       // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
       "world:advance-day",
@@ -148,7 +151,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(42);
+    expect(response.body.commandCount).toBe(44);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

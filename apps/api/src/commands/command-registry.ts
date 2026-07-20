@@ -40,6 +40,8 @@ import {
   AccrueClubTraining,
   ApplySeasonAccruals,
   ApplySeasonAging,
+  StartTrainingSession,
+  CollectTrainingSession,
   seasonIdFor,
   generateYouthClass,
   TrainingFocus,
@@ -58,6 +60,7 @@ import {
   type SeasonAccrualUnitOfWork,
   type SeasonAgingUnitOfWork,
   type SeasonLifecycleRepository,
+  type TrainingSessionUnitOfWork,
   type LineupRepository,
   type LineupContextReader,
   SetClubLineup,
@@ -144,6 +147,8 @@ export interface CommandContext {
   readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork;
   /** R-219 — materialização da temporada como entidade do mundo. */
   readonly seasonLifecycle: SeasonLifecycleRepository;
+  /** R-221 Fase 2a — treino de sessão com progresso instantâneo. */
+  readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork;
   /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
@@ -462,6 +467,16 @@ const accrueDayPayload = z.object({
   seasonId: z.string().uuid(),
 });
 
+const startSessionPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  attributeCode: z.string(),
+});
+
+const collectSessionPayload = z.object({
+  playerId: z.string().uuid(),
+});
+
 const setLineupPayload = z.object({
   clubId: z.string().uuid(),
   formation: z.string(),
@@ -526,12 +541,9 @@ async function loadWorld(
  * fechamento por clube é do handler plural, que tem o read model de clubes).
  */
 async function applySeasonTurns(
-  deps: Pick<
-    CommandContext,
-    "seasonAccrualUnitOfWork" | "seasonAgingUnitOfWork" | "seasonLifecycle"
-  >,
+  deps: Pick<CommandContext, "seasonAgingUnitOfWork" | "seasonLifecycle">,
   world: {
-    readonly worldId: Parameters<ApplySeasonAccruals["execute"]>[0]["gameWorldId"];
+    readonly worldId: Parameters<ApplySeasonAging["execute"]>[0]["gameWorldId"];
     readonly seed: string;
     readonly startDate: string;
     readonly currentDate: string;
@@ -540,17 +552,12 @@ async function applySeasonTurns(
   closedSeasonNumbers: readonly number[],
 ): Promise<void> {
   if (closedSeasonNumbers.length === 0) return;
-  const applyAccruals = new ApplySeasonAccruals(deps.seasonAccrualUnitOfWork);
+  // R-221: o CRESCIMENTO saiu da virada — o treino agora aplica na hora por
+  // sessão. A virada só envelhece (R-217) e materializa a próxima temporada
+  // (R-219). O accrual-na-virada (ApplySeasonAccruals) foi desligado daqui.
   const applyAging = new ApplySeasonAging(deps.seasonAgingUnitOfWork);
   for (const number of closedSeasonNumbers) {
     const closingSeasonId = seasonIdFor(world.seed, world.worldId, number);
-    await applyAccruals.execute({
-      gameWorldId: world.worldId,
-      seasonId: closingSeasonId,
-      worldSeed: world.seed,
-      worldDate: world.currentDate,
-      rulesetVersion: world.rulesetVersion as never,
-    });
     await applyAging.execute({
       gameWorldId: world.worldId,
       seasonId: closingSeasonId,
@@ -749,7 +756,6 @@ const handlers: Record<string, CommandHandler> = {
     worlds,
     clubReadModel,
     seasonFinanceUnitOfWork,
-    seasonAccrualUnitOfWork,
     seasonAgingUnitOfWork,
     seasonLifecycle,
     envelope,
@@ -795,7 +801,7 @@ const handlers: Record<string, CommandHandler> = {
     // Treino + idade + materialização da próxima temporada (R-219), compartilhado
     // com o caminho singular. No-op quando nenhuma fronteira foi cruzada.
     await applySeasonTurns(
-      { seasonAccrualUnitOfWork, seasonAgingUnitOfWork, seasonLifecycle },
+      { seasonAgingUnitOfWork, seasonLifecycle },
       {
         worldId,
         seed: worldSeed,
@@ -875,6 +881,56 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /** Treino de sessão — inicia; o jogador some do jogo enquanto treina (R-221 2a). */
+  "training:start-session": async ({
+    worlds,
+    trainingSessionUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = startSessionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new StartTrainingSession(
+      trainingSessionUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      attributeCode: parsed.data.attributeCode,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `training-session:${result.value.session.id}` });
+  },
+
+  /** Treino de sessão — coleta: aplica o ganho NA HORA e libera o jogador (R-221 2a). */
+  "training:collect-session": async ({
+    worlds,
+    trainingSessionUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = collectSessionPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new CollectTrainingSession(
+      trainingSessionUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+      rulesetVersion: world.value.snapshot.rulesetVersion as never,
+    });
+    if (!result.ok) return result;
+    return succeed({
+      resource: `player:${parsed.data.playerId}`,
+      gain: result.value,
+    } as never);
   },
 
   /** Tática — define a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
@@ -1374,7 +1430,6 @@ const handlers: Record<string, CommandHandler> = {
     competitionUnitOfWork,
     competitionReadModel,
     matchPlay,
-    seasonAccrualUnitOfWork,
     seasonAgingUnitOfWork,
     seasonLifecycle,
     envelope,
@@ -1394,7 +1449,7 @@ const handlers: Record<string, CommandHandler> = {
     const after = await loadWorld(worlds, envelope.worldId);
     if (after.ok) {
       await applySeasonTurns(
-        { seasonAccrualUnitOfWork, seasonAgingUnitOfWork, seasonLifecycle },
+        { seasonAgingUnitOfWork, seasonLifecycle },
         {
           worldId: after.value.worldId,
           seed: after.value.snapshot.seed,
