@@ -168,3 +168,5 @@ export * from "./players/apply-season-aging.js";
 export * from "./youth/youth-class.js";
 export * from "./youth/scout-report.js";
 export * from "./tactics/formation.js";
+export * from "./tactics/lineup-types.js";
+export * from "./tactics/set-club-lineup.js";
