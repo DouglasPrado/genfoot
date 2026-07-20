@@ -161,6 +161,7 @@ export * from "./training/training-accrual.js";
 export * from "./training/apply-accruals.js";
 export * from "./training/accrue-club-training.js";
 export * from "./training/apply-season-accruals.js";
+export * from "./training/training-session.js";
 export * from "./players/player-development-view.js";
 export * from "./players/age-decline.js";
 export * from "./players/retirement-decision.js";
