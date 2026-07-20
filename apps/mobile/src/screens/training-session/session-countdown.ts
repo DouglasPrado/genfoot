@@ -48,6 +48,31 @@ export function sessionCountdown(
   return { secondsRemaining, daysRemaining, complete: false };
 }
 
+/**
+ * O quanto da sessão JÁ passou, 0..100 — para a barra de progresso que avança em
+ * tempo real conforme a contagem regressiva desce.
+ *
+ * Com o relógio andando, usa o tempo REAL (total = duração × segundos-por-dia,
+ * feito = total − restante), então a barra se move a cada segundo. Com o relógio
+ * parado, cai na fração de DIAS lógicos decorridos — grosseira, mas honesta.
+ */
+export function countdownProgressPercent(input: {
+  readonly secondsRemaining: number | null;
+  readonly elapsedDays: number;
+  readonly durationDays: number;
+  readonly realSecondsPerDay: number | null;
+}): number {
+  if (input.durationDays <= 0) return 100;
+  if (input.secondsRemaining !== null && input.realSecondsPerDay !== null) {
+    const total = input.durationDays * input.realSecondsPerDay;
+    if (total <= 0) return 100;
+    const done = total - input.secondsRemaining;
+    return Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+  }
+  const frac = input.elapsedDays / input.durationDays;
+  return Math.max(0, Math.min(100, Math.round(frac * 100)));
+}
+
 /** Formata segundos em "Xh YYm" (≥1h) ou "Ym ZZs" (<1h). `null` → travessão. */
 export function formatCountdown(seconds: number | null): string {
   if (seconds === null) return "—";

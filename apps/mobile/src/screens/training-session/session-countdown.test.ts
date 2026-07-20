@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCountdown, sessionCountdown } from "./session-countdown.js";
+import {
+  countdownProgressPercent,
+  formatCountdown,
+  sessionCountdown,
+} from "./session-countdown.js";
 
 describe("sessionCountdown — quanto falta para a sessão render tudo", () => {
   const clock = {
@@ -63,6 +67,72 @@ describe("sessionCountdown — quanto falta para a sessão render tudo", () => {
       nowIso: "2026-01-10T13:00:00.000Z", // 1h DEPOIS do tick
     });
     expect(r.secondsRemaining).toBe(0);
+  });
+});
+
+describe("countdownProgressPercent — a barra que avança em tempo real", () => {
+  it("com relógio andando, usa o tempo real (avança a cada segundo)", () => {
+    // Duração 7 dias × 4h = 28h totais. Restam 9h → feito 19h → 68%.
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: 9 * 3600,
+        elapsedDays: 4,
+        durationDays: 7,
+        realSecondsPerDay: 4 * 3600,
+      }),
+    ).toBe(68);
+  });
+
+  it("sessão completa → 100%", () => {
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: 0,
+        elapsedDays: 7,
+        durationDays: 7,
+        realSecondsPerDay: 4 * 3600,
+      }),
+    ).toBe(100);
+  });
+
+  it("recém-iniciada → perto de 0%", () => {
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: 7 * 4 * 3600,
+        elapsedDays: 0,
+        durationDays: 7,
+        realSecondsPerDay: 4 * 3600,
+      }),
+    ).toBe(0);
+  });
+
+  it("relógio parado → cai na fração de dias lógicos", () => {
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: null,
+        elapsedDays: 3,
+        durationDays: 7,
+        realSecondsPerDay: null,
+      }),
+    ).toBe(43);
+  });
+
+  it("nunca passa de 100 nem cai abaixo de 0", () => {
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: -100,
+        elapsedDays: 8,
+        durationDays: 7,
+        realSecondsPerDay: 4 * 3600,
+      }),
+    ).toBeLessThanOrEqual(100);
+    expect(
+      countdownProgressPercent({
+        secondsRemaining: 999999,
+        elapsedDays: 0,
+        durationDays: 7,
+        realSecondsPerDay: 4 * 3600,
+      }),
+    ).toBeGreaterThanOrEqual(0);
   });
 });
 

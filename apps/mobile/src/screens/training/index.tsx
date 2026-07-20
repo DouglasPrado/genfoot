@@ -63,6 +63,7 @@ import {
   type PlanFocus,
 } from "@/screens/training-plan/training-plan-model";
 import {
+  countdownProgressPercent,
   formatCountdown,
   sessionCountdown,
 } from "@/screens/training-session/session-countdown";
@@ -930,19 +931,38 @@ export function Training() {
                           durationDays: row.session.durationDays,
                           nowIso,
                         });
+                        const pct = countdownProgressPercent({
+                          secondsRemaining: cd.secondsRemaining,
+                          elapsedDays: row.session.elapsedDays,
+                          durationDays: row.session.durationDays,
+                          realSecondsPerDay:
+                            clockQuery.data?.realSecondsPerDay ?? null,
+                        });
                         return (
-                          <Text style={styles.meta} numberOfLines={1}>
-                            Treinando{" "}
-                            <Text style={styles.metaSkill}>
-                              {attributeLabel(row.session.attributeCode)}
+                          <>
+                            <Text style={styles.meta} numberOfLines={1}>
+                              Treinando{" "}
+                              <Text style={styles.metaSkill}>
+                                {attributeLabel(row.session.attributeCode)}
+                              </Text>
+                              {" · "}
+                              {cd.complete
+                                ? "pronto para coletar"
+                                : cd.secondsRemaining === null
+                                  ? `faltam ${cd.daysRemaining} dia(s)`
+                                  : `faltam ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
-                            {" · "}
-                            {cd.complete
-                              ? "pronto para coletar"
-                              : cd.secondsRemaining === null
-                                ? `faltam ${cd.daysRemaining} dia(s)`
-                                : `faltam ${formatCountdown(cd.secondsRemaining)}`}
-                          </Text>
+                            {/* Barra que avança em tempo real com a contagem. */}
+                            <View style={styles.cdTrack}>
+                              <View
+                                style={[
+                                  styles.cdFill,
+                                  { width: `${pct}%` },
+                                  cd.complete && styles.cdFillDone,
+                                ]}
+                              />
+                            </View>
+                          </>
                         );
                       })()
                     ) : (
@@ -1096,11 +1116,45 @@ export function Training() {
                                 : "sem ganho ainda"}
                             </Text>
                           </View>
-                          <Text style={styles.summaryHint}>
-                            {session.elapsedDays}/{session.durationDays} dias
-                            treinados. Coletar agora rende o ganho projetado;
-                            mais dias rendem mais (até o teto).
-                          </Text>
+                          {(() => {
+                            const cd = sessionCountdown({
+                              realSecondsPerDay:
+                                clockQuery.data?.realSecondsPerDay ?? null,
+                              nextTickAt: clockQuery.data?.nextTickAt ?? null,
+                              elapsedDays: session.elapsedDays,
+                              durationDays: session.durationDays,
+                              nowIso,
+                            });
+                            const pct = countdownProgressPercent({
+                              secondsRemaining: cd.secondsRemaining,
+                              elapsedDays: session.elapsedDays,
+                              durationDays: session.durationDays,
+                              realSecondsPerDay:
+                                clockQuery.data?.realSecondsPerDay ?? null,
+                            });
+                            return (
+                              <>
+                                <View style={styles.cdTrackLarge}>
+                                  <View
+                                    style={[
+                                      styles.cdFill,
+                                      { width: `${pct}%` },
+                                      cd.complete && styles.cdFillDone,
+                                    ]}
+                                  />
+                                </View>
+                                <Text style={styles.summaryHint}>
+                                  {session.elapsedDays}/{session.durationDays}{" "}
+                                  dias treinados ·{" "}
+                                  {cd.complete
+                                    ? "completo — colete o ganho"
+                                    : cd.secondsRemaining === null
+                                      ? `faltam ${cd.daysRemaining} dia(s) lógicos`
+                                      : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                                </Text>
+                              </>
+                            );
+                          })()}
                         </View>
                       ) : session !== null ? (
                         <Text style={styles.summaryHint}>
@@ -1286,6 +1340,22 @@ const styles = StyleSheet.create({
   },
   meta: { color: color.textMuted, fontSize: fontSize.xs },
   metaSkill: { color: color.primary, fontWeight: fontWeight.bold as "700" },
+  cdTrack: {
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    overflow: "hidden",
+    marginTop: 4,
+  },
+  cdFill: { height: "100%", backgroundColor: color.primary },
+  cdFillDone: { backgroundColor: color.success },
+  cdTrackLarge: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    overflow: "hidden",
+    marginTop: space.xs,
+  },
   sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
