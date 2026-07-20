@@ -345,7 +345,21 @@ export function Training() {
       return;
     }
     setPlanError(null);
-    const idempotencyKey = `training:set-plan:${managedClub.id}:${plan?.version ?? 0}`;
+    /**
+     * A chave carrega o CONTEÚDO do plano, não só a versão.
+     *
+     * Com `${clubId}:${version}` apenas, duas edições diferentes na mesma versão
+     * colidiam — e a segunda era descartada em silêncio. Provado contra a API:
+     * salvar MENTAL/30 e depois PHYSICAL/90 com a mesma chave devolvia
+     * ACCEPTED e depois ALREADY_APPLIED, e o que ficou gravado foi MENTAL/30.
+     * A escolha do usuário evaporava.
+     *
+     * Isso acontece sempre que o refetch pós-gravação falha: a tela segue com a
+     * versão velha e a próxima edição reusa a chave. Incluindo foco e carga,
+     * retentar a MESMA edição ainda dedupe (que é o ponto da idempotência), mas
+     * uma edição DIFERENTE é outra conversa e vale.
+     */
+    const idempotencyKey = `training:set-plan:${managedClub.id}:${plan?.version ?? 0}:${focus}:${intensity}`;
     setTracking({
       status: CommandTrackingStatus.SUBMITTING,
       commandId: null,
