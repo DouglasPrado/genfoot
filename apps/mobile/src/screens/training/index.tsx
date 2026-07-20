@@ -163,6 +163,16 @@ export function Training() {
   const intensity = draftIntensity ?? plan?.intensity ?? 50;
   const dirty =
     plan === null || focus !== plan.focus || intensity !== plan.intensity;
+  /**
+   * Só salva com a leitura do plano CONFIRMADA.
+   *
+   * Se a query falhou, `plan` é null e `expectedVersion` iria como null — o que
+   * o servidor trata como "criar", sobrescrevendo um plano existente SEM
+   * checagem de concorrência. A tela não pode arriscar apagar o plano do clube
+   * porque não conseguiu lê-lo.
+   */
+  const planReadable = planQuery.state === "ready" || planQuery.state === "empty";
+  const canSave = dirty && planReadable;
 
   // A data do MUNDO — nunca Date.now(). O progresso mostrado tem que bater com
   // o que a coleta rende no servidor.
@@ -199,7 +209,13 @@ export function Training() {
     clubQuery.refetch();
     rosterQuery.refetch();
     sessionsQuery.refetch();
-  }, [clubQuery.refetch, rosterQuery.refetch, sessionsQuery.refetch]);
+    planQuery.refetch();
+  }, [
+    clubQuery.refetch,
+    rosterQuery.refetch,
+    sessionsQuery.refetch,
+    planQuery.refetch,
+  ]);
 
   /** Despacha start/collect. O efeito oficial é a query voltando, não o retorno. */
   const dispatch = useCallback(
@@ -461,9 +477,18 @@ export function Training() {
           <Card>
             <Text style={styles.cardTitle}>PLANO DO ELENCO</Text>
             <Text style={styles.summaryHint}>
-              {plan === null
-                ? "Nenhum plano definido nesta temporada."
-                : `Atual: ${plan.name} · ${intensityLabel(plan.intensity)}`}
+              {/*
+                "Sem plano" e "não consegui ler o plano" são coisas diferentes.
+                Tratar erro como vazio faria a tela AFIRMAR que o clube não tem
+                plano quando ela só não conseguiu saber — cliente não inventa.
+              */}
+              {planQuery.state === "loading"
+                ? "Lendo o plano…"
+                : planQuery.state === "error" || planQuery.state === "offline"
+                  ? "Não foi possível ler o plano atual. O que aparece abaixo é rascunho, não o que está valendo."
+                  : plan === null
+                    ? "Nenhum plano definido nesta temporada."
+                    : `Atual: ${plan.name} · ${intensityLabel(plan.intensity)}`}
             </Text>
 
             <View style={styles.focusGrid}>
@@ -528,14 +553,18 @@ export function Training() {
 
             <Pressable
               onPress={savePlan}
-              disabled={!dirty}
+              disabled={!canSave}
               accessibilityRole="button"
               accessibilityLabel="Salvar plano do elenco"
-              accessibilityState={{ disabled: !dirty }}
-              style={[styles.savePlan, !dirty && styles.actionBusy]}
+              accessibilityState={{ disabled: !canSave }}
+              style={[styles.savePlan, !canSave && styles.actionBusy]}
             >
               <Text style={styles.actionText}>
-                {dirty ? "SALVAR PLANO" : "PLANO SALVO"}
+                {!planReadable
+                  ? "SEM LEITURA DO PLANO"
+                  : dirty
+                    ? "SALVAR PLANO"
+                    : "PLANO SALVO"}
               </Text>
             </Pressable>
             {planError !== null ? (
