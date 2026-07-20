@@ -501,7 +501,13 @@ const setLineupPayload = z.object({
 
 const trainingPlanPayload = z.object({
   clubId: z.string().uuid(),
-  seasonId: z.string().uuid(),
+  /**
+   * OPCIONAL (espelha `player-development` e a query `training-plan`, R-221):
+   * omitido → o handler materializa/resolve a temporada corrente do mundo. O
+   * mobile não conhece o season, e exigi-lo aqui tornava o plano coletivo
+   * inconstruível: nenhuma query devolvia esse uuid para a tela mandar de volta.
+   */
+  seasonId: z.string().uuid().optional(),
   name: z.string(),
   focus: z.nativeEnum(TrainingFocus),
   intensity: z.number().int(),
@@ -876,19 +882,34 @@ const handlers: Record<string, CommandHandler> = {
     worlds,
     trainingPlanRepository,
     trainingContextReader,
+    seasonLifecycle,
     envelope,
   }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
     const parsed = trainingPlanPayload.safeParse(envelope.payload);
     if (!parsed.success) return fail(invalidPayload(parsed.error));
+    // seasonId omitido → materializa/resolve a temporada corrente (R-219). É
+    // idempotente por (mundo, número), então chamar aqui não duplica nem reabre
+    // temporada fechada — e conserta o mundo que nasceu sem `currentSeasonId`,
+    // estado em que 2 dos 24 mundos de desenvolvimento se encontram.
+    const seasonId =
+      parsed.data.seasonId ??
+      (
+        await seasonLifecycle.ensureCurrentSeason({
+          gameWorldId: world.value.worldId,
+          worldSeed: world.value.snapshot.seed,
+          startDate: world.value.snapshot.startDate,
+          currentDate: world.value.snapshot.currentDate,
+        })
+      ).currentSeasonId;
     const result = await new SetTrainingPlan(
       trainingPlanRepository,
       trainingContextReader,
     ).execute({
       gameWorldId: world.value.worldId,
       clubId: parsed.data.clubId,
-      seasonId: parsed.data.seasonId,
+      seasonId,
       worldSeed: world.value.snapshot.seed,
       occurredOn: world.value.snapshot.currentDate,
       name: parsed.data.name,
