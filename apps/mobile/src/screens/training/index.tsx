@@ -32,6 +32,12 @@ import {
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
 import {
+  buildTalkToSquadPayload,
+  STANCE_OPTIONS,
+  talkIdempotencyKey,
+  type TalkStance,
+} from "@/screens/talk/talk-model";
+import {
   buildStartSessionPayload,
   buildTrainingRows,
   summarizeTraining,
@@ -237,6 +243,52 @@ export function Training() {
     [dispatch],
   );
 
+  /** Conversa com o ELENCO — move a forma de todo mundo de uma vez. */
+  const talkToSquad = useCallback(
+    (stance: TalkStance) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      const commandType = "morale:talk-to-squad";
+      const idempotencyKey = talkIdempotencyKey({
+        commandType,
+        targetId: managedClub.id,
+        stance,
+      });
+      setTracking({
+        status: CommandTrackingStatus.SUBMITTING,
+        commandId: null,
+        resource: null,
+        correlationId: `mobile:${idempotencyKey}`,
+        errorCode: null,
+      });
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType,
+        worldId,
+        payload: buildTalkToSquadPayload({ clubId: managedClub.id, stance }),
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        setTracking(result);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          rosterQuery.refetch();
+        }
+      });
+    },
+    [
+      managedClub,
+      client,
+      contractVersion,
+      worldId,
+      rosterQuery.refetch,
+    ],
+  );
+
   const screenState = deriveScreenState({
     session: status,
     hasCachedData:
@@ -308,6 +360,33 @@ export function Training() {
                 ? `${summary.collectable} sessão(ões) podem ser coletadas agora — coletar antes do fim rende ganho parcial.`
                 : "Nenhuma sessão em andamento."}
             </Text>
+          </Card>
+
+          <Card>
+            <Text style={styles.cardTitle}>CONVERSA COM O ELENCO</Text>
+            <Text style={styles.summaryHint}>
+              Move a FORMA de todo o grupo de uma vez — não o núcleo.
+            </Text>
+            <View style={styles.stanceRow}>
+              {STANCE_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.stance}
+                  onPress={() => talkToSquad(option.stance)}
+                  disabled={actingId !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${option.label} o elenco`}
+                  accessibilityState={{ disabled: actingId !== null }}
+                  style={[
+                    styles.stance,
+                    option.tone === "up" ? styles.stanceUp : styles.stanceDown,
+                  ]}
+                >
+                  <Text style={styles.stanceText}>
+                    {option.label.toUpperCase()}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </Card>
 
           {tracking?.status === CommandTrackingStatus.REJECTED ? (
@@ -430,12 +509,18 @@ function TrainingCard({
     <Card>
       <View style={styles.playerRow}>
         <Text style={styles.shirt}>{row.shirtNumber}</Text>
-        <View style={styles.playerInfo}>
+        <Pressable
+          onPress={() => router.push(`/elenco/desenvolvimento/${row.playerId}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver desenvolvimento de ${row.name}`}
+          accessibilityState={{}}
+          style={styles.playerInfo}
+        >
           <Text style={styles.playerName}>{row.name}</Text>
           <Text style={styles.playerMeta}>
-            {row.primaryPosition} · {row.overall}
+            {row.primaryPosition} · {row.overall} · ver desenvolvimento
           </Text>
-        </View>
+        </Pressable>
 
         {row.state === "BLOCKED" ? (
           <Text style={styles.blocked}>{row.blockedLabel}</Text>
@@ -582,6 +667,27 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   progressFill: { height: 4, backgroundColor: color.primary },
+  cardTitle: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.3,
+    marginBottom: space.xs,
+  },
+  stanceRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
+  stance: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+  },
+  stanceUp: { backgroundColor: color.success },
+  stanceDown: { backgroundColor: color.danger },
+  stanceText: {
+    color: color.background,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "#0008" },
   modalSheet: {
     backgroundColor: color.backgroundElevated,
