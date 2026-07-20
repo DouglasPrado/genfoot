@@ -131,13 +131,15 @@ const handlers: Record<string, QueryHandler> = {
   },
   "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {
     const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    // seasonId é OPCIONAL (R-221): omitido → o read model usa o currentSeasonId
+    // do mundo. A tela chama só com playerId; o mobile não precisa saber o season.
     const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
-    if (playerId === null || seasonId === null) {
+    if (playerId === null) {
       return fail(
         new DomainError(
           "QUERY_PARAM_REQUIRED",
-          "player-development exige os parâmetros playerId e seasonId.",
-          { params: ["playerId", "seasonId"] },
+          "player-development exige o parâmetro playerId.",
+          { params: ["playerId"] },
         ),
       );
     }
