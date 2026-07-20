@@ -1,0 +1,40 @@
+/**
+ * Entrosamento do time (R-220 Fase 3 / R-07 / R-15 / R-33).
+ *
+ * PONTUAÇÃO DE TIME (R-220.1) — 0..100, NÃO grafo de pares. Sobe quando o time
+ * joga junto (partida disputada) e cai quando o elenco é sacudido (transferência
+ * traz cara nova). Na partida, entra como um modificador ± de time, na faixa da
+ * R-15 (entrosamento ∈ [−6, +6]): time entrosado rende mais.
+ *
+ * Puro e determinístico. Magnitudes são calibração minha (VAL-001).
+ */
+
+/** Coesão de partida de um clube recém-nascido: mediana neutra. */
+export const COHESION_START = 50;
+/** Ganho por partida jogada — o time se entende jogando junto. */
+export const COHESION_MATCH_GAIN = 4;
+/** Baque por transferência que entra: cara nova desajusta o coletivo. */
+export const COHESION_TRANSFER_HIT = 12;
+/** Faixa do modificador na partida (R-15). */
+const COHESION_MOD_MAX = 6;
+
+const clamp0to100 = (v: number): number => Math.max(0, Math.min(100, v));
+
+/** Coesão depois de uma partida disputada (sobe, teto 100). */
+export function cohesionAfterMatch(current: number): number {
+  return clamp0to100(current + COHESION_MATCH_GAIN);
+}
+
+/** Coesão depois de uma transferência que mexe no elenco (cai, piso 0). */
+export function cohesionAfterTransfer(current: number): number {
+  return clamp0to100(current - COHESION_TRANSFER_HIT);
+}
+
+/**
+ * O modificador ± que a coesão dá à força do time na partida (R-15): 50 é
+ * neutro (0), 100 → +6, 0 → −6. Inteiro.
+ */
+export function cohesionModifier(cohesion: number): number {
+  const c = clamp0to100(cohesion);
+  return Math.round(((c - COHESION_START) / COHESION_START) * COHESION_MOD_MAX);
+}

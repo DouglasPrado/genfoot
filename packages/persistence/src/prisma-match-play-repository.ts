@@ -1,4 +1,5 @@
 import {
+  COHESION_MATCH_GAIN,
   FORM_MAX,
   matchFormDelta,
   type MatchOutcome,
@@ -251,6 +252,11 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       select: { homeClubId: true, awayClubId: true },
     });
     if (clubs === null) return;
+    // Entrosamento (R-220 Fase 3): jogar sobe a coesão dos dois clubes (teto 100).
+    await this.client.$executeRaw`
+      UPDATE "Club" SET "cohesion" = LEAST(100, "cohesion" + ${COHESION_MATCH_GAIN})
+      WHERE id IN (${clubs.homeClubId}::uuid, ${clubs.awayClubId}::uuid)
+    `;
     const homeOutcome: MatchOutcome =
       result.homeGoals > result.awayGoals
         ? "WIN"
@@ -335,25 +341,31 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
   private async clubStrengths(
     gameWorldId: GameWorldId,
   ): Promise<Map<string, number>> {
+    // A força soma o entrosamento do clube (R-220 Fase 3, R-15 ±6): time
+    // entrosado rende mais. O modificador é (cohesion−50)/50×6, inteiro.
     const [squadRows, lineupRows] = await Promise.all([
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT s."clubId" AS "clubId",
-               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier"))))::int AS strength
+               (ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier"))))
+                + ROUND((c."cohesion" - 50) / 50.0 * 6))::int AS strength
         FROM "Squad" s
         JOIN "SquadMembership" sm ON sm."squadId" = s.id
         JOIN "Player" p ON p.id = sm."playerId"
+        JOIN "Club" c ON c.id = s."clubId"
         WHERE s."gameWorldId" = ${gameWorldId}::uuid
           AND s.category = 'FIRST_TEAM'
-        GROUP BY s."clubId"
+        GROUP BY s."clubId", c."cohesion"
       `,
       this.client.$queryRaw<{ clubId: string; strength: number }[]>`
         SELECT cl."clubId" AS "clubId",
-               ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier")) * cls."fillQuality"))::int AS strength
+               (ROUND(AVG(LEAST(100, GREATEST(0, p."currentAbility" + p."formaModifier")) * cls."fillQuality"))
+                + ROUND((c."cohesion" - 50) / 50.0 * 6))::int AS strength
         FROM "ClubLineup" cl
         JOIN "ClubLineupStarter" cls ON cls."lineupId" = cl.id
         JOIN "Player" p ON p.id = cls."playerId"
+        JOIN "Club" c ON c.id = cl."clubId"
         WHERE cl."gameWorldId" = ${gameWorldId}::uuid
-        GROUP BY cl."clubId"
+        GROUP BY cl."clubId", c."cohesion"
       `,
     ]);
     // Base = média do elenco; a escalação sobrescreve onde existe.
