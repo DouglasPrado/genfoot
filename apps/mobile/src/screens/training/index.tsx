@@ -58,6 +58,7 @@ import {
 import {
   buildStartSessionPayload,
   buildTrainingRows,
+  sessionProgressPercent,
   summarizeTraining,
   type TrainingRow,
 } from "@/screens/training-session/training-session-model";
@@ -976,9 +977,7 @@ function TrainingCard({
               style={[
                 styles.progressFill,
                 {
-                  width: `${Math.round(
-                    (row.session.elapsedDays / row.session.durationDays) * 100,
-                  )}%`,
+                  width: `${sessionProgressPercent(row.session)}%`,
                 },
               ]}
             />

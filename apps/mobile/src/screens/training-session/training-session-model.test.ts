@@ -5,6 +5,7 @@ import {
   buildTrainingRows,
   canCollect,
   canStart,
+  sessionProgressPercent,
   sessionStateOf,
   summarizeTraining,
 } from "./training-session-model.js";
@@ -108,5 +109,24 @@ describe("buildTrainingRows — junta elenco e sessões ativas (M-TRAINING)", ()
       blocked: 0,
       collectable: 0,
     });
+  });
+});
+
+describe("sessionProgressPercent — barra de progresso robusta", () => {
+  it("proporção normal vira porcentagem arredondada", () => {
+    expect(sessionProgressPercent({ elapsedDays: 3, durationDays: 7 })).toBe(43);
+    expect(sessionProgressPercent({ elapsedDays: 7, durationDays: 7 })).toBe(100);
+  });
+
+  it("durationDays 0 NÃO vira NaN — divisão por zero guardada", () => {
+    expect(sessionProgressPercent({ elapsedDays: 3, durationDays: 0 })).toBe(0);
+  });
+
+  it("passar da duração não estoura a barra além de 100", () => {
+    expect(sessionProgressPercent({ elapsedDays: 20, durationDays: 7 })).toBe(100);
+  });
+
+  it("valores negativos caem em 0, não em barra invertida", () => {
+    expect(sessionProgressPercent({ elapsedDays: -5, durationDays: 7 })).toBe(0);
   });
 });

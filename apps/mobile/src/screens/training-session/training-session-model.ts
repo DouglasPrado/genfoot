@@ -134,6 +134,22 @@ export interface TrainingSummary {
 }
 
 /** O cabeçalho da tela: quantos treinando, livres, bloqueados e coletáveis. */
+/**
+ * A largura (0..100) da barra de progresso da sessão.
+ *
+ * Guarda a divisão por zero: `durationDays` é sempre ≥1 no domínio, mas uma
+ * linha corrompida com 0 renderizaria `NaN%` — largura quebrada na tela. E
+ * prende em 0..100 para uma sessão que passou da duração não estourar a barra.
+ */
+export function sessionProgressPercent(input: {
+  readonly elapsedDays: number;
+  readonly durationDays: number;
+}): number {
+  if (input.durationDays <= 0) return 0;
+  const pct = (input.elapsedDays / input.durationDays) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
 export function summarizeTraining(
   rows: readonly TrainingRow[],
 ): TrainingSummary {
