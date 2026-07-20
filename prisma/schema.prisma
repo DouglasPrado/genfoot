@@ -1397,6 +1397,7 @@ model Player {
   personality           PlayerPersonality?
   development           PlayerDevelopment?
   developmentAccruals   PlayerDevelopmentAccrual[] // buffer de accrual (doc 13 §5.2)
+  trainingSessions      TrainingSession[] // sessões de treino instantâneo (R-221)
   contracts             PlayerContract[]
   injuries              PlayerInjury[]
   scoutReports          ScoutReport[]
@@ -1751,6 +1752,26 @@ model ClubLineupStarter {
 
   @@unique([lineupId, slotIndex])
   @@index([lineupId])
+}
+
+/// Sessão de treino com progresso INSTANTÂNEO (R-221 Fase 2a): enquanto ativa, o
+/// jogador fica indisponível; ao coletar, o ganho aplica na hora e a sessão
+/// encerra. Uma ativa por jogador (garantido no caso de uso).
+model TrainingSession {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId   String   @db.Uuid
+  clubId        String   @db.Uuid
+  playerId      String   @db.Uuid
+  attributeCode String
+  startDate     DateTime
+  durationDays  Int
+  active        Boolean  @default(true)
+  version       Int      @default(1)
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([gameWorldId, playerId])
+  @@index([playerId, active])
 }
 
 /// Presença operacional no elenco — NÃO substitui contrato/registro/empréstimo.

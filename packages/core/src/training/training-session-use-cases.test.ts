@@ -142,7 +142,7 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
       gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
       worldSeed: SEED, worldDate: "2026-03-01",
     });
-    const before = players.agg.player.attributes.shortPassing as number;
+    const before = players.agg.player.attributes.shortPassing;
     const r = await new CollectTrainingSession(uow).execute({
       gameWorldId: WORLD, playerId: PLAYER, worldSeed: SEED, worldDate: collectDate, rulesetVersion: RULESET,
     });
@@ -152,7 +152,7 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
   it("sessão completa: atributo SOBE na hora, jogador volta disponível e cansado, sessão encerra", async () => {
     const { players, sessions, before, r } = await startThenCollect("2026-03-08"); // 7 dias
     expect(r.ok).toBe(true);
-    const after = players.agg.player.attributes.shortPassing as number;
+    const after = players.agg.player.attributes.shortPassing;
     expect(after).toBeGreaterThan(before);
     expect(players.agg.player.availability).toBe(PlayerAvailability.AVAILABLE);
     expect(players.agg.player.dynamicState.fatigue).toBeGreaterThan(0);
@@ -162,8 +162,8 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
   it("interromper na metade rende PARCIAL (menos que a completa)", async () => {
     const parcial = await startThenCollect("2026-03-04"); // 3 dias
     const cheia = await startThenCollect("2026-03-08"); // 7 dias
-    const ganhoParcial = (parcial.players.agg.player.attributes.shortPassing as number) - parcial.before;
-    const ganhoCheio = (cheia.players.agg.player.attributes.shortPassing as number) - cheia.before;
+    const ganhoParcial = (parcial.players.agg.player.attributes.shortPassing) - parcial.before;
+    const ganhoCheio = (cheia.players.agg.player.attributes.shortPassing) - cheia.before;
     expect(ganhoParcial).toBeGreaterThanOrEqual(0);
     expect(ganhoParcial).toBeLessThanOrEqual(ganhoCheio);
     expect(ganhoCheio).toBeGreaterThan(0);
@@ -186,11 +186,11 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
       gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
       worldSeed: SEED, worldDate: "2026-03-01",
     });
-    const before = players.agg.player.attributes.shortPassing as number;
+    const before = players.agg.player.attributes.shortPassing;
     await new CollectTrainingSession(uow).execute({
       gameWorldId: WORLD, playerId: PLAYER, worldSeed: SEED, worldDate: "2026-03-08", rulesetVersion: RULESET,
     });
-    const after = players.agg.player.attributes.shortPassing as number;
+    const after = players.agg.player.attributes.shortPassing;
     expect(after).toBe(before); // sem headroom, sem ganho
   });
 });

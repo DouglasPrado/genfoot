@@ -3,10 +3,7 @@ import type { RulesetVersion } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import { Player } from "../players/player.js";
-import type {
-  PlayerAttributeCode,
-  PlayerDevelopmentHistoryId,
-} from "../players/player-lifecycle-types.js";
+import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 import { derivePotentialLayers } from "../players/potential-layers.js";
 
 import { computeDevelopmentGain, GAIN_SCALE } from "./development-gain.js";
@@ -35,6 +32,15 @@ const COMPETITIVE_MINUTES = 0.6;
 /** Headroom (teto − atual) que satura o fator de potencial restante em 1. */
 const MAX_HEADROOM = 40;
 const TRAINING_FATIGUE_PER_DAY = 3;
+/**
+ * Concentração da sessão (R-221): a fórmula canônica (`development-gain`) foi
+ * calibrada para accrual de TEMPORADA — por dia ela rende migalhas, e uma sessão
+ * de dias renderia < 1 ponto, invisível. O treino de sessão é uma atividade
+ * concentrada e o progresso é INSTANTÂNEO e VISÍVEL (R-221), então o ganho da
+ * sessão é multiplicado por este fator. O clamp ±6 de `applyAttributeChange`
+ * ainda teta o salto de uma sessão. Calibração minha (VAL-001).
+ */
+const SESSION_INTENSITY = 12;
 
 export interface CollectTrainingSessionInput {
   readonly gameWorldId: string;
@@ -125,11 +131,12 @@ export class CollectTrainingSession {
           injury: 0,
           negativePressure: 0,
         });
-        const gainMilli = sessionGainMilli({
-          dailyGainMilli,
-          elapsedDays,
-          durationDays: session.durationDays,
-        });
+        const gainMilli =
+          sessionGainMilli({
+            dailyGainMilli,
+            elapsedDays,
+            durationDays: session.durationDays,
+          }) * SESSION_INTENSITY;
         gainPoints = Math.round(gainMilli / GAIN_SCALE);
         if (gainPoints > 0) {
           const applied = player.applyAttributeChange({
@@ -137,7 +144,7 @@ export class CollectTrainingSession {
               worldSeed: input.worldSeed,
               context: `training-session:${session.id}`,
               timestampMilliseconds: 0,
-            }) as PlayerDevelopmentHistoryId,
+            }),
             attributeCode: code,
             requestedValue: current + gainPoints,
             cause: "training-session",
