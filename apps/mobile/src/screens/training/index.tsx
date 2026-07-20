@@ -14,6 +14,7 @@ import { CommandTrackingStatus } from "@grinta/core";
 
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
+import { PositionBadge, positionGroupTint } from "@/components/position-badge";
 import {
   PlayerSkillCard,
   type PlayerSkillCardData,
@@ -64,7 +65,6 @@ import {
 import {
   buildStartSessionPayload,
   buildTrainingRows,
-  sessionProgressPercent,
   summarizeTraining,
   type TrainingRow,
 } from "@/screens/training-session/training-session-model";
@@ -141,6 +141,16 @@ const ATTRIBUTE_LABEL: Readonly<Record<string, string>> = {
 };
 
 const attributeLabel = (code: string): string => ATTRIBUTE_LABEL[code] ?? code;
+
+/** Setor de cada posição — para o tint da PositionBadge, como no elenco. */
+const SECTOR: Readonly<Record<string, "GOL" | "DEF" | "MEI" | "ATA">> = {
+  GK: "GOL",
+  CB: "DEF", LB: "DEF", RB: "DEF", LWB: "DEF", RWB: "DEF",
+  CDM: "MEI", CM: "MEI", CAM: "MEI", LM: "MEI", RM: "MEI",
+  LW: "ATA", RW: "ATA", ST: "ATA", CF: "ATA",
+};
+const sectorOf = (code: string): "GOL" | "DEF" | "MEI" | "ATA" =>
+  SECTOR[code] ?? "MEI";
 
 /**
  * Treino (M-TRAINING) — o elenco e o estado de treino de cada jogador.
@@ -851,28 +861,50 @@ export function Training() {
             </View>
           </Card>
 
-          {tracking?.status === CommandTrackingStatus.REJECTED ? (
-            <Text style={styles.error}>
-              {tracking.errorCode ?? "COMMAND_REJECTED"}
-            </Text>
-          ) : null}
-
-          {rows.length === 0 ? (
-            <Text style={styles.empty}>
-              O elenco está vazio — não há ninguém para treinar.
-            </Text>
-          ) : (
-            rows.map((row) => (
-              <TrainingCard
-                key={row.playerId}
-                row={row}
-                busy={actingId === row.playerId}
-                onStart={() => setPicking(row)}
-                onCollect={() => collectSession(row)}
-                onInspect={() => setInspectId(row.playerId)}
-              />
-            ))
-          )}
+          {/* Listagem PADRÃO — mesma row do elenco: camisa, posição, nome/idade,
+              overall + status do treino. Tocar abre o card, onde treina/coleta. */}
+          <Card>
+            {rows.length === 0 ? (
+              <Text style={styles.empty}>
+                O elenco está vazio — não há ninguém para treinar.
+              </Text>
+            ) : (
+              rows.map((row, i) => (
+                <Pressable
+                  key={row.playerId}
+                  onPress={() => setInspectId(row.playerId)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ver card de ${row.name}`}
+                  accessibilityState={{}}
+                  style={[styles.row, i === 0 && styles.rowFirst]}
+                >
+                  <Text style={styles.shirt}>{row.shirtNumber}</Text>
+                  <PositionBadge
+                    label={row.primaryPosition}
+                    tint={positionGroupTint(sectorOf(row.primaryPosition))}
+                  />
+                  <View style={styles.info}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {row.name}
+                    </Text>
+                    <Text style={styles.meta} numberOfLines={1}>
+                      {row.state === "TRAINING" && row.session !== null
+                        ? `Treinando · ${row.session.elapsedDays}/${row.session.durationDays} dias`
+                        : row.state === "BLOCKED"
+                          ? (row.blockedLabel ?? "Indisponível")
+                          : "Disponível"}
+                    </Text>
+                  </View>
+                  {row.state === "TRAINING" ? (
+                    <Text style={styles.rowStatusTraining}>●</Text>
+                  ) : row.state === "BLOCKED" ? (
+                    <Text style={styles.rowStatusBlocked}>●</Text>
+                  ) : null}
+                  <Text style={styles.ovr}>{row.overall}</Text>
+                </Pressable>
+              ))
+            )}
+          </Card>
         </ScrollView>
       )}
 
@@ -943,84 +975,140 @@ export function Training() {
             null;
           const row = rows.find((r) => r.playerId === inspectId) ?? null;
           const session = row?.session ?? null;
+          const busy = actingId === inspectId;
           return (
-            <Pressable
-              style={styles.inspectBackdrop}
-              onPress={() => setInspectId(null)}
-            >
-              <Pressable style={styles.inspectCard} onPress={() => undefined}>
-                {player === null ? (
-                  <Text style={styles.empty}>Jogador não encontrado.</Text>
-                ) : (
-                  <>
-                    <PlayerSkillCard
-                      data={
-                        {
-                          name: player.name,
-                          number: player.shirtNumber,
-                          position: player.primaryPosition,
-                          age: player.age,
-                          ovr: player.overall,
-                          pot: player.potential,
-                          groups: player.groups ?? null,
-                          attributes: player.attributes ?? null,
-                        } satisfies PlayerSkillCardData
-                      }
-                    />
-                    {session !== null && session.projectedValue !== null ? (
-                      <View style={styles.projectionBox}>
-                        <Text style={styles.cardTitle}>
-                          TREINANDO · {attributeLabel(session.attributeCode)}
-                        </Text>
-                        <View style={styles.projectionRow}>
-                          <Text style={styles.projCurrent}>
-                            {session.attributeCurrentValue}
+            <View style={styles.inspectRoot}>
+              {/* Backdrop SEPARADO (absoluto): fecha ao tocar fora. Não embrulha
+                  o card, senão captura o swipe e o slide do card não roda. */}
+              <Pressable
+                style={styles.inspectBackdrop}
+                onPress={() => setInspectId(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar"
+                accessibilityState={{}}
+              />
+              <View style={styles.inspectWrap} pointerEvents="box-none">
+                <ScrollView
+                  style={styles.inspectScroll}
+                  contentContainerStyle={styles.inspectCard}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {player === null ? (
+                    <Text style={styles.empty}>Jogador não encontrado.</Text>
+                  ) : (
+                    <>
+                      <PlayerSkillCard
+                        data={
+                          {
+                            name: player.name,
+                            number: player.shirtNumber,
+                            position: player.primaryPosition,
+                            positionTint: positionGroupTint(
+                              sectorOf(player.primaryPosition),
+                            ),
+                            age: player.age,
+                            ovr: player.overall,
+                            pot: player.potential,
+                            groups: player.groups ?? null,
+                            attributes: player.attributes ?? null,
+                          } satisfies PlayerSkillCardData
+                        }
+                      />
+
+                      {session !== null && session.projectedValue !== null ? (
+                        <View style={styles.projectionBox}>
+                          <Text style={styles.cardTitle}>
+                            TREINANDO · {attributeLabel(session.attributeCode)}
                           </Text>
-                          <Icon
-                            name="arrow-forward"
-                            size={18}
-                            color={color.textMuted}
-                          />
-                          <Text style={styles.projTarget}>
-                            {session.projectedValue}
-                          </Text>
-                          <Text style={styles.projDelta}>
-                            {session.projectedGainPoints > 0
-                              ? `+${session.projectedGainPoints}`
-                              : "sem ganho ainda"}
+                          <View style={styles.projectionRow}>
+                            <Text style={styles.projCurrent}>
+                              {session.attributeCurrentValue}
+                            </Text>
+                            <Icon
+                              name="arrow-forward"
+                              size={18}
+                              color={color.textMuted}
+                            />
+                            <Text style={styles.projTarget}>
+                              {session.projectedValue}
+                            </Text>
+                            <Text style={styles.projDelta}>
+                              {session.projectedGainPoints > 0
+                                ? `+${session.projectedGainPoints}`
+                                : "sem ganho ainda"}
+                            </Text>
+                          </View>
+                          <Text style={styles.summaryHint}>
+                            {session.elapsedDays}/{session.durationDays} dias
+                            treinados. Coletar agora rende o ganho projetado;
+                            mais dias rendem mais (até o teto).
                           </Text>
                         </View>
+                      ) : session !== null ? (
                         <Text style={styles.summaryHint}>
-                          {session.elapsedDays}/{session.durationDays} dias
-                          treinados. Coletar agora rende o ganho projetado; mais
-                          dias rendem mais (até o teto).
+                          Treinando {attributeLabel(session.attributeCode)} ·{" "}
+                          {session.elapsedDays}/{session.durationDays} dias.
                         </Text>
-                      </View>
-                    ) : session !== null ? (
-                      <Text style={styles.summaryHint}>
-                        Treinando {attributeLabel(session.attributeCode)} ·{" "}
-                        {session.elapsedDays}/{session.durationDays} dias. Ganho
-                        ainda não projetado.
-                      </Text>
-                    ) : (
-                      <Text style={styles.summaryHint}>
-                        Sem treino ativo. Toque em TREINAR na lista para iniciar
-                        uma sessão.
-                      </Text>
-                    )}
-                    <Pressable
-                      onPress={() => setInspectId(null)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Fechar card"
-                      accessibilityState={{}}
-                      style={styles.modalCancel}
-                    >
-                      <Text style={styles.modalCancelText}>FECHAR</Text>
-                    </Pressable>
-                  </>
-                )}
-              </Pressable>
-            </Pressable>
+                      ) : row !== null && row.state === "BLOCKED" ? (
+                        <Text style={styles.summaryHint}>
+                          {row.blockedLabel} — não pode treinar agora.
+                        </Text>
+                      ) : (
+                        <Text style={styles.summaryHint}>
+                          Sem treino ativo. Inicie uma sessão abaixo.
+                        </Text>
+                      )}
+
+                      {/* AÇÃO no card: treinar ou coletar, conforme o estado. */}
+                      {row !== null && row.state === "TRAINING" ? (
+                        <Pressable
+                          onPress={() => collectSession(row)}
+                          disabled={busy}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Coletar treino de ${row.name}`}
+                          accessibilityState={{ disabled: busy }}
+                          style={[
+                            styles.cardAction,
+                            styles.cardActionCollect,
+                            busy && styles.actionBusy,
+                          ]}
+                        >
+                          <Text style={styles.cardActionText}>
+                            {busy ? "…" : "COLETAR TREINO"}
+                          </Text>
+                        </Pressable>
+                      ) : row !== null && row.state === "IDLE" ? (
+                        <Pressable
+                          onPress={() => {
+                            setInspectId(null);
+                            setPicking(row);
+                          }}
+                          disabled={busy}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Treinar ${row.name}`}
+                          accessibilityState={{ disabled: busy }}
+                          style={[styles.cardAction, busy && styles.actionBusy]}
+                        >
+                          <Text style={styles.cardActionText}>
+                            {busy ? "…" : "TREINAR"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+
+                      <Pressable
+                        onPress={() => setInspectId(null)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Fechar card"
+                        accessibilityState={{}}
+                        style={styles.modalCancel}
+                      >
+                        <Text style={styles.modalCancelText}>FECHAR</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
           );
         })()}
       </Modal>
@@ -1050,88 +1138,6 @@ function Summary({
         {value}
       </Text>
     </View>
-  );
-}
-
-function TrainingCard({
-  row,
-  busy,
-  onStart,
-  onCollect,
-  onInspect,
-}: {
-  readonly row: TrainingRow;
-  readonly busy: boolean;
-  readonly onStart: () => void;
-  readonly onCollect: () => void;
-  readonly onInspect: () => void;
-}) {
-  return (
-    <Card>
-      <View style={styles.playerRow}>
-        <Text style={styles.shirt}>{row.shirtNumber}</Text>
-        <Pressable
-          onPress={onInspect}
-          accessibilityRole="button"
-          accessibilityLabel={`Ver card de ${row.name}`}
-          accessibilityState={{}}
-          style={styles.playerInfo}
-        >
-          <Text style={styles.playerName}>{row.name}</Text>
-          <Text style={styles.playerMeta}>
-            {row.primaryPosition} · {row.overall} · ver card
-          </Text>
-        </Pressable>
-
-        {row.state === "BLOCKED" ? (
-          <Text style={styles.blocked}>{row.blockedLabel}</Text>
-        ) : row.state === "TRAINING" && row.session !== null ? (
-          <Pressable
-            onPress={onCollect}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel={`Coletar treino de ${row.name}`}
-            accessibilityState={{ disabled: busy }}
-            style={[styles.action, styles.actionCollect, busy && styles.actionBusy]}
-          >
-            <Text style={styles.actionText}>
-              {busy ? "…" : "COLETAR"}
-            </Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={onStart}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel={`Treinar ${row.name}`}
-            accessibilityState={{ disabled: busy }}
-            style={[styles.action, busy && styles.actionBusy]}
-          >
-            <Text style={styles.actionText}>{busy ? "…" : "TREINAR"}</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {row.session === null ? null : (
-        <View style={styles.progressBlock}>
-          <Text style={styles.progressLabel}>
-            {attributeLabel(row.session.attributeCode)} ·{" "}
-            {row.session.elapsedDays}/{row.session.durationDays} dias
-            {row.session.complete ? " · completo" : " · parcial"}
-          </Text>
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${sessionProgressPercent(row.session)}%`,
-                },
-              ]}
-            />
-          </View>
-        </View>
-      )}
-    </Card>
   );
 }
 
@@ -1184,7 +1190,6 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   empty: { color: color.textMuted, fontSize: fontSize.sm },
-  playerRow: { flexDirection: "row", alignItems: "center", gap: space.md },
   shirt: {
     color: color.textFaint,
     fontSize: fontSize.md,
@@ -1192,40 +1197,12 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     width: 28,
   },
-  playerInfo: { flex: 1, gap: 2 },
-  playerName: {
-    color: color.text,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold as "700",
-  },
-  playerMeta: { color: color.textMuted, fontSize: fontSize.xs },
-  blocked: {
-    color: color.warning,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold as "700",
-  },
-  action: {
-    paddingHorizontal: space.md,
-    paddingVertical: space.xs,
-    borderRadius: radius.pill,
-    backgroundColor: color.primary,
-  },
-  actionCollect: { backgroundColor: color.success },
   actionBusy: { opacity: 0.5 },
   actionText: {
     color: color.background,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
-  progressBlock: { marginTop: space.md, gap: space.xs },
-  progressLabel: { color: color.textMuted, fontSize: fontSize.xs },
-  progressTrack: {
-    height: 4,
-    borderRadius: radius.pill,
-    backgroundColor: color.surface,
-    overflow: "hidden",
-  },
-  progressFill: { height: 4, backgroundColor: color.primary },
   cardTitle: {
     color: color.textMuted,
     fontSize: 9,
@@ -1233,17 +1210,60 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: space.xs,
   },
+  // Listagem PADRÃO — rows como no elenco.
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  rowFirst: { borderTopWidth: 0 },
+  info: { flex: 1, gap: 2 },
+  name: {
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
+  },
+  meta: { color: color.textMuted, fontSize: fontSize.xs },
+  ovr: {
+    minWidth: 32,
+    textAlign: "right",
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold as "700",
+  },
+  rowStatusTraining: { color: color.primary, fontSize: 10 },
+  rowStatusBlocked: { color: color.warning, fontSize: 10 },
+  // Inspeção — estrutura do elenco: backdrop separado, card em View (slide roda).
+  inspectRoot: { flex: 1 },
   inspectBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  inspectWrap: {
     flex: 1,
-    backgroundColor: "#000A",
+    alignItems: "center",
     justifyContent: "center",
     padding: space.lg,
   },
+  inspectScroll: { width: "100%", maxWidth: 420, flexGrow: 0 },
   inspectCard: {
-    backgroundColor: color.backgroundElevated,
-    borderRadius: radius.lg,
-    padding: space.lg,
     gap: space.md,
+    paddingVertical: space.lg,
+  },
+  cardAction: {
+    alignItems: "center",
+    paddingVertical: space.md,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
+  },
+  cardActionCollect: { backgroundColor: color.success },
+  cardActionText: {
+    color: color.background,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
   projectionBox: {
     backgroundColor: color.background,
