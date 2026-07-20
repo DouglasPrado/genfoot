@@ -68,17 +68,30 @@ interface ClerkErrorShape {
   readonly longMessage?: string;
 }
 
-/** Aceita o erro solto ou uma lista, e nunca confia em `.errors`. */
+/**
+ * Aceita o erro solto ou uma lista, e nunca confia em `.errors`.
+ *
+ * **Ausência de erro e erro irreconhecível são coisas DIFERENTES.** Só `null`/
+ * `undefined` e lista vazia significam "não houve erro"; qualquer outro valor
+ * é uma falha que existe, e sai daqui como um item — sem `code`, para o
+ * chamador cair na mensagem genérica.
+ *
+ * Antes, um erro que não fosse do formato do Clerk (falha de rede, `Error`
+ * solto do `finalize()`, `TypeError` do bundle) devolvia `[]` — indistinguível
+ * de sucesso para a tela, que voltava ao formulário muda. É o mesmo defeito do
+ * catch vazio que `lib/session.tsx` já pagou uma vez.
+ */
 function asClerkErrors(error: unknown): readonly ClerkErrorShape[] {
   if (error === null || error === undefined) return [];
   if (Array.isArray(error)) return error as ClerkErrorShape[];
+  if (typeof error !== "object") return [{}];
   const shape = error as ClerkErrorShape & {
     readonly errors?: readonly ClerkErrorShape[];
   };
   // Tolera o formato legado se algum caminho ainda o produzir.
   if (Array.isArray(shape.errors)) return shape.errors;
   if (shape.code !== undefined || shape.longMessage !== undefined) return [shape];
-  return [];
+  return [{}];
 }
 
 /**

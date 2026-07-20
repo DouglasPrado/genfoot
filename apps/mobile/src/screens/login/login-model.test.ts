@@ -110,4 +110,34 @@ describe("mapLoginError", () => {
   it("sem erro devolve vazio", () => {
     expect(mapLoginError(null)).toEqual([]);
   });
+
+  /**
+   * Um erro QUE EXISTE nunca vira lista vazia.
+   *
+   * Este era o buraco: `asClerkErrors` só reconhecia objeto com `code` ou
+   * `longMessage`. Falha de rede, `TypeError` do bundle, `Error` solto do
+   * `finalize()` — tudo caía fora e virava `[]`. Na tela, `[]` é
+   * indistinguível de "deu certo": `formError` fica null, o ramo de
+   * carregamento continua, e o login falha sem uma palavra. É o mesmo defeito
+   * que o catch vazio de `lib/session.tsx` já custou uma vez.
+   */
+  it("Error comum não vira silêncio", () => {
+    const mapped = mapLoginError(new Error("Network request failed"));
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0].field).toBe("form");
+    expect(mapped[0].messageKey.length).toBeGreaterThan(0);
+  });
+
+  it("objeto sem forma de erro do Clerk não vira silêncio", () => {
+    expect(mapLoginError({ status: 500 })).toHaveLength(1);
+  });
+
+  it("string solta não vira silêncio", () => {
+    expect(mapLoginError("boom")).toHaveLength(1);
+  });
+
+  it("lista vazia de erros não inventa erro", () => {
+    expect(mapLoginError([])).toEqual([]);
+    expect(mapLoginError({ errors: [] })).toEqual([]);
+  });
 });
