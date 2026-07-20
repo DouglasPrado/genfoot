@@ -567,6 +567,16 @@ Investigação da trava B-08 revelou que a `Season` não é do mundo — é arte
 
 A definição completa vive em [`ciclo-de-vida-de-temporada-2026-07-19.md`](ciclo-de-vida-de-temporada-2026-07-19.md).
 
+### R-220 — Entrosamento, treino de sessão e fundação tática · RATIFICADA em 2026-07-19
+
+O dono pediu treino em duas formas (coletivo→entrosamento, individual→atributos) e um entrosamento que buffa o time na partida. A investigação revelou que o entrosamento já é RATIFICADO nos docs (R-07 grafo, R-15 ±6, R-33, coluna tacticalCohesion, telas M-LINEUP/M-TEAMBALANCE) mas sem código, e que a proposta diverge da R-07. Três forks foram batidos pelo dono:
+
+- **R-220.1 — Fonte:** treino coletivo (por formação) **+** minutos jogados juntos. Emenda/estende a R-07 (as duas fontes somam). Treino individual não afeta entrosamento.
+- **R-220.2 — Treino de sessão** substitui a execução passiva (R-212..R-216): duração em tempo real, jogador indisponível, ganho parcial ao interromper, estamina no mesmo dia. Toca R-113/INV-29 (tensão aberta, resolvida na Fase 2).
+- **R-220.3 — Formação + escalação primeiro:** fundação tática é pré-requisito (a partida hoje é média do time, sem formação/escalação no domínio).
+
+Programa em 3 fases: (1) formação/escalação; (2) treino de sessão; (3) entrosamento. Emenda R-07; reaproveita R-15/R-33; zera na transferência. A definição completa vive em [`entrosamento-e-treino-de-sessao-2026-07-19.md`](entrosamento-e-treino-de-sessao-2026-07-19.md).
+
 ### R-211 — O clube gerado nasce COM identidade visual · RATIFICADA em 2026-07-19
 
 Clube gerado nascia sem cara: `crestTemplateId` e as cores ficavam nulos até o jogador personalizar (BC-003), e a lista de escolher clube do onboarding mostrava 20 caixas cinzas idênticas — nada para escolher olhando. Conferido no banco antes da mudança: `0 de 20` com escudo, `0 de 20` com cor.
@@ -579,4 +589,4 @@ Continua sendo ponto de partida, não sentença — as colunas seguem anuláveis
 
 A definição completa, as consequências aceitas e as **pendências de produto que a reescrita expôs** vivem em [`reescrita-do-core-2026-07-16.md`](reescrita-do-core-2026-07-16.md).
 
-> **Estado consolidado:** R-01..R-219 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
+> **Estado consolidado:** R-01..R-220 RATIFICADAS, exceto R-35..R-40 e R-108 reservados. R-208..R-210 matam a constante de build do mundo no mobile e abrem `M-WORLD-PICK` (vitrine pública + elegibilidade pós-login). R-211 faz o clube gerado nascer com escudo e cores. R-212..R-216 abrem treino e base, alinhando o schema à doc (accrual por atributo, potencial em camadas, `version` no plano, nomes de command reais, linha de base por temporada). R-202..R-207 abrem C7 autorado (competição autorada no admin, imutável ao iniciar; mundo nasce sem competição). R-133 estava declarada e não cumprida; R-176 a corrige. R-188 corrige a premissa de R-179. R-191 materializa C9 (Currency, razão dobrado, dotação inicial). R-192 abre C6 (transferência atômica). R-193 dá folga de elenco (teto 250) para o mercado não nascer travado. R-194 abre C10 (torcida: headcount na gênese). R-195 abre C11 (imprensa: a transferência vira manchete). R-196 abre C12 (inbox: a transferência vira pendência do clube).
