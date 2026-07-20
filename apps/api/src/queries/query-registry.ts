@@ -18,6 +18,7 @@ import type {
 import type {
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
+  WorldSeasonReadModel,
   YouthIntakeReadModel,
 } from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
@@ -55,6 +56,8 @@ export interface QueryContext {
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
+  /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
+  readonly worldSeasonReadModel: WorldSeasonReadModel;
   readonly youthIntakeReadModel: YouthIntakeReadModel;
   /** Tática — a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
   readonly clubLineupRepository: LineupRepository;
@@ -113,17 +116,32 @@ const handlers: Record<string, QueryHandler> = {
     const lineup = await clubLineupRepository.findByClub(worldId, clubId);
     return succeed({ lineup });
   },
-  "training-plan": async ({ trainingPlanRepository }, worldId, params) => {
+  "training-plan": async (
+    { trainingPlanRepository, worldSeasonReadModel },
+    worldId,
+    params,
+  ) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
-    const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
-    if (clubId === null || seasonId === null) {
+    if (clubId === null) {
       return fail(
         new DomainError(
           "QUERY_PARAM_REQUIRED",
-          "training-plan exige os parâmetros clubId e seasonId.",
-          { params: ["clubId", "seasonId"] },
+          "training-plan exige o parâmetro clubId.",
+          { params: ["clubId"] },
         ),
       );
+    }
+    // seasonId é OPCIONAL, como em `player-development` (R-221): omitido → usa o
+    // season CORRENTE do mundo. O mobile não conhece o season, e exigi-lo aqui
+    // tornava a tela de treino inconstruível — nenhuma query o devolvia.
+    let seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
+    if (seasonId === null) {
+      seasonId = await worldSeasonReadModel.currentSeasonId(worldId);
+    }
+    if (seasonId === null) {
+      // Mundo sem temporada corrente é estado LEGÍTIMO (mundo recém-semeado).
+      // Devolve plano nulo para a tela dizer "sem temporada", não erro técnico.
+      return succeed({ plan: null });
     }
     // `null` é resposta legítima: clube sem plano na temporada. A tela cai no
     // estado vazio (M-TRAINING sem foco definido), não em erro.
