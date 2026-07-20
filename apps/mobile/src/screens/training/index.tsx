@@ -38,6 +38,13 @@ import {
   type TalkStance,
 } from "@/screens/talk/talk-model";
 import {
+  FOCUS_OPTIONS,
+  buildSetPlanPayload,
+  clampIntensity,
+  intensityLabel,
+  type PlanFocus,
+} from "@/screens/training-plan/training-plan-model";
+import {
   buildStartSessionPayload,
   buildTrainingRows,
   summarizeTraining,
@@ -68,6 +75,15 @@ interface ActiveSession {
 
 interface TrainingSessionsProjection {
   readonly sessions: readonly ActiveSession[];
+}
+
+interface TrainingPlanProjection {
+  readonly plan: {
+    readonly name: string;
+    readonly focus: string;
+    readonly intensity: number;
+    readonly version: number;
+  } | null;
 }
 
 /** Rótulo PT dos atributos que a tela oferece como foco. */
@@ -106,6 +122,7 @@ export function Training() {
   const [picking, setPicking] = useState<TrainingRow | null>(null);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
@@ -130,6 +147,22 @@ export function Training() {
     managedClub === null ? null : "training-sessions",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
+  // Sem seasonId: o servidor resolve a temporada corrente (e a materializa se
+  // faltar). O mobile não conhece o season.
+  const planQuery = useWorldQuery<TrainingPlanProjection>(
+    managedClub === null ? null : "training-plan",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const plan = planQuery.data?.plan ?? null;
+
+  // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
+  const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
+  const [draftIntensity, setDraftIntensity] = useState<number | null>(null);
+  const focus: PlanFocus =
+    draftFocus ?? ((plan?.focus as PlanFocus | undefined) ?? "TECHNICAL");
+  const intensity = draftIntensity ?? plan?.intensity ?? 50;
+  const dirty =
+    plan === null || focus !== plan.focus || intensity !== plan.intensity;
 
   // A data do MUNDO — nunca Date.now(). O progresso mostrado tem que bater com
   // o que a coleta rende no servidor.
@@ -242,6 +275,68 @@ export function Training() {
     },
     [dispatch],
   );
+
+  /** Grava o plano COLETIVO: um foco e uma carga para o grupo inteiro. */
+  const savePlan = useCallback(() => {
+    if (managedClub === null || client === null || contractVersion === null) {
+      return;
+    }
+    const payload = buildSetPlanPayload({
+      clubId: managedClub.id,
+      name: plan?.name ?? "Plano do elenco",
+      focus,
+      intensity,
+      players: rosterQuery.data?.players ?? [],
+      expectedVersion: plan?.version ?? null,
+    });
+    if ("error" in payload) {
+      // Recusa própria da tela, com o motivo — não um branch vazio.
+      setPlanError(
+        payload.error === "NO_PLAYERS"
+          ? "Um plano sem jogador não treina ninguém."
+          : "O plano precisa de um nome.",
+      );
+      return;
+    }
+    setPlanError(null);
+    const idempotencyKey = `training:set-plan:${managedClub.id}:${plan?.version ?? 0}`;
+    setTracking({
+      status: CommandTrackingStatus.SUBMITTING,
+      commandId: null,
+      resource: null,
+      correlationId: `mobile:${idempotencyKey}`,
+      errorCode: null,
+    });
+    void submitTrackedCommand(client, {
+      clientContractVersion: "v1",
+      serverContractVersion: contractVersion,
+      commandType: "training:set-plan",
+      worldId,
+      payload: { ...payload },
+      idempotencyKey,
+      correlationId: `mobile:${idempotencyKey}`,
+    }).then((result) => {
+      setTracking(result);
+      if (
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED
+      ) {
+        setDraftFocus(null);
+        setDraftIntensity(null);
+        planQuery.refetch();
+      }
+    });
+  }, [
+    managedClub,
+    client,
+    contractVersion,
+    worldId,
+    plan,
+    focus,
+    intensity,
+    rosterQuery.data,
+    planQuery.refetch,
+  ]);
 
   /** Conversa com o ELENCO — move a forma de todo mundo de uma vez. */
   const talkToSquad = useCallback(
@@ -360,6 +455,92 @@ export function Training() {
                 ? `${summary.collectable} sessão(ões) podem ser coletadas agora — coletar antes do fim rende ganho parcial.`
                 : "Nenhuma sessão em andamento."}
             </Text>
+          </Card>
+
+          {/* O plano COLETIVO: um foco e uma carga para o grupo. */}
+          <Card>
+            <Text style={styles.cardTitle}>PLANO DO ELENCO</Text>
+            <Text style={styles.summaryHint}>
+              {plan === null
+                ? "Nenhum plano definido nesta temporada."
+                : `Atual: ${plan.name} · ${intensityLabel(plan.intensity)}`}
+            </Text>
+
+            <View style={styles.focusGrid}>
+              {FOCUS_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.focus}
+                  onPress={() => setDraftFocus(option.focus)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Foco ${option.label}`}
+                  accessibilityState={{ selected: focus === option.focus }}
+                  style={[
+                    styles.chip,
+                    focus === option.focus && styles.chipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      focus === option.focus && styles.chipTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.loadRow}>
+              <Text style={styles.loadLabel}>
+                CARGA · {intensityLabel(intensity)} ({intensity})
+              </Text>
+              <View style={styles.loadButtons}>
+                <Pressable
+                  onPress={() => setDraftIntensity(clampIntensity(intensity - 10))}
+                  accessibilityRole="button"
+                  accessibilityLabel="Diminuir carga"
+                  accessibilityState={{}}
+                  style={styles.loadButton}
+                >
+                  <Text style={styles.loadButtonText}>−</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setDraftIntensity(clampIntensity(intensity + 10))}
+                  accessibilityRole="button"
+                  accessibilityLabel="Aumentar carga"
+                  accessibilityState={{}}
+                  style={styles.loadButton}
+                >
+                  <Text style={styles.loadButtonText}>+</Text>
+                </Pressable>
+              </View>
+            </View>
+            {intensity >= 75 ? (
+              <Text style={styles.warn}>
+                Carga pesada: sobe o risco de lesão no elenco.
+              </Text>
+            ) : null}
+            <Text style={styles.summaryHint}>
+              Quem está sob restrição médica entra em RECUPERAÇÃO, não no foco
+              do grupo — o domínio recusaria o contrário.
+            </Text>
+
+            <Pressable
+              onPress={savePlan}
+              disabled={!dirty}
+              accessibilityRole="button"
+              accessibilityLabel="Salvar plano do elenco"
+              accessibilityState={{ disabled: !dirty }}
+              style={[styles.savePlan, !dirty && styles.actionBusy]}
+            >
+              <Text style={styles.actionText}>
+                {dirty ? "SALVAR PLANO" : "PLANO SALVO"}
+              </Text>
+            </Pressable>
+            {planError !== null ? (
+              <Text style={styles.error}>{planError}</Text>
+            ) : null}
           </Card>
 
           <Card>
@@ -673,6 +854,62 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
     letterSpacing: 0.3,
     marginBottom: space.xs,
+  },
+  focusGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: space.xs,
+    marginTop: space.sm,
+  },
+  chip: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+  },
+  chipActive: { backgroundColor: color.primary },
+  chipText: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  chipTextActive: { color: color.background },
+  loadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: space.md,
+  },
+  loadLabel: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
+  loadButtons: { flexDirection: "row", gap: space.sm },
+  loadButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.pill,
+    backgroundColor: color.backgroundElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadButtonText: {
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.black as "800",
+  },
+  warn: {
+    color: color.warning,
+    fontSize: fontSize.xs,
+    marginTop: space.sm,
+  },
+  savePlan: {
+    marginTop: space.md,
+    alignItems: "center",
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    backgroundColor: color.primary,
   },
   stanceRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
   stance: {
