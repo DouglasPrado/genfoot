@@ -1135,6 +1135,7 @@ model Club {
   playerContracts   PlayerContract[]
   staffContracts    StaffContract[]
   trainingPlans     TrainingPlan[]
+  clubLineups       ClubLineup[]
   squads            Squad[]
   scoutReports      ScoutReport[]
   transferListings  TransferListing[]
@@ -1714,6 +1715,42 @@ model TrainingPlayerEntry {
 
   @@index([trainingPlanId])
   @@index([playerId])
+}
+
+/// Escalação CORRENTE do clube (R-220 Fase 1): formação + 11 titulares nos slots
+/// + banco. Per (mundo, clube); a partida lê ISTO para saber quem entra em campo,
+/// com fallback à média do elenco quando não há escalação. Não confundir com o
+/// MatchLineup congelado por-partida (R-145), que é outro passo.
+model ClubLineup {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  formation      String
+  benchPlayerIds String[] @db.Uuid
+  version        Int      @default(1)
+
+  club     Club                @relation(fields: [gameWorldId, clubId], references: [gameWorldId, id], onDelete: Cascade)
+  starters ClubLineupStarter[]
+
+  @@unique([gameWorldId, clubId])
+  @@unique([gameWorldId, id])
+  @@index([gameWorldId, clubId])
+}
+
+/// Um titular num slot da formação, com o aproveitamento (fillQuality 0..1) que
+/// a partida usa para ponderar a força de quem joga fora de posição.
+model ClubLineupStarter {
+  id           String         @id @default(uuid(7)) @db.Uuid
+  lineupId     String         @db.Uuid
+  playerId     String         @db.Uuid
+  slotIndex    Int
+  slotPosition PlayerPosition
+  fillQuality  Float
+
+  lineup ClubLineup @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+
+  @@unique([lineupId, slotIndex])
+  @@index([lineupId])
 }
 
 /// Presença operacional no elenco — NÃO substitui contrato/registro/empréstimo.

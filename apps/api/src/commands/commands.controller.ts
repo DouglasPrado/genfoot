@@ -36,6 +36,8 @@ import type {
   SeasonAccrualUnitOfWork,
   SeasonAgingUnitOfWork,
   SeasonLifecycleRepository,
+  LineupRepository,
+  LineupContextReader,
   PlayerRepository,
   AutomationUnitOfWork,
   WorldRepository,
@@ -71,6 +73,8 @@ import {
   SEASON_ACCRUAL_UNIT_OF_WORK,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
+  CLUB_LINEUP_REPOSITORY,
+  LINEUP_CONTEXT_READER,
   PLAYER_REPOSITORY,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
@@ -139,6 +143,10 @@ export class CommandsController {
     private readonly seasonAgingUnitOfWork: SeasonAgingUnitOfWork,
     @Inject(SEASON_LIFECYCLE_REPOSITORY)
     private readonly seasonLifecycle: SeasonLifecycleRepository,
+    @Inject(CLUB_LINEUP_REPOSITORY)
+    private readonly clubLineupRepository: LineupRepository,
+    @Inject(LINEUP_CONTEXT_READER)
+    private readonly lineupContextReader: LineupContextReader,
     @Inject(PLAYER_REPOSITORY)
     private readonly playerRepository: PlayerRepository,
     @Inject(AUTOMATION_UNIT_OF_WORK)
@@ -301,6 +309,8 @@ export class CommandsController {
         seasonAccrualUnitOfWork: this.seasonAccrualUnitOfWork,
         seasonAgingUnitOfWork: this.seasonAgingUnitOfWork,
         seasonLifecycle: this.seasonLifecycle,
+        clubLineupRepository: this.clubLineupRepository,
+        lineupContextReader: this.lineupContextReader,
         playerRepository: this.playerRepository,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,

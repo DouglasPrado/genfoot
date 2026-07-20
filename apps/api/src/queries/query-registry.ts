@@ -13,6 +13,7 @@ import type {
   StaffReadModel,
   InboxReadModel,
   TrainingPlanRepository,
+  LineupRepository,
 } from "@grinta/core";
 import type { PlayerDevelopmentReadModel, YouthIntakeReadModel } from "@grinta/persistence";
 import { DomainError, fail, succeed, type GameWorldId, type Result } from "@grinta/shared";
@@ -50,6 +51,8 @@ export interface QueryContext {
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
   readonly youthIntakeReadModel: YouthIntakeReadModel;
+  /** Tática — a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
+  readonly clubLineupRepository: LineupRepository;
 }
 
 /**
@@ -89,6 +92,22 @@ const handlers: Record<string, QueryHandler> = {
   },
   "world-clock": async ({ worldClock }, worldId) =>
     succeed(await worldClock.getClock(worldId)),
+  lineup: async ({ clubLineupRepository }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "lineup exige o parâmetro clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    // `null` = clube sem escalação (a partida usa a média do elenco). A tela
+    // distingue "sem escalação" de "escalação vazia" pelo próprio null.
+    const lineup = await clubLineupRepository.findByClub(worldId, clubId);
+    return succeed({ lineup });
+  },
   "training-plan": async ({ trainingPlanRepository }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     const seasonId = typeof params.seasonId === "string" ? params.seasonId : null;
