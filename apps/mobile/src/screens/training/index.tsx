@@ -24,6 +24,12 @@ import {
   submitTrackedCommand,
   type TrackedCommandResult,
 } from "@/lib/command-orchestrator";
+import {
+  commandIdempotencyKey,
+  onDay,
+  onEntity,
+  onRevision,
+} from "@/lib/idempotency";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
@@ -295,7 +301,11 @@ export function Training() {
         "training:start-session",
         row.playerId,
         { ...payload },
-        `training:start-session:${row.playerId}:${attributeCode}:${worldDate}`,
+        commandIdempotencyKey({
+          commandType: "training:start-session",
+          target: `${row.playerId}:${attributeCode}`,
+          occasion: onDay(worldDate),
+        }),
       );
     },
     [managedClub, dispatch, worldDate],
@@ -316,7 +326,11 @@ export function Training() {
         "training:collect-session",
         row.playerId,
         { playerId: row.playerId },
-        `training:collect-session:${sessionId}`,
+        commandIdempotencyKey({
+          commandType: "training:collect-session",
+          target: row.playerId,
+          occasion: onEntity(sessionId),
+        }),
       );
     },
     [dispatch, sessionsQuery.data],
@@ -359,7 +373,11 @@ export function Training() {
      * retentar a MESMA edição ainda dedupe (que é o ponto da idempotência), mas
      * uma edição DIFERENTE é outra conversa e vale.
      */
-    const idempotencyKey = `training:set-plan:${managedClub.id}:${plan?.version ?? 0}:${focus}:${intensity}`;
+    const idempotencyKey = commandIdempotencyKey({
+      commandType: "training:set-plan",
+      target: managedClub.id,
+      occasion: onRevision(plan?.version ?? 0, focus, intensity),
+    });
     setTracking({
       status: CommandTrackingStatus.SUBMITTING,
       commandId: null,

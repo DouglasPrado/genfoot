@@ -1,3 +1,5 @@
+import { commandIdempotencyKey, onDay } from "../../lib/idempotency.js";
+
 /**
  * Modelo puro da conversa/decisão (R-221 Fase 2c, mobile). Seleção de postura e
  * montagem dos payloads dos commands morale:talk-to-player e morale:talk-to-squad.
@@ -53,12 +55,9 @@ export function talkIdempotencyKey(input: {
   readonly stance: TalkStance;
   readonly worldDate: string;
 }): string {
-  if (input.worldDate.trim() === "") {
-    // Sem data, a única chave possível seria eterna — e chave eterna já causou o
-    // bug acima. Falhar alto é melhor que gravar uma que nunca mais destrava.
-    throw new Error(
-      "talkIdempotencyKey exige a data do mundo: sem ela a chave vira permanente.",
-    );
-  }
-  return `${input.commandType}:${input.targetId}:${input.stance}:${input.worldDate}`;
+  return commandIdempotencyKey({
+    commandType: input.commandType,
+    target: `${input.targetId}:${input.stance}`,
+    occasion: onDay(input.worldDate),
+  });
 }

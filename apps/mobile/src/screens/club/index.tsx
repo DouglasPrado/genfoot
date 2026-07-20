@@ -28,6 +28,11 @@ import {
   defaultVisualIdentity,
   type VisualIdentity,
 } from "@/screens/club/customization/visual-identity";
+import {
+  commandIdempotencyKey,
+  onEntity,
+  onRevision,
+} from "@/lib/idempotency";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useAuth, useUser } from "@clerk/expo";
 import { useWorldQuery } from "@/lib/world";
@@ -216,7 +221,24 @@ export function Club() {
         return;
       }
       const worldDate = worldQuery.data?.currentDate ?? "2026-01-01";
-      const idempotencyKey = `rebrand:${managedClub.id}:${managedClub.version}`;
+      /**
+       * A chave carrega o CONTEÚDO da identidade, não só a versão.
+       *
+       * Com `${clubId}:${version}` apenas, duas personalizações diferentes na
+       * mesma versão colidiam e a segunda era descartada em SILÊNCIO — o mesmo
+       * defeito que fazia o plano de treino perder a segunda edição. Acontece
+       * sempre que o refetch pós-gravação falha e a tela segue na versão velha.
+       */
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "club:apply-identity",
+        target: managedClub.id,
+        occasion: onRevision(
+          managedClub.version,
+          input.name,
+          input.shortCode,
+          JSON.stringify(input.visualIdentity),
+        ),
+      });
       setCustomizeTracking({
         status: CommandTrackingStatus.SUBMITTING,
         commandId: null,
@@ -288,7 +310,13 @@ export function Club() {
             text: "Encerrar controle",
             style: "destructive",
             onPress: () => {
-              const idempotencyKey = `end-control:${controlStep.controlId}:${reason}`;
+              // Encerrar controle é TERMINAL: o controle é a ocasião, e não há
+              // o que reencerrar depois. Aqui a chave por entidade é correta.
+              const idempotencyKey = commandIdempotencyKey({
+                commandType: "identity:end-club-control",
+                target: reason,
+                occasion: onEntity(controlStep.controlId),
+              });
               setTracking({
                 status: CommandTrackingStatus.SUBMITTING,
                 commandId: null,

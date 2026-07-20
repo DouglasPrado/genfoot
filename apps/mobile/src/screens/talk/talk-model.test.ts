@@ -44,8 +44,10 @@ describe("talk-model (R-221 2c mobile)", () => {
       worldDate: "2026-01-09",
     } as const;
     expect(talkIdempotencyKey(args)).toBe(talkIdempotencyKey(args));
+    // Formato PRESO de propósito: mudá-lo sem querer faz todas as chaves em voo
+    // virarem outras, e um efeito já aplicado poderia ser aplicado de novo.
     expect(talkIdempotencyKey(args)).toBe(
-      "morale:talk-to-player:p:PRAISE:2026-01-09",
+      "morale:talk-to-player:p:PRAISE:day:2026-01-09",
     );
   });
 
