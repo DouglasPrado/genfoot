@@ -4,7 +4,7 @@ import { PlayerPosition } from "../genesis/genesis-types.js";
 
 import {
   CANONICAL_FORMATIONS,
-  FormationName,
+  type FormationName,
   fillQuality,
   formationSlots,
   isKnownFormation,
@@ -35,7 +35,7 @@ describe("formações canônicas", () => {
 
   it("rejeita formação desconhecida", () => {
     expect(isKnownFormation("6-0-4")).toBe(false);
-    expect(formationSlots("6-0-4" as FormationName)).toBeNull();
+    expect(formationSlots("6-0-4")).toBeNull();
   });
 
   it("os dígitos do nome batem com a contagem de linhas (fora o GK)", () => {

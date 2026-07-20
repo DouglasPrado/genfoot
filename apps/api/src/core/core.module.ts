@@ -17,6 +17,8 @@ import {
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
   PrismaSeasonLifecycleRepository,
+  PrismaClubLineupRepository,
+  PrismaLineupContextReader,
   PrismaMatchesReadModel,
   PrismaMarketReadModel,
   PrismaFanbaseReadModel,
@@ -64,6 +66,8 @@ import {
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
+  CLUB_LINEUP_REPOSITORY,
+  LINEUP_CONTEXT_READER,
   MATCHES_READ_MODEL,
   MARKET_READ_MODEL,
   FANBASE_READ_MODEL,
@@ -212,6 +216,18 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaSeasonLifecycleRepository =>
         new PrismaSeasonLifecycleRepository(client),
+    },
+    {
+      provide: CLUB_LINEUP_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaClubLineupRepository =>
+        new PrismaClubLineupRepository(client),
+    },
+    {
+      provide: LINEUP_CONTEXT_READER,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaLineupContextReader =>
+        new PrismaLineupContextReader(client),
     },
     {
       provide: PLAYER_REPOSITORY,
@@ -416,6 +432,8 @@ import {
     PLAYER_DEVELOPMENT_READ_MODEL,
     SEASON_AGING_UNIT_OF_WORK,
     SEASON_LIFECYCLE_REPOSITORY,
+    CLUB_LINEUP_REPOSITORY,
+    LINEUP_CONTEXT_READER,
     PLAYER_REPOSITORY,
     YOUTH_INTAKE_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,

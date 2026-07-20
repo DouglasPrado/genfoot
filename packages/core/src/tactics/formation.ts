@@ -61,7 +61,7 @@ export function isKnownFormation(name: string): name is FormationName {
 
 /** Os 11 slots de uma formação, ou `null` se o nome não for conhecido. */
 export function formationSlots(
-  name: FormationName | string,
+  name: string,
 ): readonly PlayerPosition[] | null {
   return isKnownFormation(name) ? CANONICAL_FORMATIONS[name] : null;
 }

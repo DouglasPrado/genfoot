@@ -108,6 +108,13 @@ describe("API command catalog integrity (e2e)", () => {
       "market:sign-player",
       // X-001: o usuário registra presença no mundo (heartbeat).
       "presence:heartbeat",
+      // R-220 Fase 1: a escalação corrente do clube (M-LINEUP).
+      "tactics:set-lineup",
+      // Treino (R-212..R-217): plano, accrual diário, virada de treino e idade.
+      "training:accrue-day",
+      "training:apply-season",
+      "training:apply-season-aging",
+      "training:set-plan",
       "world:activate",
       // MUNDO-V2: avança um dia lógico e roda o trabalho do dia (o motor).
       "world:advance-day",
@@ -129,6 +136,8 @@ describe("API command catalog integrity (e2e)", () => {
       "world:set-identity",
       // C8: desce um profissional (≤21) de volta à base.
       "youth:demote-player",
+      // R-218: gera a safra anual de captação (M-YOUTH-INTAKE).
+      "youth:generate-intake",
       // C8: sobe um jovem da base ao elenco profissional.
       "youth:promote-player",
     ]);
@@ -139,7 +148,7 @@ describe("API command catalog integrity (e2e)", () => {
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(36);
+    expect(response.body.commandCount).toBe(42);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
