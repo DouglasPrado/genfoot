@@ -12,10 +12,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registeredCommandTypes } from "../src/commands/command-registry.js";
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
+import { hasDatabase, skipReason } from "./postgres.guard.js";
 
 const VALID_STATUSES = new Set(["ACCEPTED", "ALREADY_APPLIED", "REJECTED"]);
 
-describe("API command catalog integrity (e2e)", () => {
+describe.skipIf(!hasDatabase)(
+  `API command catalog integrity (e2e)${hasDatabase ? "" : ` — PULADO: ${skipReason}`}`,
+  () => {
   let app: INestApplication;
   let dataDirectory: string;
   let worldId = "";

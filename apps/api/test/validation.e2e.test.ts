@@ -11,8 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
+import { hasDatabase, skipReason } from "./postgres.guard.js";
 
-describe("API validation/calibration (e2e)", () => {
+describe.skipIf(!hasDatabase)(
+  `API validation/calibration (e2e)${hasDatabase ? "" : ` — PULADO: ${skipReason}`}`,
+  () => {
   let app: INestApplication;
   let dataDirectory: string;
 
