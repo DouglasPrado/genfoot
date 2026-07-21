@@ -17,6 +17,8 @@ import type {
   PlayerAggregateSnapshot,
   PlayerRepository,
 } from "../players/player-repository.js";
+import { derivePotentialLayers } from "../players/potential-layers.js";
+import { sessionRawGainPoints } from "../training/session-gain.js";
 import type { CohesionWriter } from "../training/train-formation-cohesion.js";
 import {
   RunAiClubsTraining,
@@ -85,28 +87,47 @@ function uowOf(repos: AiTrainingRepositories): AiTrainingUnitOfWork {
 }
 
 describe("RunAiClubsTraining", () => {
-  it("sobe TODOS os atributos por igual (equilibrado) e o entrosamento do clube de IA", async () => {
+  it("gasta o orçamento humano (1×) nos atributos mais fracos e sobe o entrosamento", async () => {
     const players = new MemPlayers(aggregate());
     const cohesion = new MemCohesion();
     const uow = uowOf({ reader: new MemReader(PLAYER), players, cohesion });
-    const finishingBefore = players.agg.player.attributes.finishing; // 30
-    const dribblingBefore = players.agg.player.attributes.dribbling; // 50
+    const snap = players.agg.player;
+    const before: Record<string, number | null> = { ...snap.attributes };
+
+    // O MESMO orçamento diário de uma sessão humana (1×): quantos pontos a IA gasta.
+    const budget = sessionRawGainPoints({
+      usableCeiling: derivePotentialLayers({
+        natural: snap.potentialAbility,
+        baselineAbility: snap.baselineAbility,
+        currentAbility: snap.currentAbility,
+      }).usable,
+      currentAbility: snap.currentAbility,
+      morale: snap.dynamicState.morale,
+      fatigue: snap.dynamicState.fatigue,
+      age: 20, // nascido 2006-01-01, mundo 2026-03-02
+      elapsedDays: 1,
+      durationDays: 1,
+    });
+    expect(budget).toBeGreaterThan(0);
 
     const r = await new RunAiClubsTraining(uow).execute({
       gameWorldId: WORLD, worldSeed: "seed", worldDate: "2026-03-02", rulesetVersion: RULESET,
     });
 
     expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(r.value.clubsTrained).toBe(1);
-      expect(r.value.playersDeveloped).toBe(1);
-    }
-    // Equilibrado: a mais fraca (finishing) E uma qualquer (dribbling) subiram o
-    // MESMO passo — não só as recomendadas, tudo por igual.
-    expect(players.agg.player.attributes.finishing).toBe(finishingBefore + 1);
-    expect(players.agg.player.attributes.dribbling).toBe(dribblingBefore + 1);
-    // Atributos de goleiro (null num ST) continuam null — só sobe o que ele tem.
-    expect(players.agg.player.attributes.goalkeeperReflexes).toBeNull();
+    if (r.ok) expect(r.value.playersDeveloped).toBe(1);
+
+    // 1× o humano: subiram EXATAMENTE `budget` atributos, +1 em cada.
+    const after = players.agg.player.attributes as Record<string, number | null>;
+    const raised = Object.keys(after).filter(
+      (k) => after[k] !== null && before[k] !== null && (after[k] as number) > (before[k] as number),
+    );
+    expect(raised.length).toBe(budget);
+    for (const k of raised) expect(after[k]).toBe((before[k] as number) + 1);
+    // Equilibrado: a mais fraca (finishing=30) é a PRIMEIRA a subir.
+    expect(after.finishing).toBe((before.finishing as number) + 1);
+    // Só o que ele tem: goleiro (null num ST) continua null.
+    expect(after.goalkeeperReflexes).toBeNull();
     // Entrosamento do clube de IA subiu.
     expect(cohesion.raises).toEqual([AI_CLUB]);
   });
