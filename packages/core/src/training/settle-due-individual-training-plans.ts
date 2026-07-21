@@ -6,14 +6,14 @@ import { Player } from "../players/player.js";
 import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 import { PlayerAvailability } from "../players/player-lifecycle-types.js";
 import type { PlayerRepository } from "../players/player-repository.js";
-import { recommendedAttributes } from "../players/position-attributes.js";
 import { derivePotentialLayers } from "../players/potential-layers.js";
 
 import type {
   IndividualTrainingPlanRepository,
   IndividualTrainingPlanSnapshot,
 } from "./individual-training-plan-types.js";
-import { perAttributeGain, sessionRawGainPoints } from "./session-gain.js";
+import { projectIndividualPlan } from "./individual-training-projection.js";
+import { sessionRawGainPoints } from "./session-gain.js";
 
 /**
  * Aplica os planos INDIVIDUAIS na virada do dia — o motor que faz o plano
@@ -116,53 +116,29 @@ async function developToward(
   });
   if (rawGain <= 0) return false;
 
-  const apply = (code: string, requestedValue: number): boolean => {
+  // A MESMA projeção que a tela mostra (fonte única): aplica exatamente o que a
+  // M-TRAINING-INDIV projetou — concentrado no atributo, ou espalhado na posição.
+  const changes = projectIndividualPlan({
+    target: plan.target,
+    rawGainPoints: rawGain,
+    attributeValueOf: (code) => player.attributeValue(code as PlayerAttributeCode),
+  });
+
+  let developed = false;
+  for (const change of changes) {
     const applied = player.applyAttributeChange({
       historyId: deterministicUuidV7({
         worldSeed: input.worldSeed,
-        context: `individual-training:${plan.playerId}:${input.worldDate}:${code}`,
+        context: `individual-training:${plan.playerId}:${input.worldDate}:${change.attributeCode}`,
         timestampMilliseconds: 0,
       }),
-      attributeCode: code as PlayerAttributeCode,
-      requestedValue,
+      attributeCode: change.attributeCode as PlayerAttributeCode,
+      requestedValue: change.after,
       cause: "training-session",
       worldDate: input.worldDate,
       rulesetVersion: input.rulesetVersion,
     });
-    return applied.ok && applied.value !== null;
-  };
-
-  let developed = false;
-  if (plan.target.kind === "ATTRIBUTE") {
-    // Ganho CONCENTRADO: o orçamento inteiro no atributo-alvo (como treinar UMA
-    // habilidade numa sessão manual). Se não se aplica ao jogador (null), pula.
-    const current = player.attributeValue(plan.target.attributeCode as PlayerAttributeCode);
-    if (current !== null && current < 100) {
-      const gain = perAttributeGain({
-        rawGain,
-        attributeCount: 1,
-        attributeCurrentValue: current,
-      });
-      if (gain > 0) developed = apply(plan.target.attributeCode, current + gain);
-    }
-  } else {
-    // POSIÇÃO: +1 nas recomendadas mais fracas, gastando o orçamento — espalha
-    // o ganho pelo perfil da posição, nivelando por baixo.
-    const weakestFirst = recommendedAttributes(plan.target.position)
-      .map((code) => ({
-        code,
-        value: player.attributeValue(code as PlayerAttributeCode),
-      }))
-      .filter((c): c is { code: string; value: number } => c.value !== null && c.value < 100)
-      .sort((a, b) => a.value - b.value);
-    let spent = 0;
-    for (const { code, value } of weakestFirst) {
-      if (spent >= rawGain) break;
-      if (apply(code, value + 1)) {
-        spent += 1;
-        developed = true;
-      }
-    }
+    if (applied.ok && applied.value !== null) developed = true;
   }
 
   if (!developed) return false;

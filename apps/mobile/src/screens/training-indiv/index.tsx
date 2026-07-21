@@ -3,7 +3,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import { CommandTrackingStatus } from "@grinta/core";
+import {
+  CommandTrackingStatus,
+  attributeLabelPt,
+  projectIndividualPlan,
+} from "@grinta/core";
 
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
@@ -58,6 +62,8 @@ interface IndividualPlanProjection {
     readonly intensity: number;
     readonly version: number;
   } | null;
+  /** Orçamento diário do jogador (0..6), para projetar o ganho. null = sumiu. */
+  readonly budget: number | null;
 }
 
 /**
@@ -141,6 +147,21 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
     () => targetAttributeOptions(player?.attributes ?? {}),
     [player],
   );
+
+  // A projeção EXATA: a MESMA função pura que a virada aplica (core), alimentada
+  // pelo orçamento do servidor + os atributos do jogador. Não é estimativa.
+  const budget = planQuery.data?.budget ?? null;
+  const projection = useMemo(() => {
+    if (target === null || budget === null || player?.attributes == null) {
+      return [];
+    }
+    const attrs = player.attributes;
+    return projectIndividualPlan({
+      target,
+      rawGainPoints: budget,
+      attributeValueOf: (code) => attrs[code] ?? null,
+    });
+  }, [target, budget, player]);
 
   const planReadable =
     planQuery.state === "ready" || planQuery.state === "empty";
@@ -333,6 +354,35 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
             <Text style={styles.tradeoff}>{tradeoffHint(target)}</Text>
           ) : null}
 
+          {/* Projeção EXATA da PRÓXIMA virada (a mesma conta que o settle aplica). */}
+          {target !== null ? (
+            <View style={styles.projectionBox}>
+              <Text style={styles.projectionTitle}>PROJEÇÃO — PRÓXIMA VIRADA</Text>
+              {budget === null ? (
+                <Text style={styles.projectionHint}>
+                  Não consegui ler o orçamento do jogador; salve para aplicar mesmo assim.
+                </Text>
+              ) : projection.length === 0 ? (
+                <Text style={styles.projectionHint}>
+                  Sem ganho projetado hoje — jogador perto do potencial (ou sem folga
+                  de sessão). A virada não moverá o alvo.
+                </Text>
+              ) : (
+                projection.map((c) => (
+                  <View key={c.attributeCode} style={styles.projectionRow}>
+                    <Text style={styles.projAttr} numberOfLines={1}>
+                      {attributeLabelPt(c.attributeCode)}
+                    </Text>
+                    <Text style={styles.projBefore}>{c.before}</Text>
+                    <Text style={styles.projArrow}>→</Text>
+                    <Text style={styles.projAfter}>{c.after}</Text>
+                    <Text style={styles.projGain}>+{c.gain}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+          ) : null}
+
           <View style={styles.loadRow}>
             <Text style={styles.loadLabel}>
               INTENSIDADE · {intensityLabel(intensity)} ({intensity})
@@ -446,6 +496,31 @@ const styles = StyleSheet.create({
   chipText: { color: color.text, fontSize: fontSize.sm },
   chipTextActive: { color: color.background, fontWeight: fontWeight.bold },
   tradeoff: { color: color.text, fontSize: fontSize.sm, marginTop: space.sm, fontStyle: "italic" },
+  projectionBox: {
+    marginTop: space.md,
+    padding: space.sm,
+    borderRadius: radius.md,
+    backgroundColor: color.surfaceRaised,
+  },
+  projectionTitle: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 1,
+    marginBottom: space.xs,
+  },
+  projectionHint: { color: color.textMuted, fontSize: fontSize.sm },
+  projectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+    paddingVertical: 2,
+  },
+  projAttr: { flex: 1, color: color.text, fontSize: fontSize.sm },
+  projBefore: { color: color.textMuted, fontSize: fontSize.sm },
+  projArrow: { color: color.textFaint, fontSize: fontSize.sm },
+  projAfter: { color: color.text, fontSize: fontSize.sm, fontWeight: fontWeight.bold },
+  projGain: { color: color.success, fontSize: fontSize.xs, fontWeight: fontWeight.bold, marginLeft: space.xs },
   loadRow: {
     flexDirection: "row",
     alignItems: "center",

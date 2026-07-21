@@ -1,10 +1,23 @@
-import type {
-  IndividualTrainingPlanRepository,
-  IndividualTrainingPlanSnapshot,
-  IndividualTrainingTarget,
+import {
+  derivePotentialLayers,
+  sessionRawGainPoints,
+  type IndividualTrainingPlanRepository,
+  type IndividualTrainingPlanSnapshot,
+  type IndividualTrainingTarget,
 } from "@grinta/core";
 
 import type { Prisma } from "./generated/prisma/client.js";
+
+/** Idade em anos completos na data do mundo (UTC). */
+function ageOn(birthDate: Date, asOf: Date): number {
+  let age = asOf.getUTCFullYear() - birthDate.getUTCFullYear();
+  const beforeBirthday =
+    asOf.getUTCMonth() < birthDate.getUTCMonth() ||
+    (asOf.getUTCMonth() === birthDate.getUTCMonth() &&
+      asOf.getUTCDate() < birthDate.getUTCDate());
+  if (beforeBirthday) age -= 1;
+  return age;
+}
 
 /**
  * O plano de treino INDIVIDUAL em Postgres (M-TRAINING-INDIV).
@@ -76,6 +89,37 @@ export class PrismaIndividualTrainingPlanRepository
       where: { gameWorldId },
     });
     return rows.map(toSnapshot);
+  }
+
+  public async dailyBudget(
+    gameWorldId: string,
+    playerId: string,
+  ): Promise<number | null> {
+    const player = await this.client.player.findUnique({
+      where: { id: playerId },
+      include: { person: true },
+    });
+    if (player === null || player.gameWorldId !== gameWorldId) return null;
+    const world = await this.client.gameWorld.findUnique({
+      where: { id: gameWorldId },
+      select: { currentDate: true },
+    });
+    if (world === null) return null;
+    const usableCeiling = derivePotentialLayers({
+      natural: player.potentialAbility,
+      baselineAbility: player.baselineAbility,
+      currentAbility: player.currentAbility,
+    }).usable;
+    // A MESMA conta da virada (settle) e da projeção de sessão: 1 dia lógico.
+    return sessionRawGainPoints({
+      usableCeiling,
+      currentAbility: player.currentAbility,
+      morale: player.morale,
+      fatigue: player.fatigue,
+      age: ageOn(player.person.birthDate, world.currentDate),
+      elapsedDays: 1,
+      durationDays: 1,
+    });
   }
 
   public async save(

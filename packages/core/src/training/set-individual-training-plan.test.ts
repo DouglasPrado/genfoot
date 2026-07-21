@@ -28,6 +28,9 @@ class MemRepo implements IndividualTrainingPlanRepository {
   public findAllActive(): Promise<readonly IndividualTrainingPlanSnapshot[]> {
     return Promise.resolve(this.plan === null ? [] : [this.plan]);
   }
+  public dailyBudget(): Promise<number | null> {
+    return Promise.resolve(6);
+  }
 }
 
 class MemContext implements TrainingContextReader {

@@ -55,4 +55,14 @@ export interface IndividualTrainingPlanRepository {
   findAllActive(
     gameWorldId: string,
   ): Promise<readonly IndividualTrainingPlanSnapshot[]>;
+  /**
+   * O orçamento diário de desenvolvimento do jogador (`sessionRawGainPoints`,
+   * 0..6) — o que a tela precisa para PROJETAR o ganho do alvo com a mesma régua
+   * da virada. `null` se o jogador não existe. Encapsula moral/fadiga/idade/teto,
+   * que o cliente não tem.
+   */
+  dailyBudget(
+    gameWorldId: string,
+    playerId: string,
+  ): Promise<number | null>;
 }

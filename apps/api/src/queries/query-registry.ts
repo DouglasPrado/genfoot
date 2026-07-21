@@ -173,12 +173,13 @@ const handlers: Record<string, QueryHandler> = {
         ),
       );
     }
-    const plan = await individualTrainingPlanRepository.findByPlayer(
-      worldId,
-      clubId,
-      playerId,
-    );
-    return succeed({ plan });
+    const [plan, budget] = await Promise.all([
+      individualTrainingPlanRepository.findByPlayer(worldId, clubId, playerId),
+      // O orçamento diário do jogador, para a tela projetar o ganho com a MESMA
+      // régua da virada. `null` se o jogador sumiu.
+      individualTrainingPlanRepository.dailyBudget(worldId, playerId),
+    ]);
+    return succeed({ plan, budget });
   },
   "training-sessions": async ({ trainingSessionsReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
