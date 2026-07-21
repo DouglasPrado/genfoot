@@ -1568,6 +1568,27 @@ export function Training() {
                         }
                       />
 
+                      {/* Abrir o PLANO INDIVIDUAL (M-TRAINING-INDIV) — a ação
+                          "abrir plano individual" que o doc da M-TRAINING lista. */}
+                      <Pressable
+                        onPress={() => {
+                          const id = inspectId;
+                          setInspectId(null);
+                          if (id !== null) {
+                            router.push(`/elenco/treino-indiv/${id}`);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Abrir plano individual de ${player.name}`}
+                        accessibilityState={{}}
+                        style={styles.individualPlanButton}
+                      >
+                        <Icon name="star" size={16} color={color.primary} />
+                        <Text style={styles.individualPlanText}>
+                          PLANO INDIVIDUAL DE TREINO
+                        </Text>
+                      </Pressable>
+
                       {session !== null && session.projections.length > 0 ? (
                         <View style={styles.projectionBox}>
                           <Text style={styles.cardTitle}>
@@ -2423,6 +2444,23 @@ const styles = StyleSheet.create({
     borderColor: color.primary,
   },
   recoveryButtonText: {
+    color: color.primary,
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  individualPlanButton: {
+    marginTop: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.primary,
+  },
+  individualPlanText: {
     color: color.primary,
     fontWeight: "700",
     fontSize: 13,
