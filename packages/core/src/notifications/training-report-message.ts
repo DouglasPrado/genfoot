@@ -9,37 +9,12 @@ import {
   deterministicUuidV7,
   timestampOf,
 } from "../foundation/deterministic-uuid.js";
+import { attributeLabelPt } from "../players/attribute-labels.js";
 
 import {
   NotificationType,
   type NotificationItemSnapshot,
 } from "./notification-types.js";
-
-/** Rótulo PT dos atributos treináveis (espelha o ATTRIBUTE_LABEL da tela). */
-const ATTRIBUTE_LABEL_PT: Readonly<Record<string, string>> = {
-  finishing: "Finalização",
-  shortPassing: "Passe curto",
-  longPassing: "Passe longo",
-  dribbling: "Drible",
-  crossing: "Cruzamento",
-  marking: "Marcação",
-  tackling: "Desarme",
-  heading: "Cabeceio",
-  pace: "Velocidade",
-  stamina: "Resistência",
-  strength: "Força",
-  agility: "Agilidade",
-  vision: "Visão de jogo",
-  composure: "Frieza",
-  positioning: "Posicionamento",
-  reflexes: "Reflexos",
-  handling: "Defesa (mãos)",
-  diving: "Elasticidade",
-};
-
-export function attributeLabelPt(code: string): string {
-  return ATTRIBUTE_LABEL_PT[code] ?? code;
-}
 
 export interface TrainingReportMessageInput {
   readonly playerName: string;

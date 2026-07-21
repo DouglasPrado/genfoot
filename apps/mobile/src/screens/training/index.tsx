@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import { CommandTrackingStatus } from "@grinta/core";
+import { CommandTrackingStatus, attributeLabelPt } from "@grinta/core";
 
 import { AvailabilityFlag } from "@/components/availability-flag";
 import { Card } from "@/components/card";
@@ -146,29 +146,8 @@ interface GroupSessionProjection {
   } | null;
 }
 
-/** Rótulo PT dos atributos que a tela oferece como foco. */
-const ATTRIBUTE_LABEL: Readonly<Record<string, string>> = {
-  finishing: "Finalização",
-  shortPassing: "Passe curto",
-  longPassing: "Passe longo",
-  dribbling: "Drible",
-  crossing: "Cruzamento",
-  marking: "Marcação",
-  tackling: "Desarme",
-  heading: "Cabeceio",
-  pace: "Velocidade",
-  stamina: "Resistência",
-  strength: "Força",
-  agility: "Agilidade",
-  vision: "Visão de jogo",
-  composure: "Frieza",
-  positioning: "Posicionamento",
-  reflexes: "Reflexos",
-  handling: "Defesa (mãos)",
-  diving: "Elasticidade",
-};
-
-const attributeLabel = (code: string): string => ATTRIBUTE_LABEL[code] ?? code;
+/** Rótulo PT do atributo — mapa CANÔNICO único, compartilhado com o core. */
+const attributeLabel = attributeLabelPt;
 
 /** Setor de cada posição — para o tint da PositionBadge, como no elenco. */
 const SECTOR: Readonly<Record<string, "GOL" | "DEF" | "MEI" | "ATA">> = {
