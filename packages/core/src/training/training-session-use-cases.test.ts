@@ -285,7 +285,7 @@ describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lóg
     const sessions = new MemSessions();
     const uow = uowOf(sessions, players);
     await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
-    const before = players.agg.player.attributes.shortPassing as number;
+    const before = players.agg.player.attributes.shortPassing;
     const r = await new SettleDueTrainingSessions(uow).execute({
       gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-02", rulesetVersion: RULESET,
     });
@@ -293,7 +293,7 @@ describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lóg
     if (r.ok) expect(r.value.settledCount).toBe(1);
     expect(sessions.current?.active).toBe(false);
     expect(players.agg.player.availability).toBe(PlayerAvailability.AVAILABLE);
-    expect(players.agg.player.attributes.shortPassing as number).toBeGreaterThan(before);
+    expect(players.agg.player.attributes.shortPassing).toBeGreaterThan(before);
   });
 
   it("reavançar não settla de novo — a sessão já está inativa (idempotente)", async () => {

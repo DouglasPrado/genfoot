@@ -1,5 +1,5 @@
-import { DomainError, succeed, type Result } from "@grinta/shared";
-import type { RulesetVersion } from "@grinta/shared";
+import { succeed, type Result } from "@grinta/shared";
+import type { RulesetVersion , DomainError} from "@grinta/shared";
 
 import { settleTrainingSession } from "./collect-training-session.js";
 import { sessionElapsedDays } from "./training-session.js";

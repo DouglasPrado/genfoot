@@ -1,4 +1,5 @@
-import { DomainError, succeed, type Result } from "@grinta/shared";
+import type { DomainError} from "@grinta/shared";
+import { succeed, type Result } from "@grinta/shared";
 
 import { settleGroupSession } from "./collect-group-training-session.js";
 import { sessionElapsedDays } from "./training-session.js";
