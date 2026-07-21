@@ -7,6 +7,7 @@ import type {
 
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
+import { PrismaNotificationRepository } from "./prisma-notification-repository.js";
 import { PrismaPlayerRepository } from "./prisma-player-repository.js";
 
 /**
@@ -34,6 +35,7 @@ function bind(tx: Prisma.TransactionClient): TrainingSessionRepositories {
   return {
     players: new PrismaPlayerRepository(tx),
     sessions: new PrismaTrainingSessionRepository(tx),
+    notifications: new PrismaNotificationRepository(tx),
   };
 }
 

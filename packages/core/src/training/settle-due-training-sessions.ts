@@ -1,6 +1,8 @@
 import { succeed, type Result } from "@grinta/shared";
 import type { RulesetVersion , DomainError} from "@grinta/shared";
 
+import { buildTrainingReportNotification } from "../notifications/training-report-message.js";
+
 import {
   settleTrainingSession,
   type CollectTrainingSessionResult,
@@ -56,6 +58,21 @@ export class SettleDueTrainingSessions {
         if (result.ok) {
           settledCount += 1;
           reports.push(result.value);
+          // Aviso IN-APP (C12): no mesmo commit do settle, grava o TRAINING_REPORT
+          // que a home conta e a lista de avisos mostra.
+          await repos.notifications.append(
+            buildTrainingReportNotification({
+              gameWorldId: input.gameWorldId,
+              worldSeed: input.worldSeed,
+              clubId: result.value.clubId,
+              playerId: result.value.playerId,
+              playerName: result.value.playerName,
+              attributeCode: result.value.attributeCode,
+              before: result.value.before,
+              after: result.value.after,
+              worldDate: input.worldDate,
+            }),
+          );
         } else skippedCount += 1;
       }
       return succeed({ settledCount, skippedCount, reports });

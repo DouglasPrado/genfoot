@@ -14,6 +14,10 @@ import {
   type PlayerLifecycleSnapshot,
 } from "../players/player-lifecycle-types.js";
 import type { PlayerAggregateSnapshot, PlayerRepository } from "../players/player-repository.js";
+import type {
+  NotificationItemSnapshot,
+  NotificationRepository,
+} from "../notifications/notification-types.js";
 
 import { CollectTrainingSession } from "./collect-training-session.js";
 import { SettleDueTrainingSessions } from "./settle-due-training-sessions.js";
@@ -103,8 +107,20 @@ class MemSessions implements TrainingSessionRepository {
     return Promise.resolve();
   }
 }
-function uowOf(sessions: MemSessions, players: MemPlayers): TrainingSessionUnitOfWork {
-  const repos: TrainingSessionRepositories = { sessions, players };
+class MemNotifications implements NotificationRepository {
+  public items: NotificationItemSnapshot[] = [];
+  public append(item: NotificationItemSnapshot): Promise<void> {
+    // Idempotente por id, como o adapter.
+    if (!this.items.some((i) => i.id === item.id)) this.items.push(item);
+    return Promise.resolve();
+  }
+}
+function uowOf(
+  sessions: MemSessions,
+  players: MemPlayers,
+  notifications: MemNotifications = new MemNotifications(),
+): TrainingSessionUnitOfWork {
+  const repos: TrainingSessionRepositories = { sessions, players, notifications };
   return { run: (work) => work(repos) };
 }
 
@@ -280,10 +296,11 @@ describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lóg
     expect(players.agg.player.availability).toBe(PlayerAvailability.UNAVAILABLE);
   });
 
-  it("NA VIRADA (dia seguinte) a sessão settla SOZINHA: ganho aplicado, jogador APTO, sessão fechada", async () => {
+  it("NA VIRADA (dia seguinte) a sessão settla SOZINHA: ganho aplicado, jogador APTO, sessão fechada, e grava o AVISO", async () => {
     const players = new MemPlayers(aggregate());
     const sessions = new MemSessions();
-    const uow = uowOf(sessions, players);
+    const notifications = new MemNotifications();
+    const uow = uowOf(sessions, players, notifications);
     await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
     const before = players.agg.player.attributes.shortPassing;
     const r = await new SettleDueTrainingSessions(uow).execute({
@@ -294,6 +311,10 @@ describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lóg
     expect(sessions.current?.active).toBe(false);
     expect(players.agg.player.availability).toBe(PlayerAvailability.AVAILABLE);
     expect(players.agg.player.attributes.shortPassing).toBeGreaterThan(before);
+    // Aviso IN-APP gravado (C12) — título/mensagem do treino completo.
+    expect(notifications.items).toHaveLength(1);
+    expect(notifications.items[0]?.type).toBe("TRAINING_REPORT");
+    expect(notifications.items[0]?.title).toContain("completou o treino");
   });
 
   it("reavançar não settla de novo — a sessão já está inativa (idempotente)", async () => {

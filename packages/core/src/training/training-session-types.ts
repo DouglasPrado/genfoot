@@ -1,3 +1,4 @@
+import type { NotificationRepository } from "../notifications/notification-types.js";
 import type { PlayerRepository } from "../players/player-repository.js";
 
 /**
@@ -53,6 +54,8 @@ export interface TrainingSessionRepository {
 export interface TrainingSessionRepositories {
   readonly sessions: TrainingSessionRepository;
   readonly players: PlayerRepository;
+  /** Avisos in-app (C12): o settle da virada grava um TRAINING_REPORT por sessão. */
+  readonly notifications: NotificationRepository;
 }
 
 /** Sessão e jogador mudam no MESMO commit — aplicar o ganho e encerrar a sessão é um efeito só. */
