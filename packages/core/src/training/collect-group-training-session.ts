@@ -6,7 +6,11 @@ import { Player } from "../players/player.js";
 import { fillQuality, formationSlots } from "../tactics/formation.js";
 
 import { sessionElapsedDays } from "./training-session.js";
-import type { GroupTrainingSessionUnitOfWork } from "./group-training-session-types.js";
+import type {
+  GroupTrainingSessionRepositories,
+  GroupTrainingSessionSnapshot,
+  GroupTrainingSessionUnitOfWork,
+} from "./group-training-session-types.js";
 
 /**
  * O jogador está ADAPTADO (fora do ofício) na formação? Melhor encaixe entre os
@@ -52,14 +56,75 @@ export interface CollectGroupTrainingSessionResult {
   readonly cohesionBonus: number;
 }
 
+/**
+ * Encerra UMA sessão de grupo já carregada: libera os participantes, conta os
+ * adaptados, sobe o entrosamento (base + bônus) e fecha a sessão — num commit só
+ * sobre os repos dados. Compartilhado pela coleta manual
+ * (`CollectGroupTrainingSession`) e pelo settle da virada de dia
+ * (`SettleDueGroupTrainingSessions`), para o mesmo efeito nos dois caminhos.
+ */
+export async function settleGroupSession(
+  repos: GroupTrainingSessionRepositories,
+  input: {
+    readonly session: GroupTrainingSessionSnapshot;
+    readonly worldDate: string;
+  },
+): Promise<Result<CollectGroupTrainingSessionResult, DomainError>> {
+  const { sessions, players, cohesion } = repos;
+  const { session } = input;
+  const elapsedDays = sessionElapsedDays(session.startDate, input.worldDate);
+
+  // Libera cada participante (volta ao elenco, disponível) e conta quantos
+  // treinaram ADAPTADOS na formação — cada um soma bônus ao entrosamento.
+  let adaptedCount = 0;
+  for (const playerId of session.participantIds) {
+    const snapshot = await players.findPlayerById(
+      session.gameWorldId as never,
+      playerId as never,
+    );
+    if (snapshot === null) continue; // sumiu do mundo — segue os outros.
+    const loaded = Player.fromSnapshot(snapshot.player);
+    if (!loaded.ok) return loaded;
+    const player = loaded.value;
+    if (isAdaptedInFormation(snapshot.player.primaryPosition, session.formation)) {
+      adaptedCount += 1;
+    }
+    player.endTraining();
+    await players.savePlayer(
+      { player: player.snapshot(), person: snapshot.person },
+      snapshot.player.version,
+    );
+  }
+
+  // Sobe o entrosamento: ganho base + bônus por adaptação (decisão do dono).
+  await cohesion.raiseByFormationTraining(
+    session.gameWorldId,
+    session.clubId,
+    adaptedCohesionBonus(adaptedCount),
+  );
+
+  await sessions.save(
+    { ...session, active: false, version: session.version + 1 },
+    session.version,
+  );
+
+  return succeed({
+    elapsedDays,
+    complete: elapsedDays >= session.durationDays,
+    participantCount: session.participantIds.length,
+    adaptedCount,
+    cohesionBonus: adaptedCohesionBonus(adaptedCount),
+  });
+}
+
 export class CollectGroupTrainingSession {
   public constructor(private readonly uow: GroupTrainingSessionUnitOfWork) {}
 
   public async execute(
     input: CollectGroupTrainingSessionInput,
   ): Promise<Result<CollectGroupTrainingSessionResult, DomainError>> {
-    return this.uow.run(async ({ sessions, players, cohesion }) => {
-      const session = await sessions.findActiveByClub(
+    return this.uow.run(async (repos) => {
+      const session = await repos.sessions.findActiveByClub(
         input.gameWorldId,
         input.clubId,
       );
@@ -84,51 +149,9 @@ export class CollectGroupTrainingSession {
         );
       }
 
-      // Libera cada participante (volta ao elenco, disponível) e conta quantos
-      // treinaram ADAPTADOS na formação — cada um soma bônus ao entrosamento.
-      let adaptedCount = 0;
-      for (const playerId of session.participantIds) {
-        const snapshot = await players.findPlayerById(
-          input.gameWorldId as never,
-          playerId as never,
-        );
-        if (snapshot === null) continue; // sumiu do mundo — segue os outros.
-        const loaded = Player.fromSnapshot(snapshot.player);
-        if (!loaded.ok) return loaded;
-        const player = loaded.value;
-        if (
-          isAdaptedInFormation(
-            snapshot.player.primaryPosition,
-            session.formation,
-          )
-        ) {
-          adaptedCount += 1;
-        }
-        player.endTraining();
-        await players.savePlayer(
-          { player: player.snapshot(), person: snapshot.person },
-          snapshot.player.version,
-        );
-      }
-
-      // Sobe o entrosamento: ganho base + bônus por adaptação (decisão do dono).
-      await cohesion.raiseByFormationTraining(
-        input.gameWorldId,
-        input.clubId,
-        adaptedCohesionBonus(adaptedCount),
-      );
-
-      await sessions.save(
-        { ...session, active: false, version: session.version + 1 },
-        session.version,
-      );
-
-      return succeed({
-        elapsedDays,
-        complete: elapsedDays >= session.durationDays,
-        participantCount: session.participantIds.length,
-        adaptedCount,
-        cohesionBonus: adaptedCohesionBonus(adaptedCount),
+      return settleGroupSession(repos, {
+        session,
+        worldDate: input.worldDate,
       });
     });
   }

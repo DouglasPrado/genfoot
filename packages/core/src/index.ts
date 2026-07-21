@@ -172,6 +172,7 @@ export * from "./training/settle-due-training-sessions.js";
 export * from "./training/group-training-session-types.js";
 export * from "./training/start-group-training-session.js";
 export * from "./training/collect-group-training-session.js";
+export * from "./training/settle-due-group-training-sessions.js";
 export * from "./players/player-development-view.js";
 export * from "./players/age-decline.js";
 export * from "./players/match-form.js";

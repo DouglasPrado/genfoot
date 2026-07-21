@@ -28,6 +28,15 @@ export interface GroupTrainingSessionRepository {
     gameWorldId: string,
     clubId: string,
   ): Promise<GroupTrainingSessionSnapshot | null>;
+  /**
+   * Todas as sessões de grupo ATIVAS do mundo — para o settle na virada do dia
+   * (`SettleDueGroupTrainingSessions`), que encerra as que cumpriram a duração,
+   * sobe o entrosamento e libera os participantes. Sem isto, esquecer de coletar
+   * prendia o grupo até a coleta manual.
+   */
+  findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly GroupTrainingSessionSnapshot[]>;
   save(
     session: GroupTrainingSessionSnapshot,
     expectedVersion: number | null,

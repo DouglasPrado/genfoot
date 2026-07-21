@@ -43,6 +43,7 @@ import {
   StartTrainingSession,
   CollectTrainingSession,
   SettleDueTrainingSessions,
+  SettleDueGroupTrainingSessions,
   TalkToPlayer,
   TalkStance,
   talkStanceFormDelta,
@@ -640,6 +641,21 @@ async function settleDueTraining(
   });
 }
 
+/**
+ * Settle do treino em GRUPO na virada (irmão do individual): encerra as sessões
+ * de grupo que cumpriram a duração — sobe o entrosamento e libera os
+ * participantes — para que esquecer de coletar não prenda o grupo. Idempotente.
+ */
+async function settleDueGroupTraining(
+  deps: Pick<CommandContext, "groupTrainingUnitOfWork">,
+  world: { readonly worldId: string; readonly currentDate: string },
+): Promise<void> {
+  await new SettleDueGroupTrainingSessions(deps.groupTrainingUnitOfWork).execute({
+    gameWorldId: world.worldId,
+    worldDate: world.currentDate,
+  });
+}
+
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
@@ -825,6 +841,7 @@ const handlers: Record<string, CommandHandler> = {
     seasonAgingUnitOfWork,
     seasonLifecycle,
     trainingSessionUnitOfWork,
+    groupTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -893,6 +910,10 @@ const handlers: Record<string, CommandHandler> = {
         currentDate: worldDate,
         rulesetVersion: advanced.value.world.rulesetVersion,
       },
+    );
+    await settleDueGroupTraining(
+      { groupTrainingUnitOfWork },
+      { worldId, currentDate: worldDate },
     );
 
     return succeed({
@@ -1641,6 +1662,7 @@ const handlers: Record<string, CommandHandler> = {
     seasonAgingUnitOfWork,
     seasonLifecycle,
     trainingSessionUnitOfWork,
+    groupTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1680,6 +1702,14 @@ const handlers: Record<string, CommandHandler> = {
           seed: after.value.snapshot.seed,
           currentDate: after.value.snapshot.currentDate,
           rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // E o treino em GRUPO que cumpriu a duração (sobe entrosamento, libera).
+      await settleDueGroupTraining(
+        { groupTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          currentDate: after.value.snapshot.currentDate,
         },
       );
     }

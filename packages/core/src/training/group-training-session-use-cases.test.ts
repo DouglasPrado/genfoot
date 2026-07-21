@@ -17,6 +17,7 @@ import type { PlayerAggregateSnapshot, PlayerRepository } from "../players/playe
 import type { CohesionWriter } from "./train-formation-cohesion.js";
 
 import { CollectGroupTrainingSession } from "./collect-group-training-session.js";
+import { SettleDueGroupTrainingSessions } from "./settle-due-group-training-sessions.js";
 import { StartGroupTrainingSession } from "./start-group-training-session.js";
 import type {
   GroupTrainingSessionRepositories,
@@ -63,7 +64,7 @@ function makeSnapshot(
 }
 
 class MemPlayers implements PlayerRepository {
-  public constructor(private readonly byId: Map<string, PlayerAggregateSnapshot>) {}
+  public constructor(public readonly byId: Map<string, PlayerAggregateSnapshot>) {}
   public findPlayerById(_w: never, id: never): Promise<PlayerAggregateSnapshot | null> {
     return Promise.resolve(this.byId.get(id as unknown as string) ?? null);
   }
@@ -79,6 +80,9 @@ class MemGroupSessions implements GroupTrainingSessionRepository {
   public current: GroupTrainingSessionSnapshot | null = null;
   public findActiveByClub(): Promise<GroupTrainingSessionSnapshot | null> {
     return Promise.resolve(this.current?.active ? this.current : null);
+  }
+  public findAllActive(): Promise<readonly GroupTrainingSessionSnapshot[]> {
+    return Promise.resolve(this.current?.active ? [this.current] : []);
   }
   public save(session: GroupTrainingSessionSnapshot): Promise<void> {
     this.current = session;
@@ -241,5 +245,37 @@ describe("CollectGroupTrainingSession", () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("GROUP_TRAINING_TOO_EARLY");
+  });
+});
+
+describe("SettleDueGroupTrainingSessions — settle do grupo na virada", () => {
+  it("antes da duração NÃO settla; ao completar, settla (coesão sobe, libera, fecha)", async () => {
+    const players = new MemPlayers(new Map([
+      [A, makeSnapshot(A, PlayerAvailability.AVAILABLE)],
+      [B, makeSnapshot(B, PlayerAvailability.AVAILABLE)],
+    ]));
+    const sessions = new MemGroupSessions();
+    const cohesion = new MemCohesion();
+    const uow = uowOf(sessions, players, cohesion);
+    await new StartGroupTrainingSession(uow).execute({
+      gameWorldId: WORLD, clubId: CLUB, formation: "4-4-2", participantIds: [A, B],
+      worldSeed: SEED, worldDate: "2026-03-01",
+    });
+    // Duração é 7 dias — no meio (dia 3) NÃO settla.
+    const meio = await new SettleDueGroupTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldDate: "2026-03-04",
+    });
+    expect(meio.ok).toBe(true);
+    if (meio.ok) expect(meio.value.settledCount).toBe(0);
+    expect(sessions.current?.active).toBe(true);
+    // Ao completar a duração (dia 8), settla sozinho.
+    const fim = await new SettleDueGroupTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldDate: "2026-03-08",
+    });
+    expect(fim.ok).toBe(true);
+    if (fim.ok) expect(fim.value.settledCount).toBe(1);
+    expect(cohesion.raises).toBe(1);
+    expect(sessions.current?.active).toBe(false);
+    expect(players.byId.get(A)?.player.availability).toBe(PlayerAvailability.AVAILABLE);
   });
 });

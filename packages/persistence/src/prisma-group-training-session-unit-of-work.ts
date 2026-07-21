@@ -59,6 +59,15 @@ export class PrismaGroupTrainingSessionRepository
     return toSnapshot(row);
   }
 
+  public async findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly GroupTrainingSessionSnapshot[]> {
+    const rows = await this.tx.groupTrainingSession.findMany({
+      where: { gameWorldId, active: true },
+    });
+    return rows.map(toSnapshot);
+  }
+
   public async save(
     session: GroupTrainingSessionSnapshot,
     expectedVersion: number | null,
