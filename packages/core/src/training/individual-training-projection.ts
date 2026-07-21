@@ -1,5 +1,6 @@
 import { recommendedAttributes } from "../players/position-attributes.js";
 
+import { archetypeAttributes } from "./gk-archetypes.js";
 import type { IndividualTrainingTarget } from "./individual-training-plan-types.js";
 import { perAttributeGain } from "./session-gain.js";
 
@@ -42,7 +43,13 @@ export function projectIndividualPlan(input: {
       : [];
   }
 
-  const weakestFirst = recommendedAttributes(input.target.position)
+  // POSIÇÃO e ARQUÉTIPO DE GOLEIRO: ambos são um CONJUNTO de atributos que o
+  // orçamento espalha (+1 nos mais fracos primeiro).
+  const spreadCodes =
+    input.target.kind === "POSITION"
+      ? recommendedAttributes(input.target.position)
+      : archetypeAttributes(input.target.archetype);
+  const weakestFirst = spreadCodes
     .map((code) => ({ code, value: input.attributeValueOf(code) }))
     .filter((c): c is { code: string; value: number } => c.value !== null && c.value < 100)
     .sort((a, b) => a.value - b.value);

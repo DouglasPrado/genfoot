@@ -12,6 +12,7 @@ import {
 } from "../players/player-attributes.js";
 import { recommendedAttributes } from "../players/position-attributes.js";
 
+import { archetypeAttributes } from "./gk-archetypes.js";
 import {
   MAX_INTENSITY,
   MIN_INTENSITY,
@@ -74,8 +75,9 @@ export class SetIndividualTrainingPlan {
       });
     }
 
-    // O alvo tem que existir de fato: atributo do catálogo, ou posição conhecida
-    // (a que tem habilidades recomendadas). Alvo inválido não vira plano.
+    // O alvo tem que existir de fato: atributo do catálogo, posição conhecida
+    // (com recomendadas), ou arquétipo de goleiro conhecido. Alvo inválido não
+    // vira plano.
     if (input.target.kind === "ATTRIBUTE") {
       if (!KNOWN_ATTRIBUTES.has(input.target.attributeCode)) {
         return fail(
@@ -86,9 +88,15 @@ export class SetIndividualTrainingPlan {
           ),
         );
       }
-    } else if (recommendedAttributes(input.target.position).length === 0) {
-      return invalid("Posição-alvo desconhecida.", {
-        position: input.target.position,
+    } else if (input.target.kind === "POSITION") {
+      if (recommendedAttributes(input.target.position).length === 0) {
+        return invalid("Posição-alvo desconhecida.", {
+          position: input.target.position,
+        });
+      }
+    } else if (archetypeAttributes(input.target.archetype).length === 0) {
+      return invalid("Arquétipo de goleiro desconhecido.", {
+        archetype: input.target.archetype,
       });
     }
 

@@ -7,13 +7,20 @@
  * union do core.
  */
 
-import { attributeLabelPt } from "@grinta/core";
+import { GK_ARCHETYPES, attributeLabelPt } from "@grinta/core";
 
 import { clampIntensity } from "../training-plan/training-plan-model";
 
 export type IndividualTarget =
   | { readonly kind: "ATTRIBUTE"; readonly attributeCode: string }
-  | { readonly kind: "POSITION"; readonly position: string };
+  | { readonly kind: "POSITION"; readonly position: string }
+  | { readonly kind: "GK_ARCHETYPE"; readonly archetype: string };
+
+/** Os arquétipos de goleiro (clássico/líbero/shot-stopper), com rótulo. */
+export const ARCHETYPE_OPTIONS = GK_ARCHETYPES.map((a) => ({
+  archetype: a.archetype,
+  label: a.label,
+}));
 
 /** As 15 posições do domínio (`PlayerPosition`), com rótulo para a tela. */
 export const POSITION_OPTIONS = [
@@ -63,9 +70,13 @@ export function targetAttributeOptions(
 
 /** O trade-off do alvo, em palavras — o que ele concentra ou espalha. */
 export function tradeoffHint(target: IndividualTarget): string {
-  return target.kind === "ATTRIBUTE"
-    ? "Ganho CONCENTRADO: o orçamento diário inteiro vai neste atributo."
-    : "Ganho ESPALHADO: sobe as habilidades recomendadas da posição, as mais fracas primeiro.";
+  if (target.kind === "ATTRIBUTE") {
+    return "Ganho CONCENTRADO: o orçamento diário inteiro vai neste atributo.";
+  }
+  if (target.kind === "GK_ARCHETYPE") {
+    return "Ganho ESPALHADO: sobe os atributos de goleiro do arquétipo, os mais fracos primeiro.";
+  }
+  return "Ganho ESPALHADO: sobe as habilidades recomendadas da posição, as mais fracas primeiro.";
 }
 
 export interface SetIndividualPlanPayload {
@@ -92,6 +103,9 @@ export function buildSetIndividualPlanPayload(input: {
     return { error: "NO_TARGET" };
   }
   if (input.target.kind === "POSITION" && input.target.position === "") {
+    return { error: "NO_TARGET" };
+  }
+  if (input.target.kind === "GK_ARCHETYPE" && input.target.archetype === "") {
     return { error: "NO_TARGET" };
   }
   return {

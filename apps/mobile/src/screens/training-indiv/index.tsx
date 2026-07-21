@@ -5,6 +5,7 @@ import { router } from "expo-router";
 
 import {
   CommandTrackingStatus,
+  archetypeLabel,
   attributeLabelPt,
   projectIndividualPlan,
 } from "@grinta/core";
@@ -36,6 +37,7 @@ import {
   intensityLabel,
 } from "@/screens/training-plan/training-plan-model";
 import {
+  ARCHETYPE_OPTIONS,
   POSITION_OPTIONS,
   buildSetIndividualPlanPayload,
   positionLabel,
@@ -79,9 +81,12 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   const worldId = useRequiredWorldId();
   const toast = useToast();
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
-  const [draftKind, setDraftKind] = useState<"ATTRIBUTE" | "POSITION" | null>(null);
+  const [draftKind, setDraftKind] = useState<
+    "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE" | null
+  >(null);
   const [draftAttribute, setDraftAttribute] = useState<string | null>(null);
   const [draftPosition, setDraftPosition] = useState<string | null>(null);
+  const [draftArchetype, setDraftArchetype] = useState<string | null>(null);
   const [draftIntensity, setDraftIntensity] = useState<number | null>(null);
 
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
@@ -123,8 +128,10 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   }, [rosterQuery.data, youthQuery.data, playerId]);
   const plan = planQuery.data?.plan ?? null;
 
+  const isKeeper = player?.primaryPosition === "GK";
+
   // O alvo/intensidade correntes: rascunho por cima do que está valendo.
-  const kind: "ATTRIBUTE" | "POSITION" =
+  const kind: "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE" =
     draftKind ?? plan?.target.kind ?? "ATTRIBUTE";
   const attributeCode =
     draftAttribute ??
@@ -132,6 +139,9 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   const position =
     draftPosition ??
     (plan?.target.kind === "POSITION" ? plan.target.position : player?.primaryPosition ?? null);
+  const archetype =
+    draftArchetype ??
+    (plan?.target.kind === "GK_ARCHETYPE" ? plan.target.archetype : null);
   const intensity = draftIntensity ?? plan?.intensity ?? 60;
 
   const target: IndividualTarget | null =
@@ -139,9 +149,13 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
       ? attributeCode === null
         ? null
         : { kind: "ATTRIBUTE", attributeCode }
-      : position === null
-        ? null
-        : { kind: "POSITION", position };
+      : kind === "GK_ARCHETYPE"
+        ? archetype === null
+          ? null
+          : { kind: "GK_ARCHETYPE", archetype }
+        : position === null
+          ? null
+          : { kind: "POSITION", position };
 
   const attributeOptions = useMemo(
     () => targetAttributeOptions(player?.attributes ?? {}),
@@ -191,7 +205,9 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
     const sig =
       payload.target.kind === "ATTRIBUTE"
         ? `A:${payload.target.attributeCode}`
-        : `P:${payload.target.position}`;
+        : payload.target.kind === "GK_ARCHETYPE"
+          ? `G:${payload.target.archetype}`
+          : `P:${payload.target.position}`;
     const idempotencyKey = commandIdempotencyKey({
       commandType: "training:set-individual-plan",
       target: playerId,
@@ -223,6 +239,7 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
         setDraftKind(null);
         setDraftAttribute(null);
         setDraftPosition(null);
+        setDraftArchetype(null);
         setDraftIntensity(null);
         planQuery.refetch();
       }
@@ -286,21 +303,29 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
                 ? `${player.name} não tem plano individual. Escolha um alvo.`
                 : plan.target.kind === "ATTRIBUTE"
                   ? `Atual: atributo · intensidade ${intensityLabel(plan.intensity)}`
-                  : `Atual: posição ${positionLabel(plan.target.position)} · ${intensityLabel(plan.intensity)}`}
+                  : plan.target.kind === "GK_ARCHETYPE"
+                    ? `Atual: goleiro ${archetypeLabel(plan.target.archetype)} · ${intensityLabel(plan.intensity)}`
+                    : `Atual: posição ${positionLabel(plan.target.position)} · ${intensityLabel(plan.intensity)}`}
           </Text>
 
           <View style={styles.kindRow}>
-            {(["ATTRIBUTE", "POSITION"] as const).map((k) => (
+            {(
+              [
+                ["ATTRIBUTE", "ATRIBUTO"],
+                ["POSITION", "POSIÇÃO"],
+                ...(isKeeper ? [["GK_ARCHETYPE", "GOLEIRO"] as const] : []),
+              ] as const
+            ).map(([k, label]) => (
               <Pressable
                 key={k}
                 onPress={() => setDraftKind(k)}
                 accessibilityRole="button"
-                accessibilityLabel={k === "ATTRIBUTE" ? "Alvo por atributo" : "Alvo por posição"}
+                accessibilityLabel={`Alvo por ${label.toLowerCase()}`}
                 accessibilityState={{ selected: kind === k }}
                 style={[styles.kindChip, kind === k && styles.kindChipActive]}
               >
                 <Text style={[styles.kindText, kind === k && styles.kindTextActive]}>
-                  {k === "ATTRIBUTE" ? "ATRIBUTO" : "POSIÇÃO"}
+                  {label}
                 </Text>
               </Pressable>
             ))}
@@ -321,6 +346,26 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
                   >
                     <Text style={[styles.chipText, on && styles.chipTextActive]}>
                       {opt.label} {opt.value}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : kind === "GK_ARCHETYPE" ? (
+            <View style={styles.grid}>
+              {ARCHETYPE_OPTIONS.map((opt) => {
+                const on = archetype === opt.archetype;
+                return (
+                  <Pressable
+                    key={opt.archetype}
+                    onPress={() => setDraftArchetype(opt.archetype)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Arquétipo ${opt.label}`}
+                    accessibilityState={{ selected: on }}
+                    style={[styles.chip, on && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                      {opt.label}
                     </Text>
                   </Pressable>
                 );

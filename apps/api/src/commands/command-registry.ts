@@ -583,6 +583,7 @@ const individualTrainingPlanPayload = z.object({
   target: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("ATTRIBUTE"), attributeCode: z.string() }),
     z.object({ kind: z.literal("POSITION"), position: z.string() }),
+    z.object({ kind: z.literal("GK_ARCHETYPE"), archetype: z.string() }),
   ]),
   intensity: z.number().int(),
   expectedVersion: z.number().int().nullable(),

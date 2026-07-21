@@ -34,14 +34,19 @@ interface Row {
   readonly targetKind: string;
   readonly targetAttributeCode: string | null;
   readonly targetPosition: string | null;
+  readonly targetArchetype: string | null;
   readonly intensity: number;
   readonly version: number;
 }
 
 function toTarget(row: Row): IndividualTrainingTarget {
-  return row.targetKind === "POSITION"
-    ? { kind: "POSITION", position: row.targetPosition ?? "" }
-    : { kind: "ATTRIBUTE", attributeCode: row.targetAttributeCode ?? "" };
+  if (row.targetKind === "POSITION") {
+    return { kind: "POSITION", position: row.targetPosition ?? "" };
+  }
+  if (row.targetKind === "GK_ARCHETYPE") {
+    return { kind: "GK_ARCHETYPE", archetype: row.targetArchetype ?? "" };
+  }
+  return { kind: "ATTRIBUTE", attributeCode: row.targetAttributeCode ?? "" };
 }
 
 function toSnapshot(row: Row): IndividualTrainingPlanSnapshot {
@@ -60,10 +65,15 @@ function targetColumns(target: IndividualTrainingTarget): {
   targetKind: string;
   targetAttributeCode: string | null;
   targetPosition: string | null;
+  targetArchetype: string | null;
 } {
-  return target.kind === "POSITION"
-    ? { targetKind: "POSITION", targetAttributeCode: null, targetPosition: target.position }
-    : { targetKind: "ATTRIBUTE", targetAttributeCode: target.attributeCode, targetPosition: null };
+  if (target.kind === "POSITION") {
+    return { targetKind: "POSITION", targetAttributeCode: null, targetPosition: target.position, targetArchetype: null };
+  }
+  if (target.kind === "GK_ARCHETYPE") {
+    return { targetKind: "GK_ARCHETYPE", targetAttributeCode: null, targetPosition: null, targetArchetype: target.archetype };
+  }
+  return { targetKind: "ATTRIBUTE", targetAttributeCode: target.attributeCode, targetPosition: null, targetArchetype: null };
 }
 
 export class PrismaIndividualTrainingPlanRepository

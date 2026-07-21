@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ARCHETYPE_OPTIONS,
   POSITION_OPTIONS,
   buildSetIndividualPlanPayload,
   positionLabel,
@@ -52,6 +53,20 @@ describe("individual-training-model (M-TRAINING-INDIV)", () => {
     });
     if ("error" in p) throw new Error("deveria montar");
     expect(p.target).toEqual({ kind: "POSITION", position: "CB" });
+  });
+
+  it("oferece os 3 arquétipos de goleiro e monta o payload GK_ARCHETYPE", () => {
+    expect(ARCHETYPE_OPTIONS.map((a) => a.archetype).sort()).toEqual([
+      "CLASSIC", "SHOT_STOPPER", "SWEEPER",
+    ]);
+    const p = buildSetIndividualPlanPayload({
+      clubId: "c1", playerId: "gk",
+      target: { kind: "GK_ARCHETYPE", archetype: "SHOT_STOPPER" },
+      intensity: 70, expectedVersion: null,
+    });
+    if ("error" in p) throw new Error("deveria montar");
+    expect(p.target).toEqual({ kind: "GK_ARCHETYPE", archetype: "SHOT_STOPPER" });
+    expect(tradeoffHint(p.target)).toMatch(/ESPALHADO/);
   });
 
   it("sem alvo definido → NO_TARGET (não sai do aparelho)", () => {

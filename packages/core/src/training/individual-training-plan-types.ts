@@ -21,6 +21,8 @@ export const IndividualTrainingTargetKind = {
   ATTRIBUTE: "ATTRIBUTE",
   /** Espalha o ganho nas habilidades recomendadas da posição. */
   POSITION: "POSITION",
+  /** Espalha nos atributos de GOLEIRO de um arquétipo (clássico/líbero/shot-stopper). */
+  GK_ARCHETYPE: "GK_ARCHETYPE",
 } as const;
 
 export type IndividualTrainingTargetKind =
@@ -28,7 +30,8 @@ export type IndividualTrainingTargetKind =
 
 export type IndividualTrainingTarget =
   | { readonly kind: "ATTRIBUTE"; readonly attributeCode: string }
-  | { readonly kind: "POSITION"; readonly position: string };
+  | { readonly kind: "POSITION"; readonly position: string }
+  | { readonly kind: "GK_ARCHETYPE"; readonly archetype: string };
 
 export interface IndividualTrainingPlanSnapshot {
   readonly id: string;

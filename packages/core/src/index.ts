@@ -164,6 +164,7 @@ export * from "./training/development-gain.js";
 export * from "./training/training-types.js";
 export * from "./training/set-training-plan.js";
 export * from "./training/individual-training-plan-types.js";
+export * from "./training/gk-archetypes.js";
 export * from "./training/individual-training-projection.js";
 export * from "./training/set-individual-training-plan.js";
 export * from "./training/settle-due-individual-training-plans.js";
