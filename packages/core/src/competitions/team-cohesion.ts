@@ -23,6 +23,22 @@ export const COHESION_TRANSFER_HIT = 12;
  * bastaria treinar para reentrosar na hora. É o caminho lento. VAL-001.
  */
 export const COHESION_FORMATION_TRAINING_GAIN = 2;
+
+/**
+ * Bônus de coesão por participante ADAPTADO (fora do ofício) no treino em grupo —
+ * decisão do dono (2026-07-21): treinar a formação com gente jogando adaptada
+ * entrosa MAIS (o time aprende a se virar). Some ao ganho base. VAL-001.
+ */
+export const COHESION_ADAPTED_BONUS_PER_PLAYER = 1;
+/** Teto do bônus por sessão, para um time inteiro adaptado não estourar a coesão. */
+export const COHESION_ADAPTED_BONUS_MAX = 3;
+
+/** O bônus total (tetado) para um número de participantes adaptados. */
+export function adaptedCohesionBonus(adaptedCount: number): number {
+  const raw = Math.max(0, adaptedCount) * COHESION_ADAPTED_BONUS_PER_PLAYER;
+  return Math.min(raw, COHESION_ADAPTED_BONUS_MAX);
+}
+
 /** Faixa do modificador na partida (R-15). */
 const COHESION_MOD_MAX = 6;
 

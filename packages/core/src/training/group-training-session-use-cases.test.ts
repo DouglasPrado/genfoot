@@ -32,6 +32,7 @@ const SEED = "seed-grp";
 function makeSnapshot(
   id: string,
   availability: PlayerAvailability,
+  position: PlayerPosition = PlayerPosition.CB,
 ): PlayerAggregateSnapshot {
   const attrs: Record<string, number | null> = {};
   for (const c of [...TECHNICAL_ATTRIBUTES, ...PHYSICAL_ATTRIBUTES, ...MENTAL_ATTRIBUTES]) attrs[c] = 50;
@@ -40,7 +41,7 @@ function makeSnapshot(
     id,
     gameWorldId: WORLD,
     personId: `${id}-p`,
-    primaryPosition: PlayerPosition.CB,
+    primaryPosition: position,
     dominantFoot: DominantFoot.RIGHT,
     careerStatus: PlayerCareerStatus.ACTIVE,
     availability,
@@ -87,8 +88,14 @@ class MemGroupSessions implements GroupTrainingSessionRepository {
 
 class MemCohesion implements CohesionWriter {
   public raises = 0;
-  public raiseByFormationTraining(): Promise<void> {
+  public lastBonus = 0;
+  public raiseByFormationTraining(
+    _w: string,
+    _c: string,
+    bonusPoints = 0,
+  ): Promise<void> {
     this.raises += 1;
+    this.lastBonus = bonusPoints;
     return Promise.resolve();
   }
 }
@@ -182,7 +189,35 @@ describe("CollectGroupTrainingSession", () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.participantCount).toBe(2);
     expect(cohesion.raises).toBe(1);
+    // Dois zagueiros num 4-4-2 jogam no ofício → sem bônus de adaptação.
+    if (r.ok) expect(r.value.adaptedCount).toBe(0);
+    expect(cohesion.lastBonus).toBe(0);
     expect(sessions.current?.active).toBe(false);
+  });
+
+  it("participante ADAPTADO na formação soma BÔNUS de coesão (decisão do dono)", async () => {
+    // No 4-4-2 (GK,RB,CB,CB,LB,RM,CM,CM,LM,ST,ST) um CAM não tem slot exato, mas
+    // é meio-campo (mesma linha) → adaptado. Um CB é ofício (há slot CB).
+    const players = new MemPlayers(new Map([
+      [A, makeSnapshot(A, PlayerAvailability.AVAILABLE, PlayerPosition.CAM)],
+      [B, makeSnapshot(B, PlayerAvailability.AVAILABLE, PlayerPosition.CB)],
+    ]));
+    const sessions = new MemGroupSessions();
+    const cohesion = new MemCohesion();
+    const uow = uowOf(sessions, players, cohesion);
+    await new StartGroupTrainingSession(uow).execute({
+      gameWorldId: WORLD, clubId: CLUB, formation: "4-4-2", participantIds: [A, B],
+      worldSeed: SEED, worldDate: "2026-03-01",
+    });
+    const r = await new CollectGroupTrainingSession(uow).execute({
+      gameWorldId: WORLD, clubId: CLUB, worldDate: "2026-03-05",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.adaptedCount).toBe(1); // só o CAM
+      expect(r.value.cohesionBonus).toBe(1); // 1 adaptado × +1
+    }
+    expect(cohesion.lastBonus).toBe(1);
   });
 
   it("RECUSA coletar sem sessão ativa", async () => {

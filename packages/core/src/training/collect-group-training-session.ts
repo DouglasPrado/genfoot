@@ -1,9 +1,32 @@
 import { DomainError, fail, succeed, type Result } from "@grinta/shared";
 
+import { adaptedCohesionBonus } from "../competitions/team-cohesion.js";
+import type { PlayerPosition } from "../genesis/genesis-types.js";
 import { Player } from "../players/player.js";
+import { fillQuality, formationSlots } from "../tactics/formation.js";
 
 import { sessionElapsedDays } from "./training-session.js";
 import type { GroupTrainingSessionUnitOfWork } from "./group-training-session-types.js";
+
+/**
+ * O jogador está ADAPTADO (fora do ofício) na formação? Melhor encaixe entre os
+ * slots é da mesma linha ou vizinha (fillQuality ≥ 0.5), nunca exato. Formação
+ * que o core não cataloga → não conta (não inventa bônus). Mesma régua da tela
+ * (`formation-fit.ts` no mobile), sobre o modelo canônico do domínio.
+ */
+function isAdaptedInFormation(
+  primaryPosition: PlayerPosition,
+  formation: string,
+): boolean {
+  const slots = formationSlots(formation);
+  if (slots === null) return false;
+  let best = 0;
+  for (const slot of slots) {
+    const q = fillQuality(primaryPosition, slot);
+    if (q > best) best = q;
+  }
+  return best >= 0.5 && best < 1;
+}
 
 /**
  * Coleta a sessão de treino em GRUPO: sobe o entrosamento do time e libera os
@@ -23,6 +46,10 @@ export interface CollectGroupTrainingSessionResult {
   readonly elapsedDays: number;
   readonly complete: boolean;
   readonly participantCount: number;
+  /** Quantos treinaram fora do ofício (adaptados). */
+  readonly adaptedCount: number;
+  /** Bônus de coesão que a adaptação somou ao ganho base. */
+  readonly cohesionBonus: number;
 }
 
 export class CollectGroupTrainingSession {
@@ -57,7 +84,9 @@ export class CollectGroupTrainingSession {
         );
       }
 
-      // Libera cada participante (volta ao elenco, disponível).
+      // Libera cada participante (volta ao elenco, disponível) e conta quantos
+      // treinaram ADAPTADOS na formação — cada um soma bônus ao entrosamento.
+      let adaptedCount = 0;
       for (const playerId of session.participantIds) {
         const snapshot = await players.findPlayerById(
           input.gameWorldId as never,
@@ -67,6 +96,14 @@ export class CollectGroupTrainingSession {
         const loaded = Player.fromSnapshot(snapshot.player);
         if (!loaded.ok) return loaded;
         const player = loaded.value;
+        if (
+          isAdaptedInFormation(
+            snapshot.player.primaryPosition,
+            session.formation,
+          )
+        ) {
+          adaptedCount += 1;
+        }
         player.endTraining();
         await players.savePlayer(
           { player: player.snapshot(), person: snapshot.person },
@@ -74,8 +111,12 @@ export class CollectGroupTrainingSession {
         );
       }
 
-      // Sobe o entrosamento do time (mesma escrita do train-formation).
-      await cohesion.raiseByFormationTraining(input.gameWorldId, input.clubId);
+      // Sobe o entrosamento: ganho base + bônus por adaptação (decisão do dono).
+      await cohesion.raiseByFormationTraining(
+        input.gameWorldId,
+        input.clubId,
+        adaptedCohesionBonus(adaptedCount),
+      );
 
       await sessions.save(
         { ...session, active: false, version: session.version + 1 },
@@ -86,6 +127,8 @@ export class CollectGroupTrainingSession {
         elapsedDays,
         complete: elapsedDays >= session.durationDays,
         participantCount: session.participantIds.length,
+        adaptedCount,
+        cohesionBonus: adaptedCohesionBonus(adaptedCount),
       });
     });
   }

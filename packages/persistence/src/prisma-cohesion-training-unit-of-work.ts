@@ -58,10 +58,12 @@ class PrismaCohesionWriter implements CohesionWriter {
   public async raiseByFormationTraining(
     gameWorldId: string,
     clubId: string,
+    bonusPoints = 0,
   ): Promise<void> {
     // Simétrico ao applyTransferHit, com sinal trocado e teto 100 (LEAST).
+    const gain = COHESION_FORMATION_TRAINING_GAIN + Math.max(0, bonusPoints);
     await this.tx.$executeRaw`
-      UPDATE "Club" SET "cohesion" = LEAST(100, "cohesion" + ${COHESION_FORMATION_TRAINING_GAIN})
+      UPDATE "Club" SET "cohesion" = LEAST(100, "cohesion" + ${gain})
       WHERE "gameWorldId" = ${gameWorldId}::uuid AND id = ${clubId}::uuid
     `;
   }
