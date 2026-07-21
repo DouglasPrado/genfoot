@@ -8,9 +8,10 @@ import { Player } from "../players/player.js";
 import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 
 import { INDIVIDUAL_SESSION_DURATION_DAYS } from "./training-session.js";
-import type {
-  TrainingSessionSnapshot,
-  TrainingSessionUnitOfWork,
+import {
+  MAX_SESSION_ATTRIBUTES,
+  type TrainingSessionSnapshot,
+  type TrainingSessionUnitOfWork,
 } from "./training-session-types.js";
 
 /**
@@ -24,7 +25,8 @@ export interface StartTrainingSessionInput {
   readonly gameWorldId: string;
   readonly clubId: string;
   readonly playerId: string;
-  readonly attributeCode: string;
+  /** 1..5 atributos-foco (o ganho é dividido entre eles). */
+  readonly attributeCodes: readonly string[];
   readonly worldSeed: string;
   readonly worldDate: string;
 }
@@ -65,12 +67,29 @@ export class StartTrainingSession {
       if (!loaded.ok) return loaded;
       const player = loaded.value;
 
-      if (player.attributeValue(input.attributeCode as PlayerAttributeCode) === null) {
+      // 1..5 habilidades distintas, todas aplicáveis à posição.
+      const attributeCodes = [...new Set(input.attributeCodes)];
+      if (
+        attributeCodes.length === 0 ||
+        attributeCodes.length > MAX_SESSION_ATTRIBUTES
+      ) {
+        return fail(
+          new DomainError(
+            "TRAINING_ATTRIBUTES_INVALID",
+            `Escolha de 1 a ${MAX_SESSION_ATTRIBUTES} habilidades para treinar.`,
+            { playerId: input.playerId, count: attributeCodes.length },
+          ),
+        );
+      }
+      const notApplicable = attributeCodes.find(
+        (code) => player.attributeValue(code as PlayerAttributeCode) === null,
+      );
+      if (notApplicable !== undefined) {
         return fail(
           new DomainError(
             "ATTRIBUTE_NOT_APPLICABLE",
-            "Esse atributo não se aplica à posição do jogador.",
-            { playerId: input.playerId, attributeCode: input.attributeCode },
+            "Uma das habilidades não se aplica à posição do jogador.",
+            { playerId: input.playerId, attributeCode: notApplicable },
           ),
         );
       }
@@ -94,7 +113,7 @@ export class StartTrainingSession {
         gameWorldId: input.gameWorldId,
         clubId: input.clubId,
         playerId: input.playerId,
-        attributeCode: input.attributeCode,
+        attributeCodes,
         startDate: input.worldDate,
         durationDays: INDIVIDUAL_SESSION_DURATION_DAYS,
         active: true,

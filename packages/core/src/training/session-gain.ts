@@ -43,12 +43,15 @@ export interface SessionGainInput {
   readonly durationDays: number;
 }
 
+/** O que a sessão rende NO NÍVEL DO JOGADOR, antes do teto por atributo. */
+export type SessionRawGainInput = Omit<SessionGainInput, "attributeCurrentValue">;
+
 /**
- * Os pontos que a coleta desta sessão renderia AGORA (dado o tempo já treinado),
- * já com o clamp de +6 por coleta e o teto de 100. Não aplica nada — só projeta.
+ * O ganho BRUTO da sessão (pontos), já com o clamp de +6 por coleta, mas ANTES
+ * do teto de 100 por atributo e ANTES de dividir entre habilidades. É o "total"
+ * que a coleta rende; quem escolhe treinar N habilidades divide isto por N.
  */
-export function projectSessionGainPoints(input: SessionGainInput): number {
-  if (input.attributeCurrentValue === null) return 0;
+export function sessionRawGainPoints(input: SessionRawGainInput): number {
   const remainingPotential = clamp01(
     (input.usableCeiling - input.currentAbility) / SESSION_MAX_HEADROOM,
   );
@@ -72,8 +75,36 @@ export function projectSessionGainPoints(input: SessionGainInput): number {
       durationDays: input.durationDays,
     }) * SESSION_INTENSITY;
   const raw = Math.round(gainMilli / GAIN_SCALE);
-  // Clamp por coleta (+6) e teto do atributo (100).
-  const capped = Math.min(raw, SESSION_MAX_GAIN_PER_COLLECT);
+  return Math.min(raw, SESSION_MAX_GAIN_PER_COLLECT);
+}
+
+/**
+ * O ganho de UM atributo: o bruto DIVIDIDO pelo número de habilidades treinadas
+ * (arredondando PARA BAIXO — decisão do dono), tetado no teto de 100 do atributo.
+ * Treinar 1 habilidade rende tudo; treinar 5 divide por 5 (e o resto se perde).
+ */
+export function perAttributeGain(input: {
+  readonly rawGain: number;
+  readonly attributeCount: number;
+  readonly attributeCurrentValue: number | null;
+}): number {
+  if (input.attributeCurrentValue === null || input.attributeCount <= 0) {
+    return 0;
+  }
+  const split = Math.floor(input.rawGain / input.attributeCount);
   const headroomToCeiling = Math.max(0, 100 - input.attributeCurrentValue);
-  return Math.max(0, Math.min(capped, headroomToCeiling));
+  return Math.max(0, Math.min(split, headroomToCeiling));
+}
+
+/**
+ * Os pontos que a coleta renderia AGORA para UM atributo treinado sozinho —
+ * compatibilidade e projeção da tela (N=1). Multi-habilidade usa
+ * `sessionRawGainPoints` + `perAttributeGain`.
+ */
+export function projectSessionGainPoints(input: SessionGainInput): number {
+  return perAttributeGain({
+    rawGain: sessionRawGainPoints(input),
+    attributeCount: 1,
+    attributeCurrentValue: input.attributeCurrentValue,
+  });
 }

@@ -507,7 +507,8 @@ const talkToSquadPayload = z.object({
 const startSessionPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
-  attributeCode: z.string(),
+  // 1..5 habilidades; o domínio valida o limite e a aplicabilidade.
+  attributeCodes: z.array(z.string()).min(1).max(5),
 });
 
 const collectSessionPayload = z.object({
@@ -672,9 +673,7 @@ async function settleDueTraining(
     if (tokens.length === 0) continue;
     const text = buildTrainingReportMessage({
       playerName: report.playerName,
-      attributeCode: report.attributeCode,
-      before: report.before,
-      after: report.after,
+      changes: report.changes,
     });
     for (const to of tokens) {
       messages.push({ to, title: text.title, body: text.body });
@@ -1171,7 +1170,7 @@ const handlers: Record<string, CommandHandler> = {
       gameWorldId: world.value.worldId,
       clubId: parsed.data.clubId,
       playerId: parsed.data.playerId,
-      attributeCode: parsed.data.attributeCode,
+      attributeCodes: parsed.data.attributeCodes,
       worldSeed: world.value.snapshot.seed,
       worldDate: world.value.snapshot.currentDate,
     });

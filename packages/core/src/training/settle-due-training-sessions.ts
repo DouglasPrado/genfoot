@@ -67,9 +67,7 @@ export class SettleDueTrainingSessions {
               clubId: result.value.clubId,
               playerId: result.value.playerId,
               playerName: result.value.playerName,
-              attributeCode: result.value.attributeCode,
-              before: result.value.before,
-              after: result.value.after,
+              changes: result.value.changes,
               worldDate: input.worldDate,
             }),
           );

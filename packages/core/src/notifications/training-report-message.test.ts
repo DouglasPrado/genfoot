@@ -3,34 +3,42 @@ import { describe, expect, it } from "vitest";
 import { buildTrainingReportMessage } from "./training-report-message.js";
 
 describe("buildTrainingReportMessage", () => {
-  it("monta título + corpo com o ganho (de → para)", () => {
+  it("uma habilidade: título + corpo com de→para", () => {
     const m = buildTrainingReportMessage({
       playerName: "Kauã Martins",
-      attributeCode: "shortPassing",
-      before: 32,
-      after: 38,
+      changes: [{ attributeCode: "shortPassing", before: 32, after: 38 }],
     });
     expect(m.title).toBe("Kauã Martins completou o treino");
-    expect(m.body).toBe("Passe curto 32 → 38 (+6)");
+    expect(m.body).toBe("Passe curto 32→38");
   });
 
-  it("sem ganho (teto), o corpo diz que não rendeu", () => {
+  it("várias habilidades: lista as que subiram, separadas por ·", () => {
     const m = buildTrainingReportMessage({
       playerName: "Fulano",
-      attributeCode: "pace",
-      before: 80,
-      after: 80,
+      changes: [
+        { attributeCode: "finishing", before: 30, after: 31 },
+        { attributeCode: "shortPassing", before: 40, after: 41 },
+      ],
     });
-    expect(m.body).toBe("Velocidade 80 — sem ganho neste treino");
+    expect(m.body).toBe("Finalização 30→31 · Passe curto 40→41");
   });
 
-  it("atributo desconhecido cai no próprio código (não quebra)", () => {
+  it("ignora habilidades sem ganho (after == before)", () => {
     const m = buildTrainingReportMessage({
       playerName: "X",
-      attributeCode: "xyz",
-      before: 1,
-      after: 2,
+      changes: [
+        { attributeCode: "pace", before: 80, after: 80 },
+        { attributeCode: "finishing", before: 30, after: 32 },
+      ],
     });
-    expect(m.body).toBe("xyz 1 → 2 (+1)");
+    expect(m.body).toBe("Finalização 30→32");
+  });
+
+  it("nenhuma subiu → diz que não rendeu", () => {
+    const m = buildTrainingReportMessage({
+      playerName: "X",
+      changes: [{ attributeCode: "pace", before: 100, after: 100 }],
+    });
+    expect(m.body).toBe("sem ganho neste treino");
   });
 });

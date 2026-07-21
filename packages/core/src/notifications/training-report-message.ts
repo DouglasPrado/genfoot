@@ -16,11 +16,16 @@ import {
   type NotificationItemSnapshot,
 } from "./notification-types.js";
 
-export interface TrainingReportMessageInput {
-  readonly playerName: string;
+/** O que uma habilidade rendeu, para o texto do aviso. */
+export interface TrainingChangeText {
   readonly attributeCode: string;
   readonly before: number;
   readonly after: number;
+}
+
+export interface TrainingReportMessageInput {
+  readonly playerName: string;
+  readonly changes: readonly TrainingChangeText[];
 }
 
 export interface PushMessageText {
@@ -29,18 +34,22 @@ export interface PushMessageText {
 }
 
 /**
- * "Kauã Martins completou o treino" / "Passe curto 32 → 38 (+6)". Quando não
- * houve ganho (teto/sem headroom), o corpo diz isso em vez de "→ igual".
+ * "Kauã Martins completou o treino" / "Finalização 30→31 · Passe curto 40→41".
+ * Lista as habilidades que subiram (before→after); se nenhuma subiu (teto/sem
+ * headroom), diz que não rendeu.
  */
 export function buildTrainingReportMessage(
   input: TrainingReportMessageInput,
 ): PushMessageText {
-  const label = attributeLabelPt(input.attributeCode);
-  const delta = input.after - input.before;
+  const gained = input.changes.filter((c) => c.after > c.before);
   const body =
-    delta > 0
-      ? `${label} ${input.before} → ${input.after} (+${delta})`
-      : `${label} ${input.before} — sem ganho neste treino`;
+    gained.length > 0
+      ? gained
+          .map(
+            (c) => `${attributeLabelPt(c.attributeCode)} ${c.before}→${c.after}`,
+          )
+          .join(" · ")
+      : "sem ganho neste treino";
   return {
     title: `${input.playerName} completou o treino`,
     body,
@@ -53,9 +62,7 @@ export interface TrainingReportNotificationInput {
   readonly clubId: string;
   readonly playerId: string;
   readonly playerName: string;
-  readonly attributeCode: string;
-  readonly before: number;
-  readonly after: number;
+  readonly changes: readonly TrainingChangeText[];
   readonly worldDate: string;
 }
 

@@ -1761,15 +1761,15 @@ model ClubLineupStarter {
 /// jogador fica indisponível; ao coletar, o ganho aplica na hora e a sessão
 /// encerra. Uma ativa por jogador (garantido no caso de uso).
 model TrainingSession {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  gameWorldId   String   @db.Uuid
-  clubId        String   @db.Uuid
-  playerId      String   @db.Uuid
-  attributeCode String
-  startDate     DateTime
-  durationDays  Int
-  active        Boolean  @default(true)
-  version       Int      @default(1)
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  playerId       String   @db.Uuid
+  attributeCodes String[] // 1..5 habilidades; o ganho é dividido entre elas
+  startDate      DateTime
+  durationDays   Int
+  active         Boolean  @default(true)
+  version        Int      @default(1)
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 

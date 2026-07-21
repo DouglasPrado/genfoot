@@ -8,13 +8,19 @@ import type { PlayerRepository } from "../players/player-repository.js";
  * coletar, o ganho é aplicado NA HORA e a sessão encerra. Persistente e
  * determinística (id por mundo/jogador/início).
  */
+/** Quantas habilidades uma sessão pode treinar de uma vez (decisão do dono). */
+export const MAX_SESSION_ATTRIBUTES = 5;
+
 export interface TrainingSessionSnapshot {
   readonly id: string;
   readonly gameWorldId: string;
   readonly clubId: string;
   readonly playerId: string;
-  /** O atributo-foco que a sessão desenvolve. */
-  readonly attributeCode: string;
+  /**
+   * Os atributos-foco (1..5) que a sessão desenvolve. O ganho da coleta é
+   * dividido entre eles (arredondando pra baixo).
+   */
+  readonly attributeCodes: readonly string[];
   /** Início em data lógica do mundo. */
   readonly startDate: string;
   readonly durationDays: number;
