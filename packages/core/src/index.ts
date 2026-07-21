@@ -155,6 +155,7 @@ export * from "./automation/automation-rule.js";
 export * from "./automation/set-offline-plan.js";
 export * from "./automation/save-automation.js";
 export * from "./automation/run-autopilot.js";
+export * from "./automation/ai-club-training.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";
 

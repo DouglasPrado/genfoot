@@ -76,7 +76,9 @@ import {
   SetClubLineup,
   type PlayerRepository,
   type PushTokenRepository,
+  type AiTrainingUnitOfWork,
   RegisterPushToken,
+  RunAiClubsTraining,
   buildTrainingReportMessage,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
@@ -174,6 +176,8 @@ export interface CommandContext {
   readonly playerRepository: PlayerRepository;
   /** Push remoto (Expo) — registro do token do device por conta. */
   readonly pushTokenRepository: PushTokenRepository;
+  /** Treino dos clubes de IA na virada (balanceamento). */
+  readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -697,6 +701,32 @@ async function settleDueGroupTraining(
   });
 }
 
+/**
+ * Treino dos clubes de IA na virada (balanceamento): desenvolve os jogadores e
+ * sobe o entrosamento dos clubes SEM técnico humano, para não ficarem parados
+ * enquanto o do jogador evolui. Best-effort: uma falha não derruba a virada.
+ */
+async function runAiTraining(
+  deps: Pick<CommandContext, "aiTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new RunAiClubsTraining(deps.aiTrainingUnitOfWork).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[ai-training] falha no treino dos clubes de IA: ${String(err)}`);
+  }
+}
+
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
@@ -884,6 +914,7 @@ const handlers: Record<string, CommandHandler> = {
     trainingSessionUnitOfWork,
     groupTrainingUnitOfWork,
     pushTokenRepository,
+    aiTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -956,6 +987,15 @@ const handlers: Record<string, CommandHandler> = {
     await settleDueGroupTraining(
       { groupTrainingUnitOfWork },
       { worldId, currentDate: worldDate },
+    );
+    await runAiTraining(
+      { aiTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
     );
 
     return succeed({
@@ -1732,6 +1772,7 @@ const handlers: Record<string, CommandHandler> = {
     trainingSessionUnitOfWork,
     groupTrainingUnitOfWork,
     pushTokenRepository,
+    aiTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1780,6 +1821,16 @@ const handlers: Record<string, CommandHandler> = {
         {
           worldId: after.value.worldId,
           currentDate: after.value.snapshot.currentDate,
+        },
+      );
+      // Clubes de IA treinam também (balanceamento).
+      await runAiTraining(
+        { aiTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
         },
       );
     }

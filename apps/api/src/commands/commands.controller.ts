@@ -43,6 +43,7 @@ import type {
   LineupContextReader,
   PlayerRepository,
   PushTokenRepository,
+  AiTrainingUnitOfWork,
   AutomationUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -84,6 +85,7 @@ import {
   LINEUP_CONTEXT_READER,
   PLAYER_REPOSITORY,
   PUSH_TOKEN_REPOSITORY,
+  AI_TRAINING_UNIT_OF_WORK,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
@@ -165,6 +167,8 @@ export class CommandsController {
     private readonly playerRepository: PlayerRepository,
     @Inject(PUSH_TOKEN_REPOSITORY)
     private readonly pushTokenRepository: PushTokenRepository,
+    @Inject(AI_TRAINING_UNIT_OF_WORK)
+    private readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork,
     @Inject(AUTOMATION_UNIT_OF_WORK)
     private readonly automationUnitOfWork: AutomationUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
@@ -332,6 +336,7 @@ export class CommandsController {
         lineupContextReader: this.lineupContextReader,
         playerRepository: this.playerRepository,
         pushTokenRepository: this.pushTokenRepository,
+        aiTrainingUnitOfWork: this.aiTrainingUnitOfWork,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,
