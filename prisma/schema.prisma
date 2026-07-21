@@ -1744,6 +1744,22 @@ model IndividualTrainingPlan {
   @@index([gameWorldId])
 }
 
+/// Vínculo de MENTORIA (M-MENTORING): um mentor (veterano/líder) acelera o
+/// desenvolvimento de um pupilo. Um mentor por pupilo. Sem FK relacional por
+/// ora (cascade é follow-up) — o banco de dev é descartável.
+model Mentorship {
+  id          String @id @default(uuid(7)) @db.Uuid
+  gameWorldId String @db.Uuid
+  clubId      String @db.Uuid
+  menteeId    String @db.Uuid
+  mentorId    String @db.Uuid
+  version     Int    @default(1)
+
+  @@unique([gameWorldId, menteeId]) // um mentor por pupilo
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId])
+}
+
 /// Escalação CORRENTE do clube (R-220 Fase 1): formação + 11 titulares nos slots
 /// + banco. Per (mundo, clube); a partida lê ISTO para saber quem entra em campo,
 /// com fallback à média do elenco quando não há escalação. Não confundir com o

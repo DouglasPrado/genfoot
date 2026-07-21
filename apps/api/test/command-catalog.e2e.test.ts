@@ -111,6 +111,9 @@ describe.skipIf(!hasDatabase)(
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // M-MENTORING: vincular/desvincular mentor (evolução acelerada).
+      "mentoring:link-mentor",
+      "mentoring:unlink-mentor",
       // R-221 Fase 2c: a decisão (elogiar/criticar) move a forma.
       "morale:talk-to-player",
       "morale:talk-to-squad",
@@ -164,7 +167,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(51);
+    expect(response.body.commandCount).toBe(53);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -200,6 +203,8 @@ describe.skipIf(!hasDatabase)(
       "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
+      // O mentor atual de um pupilo (M-MENTORING).
+      "mentorship",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
       "narrative",
       // O desenvolvimento do jogador (M-PLAYER-DEV, R-216): ganho/base por atributo.

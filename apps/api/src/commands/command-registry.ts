@@ -82,6 +82,11 @@ import {
   type IndividualTrainingTarget,
   SetIndividualTrainingPlan,
   SettleDueIndividualTrainingPlans,
+  type MentorshipRepository,
+  type MentorshipUnitOfWork,
+  LinkMentor,
+  UnlinkMentor,
+  SettleDueMentorships,
   RegisterPushToken,
   RunAiClubsTraining,
   buildTrainingReportMessage,
@@ -185,6 +190,8 @@ export interface CommandContext {
   readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
   readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
   readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
+  readonly mentorshipRepository: MentorshipRepository;
+  readonly mentorshipUnitOfWork: MentorshipUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -581,6 +588,18 @@ const individualTrainingPlanPayload = z.object({
   expectedVersion: z.number().int().nullable(),
 });
 
+const linkMentorPayload = z.object({
+  clubId: z.string().uuid(),
+  menteeId: z.string().uuid(),
+  mentorId: z.string().uuid(),
+  expectedVersion: z.number().int().nullable(),
+});
+
+const unlinkMentorPayload = z.object({
+  clubId: z.string().uuid(),
+  menteeId: z.string().uuid(),
+});
+
 const worldIdentityPayload = z.object({
   name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -769,6 +788,31 @@ async function settleIndividualTraining(
     });
   } catch (err) {
     console.warn(`[individual-training] falha no settle individual: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle da MENTORIA na virada: evolução acelerada dos pupilos. Best-effort:
+ * uma falha não derruba a virada.
+ */
+async function settleMentorships(
+  deps: Pick<CommandContext, "mentorshipUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueMentorships(deps.mentorshipUnitOfWork).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[mentorship] falha no settle de mentoria: ${String(err)}`);
   }
 }
 
@@ -961,6 +1005,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    mentorshipUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1045,6 +1090,15 @@ const handlers: Record<string, CommandHandler> = {
     );
     await settleIndividualTraining(
       { individualTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleMentorships(
+      { mentorshipUnitOfWork },
       {
         worldId,
         seed: worldSeed,
@@ -1167,6 +1221,52 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({
       resource: `individual-training-plan:${result.value.plan.id}`,
     });
+  },
+
+  /** Mentoria — vincula um mentor a um pupilo (M-MENTORING). */
+  "mentoring:link-mentor": async ({
+    worlds,
+    mentorshipRepository,
+    trainingContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = linkMentorPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new LinkMentor(
+      mentorshipRepository,
+      trainingContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      menteeId: parsed.data.menteeId,
+      mentorId: parsed.data.mentorId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `mentorship:${result.value.link.id}` });
+  },
+
+  /** Mentoria — desvincula o mentor de um pupilo. */
+  "mentoring:unlink-mentor": async ({
+    worlds,
+    mentorshipRepository,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = unlinkMentorPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new UnlinkMentor(mentorshipRepository).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      menteeId: parsed.data.menteeId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `mentorship:${parsed.data.menteeId}` });
   },
 
   /**
@@ -1859,6 +1959,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    mentorshipUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1922,6 +2023,16 @@ const handlers: Record<string, CommandHandler> = {
       // Planos individuais aplicados na virada.
       await settleIndividualTraining(
         { individualTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Mentoria: evolução acelerada dos pupilos.
+      await settleMentorships(
+        { mentorshipUnitOfWork },
         {
           worldId: after.value.worldId,
           seed: after.value.snapshot.seed,

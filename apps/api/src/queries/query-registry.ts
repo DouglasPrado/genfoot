@@ -14,6 +14,7 @@ import type {
   InboxReadModel,
   TrainingPlanRepository,
   IndividualTrainingPlanRepository,
+  MentorshipRepository,
   LineupRepository,
 } from "@grinta/core";
 import type {
@@ -57,6 +58,7 @@ export interface QueryContext {
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
   readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
+  readonly mentorshipRepository: MentorshipRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
@@ -180,6 +182,25 @@ const handlers: Record<string, QueryHandler> = {
       individualTrainingPlanRepository.dailyBudget(worldId, playerId),
     ]);
     return succeed({ plan, budget });
+  },
+  /** O mentor atual de um pupilo (M-MENTORING). `mentorId: null` = sem mentor. */
+  "mentorship": async ({ mentorshipRepository }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    const menteeId = typeof params.menteeId === "string" ? params.menteeId : null;
+    if (clubId === null || menteeId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "mentorship exige clubId e menteeId.",
+          { params: ["clubId", "menteeId"] },
+        ),
+      );
+    }
+    const link = await mentorshipRepository.findByMentee(worldId, clubId, menteeId);
+    return succeed({
+      mentorId: link?.mentorId ?? null,
+      version: link?.version ?? null,
+    });
   },
   "training-sessions": async ({ trainingSessionsReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;

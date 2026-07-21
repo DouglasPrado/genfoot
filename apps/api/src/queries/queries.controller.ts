@@ -19,6 +19,7 @@ import type {
   WorldClockRepository,
   TrainingPlanRepository,
   IndividualTrainingPlanRepository,
+  MentorshipRepository,
   LineupRepository,
   SquadReadModel,
   WorldReadModel,
@@ -56,6 +57,7 @@ import {
   WORLD_CLOCK_REPOSITORY,
   TRAINING_PLAN_REPOSITORY,
   INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+  MENTORSHIP_REPOSITORY,
   CLUB_LINEUP_REPOSITORY,
   PLAYER_DEVELOPMENT_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
@@ -118,6 +120,8 @@ export class QueriesController {
     private readonly trainingPlanRepository: TrainingPlanRepository,
     @Inject(INDIVIDUAL_TRAINING_PLAN_REPOSITORY)
     private readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository,
+    @Inject(MENTORSHIP_REPOSITORY)
+    private readonly mentorshipRepository: MentorshipRepository,
     @Inject(CLUB_LINEUP_REPOSITORY)
     private readonly clubLineupRepository: LineupRepository,
     @Inject(PLAYER_DEVELOPMENT_READ_MODEL)
@@ -328,6 +332,7 @@ export class QueriesController {
         worldClock: this.worldClock,
         trainingPlanRepository: this.trainingPlanRepository,
         individualTrainingPlanRepository: this.individualTrainingPlanRepository,
+        mentorshipRepository: this.mentorshipRepository,
         clubLineupRepository: this.clubLineupRepository,
         playerDevelopmentReadModel: this.playerDevelopmentReadModel,
         trainingSessionsReadModel: this.trainingSessionsReadModel,
