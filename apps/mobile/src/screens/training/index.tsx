@@ -77,6 +77,7 @@ import {
   sessionCountdown,
 } from "@/screens/training-session/session-countdown";
 import {
+  MAX_SESSION_ATTRIBUTES,
   buildStartSessionPayload,
   buildTrainingRows,
   summarizeTraining,
@@ -106,17 +107,22 @@ interface RosterProjection {
   readonly players: readonly RosterPlayer[];
 }
 
+interface AttrProjection {
+  readonly attributeCode: string;
+  readonly currentValue: number | null;
+  readonly projectedGainPoints: number;
+  readonly projectedValue: number | null;
+}
+
 interface ActiveSession {
   readonly id: string;
   readonly playerId: string;
-  readonly attributeCode: string;
+  readonly attributeCodes: readonly string[];
   readonly startDate: string;
   readonly durationDays: number;
   readonly elapsedDays: number;
-  /** Projeção do ganho (R-221): o servidor computa com a fórmula da coleta. */
-  readonly attributeCurrentValue: number | null;
-  readonly projectedGainPoints: number;
-  readonly projectedValue: number | null;
+  /** Projeção por habilidade (R-221): o servidor computa com a fórmula da coleta. */
+  readonly projections: readonly AttrProjection[];
 }
 
 interface TrainingSessionsProjection {
@@ -170,6 +176,8 @@ export function Training() {
   const worldId = useRequiredWorldId();
   const toast = useToast();
   const [picking, setPicking] = useState<TrainingRow | null>(null);
+  // Habilidades escolhidas no modal de foco (até 5). Zera ao abrir/fechar.
+  const [pickedAttrs, setPickedAttrs] = useState<readonly string[]>([]);
   const [inspectId, setInspectId] = useState<string | null>(null);
   const [formationOpen, setFormationOpen] = useState(false);
   const [participantsOpen, setParticipantsOpen] = useState(false);
@@ -412,6 +420,7 @@ export function Training() {
           result.status === CommandTrackingStatus.APPLIED
         ) {
           setPicking(null);
+          setPickedAttrs([]);
           rosterQuery.refetch();
           youthQuery.refetch();
           sessionsQuery.refetch();
@@ -431,15 +440,21 @@ export function Training() {
   );
 
   const startSession = useCallback(
-    (row: TrainingRow, attributeCode: string) => {
+    (row: TrainingRow, attributeCodes: readonly string[]) => {
       if (managedClub === null) return;
       const payload = buildStartSessionPayload({
         clubId: managedClub.id,
         playerId: row.playerId,
-        attributeCode,
+        attributeCodes,
       });
       if ("error" in payload) {
-        toast.show({ tone: "error", text: "Escolha um atributo para treinar." });
+        toast.show({
+          tone: "error",
+          text:
+            payload.error === "TOO_MANY"
+              ? "No máximo 5 habilidades por treino."
+              : "Escolha ao menos uma habilidade para treinar.",
+        });
         return;
       }
       if (worldDate === "") {
@@ -456,7 +471,7 @@ export function Training() {
         { ...payload },
         commandIdempotencyKey({
           commandType: "training:start-session",
-          target: `${row.playerId}:${attributeCode}`,
+          target: `${row.playerId}:${[...payload.attributeCodes].sort().join(",")}`,
           occasion: onDay(worldDate),
         }),
         `Treino iniciado: ${row.name}.`,
@@ -1288,7 +1303,9 @@ export function Training() {
                             <Text style={styles.meta} numberOfLines={1}>
                               Treinando{" "}
                               <Text style={styles.metaSkill}>
-                                {attributeLabel(row.session.attributeCode)}
+                                {row.session.attributeCodes
+                                  .map(attributeLabel)
+                                  .join(", ")}
                               </Text>
                             </Text>
                             {/* Tempo ACIMA da barra. Na virada do dia o jogador é
@@ -1352,8 +1369,9 @@ export function Training() {
               FOCO DO TREINO — {picking?.name ?? ""}
             </Text>
             <Text style={styles.modalHint}>
-              O menor atributo aparece primeiro: é onde sobra mais espaço para
-              crescer.
+              Escolha até 5 habilidades. O ganho do treino é DIVIDIDO entre elas
+              (quanto mais habilidades, menos em cada). Menor primeiro: é onde
+              sobra mais espaço.
             </Text>
             <ScrollView style={styles.modalList}>
               {picking === null ? null : attributesOf(picking.playerId).length ===
@@ -1363,23 +1381,59 @@ export function Training() {
                   não há foco a escolher.
                 </Text>
               ) : (
-                attributesOf(picking.playerId).map((attr) => (
-                  <Pressable
-                    key={attr.code}
-                    onPress={() => startSession(picking, attr.code)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Treinar ${attributeLabel(attr.code)}`}
-                    accessibilityState={{}}
-                    style={styles.attrRow}
-                  >
-                    <Text style={styles.attrName}>
-                      {attributeLabel(attr.code)}
-                    </Text>
-                    <Text style={styles.attrValue}>{attr.value}</Text>
-                  </Pressable>
-                ))
+                attributesOf(picking.playerId).map((attr) => {
+                  const on = pickedAttrs.includes(attr.code);
+                  const full =
+                    !on && pickedAttrs.length >= MAX_SESSION_ATTRIBUTES;
+                  return (
+                    <Pressable
+                      key={attr.code}
+                      disabled={full}
+                      onPress={() =>
+                        setPickedAttrs((prev) =>
+                          prev.includes(attr.code)
+                            ? prev.filter((c) => c !== attr.code)
+                            : [...prev, attr.code],
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`${on ? "Remover" : "Escolher"} ${attributeLabel(attr.code)}`}
+                      accessibilityState={{ selected: on, disabled: full }}
+                      style={[styles.attrRow, full && styles.rowDisabled]}
+                    >
+                      <Icon
+                        name="checkmark-circle"
+                        size={18}
+                        color={on ? color.primary : color.textFaint}
+                      />
+                      <Text
+                        style={[styles.attrName, { flex: 1, marginLeft: space.sm }]}
+                      >
+                        {attributeLabel(attr.code)}
+                      </Text>
+                      <Text style={styles.attrValue}>{attr.value}</Text>
+                    </Pressable>
+                  );
+                })
               )}
             </ScrollView>
+            <Pressable
+              onPress={() => picking !== null && startSession(picking, pickedAttrs)}
+              disabled={pickedAttrs.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Iniciar treino com as habilidades escolhidas"
+              accessibilityState={{ disabled: pickedAttrs.length === 0 }}
+              style={[
+                styles.savePlan,
+                pickedAttrs.length === 0 && styles.actionBusy,
+              ]}
+            >
+              <Text style={styles.actionText}>
+                {pickedAttrs.length === 0
+                  ? "ESCOLHA AO MENOS UMA"
+                  : `TREINAR (${pickedAttrs.length})`}
+              </Text>
+            </Pressable>
             <Pressable
               onPress={() => setPicking(null)}
               accessibilityRole="button"
@@ -1446,29 +1500,41 @@ export function Training() {
                         }
                       />
 
-                      {session !== null && session.projectedValue !== null ? (
+                      {session !== null && session.projections.length > 0 ? (
                         <View style={styles.projectionBox}>
                           <Text style={styles.cardTitle}>
-                            TREINANDO · {attributeLabel(session.attributeCode)}
+                            TREINANDO ({session.projections.length}) — o ganho é
+                            dividido
                           </Text>
-                          <View style={styles.projectionRow}>
-                            <Text style={styles.projCurrent}>
-                              {session.attributeCurrentValue}
-                            </Text>
-                            <Icon
-                              name="arrow-forward"
-                              size={18}
-                              color={color.textMuted}
-                            />
-                            <Text style={styles.projTarget}>
-                              {session.projectedValue}
-                            </Text>
-                            <Text style={styles.projDelta}>
-                              {session.projectedGainPoints > 0
-                                ? `+${session.projectedGainPoints}`
-                                : "sem ganho ainda"}
-                            </Text>
-                          </View>
+                          {session.projections.map((pr) => (
+                            <View
+                              key={pr.attributeCode}
+                              style={styles.projectionRow}
+                            >
+                              <Text
+                                style={styles.projAttr}
+                                numberOfLines={1}
+                              >
+                                {attributeLabel(pr.attributeCode)}
+                              </Text>
+                              <Text style={styles.projCurrent}>
+                                {pr.currentValue}
+                              </Text>
+                              <Icon
+                                name="arrow-forward"
+                                size={14}
+                                color={color.textMuted}
+                              />
+                              <Text style={styles.projTarget}>
+                                {pr.projectedValue}
+                              </Text>
+                              <Text style={styles.projDelta}>
+                                {pr.projectedGainPoints > 0
+                                  ? `+${pr.projectedGainPoints}`
+                                  : "—"}
+                              </Text>
+                            </View>
+                          ))}
                           {(() => {
                             const cd = sessionCountdown({
                               realSecondsPerDay:
@@ -1527,8 +1593,9 @@ export function Training() {
                         </View>
                       ) : session !== null ? (
                         <Text style={styles.summaryHint}>
-                          Treinando {attributeLabel(session.attributeCode)} ·{" "}
-                          {session.elapsedDays}/{session.durationDays} dias.
+                          Treinando{" "}
+                          {session.attributeCodes.map(attributeLabel).join(", ")}{" "}
+                          · {session.elapsedDays}/{session.durationDays} dias.
                         </Text>
                       ) : row !== null && row.state === "BLOCKED" ? (
                         <Text style={styles.summaryHint}>
@@ -1578,6 +1645,7 @@ export function Training() {
                         <Pressable
                           onPress={() => {
                             setInspectId(null);
+                            setPickedAttrs([]);
                             setPicking(row);
                           }}
                           disabled={busy}
@@ -2067,16 +2135,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
+    paddingVertical: 3,
+  },
+  projAttr: {
+    flex: 1,
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
   projCurrent: {
     color: color.textMuted,
-    fontSize: 28,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
   projTarget: {
     color: color.success,
-    fontSize: 28,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
@@ -2084,6 +2159,8 @@ const styles = StyleSheet.create({
     color: color.success,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
+    minWidth: 28,
+    textAlign: "right",
   },
   cohesionRow: {
     flexDirection: "row",
