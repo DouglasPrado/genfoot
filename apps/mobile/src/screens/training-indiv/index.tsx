@@ -96,15 +96,25 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
     managedClub === null ? null : "roster",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
+  // A BASE (C8) também treina individualmente: o jogador pode vir da base, e o
+  // domínio aceita (squadPlayerIds inclui os dois esquadrões). Sem ler `youth`,
+  // um jogador da base abria como "não encontrado".
+  const youthQuery = useWorldQuery<RosterProjection>(
+    managedClub === null ? null : "youth",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const planQuery = useWorldQuery<IndividualPlanProjection>(
     managedClub === null ? null : "individual-training-plan",
     managedClub === null ? undefined : { clubId: managedClub.id, playerId },
   );
 
-  const player = useMemo(
-    () => rosterQuery.data?.players.find((p) => p.playerId === playerId) ?? null,
-    [rosterQuery.data, playerId],
-  );
+  const player = useMemo(() => {
+    const all = [
+      ...(rosterQuery.data?.players ?? []),
+      ...(youthQuery.data?.players ?? []),
+    ];
+    return all.find((p) => p.playerId === playerId) ?? null;
+  }, [rosterQuery.data, youthQuery.data, playerId]);
   const plan = planQuery.data?.plan ?? null;
 
   // O alvo/intensidade correntes: rascunho por cima do que está valendo.
@@ -140,8 +150,9 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   const refresh = useCallback(() => {
     clubQuery.refetch();
     rosterQuery.refetch();
+    youthQuery.refetch();
     planQuery.refetch();
-  }, [clubQuery.refetch, rosterQuery.refetch, planQuery.refetch]);
+  }, [clubQuery.refetch, rosterQuery.refetch, youthQuery.refetch, planQuery.refetch]);
 
   const save = useCallback(() => {
     if (managedClub === null || client === null || contractVersion === null) return;
@@ -200,19 +211,24 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
     plan, toast, planQuery.refetch,
   ]);
 
+  // O jogador pode vir do elenco OU da base: o estado da tela segue quem o
+  // encontra. Só é "não encontrado" quando as DUAS leituras terminaram sem ele —
+  // senão a base piscava "não encontrado" enquanto `youth` ainda carregava.
+  const anyLoading =
+    rosterQuery.state === "loading" || youthQuery.state === "loading";
+  const anyOffline =
+    rosterQuery.state === "offline" || youthQuery.state === "offline";
   const screenState = deriveScreenState({
     session: status,
     hasCachedData: rosterQuery.isStale,
     query:
-      rosterQuery.state === "loading"
-        ? "loading"
-        : rosterQuery.state === "offline"
-          ? "offline"
-          : rosterQuery.state === "error"
-            ? "error"
-            : rosterQuery.state === "empty"
-              ? "empty"
-              : "ready",
+      player !== null
+        ? "ready"
+        : anyLoading
+          ? "loading"
+          : anyOffline
+            ? "offline"
+            : "empty",
   });
 
   if (screenState !== "success" || player === null) {
