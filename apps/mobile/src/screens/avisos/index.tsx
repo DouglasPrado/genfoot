@@ -3,6 +3,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Pressable } from "react-native";
 import { router } from "expo-router";
 
+import type { Href } from "expo-router";
+
 import { Card } from "@/components/card";
 import { Icon, type IconName } from "@/components/icon";
 import { Refresh } from "@/components/refresh";
@@ -38,6 +40,13 @@ const ICON_BY_TYPE: Readonly<Record<string, IconName>> = {
   TRAINING_REPORT: "barbell",
   TRANSFER_OFFER: "cart",
   BOARD_MESSAGE: "business",
+};
+
+/** A tela que cada tipo de aviso abre ao toque; `null` = sem tela dedicada. */
+const ROUTE_BY_TYPE: Readonly<Record<string, Href | null>> = {
+  TRAINING_REPORT: "/elenco/treino",
+  TRANSFER_OFFER: "/mercado",
+  BOARD_MESSAGE: null,
 };
 
 /** Avisos do clube (C12): a LISTA de notificações — treino completo, etc. */
@@ -116,34 +125,54 @@ export function Avisos() {
             </Card>
           ) : (
             <Card>
-              {items.map((item, i) => (
-                <View
-                  key={item.id}
-                  style={[styles.row, i === 0 && styles.rowFirst]}
-                >
-                  <View
-                    style={[
-                      styles.iconWrap,
-                      !item.isRead && styles.iconWrapUnread,
-                    ]}
+              {items.map((item, i) => {
+                const route = ROUTE_BY_TYPE[item.type] ?? null;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => {
+                      if (route !== null) router.push(route);
+                    }}
+                    disabled={route === null}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      route === null ? item.title : `${item.title} — abrir tela`
+                    }
+                    accessibilityState={{ disabled: route === null }}
+                    style={[styles.row, i === 0 && styles.rowFirst]}
                   >
-                    <Icon
-                      name={ICON_BY_TYPE[item.type] ?? "notifications"}
-                      size={16}
-                      color={!item.isRead ? color.primary : color.textMuted}
-                    />
-                  </View>
-                  <View style={styles.info}>
-                    <Text style={styles.title} numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <Text style={styles.message} numberOfLines={2}>
-                      {item.message}
-                    </Text>
-                  </View>
-                  <Text style={styles.date}>{item.createdOn.slice(5)}</Text>
-                </View>
-              ))}
+                    <View
+                      style={[
+                        styles.iconWrap,
+                        !item.isRead && styles.iconWrapUnread,
+                      ]}
+                    >
+                      <Icon
+                        name={ICON_BY_TYPE[item.type] ?? "notifications"}
+                        size={16}
+                        color={!item.isRead ? color.primary : color.textMuted}
+                      />
+                    </View>
+                    <View style={styles.info}>
+                      <Text style={styles.title} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.message} numberOfLines={2}>
+                        {item.message}
+                      </Text>
+                    </View>
+                    {route !== null ? (
+                      <Icon
+                        name="chevron-forward"
+                        size={14}
+                        color={color.textFaint}
+                      />
+                    ) : (
+                      <Text style={styles.date}>{item.createdOn.slice(5)}</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
             </Card>
           )}
         </ScrollView>
