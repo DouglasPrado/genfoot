@@ -3,20 +3,26 @@ import type { DomainError, RulesetVersion } from "@grinta/shared";
 
 import { deterministicUuidV7 } from "../foundation/deterministic-uuid.js";
 import { Player } from "../players/player.js";
+import {
+  GOALKEEPING_ATTRIBUTES,
+  MENTAL_ATTRIBUTES,
+  PHYSICAL_ATTRIBUTES,
+  TECHNICAL_ATTRIBUTES,
+} from "../players/player-attributes.js";
 import type { PlayerAttributeCode } from "../players/player-lifecycle-types.js";
 import type { PlayerRepository } from "../players/player-repository.js";
-import { recommendedAttributes } from "../players/position-attributes.js";
 import { derivePotentialLayers } from "../players/potential-layers.js";
 import type { CohesionWriter } from "../training/train-formation-cohesion.js";
-import { perAttributeGain, sessionRawGainPoints } from "../training/session-gain.js";
+import { sessionRawGainPoints } from "../training/session-gain.js";
 
 /**
  * O treino dos clubes de IA na virada do dia — para que os times sem técnico
  * humano NÃO fiquem parados enquanto o do jogador evolui (balanceamento).
  *
  * Cada clube de IA, por dia: (1) desenvolve seus jogadores com folga de
- * potencial na habilidade RECOMENDADA mais fraca (o mesmo ganho diário e as
- * mesmas fórmulas do treino humano — `session-gain` + `position-attributes`), e
+ * potencial subindo TODOS os atributos por igual (o dono pediu "subir tudo
+ * equilibrado" — perfil equilibrado, não pontudo), um passo por dia limitado
+ * pelo teto de potencial, enquanto houver folga de sessão (`session-gain`), e
  * (2) sobe o ENTROSAMENTO (treino de formação), igual à coleta do treino em
  * grupo humano. Determinístico; nada de `Date.now`/`Math.random`.
  *
@@ -25,11 +31,21 @@ import { perAttributeGain, sessionRawGainPoints } from "../training/session-gain
  */
 export const AI_TRAIN_MAX_PER_CLUB = 30;
 /**
- * Quantas habilidades recomendadas a IA desenvolve por jogador/dia. >1 faz o
- * overall subir mais rápido (a IA chega a level alto rumo ao potencial numa
- * temporada) — cada uma recebe o ganho CHEIO (não dividido). VAL-001.
+ * Quanto cada atributo sobe por jogador/dia. Um passo pequeno e IGUAL em todos
+ * os atributos (não só os recomendados) mantém o perfil EQUILIBRADO enquanto o
+ * overall sobe rumo ao potencial — o `applyAttributeChange` corta cada atributo
+ * no teto utilizável, e o `rawGain` da sessão zera quando o jogador chega lá.
+ * VAL-001.
  */
-export const AI_ATTRS_PER_PLAYER = 2;
+export const AI_DAILY_ATTR_STEP = 1;
+
+/** Todos os atributos treináveis — o passo diário sobe cada um que o jogador tem. */
+const ALL_ATTRIBUTE_CODES: readonly string[] = [
+  ...TECHNICAL_ATTRIBUTES,
+  ...PHYSICAL_ATTRIBUTES,
+  ...MENTAL_ATTRIBUTES,
+  ...GOALKEEPING_ATTRIBUTES,
+];
 
 export interface AiTrainingReader {
   /** Clubes do mundo sem controle humano ativo (os "de IA"). */
@@ -109,7 +125,7 @@ export class RunAiClubsTraining {
   }
 }
 
-/** Desenvolve UM jogador de IA na sua habilidade recomendada mais fraca. */
+/** Desenvolve UM jogador de IA subindo TODOS os atributos por igual (equilibrado). */
 async function developPlayer(
   players: PlayerRepository,
   input: {
@@ -143,35 +159,23 @@ async function developPlayer(
     elapsedDays: 1,
     durationDays: 1,
   });
+  // rawGain é o teto de sessão do jogador: zera quando ele chega ao potencial
+  // utilizável (é o freio de "level alto = potencial"). Enquanto houver folga,
+  // sobe TODOS os atributos que ele tem, o mesmo passo em cada — equilibrado.
   if (rawGain <= 0) return false;
 
-  // As RECOMENDADAS mais fracas com espaço até 100 — onde o ganho rende. Treina
-  // as N mais fracas (cada uma com o ganho cheio) para o overall subir de fato.
-  const targets = recommendedAttributes(snapshot.player.primaryPosition)
-    .map((code) => ({ code, value: player.attributeValue(code as PlayerAttributeCode) }))
-    .filter((c): c is { code: string; value: number } => c.value !== null && c.value < 100)
-    .sort((a, b) => a.value - b.value)
-    .slice(0, AI_ATTRS_PER_PLAYER);
-  if (targets.length === 0) return false;
-
   let developed = false;
-  for (const target of targets) {
-    const gain = perAttributeGain({
-      rawGain,
-      attributeCount: 1,
-      attributeCurrentValue: player.attributeValue(target.code as PlayerAttributeCode) ?? target.value,
-    });
-    if (gain <= 0) continue;
-    const currentValue =
-      player.attributeValue(target.code as PlayerAttributeCode) ?? target.value;
+  for (const code of ALL_ATTRIBUTE_CODES) {
+    const current = player.attributeValue(code as PlayerAttributeCode);
+    if (current === null || current >= 100) continue;
     const applied = player.applyAttributeChange({
       historyId: deterministicUuidV7({
         worldSeed: input.worldSeed,
-        context: `ai-training:${input.playerId}:${input.worldDate}:${target.code}`,
+        context: `ai-training:${input.playerId}:${input.worldDate}:${code}`,
         timestampMilliseconds: 0,
       }),
-      attributeCode: target.code as PlayerAttributeCode,
-      requestedValue: currentValue + gain,
+      attributeCode: code as PlayerAttributeCode,
+      requestedValue: current + AI_DAILY_ATTR_STEP,
       cause: "training-session",
       worldDate: input.worldDate,
       rulesetVersion: input.rulesetVersion,

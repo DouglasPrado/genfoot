@@ -85,11 +85,12 @@ function uowOf(repos: AiTrainingRepositories): AiTrainingUnitOfWork {
 }
 
 describe("RunAiClubsTraining", () => {
-  it("desenvolve a habilidade recomendada mais fraca e sobe o entrosamento do clube de IA", async () => {
+  it("sobe TODOS os atributos por igual (equilibrado) e o entrosamento do clube de IA", async () => {
     const players = new MemPlayers(aggregate());
     const cohesion = new MemCohesion();
     const uow = uowOf({ reader: new MemReader(PLAYER), players, cohesion });
-    const before = players.agg.player.attributes.finishing;
+    const finishingBefore = players.agg.player.attributes.finishing; // 30
+    const dribblingBefore = players.agg.player.attributes.dribbling; // 50
 
     const r = await new RunAiClubsTraining(uow).execute({
       gameWorldId: WORLD, worldSeed: "seed", worldDate: "2026-03-02", rulesetVersion: RULESET,
@@ -100,8 +101,12 @@ describe("RunAiClubsTraining", () => {
       expect(r.value.clubsTrained).toBe(1);
       expect(r.value.playersDeveloped).toBe(1);
     }
-    // 'finishing' (recomendada e mais fraca do ST) subiu.
-    expect(players.agg.player.attributes.finishing).toBeGreaterThan(before);
+    // Equilibrado: a mais fraca (finishing) E uma qualquer (dribbling) subiram o
+    // MESMO passo — não só as recomendadas, tudo por igual.
+    expect(players.agg.player.attributes.finishing).toBe(finishingBefore + 1);
+    expect(players.agg.player.attributes.dribbling).toBe(dribblingBefore + 1);
+    // Atributos de goleiro (null num ST) continuam null — só sobe o que ele tem.
+    expect(players.agg.player.attributes.goalkeeperReflexes).toBeNull();
     // Entrosamento do clube de IA subiu.
     expect(cohesion.raises).toEqual([AI_CLUB]);
   });
