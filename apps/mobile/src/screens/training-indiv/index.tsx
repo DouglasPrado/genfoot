@@ -428,6 +428,18 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
                 : "SALVAR PLANO INDIVIDUAL"}
             </Text>
           </Pressable>
+
+          {/* Ação "vincular mentor" que o doc da M-TRAINING-INDIV lista. */}
+          <Pressable
+            onPress={() => router.push(`/elenco/mentoria/${playerId}`)}
+            accessibilityRole="button"
+            accessibilityLabel="Vincular mentor"
+            accessibilityState={{}}
+            style={styles.mentorLink}
+          >
+            <Icon name="people" size={16} color={color.primary} />
+            <Text style={styles.mentorLinkText}>VINCULAR MENTOR (MENTORIA)</Text>
+          </Pressable>
         </Card>
       </ScrollView>
     </SafeAreaView>
@@ -547,4 +559,16 @@ const styles = StyleSheet.create({
   },
   saveDisabled: { opacity: 0.5 },
   saveText: { color: color.background, fontWeight: fontWeight.bold, letterSpacing: 0.5 },
+  mentorLink: {
+    marginTop: space.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.primary,
+  },
+  mentorLinkText: { color: color.primary, fontWeight: fontWeight.bold, fontSize: 13, letterSpacing: 0.5 },
 });
