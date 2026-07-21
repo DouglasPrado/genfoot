@@ -1,0 +1,66 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  POSITION_OPTIONS,
+  buildSetIndividualPlanPayload,
+  positionLabel,
+  targetAttributeOptions,
+  tradeoffHint,
+} from "./individual-training-model.js";
+
+describe("individual-training-model (M-TRAINING-INDIV)", () => {
+  it("cobre as 15 posições do domínio com rótulo PT único", () => {
+    expect(POSITION_OPTIONS).toHaveLength(15);
+    expect(new Set(POSITION_OPTIONS.map((o) => o.label)).size).toBe(15);
+    expect(positionLabel("ST")).toBe("Centroavante");
+    expect(positionLabel("XYZ")).toBe("XYZ"); // desconhecida cai no código
+  });
+
+  it("targetAttributeOptions mostra só o que o jogador TEM, com rótulo PT", () => {
+    const opts = targetAttributeOptions({
+      finishing: 30,
+      goalkeeperReflexes: null, // jogador de linha: não aparece
+      pace: 60,
+    });
+    expect(opts.map((o) => o.attributeCode).sort()).toEqual(["finishing", "pace"]);
+    expect(opts.find((o) => o.attributeCode === "finishing")?.label).toBe("Finalização");
+    expect(opts.find((o) => o.attributeCode === "finishing")?.value).toBe(30);
+  });
+
+  it("tradeoffHint distingue concentrado (atributo) de espalhado (posição)", () => {
+    expect(tradeoffHint({ kind: "ATTRIBUTE", attributeCode: "finishing" })).toMatch(/CONCENTRADO/);
+    expect(tradeoffHint({ kind: "POSITION", position: "ST" })).toMatch(/ESPALHADO/);
+  });
+
+  it("monta o payload de ATRIBUTO com a intensidade presa em 0..100", () => {
+    const p = buildSetIndividualPlanPayload({
+      clubId: "c1", playerId: "p1",
+      target: { kind: "ATTRIBUTE", attributeCode: "finishing" },
+      intensity: 140, expectedVersion: 3,
+    });
+    if ("error" in p) throw new Error("deveria montar");
+    expect(p.target).toEqual({ kind: "ATTRIBUTE", attributeCode: "finishing" });
+    expect(p.intensity).toBe(100);
+    expect(p.expectedVersion).toBe(3);
+  });
+
+  it("monta o payload de POSIÇÃO", () => {
+    const p = buildSetIndividualPlanPayload({
+      clubId: "c1", playerId: "p1",
+      target: { kind: "POSITION", position: "CB" },
+      intensity: 60, expectedVersion: null,
+    });
+    if ("error" in p) throw new Error("deveria montar");
+    expect(p.target).toEqual({ kind: "POSITION", position: "CB" });
+  });
+
+  it("sem alvo definido → NO_TARGET (não sai do aparelho)", () => {
+    expect(buildSetIndividualPlanPayload({
+      clubId: "c1", playerId: "p1", target: null, intensity: 50, expectedVersion: null,
+    })).toEqual({ error: "NO_TARGET" });
+    expect(buildSetIndividualPlanPayload({
+      clubId: "c1", playerId: "p1",
+      target: { kind: "ATTRIBUTE", attributeCode: "" }, intensity: 50, expectedVersion: null,
+    })).toEqual({ error: "NO_TARGET" });
+  });
+});

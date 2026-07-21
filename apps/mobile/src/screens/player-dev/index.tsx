@@ -258,6 +258,29 @@ export function PlayerDev({ playerId }: { readonly playerId: string }) {
               O núcleo é permanente e sobe por treino. A forma é transiente:
               move por partida e por decisão sua, e decai sozinha.
             </Text>
+            {/* Abrir o plano INDIVIDUAL de treino (M-TRAINING-INDIV). */}
+            <Pressable
+              onPress={() => router.push(`/elenco/treino-indiv/${playerId}`)}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir plano individual de treino"
+              accessibilityState={{}}
+              style={{
+                marginTop: space.md,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: space.xs,
+                paddingVertical: space.sm,
+                borderRadius: radius.pill,
+                borderWidth: 1,
+                borderColor: color.primary,
+              }}
+            >
+              <Icon name="star" size={16} color={color.primary} />
+              <Text style={{ color: color.primary, fontWeight: fontWeight.bold, letterSpacing: 0.5 }}>
+                PLANO INDIVIDUAL DE TREINO
+              </Text>
+            </Pressable>
           </Card>
 
           {/* Até onde ele pode chegar. */}
