@@ -21,6 +21,8 @@ import {
   PrismaPlayerRepository,
   PrismaPushTokenRepository,
   PrismaAiTrainingUnitOfWork,
+  PrismaIndividualTrainingPlanRepository,
+  PrismaIndividualTrainingUnitOfWork,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
   PrismaSeasonLifecycleRepository,
@@ -78,6 +80,8 @@ import {
   PLAYER_REPOSITORY,
   PUSH_TOKEN_REPOSITORY,
   AI_TRAINING_UNIT_OF_WORK,
+  INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+  INDIVIDUAL_TRAINING_UNIT_OF_WORK,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
@@ -300,6 +304,18 @@ import {
         new PrismaAiTrainingUnitOfWork(client),
     },
     {
+      provide: INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaIndividualTrainingPlanRepository =>
+        new PrismaIndividualTrainingPlanRepository(client),
+    },
+    {
+      provide: INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaIndividualTrainingUnitOfWork =>
+        new PrismaIndividualTrainingUnitOfWork(client),
+    },
+    {
       provide: YOUTH_INTAKE_READ_MODEL,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaYouthIntakeReadModel =>
@@ -507,6 +523,8 @@ import {
     PLAYER_REPOSITORY,
     PUSH_TOKEN_REPOSITORY,
     AI_TRAINING_UNIT_OF_WORK,
+    INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+    INDIVIDUAL_TRAINING_UNIT_OF_WORK,
     YOUTH_INTAKE_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,

@@ -77,6 +77,11 @@ import {
   type PlayerRepository,
   type PushTokenRepository,
   type AiTrainingUnitOfWork,
+  type IndividualTrainingPlanRepository,
+  type IndividualTrainingUnitOfWork,
+  type IndividualTrainingTarget,
+  SetIndividualTrainingPlan,
+  SettleDueIndividualTrainingPlans,
   RegisterPushToken,
   RunAiClubsTraining,
   buildTrainingReportMessage,
@@ -178,6 +183,8 @@ export interface CommandContext {
   readonly pushTokenRepository: PushTokenRepository;
   /** Treino dos clubes de IA na virada (balanceamento). */
   readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
+  readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
+  readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -563,6 +570,17 @@ const trainingPlanPayload = z.object({
   expectedVersion: z.number().int().nullable(),
 });
 
+const individualTrainingPlanPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  target: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("ATTRIBUTE"), attributeCode: z.string() }),
+    z.object({ kind: z.literal("POSITION"), position: z.string() }),
+  ]),
+  intensity: z.number().int(),
+  expectedVersion: z.number().int().nullable(),
+});
+
 const worldIdentityPayload = z.object({
   name: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -724,6 +742,33 @@ async function runAiTraining(
     });
   } catch (err) {
     console.warn(`[ai-training] falha no treino dos clubes de IA: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle dos planos INDIVIDUAIS na virada: aplica cada plano ao seu jogador
+ * (desenvolvimento rumo ao alvo). Best-effort: uma falha não derruba a virada.
+ */
+async function settleIndividualTraining(
+  deps: Pick<CommandContext, "individualTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueIndividualTrainingPlans(
+      deps.individualTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[individual-training] falha no settle individual: ${String(err)}`);
   }
 }
 
@@ -915,6 +960,7 @@ const handlers: Record<string, CommandHandler> = {
     groupTrainingUnitOfWork,
     pushTokenRepository,
     aiTrainingUnitOfWork,
+    individualTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -990,6 +1036,15 @@ const handlers: Record<string, CommandHandler> = {
     );
     await runAiTraining(
       { aiTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleIndividualTraining(
+      { individualTrainingUnitOfWork },
       {
         worldId,
         seed: worldSeed,
@@ -1082,6 +1137,36 @@ const handlers: Record<string, CommandHandler> = {
     });
     if (!result.ok) return result;
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
+  },
+
+  /** Treino — define o plano INDIVIDUAL de um jogador (M-TRAINING-INDIV). */
+  "training:set-individual-plan": async ({
+    worlds,
+    individualTrainingPlanRepository,
+    trainingContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = individualTrainingPlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetIndividualTrainingPlan(
+      individualTrainingPlanRepository,
+      trainingContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      target: parsed.data.target as IndividualTrainingTarget,
+      intensity: parsed.data.intensity,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    return succeed({
+      resource: `individual-training-plan:${result.value.plan.id}`,
+    });
   },
 
   /**
@@ -1773,6 +1858,7 @@ const handlers: Record<string, CommandHandler> = {
     groupTrainingUnitOfWork,
     pushTokenRepository,
     aiTrainingUnitOfWork,
+    individualTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1826,6 +1912,16 @@ const handlers: Record<string, CommandHandler> = {
       // Clubes de IA treinam também (balanceamento).
       await runAiTraining(
         { aiTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Planos individuais aplicados na virada.
+      await settleIndividualTraining(
+        { individualTrainingUnitOfWork },
         {
           worldId: after.value.worldId,
           seed: after.value.snapshot.seed,

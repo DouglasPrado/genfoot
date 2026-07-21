@@ -1721,6 +1721,29 @@ model TrainingPlayerEntry {
   @@index([playerId])
 }
 
+/// Plano de treino INDIVIDUAL (M-TRAINING-INDIV): a diretiva de desenvolvimento
+/// de UM jogador rumo a um alvo (atributo ou posição), aplicada na virada do
+/// dia. Um por jogador. Sem FK relacional por ora (o cascade de exclusão fica
+/// como follow-up) — o banco de dev é descartável.
+model IndividualTrainingPlan {
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String  @db.Uuid
+  clubId              String  @db.Uuid
+  playerId            String  @db.Uuid
+  /// "ATTRIBUTE" | "POSITION"
+  targetKind          String
+  /// preenchido quando targetKind = ATTRIBUTE
+  targetAttributeCode String?
+  /// preenchido quando targetKind = POSITION
+  targetPosition      String?
+  intensity           Int
+  version             Int     @default(1)
+
+  @@unique([gameWorldId, playerId]) // um plano individual por jogador
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId])
+}
+
 /// Escalação CORRENTE do clube (R-220 Fase 1): formação + 11 titulares nos slots
 /// + banco. Per (mundo, clube); a partida lê ISTO para saber quem entra em campo,
 /// com fallback à média do elenco quando não há escalação. Não confundir com o

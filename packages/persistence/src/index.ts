@@ -4,6 +4,8 @@ export * from "./prisma-club-entry-reservation-repository.js";
 export * from "./prisma-domain-event-log-repository.js";
 export * from "./prisma-push-token-repository.js";
 export * from "./prisma-ai-training-unit-of-work.js";
+export * from "./prisma-individual-training-plan-repository.js";
+export * from "./prisma-individual-training-unit-of-work.js";
 export * from "./prisma-idempotency-repository.js";
 export * from "./prisma-identity-read-model.js";
 export * from "./prisma-identity-unit-of-work.js";

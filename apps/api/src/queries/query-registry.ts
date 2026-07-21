@@ -13,6 +13,7 @@ import type {
   StaffReadModel,
   InboxReadModel,
   TrainingPlanRepository,
+  IndividualTrainingPlanRepository,
   LineupRepository,
 } from "@grinta/core";
 import type {
@@ -55,6 +56,7 @@ export interface QueryContext {
   readonly worldClock: WorldClockRepository;
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
+  readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
@@ -151,6 +153,30 @@ const handlers: Record<string, QueryHandler> = {
       worldId,
       clubId,
       seasonId,
+    );
+    return succeed({ plan });
+  },
+  /** Plano INDIVIDUAL de um jogador (M-TRAINING-INDIV). `null` = jogador sem plano. */
+  "individual-training-plan": async (
+    { individualTrainingPlanRepository },
+    worldId,
+    params,
+  ) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    if (clubId === null || playerId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "individual-training-plan exige clubId e playerId.",
+          { params: ["clubId", "playerId"] },
+        ),
+      );
+    }
+    const plan = await individualTrainingPlanRepository.findByPlayer(
+      worldId,
+      clubId,
+      playerId,
     );
     return succeed({ plan });
   },

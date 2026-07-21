@@ -1,0 +1,110 @@
+import type {
+  IndividualTrainingPlanRepository,
+  IndividualTrainingPlanSnapshot,
+  IndividualTrainingTarget,
+} from "@grinta/core";
+
+import type { Prisma } from "./generated/prisma/client.js";
+
+/**
+ * O plano de treino INDIVIDUAL em Postgres (M-TRAINING-INDIV).
+ *
+ * `save` usa `updateMany` com a versão esperada no WHERE — concorrência
+ * otimista no BANCO, como o plano coletivo. O alvo (discriminated union) é
+ * achatado em três colunas: `targetKind` + `targetAttributeCode`/`targetPosition`.
+ */
+interface Row {
+  readonly id: string;
+  readonly gameWorldId: string;
+  readonly clubId: string;
+  readonly playerId: string;
+  readonly targetKind: string;
+  readonly targetAttributeCode: string | null;
+  readonly targetPosition: string | null;
+  readonly intensity: number;
+  readonly version: number;
+}
+
+function toTarget(row: Row): IndividualTrainingTarget {
+  return row.targetKind === "POSITION"
+    ? { kind: "POSITION", position: row.targetPosition ?? "" }
+    : { kind: "ATTRIBUTE", attributeCode: row.targetAttributeCode ?? "" };
+}
+
+function toSnapshot(row: Row): IndividualTrainingPlanSnapshot {
+  return {
+    id: row.id,
+    gameWorldId: row.gameWorldId,
+    clubId: row.clubId,
+    playerId: row.playerId,
+    target: toTarget(row),
+    intensity: row.intensity,
+    version: row.version,
+  };
+}
+
+function targetColumns(target: IndividualTrainingTarget): {
+  targetKind: string;
+  targetAttributeCode: string | null;
+  targetPosition: string | null;
+} {
+  return target.kind === "POSITION"
+    ? { targetKind: "POSITION", targetAttributeCode: null, targetPosition: target.position }
+    : { targetKind: "ATTRIBUTE", targetAttributeCode: target.attributeCode, targetPosition: null };
+}
+
+export class PrismaIndividualTrainingPlanRepository
+  implements IndividualTrainingPlanRepository
+{
+  public constructor(private readonly client: Prisma.TransactionClient) {}
+
+  public async findByPlayer(
+    gameWorldId: string,
+    clubId: string,
+    playerId: string,
+  ): Promise<IndividualTrainingPlanSnapshot | null> {
+    const row = await this.client.individualTrainingPlan.findFirst({
+      where: { gameWorldId, clubId, playerId },
+    });
+    return row === null ? null : toSnapshot(row);
+  }
+
+  public async findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly IndividualTrainingPlanSnapshot[]> {
+    const rows = await this.client.individualTrainingPlan.findMany({
+      where: { gameWorldId },
+    });
+    return rows.map(toSnapshot);
+  }
+
+  public async save(
+    plan: IndividualTrainingPlanSnapshot,
+    expectedVersion: number | null,
+  ): Promise<void> {
+    const cols = targetColumns(plan.target);
+    if (expectedVersion === null) {
+      await this.client.individualTrainingPlan.create({
+        data: {
+          id: plan.id,
+          gameWorldId: plan.gameWorldId,
+          clubId: plan.clubId,
+          playerId: plan.playerId,
+          ...cols,
+          intensity: plan.intensity,
+          version: plan.version,
+        },
+      });
+      return;
+    }
+    const updated = await this.client.individualTrainingPlan.updateMany({
+      where: { id: plan.id, version: expectedVersion },
+      data: { ...cols, intensity: plan.intensity, version: plan.version },
+    });
+    if (updated.count === 0) {
+      throw new Error(
+        `AGGREGATE_VERSION_CONFLICT: plano individual ${plan.id} não está na versão ${expectedVersion}.`,
+      );
+    }
+  }
+}

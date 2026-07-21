@@ -125,6 +125,7 @@ describe.skipIf(!hasDatabase)(
       // Treino de sessão instantâneo (R-221 Fase 2a): inicia e coleta.
       "training:collect-group-session",
       "training:collect-session",
+      "training:set-individual-plan",
       "training:set-plan",
       "training:start-group-session",
       "training:start-session",
@@ -163,7 +164,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(50);
+    expect(response.body.commandCount).toBe(51);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -187,6 +188,8 @@ describe.skipIf(!hasDatabase)(
       "inbox",
       // A LISTA de avisos do clube (tela de avisos): itens com título/corpo.
       "inbox-items",
+      // O plano de treino INDIVIDUAL de um jogador (M-TRAINING-INDIV).
+      "individual-training-plan",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
       // A escalação corrente do clube (M-LINEUP, R-220 Fase 1): recorte por clubId.
