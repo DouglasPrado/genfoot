@@ -699,6 +699,7 @@ model UserAccount {
   sessions            UserSession[]
   worldParticipations WorldParticipant[]
   notifications       Notification[]
+  pushDeviceTokens    PushDeviceToken[] // push remoto (Expo) por dispositivo
   credential          UserCredential? // C-12: autenticação
   refreshTokens       AuthRefreshToken[] // C-12: rotação/detecção de reuso
 }
@@ -2386,6 +2387,22 @@ model Notification {
 
   @@index([gameWorldId])
   @@index([userId])
+}
+
+/// Token de push de um dispositivo, por conta (Expo push token). Uma linha por
+/// token (o mesmo device dá o mesmo token, então upsert por token). Alimenta o
+/// envio de push remoto (ex.: treino completo) do servidor para o device.
+model PushDeviceToken {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  accountId      String   @db.Uuid
+  expoPushToken  String   @unique
+  platform       String   @default("ios")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account UserAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
 }
 
 /// Projeção transversal de auditoria — referência genérica (entity/entityId)
