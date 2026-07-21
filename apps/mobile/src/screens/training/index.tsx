@@ -45,6 +45,7 @@ import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
+import { formationFit, formationFitRank } from "@/screens/squad/formation-fit";
 import {
   FORMATION_KEYS,
   assignToFormation,
@@ -1695,21 +1696,34 @@ export function Training() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>QUEM TREINA EM GRUPO</Text>
             <Text style={styles.modalHint}>
-              Só APTOS entram. Os indisponíveis (lesão, suspensão, já em treino)
-              aparecem marcados e não podem ser escolhidos.
+              Só APTOS entram. Indisponíveis (lesão, suspensão, já em treino)
+              aparecem travados. <Text style={{ color: color.warning }}>ADAPTA</Text> = joga fora do
+              ofício na formação escolhida (ofício aparece primeiro).
             </Text>
             <ScrollView style={styles.modalList}>
               {[...allPlayers]
-                // Aptos primeiro; indisponíveis no fim, para a escolha ficar limpa.
+                // Aptos primeiro; entre aptos, ofício antes de adaptado.
                 .sort(
                   (a, b) =>
                     Number(b.availability === "AVAILABLE") -
-                    Number(a.availability === "AVAILABLE"),
+                      Number(a.availability === "AVAILABLE") ||
+                    formationFitRank(
+                      formationFit(a.primaryPosition, lineup?.formation ?? ""),
+                    ) -
+                      formationFitRank(
+                        formationFit(b.primaryPosition, lineup?.formation ?? ""),
+                      ),
                 )
                 .map((p) => {
                   const badge = availabilityBadge(p.availability);
                   const unavailable = badge !== null;
                   const isBase = youthIds.has(p.playerId);
+                  // Encaixe na formação da escalação: adaptado ganha o selo ADAPTA
+                  // (joga fora do ofício) — e é quem o bônus de entrosamento premia.
+                  const fit = formationFit(
+                    p.primaryPosition,
+                    lineup?.formation ?? "",
+                  );
                   const on = groupParticipants.has(p.playerId) && !unavailable;
                   return (
                     <Pressable
@@ -1757,6 +1771,9 @@ export function Training() {
                         {p.name}
                       </Text>
                       {isBase ? <Text style={styles.baseTag}>BASE</Text> : null}
+                      {!unavailable && fit === "adapted" ? (
+                        <Text style={styles.adaptTag}>ADAPTA</Text>
+                      ) : null}
                       {unavailable ? (
                         <Text
                           style={[
@@ -2221,6 +2238,17 @@ const styles = StyleSheet.create({
     color: color.primary,
     borderWidth: 1,
     borderColor: color.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  adaptTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.warning,
+    borderWidth: 1,
+    borderColor: color.warning,
     borderRadius: radius.sm,
     paddingHorizontal: 4,
     paddingVertical: 1,
