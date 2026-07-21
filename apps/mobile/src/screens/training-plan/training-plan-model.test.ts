@@ -6,6 +6,7 @@ import {
   clampIntensity,
   entryFocusFor,
   intensityLabel,
+  recoveryRoster,
 } from "./training-plan-model.js";
 
 const disponivel = { playerId: "p1", availability: "AVAILABLE" };
@@ -48,6 +49,46 @@ describe("training-plan-model (M-TRAINING coletivo)", () => {
 
   it("suspenso NÃO é restrição médica — treina o foco coletivo normalmente", () => {
     expect(entryFocusFor(suspenso, "TECHNICAL")).toBe("TECHNICAL");
+  });
+
+  it("agendar recuperação: jogador escolhido descansa em RECUPERAÇÃO, mesmo apto", () => {
+    const agendados = new Set(["p1"]);
+    // O apto escolhido para recuperação sai do foco coletivo.
+    expect(entryFocusFor(disponivel, "OFFENSIVE", agendados)).toBe("RECOVERY");
+    // Quem não foi escolhido segue no foco do grupo.
+    expect(entryFocusFor(suspenso, "OFFENSIVE", agendados)).toBe("OFFENSIVE");
+    // Lesionado continua em recuperação mesmo sem estar na seleção (automático).
+    expect(entryFocusFor(lesionado, "OFFENSIVE", agendados)).toBe("RECOVERY");
+  });
+
+  it("recoveryRoster marca quem está de recuperação: lesionado travado, escolhido solto", () => {
+    const roster = recoveryRoster([disponivel, lesionado, suspenso], new Set(["p1"]));
+    expect(roster).toEqual([
+      // apto escolhido: em recuperação, e pode sair (não travado).
+      { playerId: "p1", availability: "AVAILABLE", onRecovery: true, locked: false },
+      // lesionado: em recuperação e TRAVADO (o domínio obriga).
+      { playerId: "p2", availability: "INJURED", onRecovery: true, locked: true },
+      // suspenso não escolhido: treina normal.
+      { playerId: "p3", availability: "SUSPENDED", onRecovery: false, locked: false },
+    ]);
+  });
+
+  it("payload agenda recuperação por jogador (apto vira RECOVERY, resto no foco)", () => {
+    const payload = buildSetPlanPayload({
+      clubId: "c1",
+      name: "Poupar o camisa 10",
+      focus: "OFFENSIVE",
+      intensity: 60,
+      players: [disponivel, suspenso, lesionado],
+      recoveryPlayerIds: ["p1"],
+      expectedVersion: null,
+    });
+    if ("error" in payload) throw new Error("deveria montar");
+    expect(payload.entries).toEqual([
+      { playerId: "p1", focus: "RECOVERY", workload: 60 },
+      { playerId: "p3", focus: "OFFENSIVE", workload: 60 },
+      { playerId: "p2", focus: "RECOVERY", workload: 60 },
+    ]);
   });
 
   it("monta o payload sem seasonId — o servidor resolve a temporada corrente", () => {

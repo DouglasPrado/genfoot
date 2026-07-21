@@ -73,6 +73,7 @@ import {
   buildSetPlanPayload,
   clampIntensity,
   intensityLabel,
+  recoveryRoster,
   type PlanFocus,
 } from "@/screens/training-plan/training-plan-model";
 import {
@@ -311,11 +312,23 @@ export function Training() {
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
   const [draftIntensity, setDraftIntensity] = useState<number | null>(null);
+  // "Agendar recuperação" (ação do doc): jogadores APTOS que o gestor escolhe
+  // poupar em RECUPERAÇÃO. É rascunho por edição — a query `training-plan` é
+  // grossa (só name/focus/intensity/version, sem as entries por jogador), então
+  // não há como refletir quem já está persistido em recuperação. Trava de
+  // leitura conhecida; a AÇÃO funciona, o espelho do estado persistido não.
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryIds, setRecoveryIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const focus: PlanFocus =
     draftFocus ?? ((plan?.focus as PlanFocus | undefined) ?? "TECHNICAL");
   const intensity = draftIntensity ?? plan?.intensity ?? 50;
   const dirty =
-    plan === null || focus !== plan.focus || intensity !== plan.intensity;
+    plan === null ||
+    focus !== plan.focus ||
+    intensity !== plan.intensity ||
+    recoveryIds.size > 0;
   /**
    * Só salva com a leitura do plano CONFIRMADA.
    *
@@ -524,6 +537,7 @@ export function Training() {
       focus,
       intensity,
       players: rosterQuery.data?.players ?? [],
+      recoveryPlayerIds: [...recoveryIds],
       expectedVersion: plan?.version ?? null,
     });
     if ("error" in payload) {
@@ -553,7 +567,14 @@ export function Training() {
     const idempotencyKey = commandIdempotencyKey({
       commandType: "training:set-plan",
       target: managedClub.id,
-      occasion: onRevision(plan?.version ?? 0, focus, intensity),
+      // A recuperação agendada entra na chave: mudar QUEM descansa é outra
+      // edição, e não pode dedupar contra a anterior (mesma versão).
+      occasion: onRevision(
+        plan?.version ?? 0,
+        focus,
+        intensity,
+        [...recoveryIds].sort().join(","),
+      ),
     });
     setTracking({
       status: CommandTrackingStatus.SUBMITTING,
@@ -580,6 +601,7 @@ export function Training() {
       ) {
         setDraftFocus(null);
         setDraftIntensity(null);
+        setRecoveryIds(new Set());
         planQuery.refetch();
       }
     });
@@ -591,6 +613,7 @@ export function Training() {
     plan,
     focus,
     intensity,
+    recoveryIds,
     rosterQuery.data,
     planQuery.refetch,
   ]);
@@ -1193,6 +1216,21 @@ export function Training() {
               Quem está sob restrição médica entra em RECUPERAÇÃO, não no foco
               do grupo — o domínio recusaria o contrário.
             </Text>
+
+            {/* Ação "agendar recuperação": poupar aptos (fatigados/pós-jogo). */}
+            <Pressable
+              onPress={() => setRecoveryOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Agendar recuperação de jogadores"
+              accessibilityState={{}}
+              style={styles.recoveryButton}
+            >
+              <Icon name="medkit" size={16} color={color.primary} />
+              <Text style={styles.recoveryButtonText}>
+                AGENDAR RECUPERAÇÃO
+                {recoveryIds.size > 0 ? ` · ${recoveryIds.size} poupado(s)` : ""}
+              </Text>
+            </Pressable>
 
             <Pressable
               onPress={savePlan}
@@ -1888,6 +1926,113 @@ export function Training() {
           </View>
         </View>
       </Modal>
+
+      {/* Agendar recuperação: escolher aptos para descansar em RECUPERAÇÃO. O
+          lesionado aparece travado (o domínio já o obriga a recuperar). */}
+      <Modal
+        visible={recoveryOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRecoveryOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>AGENDAR RECUPERAÇÃO</Text>
+            <Text style={styles.modalHint}>
+              Poupe aptos (fatigados, pós-jogo): eles descansam em RECUPERAÇÃO em
+              vez do foco do grupo. Lesionados já entram travados — o domínio os
+              obriga a recuperar.
+            </Text>
+            <ScrollView style={styles.modalList}>
+              {[...recoveryRoster(rosterQuery.data?.players ?? [], recoveryIds)]
+                // Já em recuperação primeiro (travados no topo), depois o resto.
+                .sort(
+                  (a, b) =>
+                    Number(b.onRecovery) - Number(a.onRecovery) ||
+                    Number(b.locked) - Number(a.locked),
+                )
+                .map((entry) => {
+                  const p = (rosterQuery.data?.players ?? []).find(
+                    (rp) => rp.playerId === entry.playerId,
+                  );
+                  if (p === undefined) return null;
+                  return (
+                    <Pressable
+                      key={entry.playerId}
+                      disabled={entry.locked}
+                      onPress={() => {
+                        const next = new Set(recoveryIds);
+                        if (next.has(entry.playerId)) next.delete(entry.playerId);
+                        else next.add(entry.playerId);
+                        setRecoveryIds(next);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        entry.locked
+                          ? `${p.name} lesionado: recuperação obrigatória`
+                          : `${entry.onRecovery ? "Tirar de recuperação" : "Poupar"} ${p.name}`
+                      }
+                      accessibilityState={{
+                        selected: entry.onRecovery,
+                        disabled: entry.locked,
+                      }}
+                      style={[styles.attrRow, entry.locked && styles.rowDisabled]}
+                    >
+                      <Icon
+                        name={entry.onRecovery ? "medkit" : "person"}
+                        size={18}
+                        color={
+                          entry.locked
+                            ? color.danger
+                            : entry.onRecovery
+                              ? color.primary
+                              : color.textFaint
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.attrName,
+                          { flex: 1, marginLeft: space.sm },
+                          entry.locked && { color: color.textMuted },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                      {entry.locked ? (
+                        <Text style={[styles.statusTag, { color: color.danger }]}>
+                          LESIONADO
+                        </Text>
+                      ) : entry.onRecovery ? (
+                        <Text style={[styles.statusTag, { color: color.primary }]}>
+                          RECUPERANDO
+                        </Text>
+                      ) : (
+                        <Text style={styles.attrValue}>
+                          {p.primaryPosition} · {p.overall}
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            <Text style={styles.modalHint}>
+              A recuperação escolhida é aplicada ao SALVAR o plano.
+            </Text>
+            <Pressable
+              onPress={() => setRecoveryOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Concluir recuperação"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>
+                PRONTO ({recoveryIds.size})
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2265,6 +2410,23 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     borderRadius: radius.pill,
     backgroundColor: color.primary,
+  },
+  recoveryButton: {
+    marginTop: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.primary,
+  },
+  recoveryButtonText: {
+    color: color.primary,
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.5,
   },
   stanceRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
   stance: {
