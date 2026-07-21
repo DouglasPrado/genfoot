@@ -12,7 +12,7 @@ import { GK_ARCHETYPES, attributeLabelPt } from "@grinta/core";
 import { clampIntensity } from "../training-plan/training-plan-model";
 
 export type IndividualTarget =
-  | { readonly kind: "ATTRIBUTE"; readonly attributeCode: string }
+  | { readonly kind: "ATTRIBUTE"; readonly attributeCodes: readonly string[] }
   | { readonly kind: "POSITION"; readonly position: string }
   | { readonly kind: "GK_ARCHETYPE"; readonly archetype: string };
 
@@ -71,7 +71,9 @@ export function targetAttributeOptions(
 /** O trade-off do alvo, em palavras — o que ele concentra ou espalha. */
 export function tradeoffHint(target: IndividualTarget): string {
   if (target.kind === "ATTRIBUTE") {
-    return "Ganho CONCENTRADO: o orçamento diário inteiro vai neste atributo.";
+    return target.attributeCodes.length > 1
+      ? `Ganho DIVIDIDO entre as ${target.attributeCodes.length} habilidades (arredonda p/ baixo).`
+      : "Ganho CONCENTRADO: o orçamento diário inteiro vai nesta habilidade.";
   }
   if (target.kind === "GK_ARCHETYPE") {
     return "Ganho ESPALHADO: sobe os atributos de goleiro do arquétipo, os mais fracos primeiro.";
@@ -99,7 +101,7 @@ export function buildSetIndividualPlanPayload(input: {
   readonly expectedVersion: number | null;
 }): SetIndividualPlanResult {
   if (input.target === null) return { error: "NO_TARGET" };
-  if (input.target.kind === "ATTRIBUTE" && input.target.attributeCode === "") {
+  if (input.target.kind === "ATTRIBUTE" && input.target.attributeCodes.length === 0) {
     return { error: "NO_TARGET" };
   }
   if (input.target.kind === "POSITION" && input.target.position === "") {

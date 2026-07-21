@@ -60,7 +60,7 @@ function run(
     playerId: PLAYER,
     worldSeed: "seed",
     occurredOn: "2026-03-02",
-    target: { kind: "ATTRIBUTE", attributeCode: "finishing" },
+    target: { kind: "ATTRIBUTE", attributeCodes: ["finishing"] },
     intensity: 70,
     expectedVersion: null,
     ...overrides,
@@ -73,7 +73,7 @@ describe("SetIndividualTrainingPlan (M-TRAINING-INDIV)", () => {
     const r = await run(repo, new MemContext([PLAYER]));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.plan.target).toEqual({ kind: "ATTRIBUTE", attributeCode: "finishing" });
+    expect(r.value.plan.target).toEqual({ kind: "ATTRIBUTE", attributeCodes: ["finishing"] });
     expect(r.value.plan.version).toBe(1);
     expect(repo.savedExpected).toBe(null);
   });
@@ -89,7 +89,7 @@ describe("SetIndividualTrainingPlan (M-TRAINING-INDIV)", () => {
 
   it("atributo fora do catálogo → ATTRIBUTE_NOT_APPLICABLE", async () => {
     const r = await run(new MemRepo(), new MemContext([PLAYER]), {
-      target: { kind: "ATTRIBUTE", attributeCode: "teleporte" },
+      target: { kind: "ATTRIBUTE", attributeCodes: ["teleporte"] },
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("ATTRIBUTE_NOT_APPLICABLE");
@@ -125,7 +125,7 @@ describe("SetIndividualTrainingPlan (M-TRAINING-INDIV)", () => {
     const repo = new MemRepo();
     repo.plan = {
       id: "p", gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
-      target: { kind: "ATTRIBUTE", attributeCode: "finishing" }, intensity: 50, version: 3,
+      target: { kind: "ATTRIBUTE", attributeCodes: ["finishing"] }, intensity: 50, version: 3,
     };
     const r = await run(repo, new MemContext([PLAYER]), { expectedVersion: 1 });
     expect(r.ok).toBe(false);
@@ -136,7 +136,7 @@ describe("SetIndividualTrainingPlan (M-TRAINING-INDIV)", () => {
     const repo = new MemRepo();
     repo.plan = {
       id: "p", gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
-      target: { kind: "ATTRIBUTE", attributeCode: "finishing" }, intensity: 50, version: 3,
+      target: { kind: "ATTRIBUTE", attributeCodes: ["finishing"] }, intensity: 50, version: 3,
     };
     const r = await run(repo, new MemContext([PLAYER]), {
       expectedVersion: 3,

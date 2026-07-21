@@ -32,7 +32,7 @@ interface Row {
   readonly clubId: string;
   readonly playerId: string;
   readonly targetKind: string;
-  readonly targetAttributeCode: string | null;
+  readonly targetAttributeCodes: string[];
   readonly targetPosition: string | null;
   readonly targetArchetype: string | null;
   readonly intensity: number;
@@ -46,7 +46,7 @@ function toTarget(row: Row): IndividualTrainingTarget {
   if (row.targetKind === "GK_ARCHETYPE") {
     return { kind: "GK_ARCHETYPE", archetype: row.targetArchetype ?? "" };
   }
-  return { kind: "ATTRIBUTE", attributeCode: row.targetAttributeCode ?? "" };
+  return { kind: "ATTRIBUTE", attributeCodes: row.targetAttributeCodes };
 }
 
 function toSnapshot(row: Row): IndividualTrainingPlanSnapshot {
@@ -63,17 +63,17 @@ function toSnapshot(row: Row): IndividualTrainingPlanSnapshot {
 
 function targetColumns(target: IndividualTrainingTarget): {
   targetKind: string;
-  targetAttributeCode: string | null;
+  targetAttributeCodes: string[];
   targetPosition: string | null;
   targetArchetype: string | null;
 } {
   if (target.kind === "POSITION") {
-    return { targetKind: "POSITION", targetAttributeCode: null, targetPosition: target.position, targetArchetype: null };
+    return { targetKind: "POSITION", targetAttributeCodes: [], targetPosition: target.position, targetArchetype: null };
   }
   if (target.kind === "GK_ARCHETYPE") {
-    return { targetKind: "GK_ARCHETYPE", targetAttributeCode: null, targetPosition: null, targetArchetype: target.archetype };
+    return { targetKind: "GK_ARCHETYPE", targetAttributeCodes: [], targetPosition: null, targetArchetype: target.archetype };
   }
-  return { targetKind: "ATTRIBUTE", targetAttributeCode: target.attributeCode, targetPosition: null, targetArchetype: null };
+  return { targetKind: "ATTRIBUTE", targetAttributeCodes: [...target.attributeCodes], targetPosition: null, targetArchetype: null };
 }
 
 export class PrismaIndividualTrainingPlanRepository

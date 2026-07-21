@@ -31,16 +31,21 @@ export function projectIndividualPlan(input: {
   if (input.rawGainPoints <= 0) return [];
 
   if (input.target.kind === "ATTRIBUTE") {
-    const before = input.attributeValueOf(input.target.attributeCode);
-    if (before === null || before >= 100) return [];
-    const gain = perAttributeGain({
-      rawGain: input.rawGainPoints,
-      attributeCount: 1,
-      attributeCurrentValue: before,
-    });
-    return gain > 0
-      ? [{ attributeCode: input.target.attributeCode, before, after: before + gain, gain }]
-      : [];
+    // Até 5 habilidades: o orçamento é DIVIDIDO entre elas (÷N, arredonda p/ baixo)
+    // — a MESMA régua da sessão (`perAttributeGain`).
+    const codes = input.target.attributeCodes;
+    const changes: IndividualPlanChange[] = [];
+    for (const attributeCode of codes) {
+      const before = input.attributeValueOf(attributeCode);
+      if (before === null || before >= 100) continue;
+      const gain = perAttributeGain({
+        rawGain: input.rawGainPoints,
+        attributeCount: codes.length,
+        attributeCurrentValue: before,
+      });
+      if (gain > 0) changes.push({ attributeCode, before, after: before + gain, gain });
+    }
+    return changes;
   }
 
   // POSIÇÃO e ARQUÉTIPO DE GOLEIRO: ambos são um CONJUNTO de atributos que o

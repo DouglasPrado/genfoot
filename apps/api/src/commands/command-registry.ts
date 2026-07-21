@@ -581,7 +581,7 @@ const individualTrainingPlanPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
   target: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("ATTRIBUTE"), attributeCode: z.string() }),
+    z.object({ kind: z.literal("ATTRIBUTE"), attributeCodes: z.array(z.string()) }),
     z.object({ kind: z.literal("POSITION"), position: z.string() }),
     z.object({ kind: z.literal("GK_ARCHETYPE"), archetype: z.string() }),
   ]),

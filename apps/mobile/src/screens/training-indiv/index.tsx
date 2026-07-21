@@ -5,8 +5,10 @@ import { router } from "expo-router";
 
 import {
   CommandTrackingStatus,
+  MAX_INDIVIDUAL_PLAN_ATTRIBUTES,
   archetypeLabel,
   attributeLabelPt,
+  isRecommendedAttribute,
   projectIndividualPlan,
 } from "@grinta/core";
 
@@ -84,7 +86,7 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   const [draftKind, setDraftKind] = useState<
     "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE" | null
   >(null);
-  const [draftAttribute, setDraftAttribute] = useState<string | null>(null);
+  const [draftAttributes, setDraftAttributes] = useState<readonly string[] | null>(null);
   const [draftPosition, setDraftPosition] = useState<string | null>(null);
   const [draftArchetype, setDraftArchetype] = useState<string | null>(null);
   const [draftIntensity, setDraftIntensity] = useState<number | null>(null);
@@ -133,9 +135,9 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
   // O alvo/intensidade correntes: rascunho por cima do que está valendo.
   const kind: "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE" =
     draftKind ?? plan?.target.kind ?? "ATTRIBUTE";
-  const attributeCode =
-    draftAttribute ??
-    (plan?.target.kind === "ATTRIBUTE" ? plan.target.attributeCode : null);
+  const attributeCodes =
+    draftAttributes ??
+    (plan?.target.kind === "ATTRIBUTE" ? plan.target.attributeCodes : []);
   const position =
     draftPosition ??
     (plan?.target.kind === "POSITION" ? plan.target.position : player?.primaryPosition ?? null);
@@ -146,9 +148,9 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
 
   const target: IndividualTarget | null =
     kind === "ATTRIBUTE"
-      ? attributeCode === null
+      ? attributeCodes.length === 0
         ? null
-        : { kind: "ATTRIBUTE", attributeCode }
+        : { kind: "ATTRIBUTE", attributeCodes }
       : kind === "GK_ARCHETYPE"
         ? archetype === null
           ? null
@@ -204,7 +206,7 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
     }
     const sig =
       payload.target.kind === "ATTRIBUTE"
-        ? `A:${payload.target.attributeCode}`
+        ? `A:${[...payload.target.attributeCodes].sort().join(",")}`
         : payload.target.kind === "GK_ARCHETYPE"
           ? `G:${payload.target.archetype}`
           : `P:${payload.target.position}`;
@@ -237,7 +239,7 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
         result.status === CommandTrackingStatus.APPLIED
       ) {
         setDraftKind(null);
-        setDraftAttribute(null);
+        setDraftAttributes(null);
         setDraftPosition(null);
         setDraftArchetype(null);
         setDraftIntensity(null);
@@ -302,7 +304,7 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
               : plan === null
                 ? `${player.name} não tem plano individual. Escolha um alvo.`
                 : plan.target.kind === "ATTRIBUTE"
-                  ? `Atual: atributo · intensidade ${intensityLabel(plan.intensity)}`
+                  ? `Atual: ${plan.target.attributeCodes.length} habilidade(s) · ${intensityLabel(plan.intensity)}`
                   : plan.target.kind === "GK_ARCHETYPE"
                     ? `Atual: goleiro ${archetypeLabel(plan.target.archetype)} · ${intensityLabel(plan.intensity)}`
                     : `Atual: posição ${positionLabel(plan.target.position)} · ${intensityLabel(plan.intensity)}`}
@@ -332,25 +334,42 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
           </View>
 
           {kind === "ATTRIBUTE" ? (
-            <View style={styles.grid}>
-              {attributeOptions.map((opt) => {
-                const on = attributeCode === opt.attributeCode;
-                return (
-                  <Pressable
-                    key={opt.attributeCode}
-                    onPress={() => setDraftAttribute(opt.attributeCode)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Atributo ${opt.label}`}
-                    accessibilityState={{ selected: on }}
-                    style={[styles.chip, on && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextActive]}>
-                      {opt.label} {opt.value}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <>
+              <Text style={styles.hint}>
+                Até {MAX_INDIVIDUAL_PLAN_ATTRIBUTES} habilidades — o ganho é dividido
+                entre elas. <Text style={{ color: color.warning }}>★</Text> = recomendada
+                da posição. ({attributeCodes.length}/{MAX_INDIVIDUAL_PLAN_ATTRIBUTES})
+              </Text>
+              <View style={styles.grid}>
+                {attributeOptions.map((opt) => {
+                  const on = attributeCodes.includes(opt.attributeCode);
+                  const full = !on && attributeCodes.length >= MAX_INDIVIDUAL_PLAN_ATTRIBUTES;
+                  const rec = isRecommendedAttribute(player.primaryPosition, opt.attributeCode);
+                  return (
+                    <Pressable
+                      key={opt.attributeCode}
+                      disabled={full}
+                      onPress={() =>
+                        setDraftAttributes((prev) => {
+                          const base = prev ?? attributeCodes;
+                          return base.includes(opt.attributeCode)
+                            ? base.filter((c) => c !== opt.attributeCode)
+                            : [...base, opt.attributeCode];
+                        })
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`${on ? "Remover" : "Escolher"} ${opt.label}${rec ? ", recomendado" : ""}`}
+                      accessibilityState={{ selected: on, disabled: full }}
+                      style={[styles.chip, on && styles.chipActive, full && styles.chipDisabled]}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextActive]}>
+                        {rec ? "★ " : ""}{opt.label} {opt.value}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
           ) : kind === "GK_ARCHETYPE" ? (
             <View style={styles.grid}>
               {ARCHETYPE_OPTIONS.map((opt) => {
@@ -550,6 +569,7 @@ const styles = StyleSheet.create({
     backgroundColor: color.surfaceRaised,
   },
   chipActive: { backgroundColor: color.primary },
+  chipDisabled: { opacity: 0.4 },
   chipText: { color: color.text, fontSize: fontSize.sm },
   chipTextActive: { color: color.background, fontWeight: fontWeight.bold },
   tradeoff: { color: color.text, fontSize: fontSize.sm, marginTop: space.sm, fontStyle: "italic" },

@@ -15,9 +15,12 @@ import { MAX_INTENSITY, MIN_INTENSITY } from "./training-types.js";
 
 export { MAX_INTENSITY, MIN_INTENSITY };
 
+/** Quantas habilidades o alvo ATRIBUTO pode mirar (igual à sessão). */
+export const MAX_INDIVIDUAL_PLAN_ATTRIBUTES = 5;
+
 /** Os tipos de alvo do plano individual construídos hoje. */
 export const IndividualTrainingTargetKind = {
-  /** Concentra o ganho num único atributo. */
+  /** Até 5 habilidades escolhidas — o ganho é DIVIDIDO entre elas (como a sessão). */
   ATTRIBUTE: "ATTRIBUTE",
   /** Espalha o ganho nas habilidades recomendadas da posição. */
   POSITION: "POSITION",
@@ -29,7 +32,7 @@ export type IndividualTrainingTargetKind =
   (typeof IndividualTrainingTargetKind)[keyof typeof IndividualTrainingTargetKind];
 
 export type IndividualTrainingTarget =
-  | { readonly kind: "ATTRIBUTE"; readonly attributeCode: string }
+  | { readonly kind: "ATTRIBUTE"; readonly attributeCodes: readonly string[] }
   | { readonly kind: "POSITION"; readonly position: string }
   | { readonly kind: "GK_ARCHETYPE"; readonly archetype: string };
 

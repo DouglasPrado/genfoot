@@ -14,6 +14,7 @@ import { recommendedAttributes } from "../players/position-attributes.js";
 
 import { archetypeAttributes } from "./gk-archetypes.js";
 import {
+  MAX_INDIVIDUAL_PLAN_ATTRIBUTES,
   MAX_INTENSITY,
   MIN_INTENSITY,
   type IndividualTrainingPlanRepository,
@@ -79,14 +80,26 @@ export class SetIndividualTrainingPlan {
     // (com recomendadas), ou arquétipo de goleiro conhecido. Alvo inválido não
     // vira plano.
     if (input.target.kind === "ATTRIBUTE") {
-      if (!KNOWN_ATTRIBUTES.has(input.target.attributeCode)) {
-        return fail(
-          new DomainError(
-            "ATTRIBUTE_NOT_APPLICABLE",
-            "Atributo-alvo não existe no catálogo.",
-            { attributeCode: input.target.attributeCode },
-          ),
+      const codes = input.target.attributeCodes;
+      if (codes.length < 1 || codes.length > MAX_INDIVIDUAL_PLAN_ATTRIBUTES) {
+        return invalid(
+          `Escolha de 1 a ${MAX_INDIVIDUAL_PLAN_ATTRIBUTES} habilidades para o plano.`,
+          { count: codes.length },
         );
+      }
+      if (new Set(codes).size !== codes.length) {
+        return invalid("A mesma habilidade aparece duas vezes no plano.");
+      }
+      for (const attributeCode of codes) {
+        if (!KNOWN_ATTRIBUTES.has(attributeCode)) {
+          return fail(
+            new DomainError(
+              "ATTRIBUTE_NOT_APPLICABLE",
+              "Atributo-alvo não existe no catálogo.",
+              { attributeCode },
+            ),
+          );
+        }
       }
     } else if (input.target.kind === "POSITION") {
       if (recommendedAttributes(input.target.position).length === 0) {

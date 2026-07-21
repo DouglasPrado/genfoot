@@ -19,22 +19,34 @@ const gkValueOf = (code: string): number | null => gk[code] ?? null;
 describe("projectIndividualPlan", () => {
   it("orçamento zero não projeta nada", () => {
     expect(
-      projectIndividualPlan({ target: { kind: "ATTRIBUTE", attributeCode: "finishing" }, rawGainPoints: 0, attributeValueOf: valueOf }),
+      projectIndividualPlan({ target: { kind: "ATTRIBUTE", attributeCodes: ["finishing"] }, rawGainPoints: 0, attributeValueOf: valueOf }),
     ).toEqual([]);
   });
 
-  it("ATRIBUTO: concentra o orçamento inteiro no alvo (÷1)", () => {
+  it("ATRIBUTO com UMA habilidade: o orçamento inteiro nela (÷1)", () => {
     const changes = projectIndividualPlan({
-      target: { kind: "ATTRIBUTE", attributeCode: "finishing" },
+      target: { kind: "ATTRIBUTE", attributeCodes: ["finishing"] },
       rawGainPoints: 4,
       attributeValueOf: valueOf,
     });
     expect(changes).toEqual([{ attributeCode: "finishing", before: 30, after: 34, gain: 4 }]);
   });
 
+  it("ATRIBUTO com até 5 habilidades: o orçamento é DIVIDIDO (÷N, floor), como a sessão", () => {
+    const changes = projectIndividualPlan({
+      target: { kind: "ATTRIBUTE", attributeCodes: ["finishing", "dribbling"] },
+      rawGainPoints: 5, // ÷2 = 2 por habilidade (resto se perde)
+      attributeValueOf: valueOf,
+    });
+    expect(changes).toEqual([
+      { attributeCode: "finishing", before: 30, after: 32, gain: 2 },
+      { attributeCode: "dribbling", before: 50, after: 52, gain: 2 },
+    ]);
+  });
+
   it("ATRIBUTO que não se aplica ao jogador (null) não projeta", () => {
     expect(
-      projectIndividualPlan({ target: { kind: "ATTRIBUTE", attributeCode: "goalkeeperReflexes" }, rawGainPoints: 5, attributeValueOf: valueOf }),
+      projectIndividualPlan({ target: { kind: "ATTRIBUTE", attributeCodes: ["goalkeeperReflexes"] }, rawGainPoints: 5, attributeValueOf: valueOf }),
     ).toEqual([]);
   });
 

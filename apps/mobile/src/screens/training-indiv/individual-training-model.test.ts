@@ -28,19 +28,20 @@ describe("individual-training-model (M-TRAINING-INDIV)", () => {
     expect(opts.find((o) => o.attributeCode === "finishing")?.value).toBe(30);
   });
 
-  it("tradeoffHint distingue concentrado (atributo) de espalhado (posição)", () => {
-    expect(tradeoffHint({ kind: "ATTRIBUTE", attributeCode: "finishing" })).toMatch(/CONCENTRADO/);
+  it("tradeoffHint: uma habilidade concentra; várias dividem; posição espalha", () => {
+    expect(tradeoffHint({ kind: "ATTRIBUTE", attributeCodes: ["finishing"] })).toMatch(/CONCENTRADO/);
+    expect(tradeoffHint({ kind: "ATTRIBUTE", attributeCodes: ["finishing", "pace"] })).toMatch(/DIVIDIDO/);
     expect(tradeoffHint({ kind: "POSITION", position: "ST" })).toMatch(/ESPALHADO/);
   });
 
-  it("monta o payload de ATRIBUTO com a intensidade presa em 0..100", () => {
+  it("monta o payload de ATRIBUTO (até 5) com a intensidade presa em 0..100", () => {
     const p = buildSetIndividualPlanPayload({
       clubId: "c1", playerId: "p1",
-      target: { kind: "ATTRIBUTE", attributeCode: "finishing" },
+      target: { kind: "ATTRIBUTE", attributeCodes: ["finishing", "pace"] },
       intensity: 140, expectedVersion: 3,
     });
     if ("error" in p) throw new Error("deveria montar");
-    expect(p.target).toEqual({ kind: "ATTRIBUTE", attributeCode: "finishing" });
+    expect(p.target).toEqual({ kind: "ATTRIBUTE", attributeCodes: ["finishing", "pace"] });
     expect(p.intensity).toBe(100);
     expect(p.expectedVersion).toBe(3);
   });
@@ -75,7 +76,7 @@ describe("individual-training-model (M-TRAINING-INDIV)", () => {
     })).toEqual({ error: "NO_TARGET" });
     expect(buildSetIndividualPlanPayload({
       clubId: "c1", playerId: "p1",
-      target: { kind: "ATTRIBUTE", attributeCode: "" }, intensity: 50, expectedVersion: null,
+      target: { kind: "ATTRIBUTE", attributeCodes: [] }, intensity: 50, expectedVersion: null,
     })).toEqual({ error: "NO_TARGET" });
   });
 });

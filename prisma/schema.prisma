@@ -1732,8 +1732,8 @@ model IndividualTrainingPlan {
   playerId            String  @db.Uuid
   /// "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE"
   targetKind          String
-  /// preenchido quando targetKind = ATTRIBUTE
-  targetAttributeCode String?
+  /// preenchido quando targetKind = ATTRIBUTE — até 5 habilidades (ganho dividido)
+  targetAttributeCodes String[]
   /// preenchido quando targetKind = POSITION
   targetPosition      String?
   /// preenchido quando targetKind = GK_ARCHETYPE

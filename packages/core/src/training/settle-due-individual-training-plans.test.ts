@@ -111,7 +111,7 @@ describe("SettleDueIndividualTrainingPlans (M-TRAINING-INDIV)", () => {
 
   it("alvo ATRIBUTO: concentra o orçamento CHEIO no atributo, sem tocar os outros", async () => {
     const players = new MemPlayers(aggregate());
-    const r = await settle({ kind: "ATTRIBUTE", attributeCode: "finishing" }, players);
+    const r = await settle({ kind: "ATTRIBUTE", attributeCodes: ["finishing"] }, players);
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.value.developedCount).toBe(1);
     // finishing subiu o orçamento inteiro (concentrado), não só +1.
@@ -144,7 +144,7 @@ describe("SettleDueIndividualTrainingPlans (M-TRAINING-INDIV)", () => {
 
   it("jogador NÃO apto (lesionado) é pulado — a sessão manual/lesão tem precedência", async () => {
     const players = new MemPlayers(aggregate(PlayerAvailability.INJURED));
-    const r = await settle({ kind: "ATTRIBUTE", attributeCode: "finishing" }, players);
+    const r = await settle({ kind: "ATTRIBUTE", attributeCodes: ["finishing"] }, players);
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.value.developedCount).toBe(0);
