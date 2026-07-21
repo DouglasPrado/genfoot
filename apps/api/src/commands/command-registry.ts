@@ -75,6 +75,8 @@ import {
   type LineupContextReader,
   SetClubLineup,
   type PlayerRepository,
+  type PushTokenRepository,
+  RegisterPushToken,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -165,6 +167,8 @@ export interface CommandContext {
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
   readonly playerRepository: PlayerRepository;
+  /** Push remoto (Expo) — registro do token do device por conta. */
+  readonly pushTokenRepository: PushTokenRepository;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -420,6 +424,11 @@ const toggleAutomationPayload = z.object({
 // do token (actorId), nunca do payload.
 const presencePayload = z.object({
   online: z.boolean().default(true),
+});
+
+const registerPushTokenPayload = z.object({
+  expoPushToken: z.string().min(1),
+  platform: z.enum(["ios", "android"]).default("ios"),
 });
 
 const runAutopilotPayload = z.object({
@@ -1609,6 +1618,32 @@ const handlers: Record<string, CommandHandler> = {
       await presence.recordOffline(world.value.worldId, actorId);
     }
     return succeed({ resource: `presence:${actorId}` });
+  },
+
+  // Push remoto: o device registra seu Expo push token, atrelado à conta. Sem
+  // mundo — o token vale para o usuário, não para uma partida.
+  "identity:register-push-token": async ({
+    pushTokenRepository,
+    actorId,
+    envelope,
+  }) => {
+    if (actorId === null) {
+      return fail(
+        new DomainError(
+          "PUSH_TOKEN_REQUIRES_USER",
+          "Registrar o push exige uma sessão de usuário.",
+        ),
+      );
+    }
+    const parsed = registerPushTokenPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new RegisterPushToken(pushTokenRepository).execute({
+      accountId: actorId,
+      expoPushToken: parsed.data.expoPushToken,
+      platform: parsed.data.platform,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `push-token:${actorId}` });
   },
 
   // X-001 — o executor: roda a automação do clube num gatilho. A precedência

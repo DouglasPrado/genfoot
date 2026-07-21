@@ -101,6 +101,8 @@ describe.skipIf(!hasDatabase)(
       "identity:confirm-onboarding",
       "identity:end-club-control",
       "identity:join-world",
+      // Push remoto: o device registra seu Expo push token, atrelado à conta.
+      "identity:register-push-token",
       "identity:release-club-reservation",
       "identity:request-switch",
       "identity:reserve-club",
@@ -161,7 +163,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(49);
+    expect(response.body.commandCount).toBe(50);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

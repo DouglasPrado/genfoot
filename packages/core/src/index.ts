@@ -125,6 +125,7 @@ export * from "./narrative/narrative-types.js";
 export * from "./narrative/transfer-narrative.js";
 export * from "./notifications/notification-types.js";
 export * from "./notifications/transfer-notification.js";
+export * from "./notifications/push-token.js";
 export * from "./staff/staff-types.js";
 export * from "./staff/staff-generation.js";
 export * from "./staff/staff-bootstrap.js";

@@ -19,6 +19,7 @@ import {
   PrismaGroupTrainingSessionUnitOfWork,
   PrismaGroupTrainingSessionsReadModel,
   PrismaPlayerRepository,
+  PrismaPushTokenRepository,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
   PrismaSeasonLifecycleRepository,
@@ -74,6 +75,7 @@ import {
   GROUP_TRAINING_UNIT_OF_WORK,
   GROUP_TRAINING_SESSIONS_READ_MODEL,
   PLAYER_REPOSITORY,
+  PUSH_TOKEN_REPOSITORY,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
@@ -284,6 +286,12 @@ import {
         new PrismaPlayerRepository(client),
     },
     {
+      provide: PUSH_TOKEN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPushTokenRepository =>
+        new PrismaPushTokenRepository(client),
+    },
+    {
       provide: YOUTH_INTAKE_READ_MODEL,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaYouthIntakeReadModel =>
@@ -489,6 +497,7 @@ import {
     CLUB_LINEUP_REPOSITORY,
     LINEUP_CONTEXT_READER,
     PLAYER_REPOSITORY,
+    PUSH_TOKEN_REPOSITORY,
     YOUTH_INTAKE_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
