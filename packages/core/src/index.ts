@@ -72,6 +72,7 @@ export * from "./matches/match-types.js";
 // O grid canônico do GDD §2 (R-188) e a derivação do overall (R-09).
 export * from "./players/player-attributes.js";
 export * from "./players/attribute-labels.js";
+export * from "./players/position-attributes.js";
 export * from "./players/potential-layers.js";
 export * from "./players/player-repository.js";
 export * from "./players/squad-read-model.js";

@@ -10,7 +10,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import { CommandTrackingStatus, attributeLabelPt } from "@grinta/core";
+import {
+  CommandTrackingStatus,
+  attributeLabelPt,
+  isRecommendedAttribute,
+} from "@grinta/core";
 
 import { AvailabilityFlag } from "@/components/availability-flag";
 import { Card } from "@/components/card";
@@ -1369,9 +1373,10 @@ export function Training() {
               FOCO DO TREINO — {picking?.name ?? ""}
             </Text>
             <Text style={styles.modalHint}>
-              Escolha até 5 habilidades. O ganho do treino é DIVIDIDO entre elas
-              (quanto mais habilidades, menos em cada). Menor primeiro: é onde
-              sobra mais espaço.
+              Escolha até 5 habilidades. As{" "}
+              <Text style={{ color: color.warning }}>★ REC</Text> são recomendadas
+              para a posição. O ganho é DIVIDIDO entre as escolhidas (mais
+              habilidades, menos em cada).
             </Text>
             <ScrollView style={styles.modalList}>
               {picking === null ? null : attributesOf(picking.playerId).length ===
@@ -1381,10 +1386,29 @@ export function Training() {
                   não há foco a escolher.
                 </Text>
               ) : (
-                attributesOf(picking.playerId).map((attr) => {
+                [...attributesOf(picking.playerId)]
+                  // Recomendadas para a posição primeiro; dentro de cada grupo,
+                  // menor valor antes (mais espaço para crescer).
+                  .sort(
+                    (a, b) =>
+                      Number(
+                        isRecommendedAttribute(picking.primaryPosition, b.code),
+                      ) -
+                        Number(
+                          isRecommendedAttribute(
+                            picking.primaryPosition,
+                            a.code,
+                          ),
+                        ) || a.value - b.value,
+                  )
+                  .map((attr) => {
                   const on = pickedAttrs.includes(attr.code);
                   const full =
                     !on && pickedAttrs.length >= MAX_SESSION_ATTRIBUTES;
+                  const recommended = isRecommendedAttribute(
+                    picking.primaryPosition,
+                    attr.code,
+                  );
                   return (
                     <Pressable
                       key={attr.code}
@@ -1397,7 +1421,7 @@ export function Training() {
                         )
                       }
                       accessibilityRole="button"
-                      accessibilityLabel={`${on ? "Remover" : "Escolher"} ${attributeLabel(attr.code)}`}
+                      accessibilityLabel={`${on ? "Remover" : "Escolher"} ${attributeLabel(attr.code)}${recommended ? ", recomendado" : ""}`}
                       accessibilityState={{ selected: on, disabled: full }}
                       style={[styles.attrRow, full && styles.rowDisabled]}
                     >
@@ -1411,6 +1435,12 @@ export function Training() {
                       >
                         {attributeLabel(attr.code)}
                       </Text>
+                      {recommended ? (
+                        <View style={styles.recTag}>
+                          <Icon name="star" size={9} color={color.warning} />
+                          <Text style={styles.recTagText}>REC</Text>
+                        </View>
+                      ) : null}
                       <Text style={styles.attrValue}>{attr.value}</Text>
                     </Pressable>
                   );
@@ -2308,6 +2338,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: 4,
     paddingVertical: 1,
+  },
+  recTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    borderWidth: 1,
+    borderColor: color.warning,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  recTagText: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.3,
+    color: color.warning,
   },
   modalCancel: { alignItems: "center", paddingVertical: space.md },
   modalCancelText: {
