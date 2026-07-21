@@ -11,12 +11,12 @@ const ATTRIBUTE_LABEL_PT: Readonly<Record<string, string>> = {
   longPassing: "Passe longo",
   crossing: "Cruzamento",
   dribbling: "Drible",
-  firstTouch: "Domínio de bola",
+  firstTouch: "Domínio",
   marking: "Marcação",
   tackling: "Desarme",
   heading: "Cabeceio",
   setPieces: "Bola parada",
-  vision: "Visão de jogo",
+  vision: "Visão",
   // Físicos (9)
   pace: "Velocidade",
   acceleration: "Aceleração",
@@ -40,12 +40,12 @@ const ATTRIBUTE_LABEL_PT: Readonly<Record<string, string>> = {
   resilience: "Resiliência",
   // Goleiro (8)
   goalkeeperReflexes: "Reflexos",
-  goalkeeperPositioning: "Posicionamento (gol)",
+  goalkeeperPositioning: "Posic. de gol",
   goalkeeperHandling: "Saída de gol",
   goalkeeperKicking: "Reposição",
   goalkeeperAerial: "Jogo aéreo",
-  goalkeeperOneOnOne: "Um-contra-um",
-  goalkeeperPenalty: "Defesa de pênalti",
+  goalkeeperOneOnOne: "Um-a-um",
+  goalkeeperPenalty: "Pênalti",
   goalkeeperCommand: "Comando de área",
 };
 
