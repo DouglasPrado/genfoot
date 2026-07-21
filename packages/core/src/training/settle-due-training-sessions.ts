@@ -1,7 +1,10 @@
 import { succeed, type Result } from "@grinta/shared";
 import type { RulesetVersion , DomainError} from "@grinta/shared";
 
-import { settleTrainingSession } from "./collect-training-session.js";
+import {
+  settleTrainingSession,
+  type CollectTrainingSessionResult,
+} from "./collect-training-session.js";
 import { sessionElapsedDays } from "./training-session.js";
 import type { TrainingSessionUnitOfWork } from "./training-session-types.js";
 
@@ -26,6 +29,8 @@ export interface SettleDueTrainingSessionsInput {
 export interface SettleDueTrainingSessionsResult {
   readonly settledCount: number;
   readonly skippedCount: number;
+  /** Um relatório por sessão settlada — alimenta o push de treino completo. */
+  readonly reports: readonly CollectTrainingSessionResult[];
 }
 
 export class SettleDueTrainingSessions {
@@ -38,6 +43,7 @@ export class SettleDueTrainingSessions {
       const active = await repos.sessions.findAllActive(input.gameWorldId);
       let settledCount = 0;
       let skippedCount = 0;
+      const reports: CollectTrainingSessionResult[] = [];
       for (const session of active) {
         const elapsed = sessionElapsedDays(session.startDate, input.worldDate);
         if (elapsed < session.durationDays) continue; // ainda em curso
@@ -47,10 +53,12 @@ export class SettleDueTrainingSessions {
           worldDate: input.worldDate,
           rulesetVersion: input.rulesetVersion,
         });
-        if (result.ok) settledCount += 1;
-        else skippedCount += 1;
+        if (result.ok) {
+          settledCount += 1;
+          reports.push(result.value);
+        } else skippedCount += 1;
       }
-      return succeed({ settledCount, skippedCount });
+      return succeed({ settledCount, skippedCount, reports });
     });
   }
 }

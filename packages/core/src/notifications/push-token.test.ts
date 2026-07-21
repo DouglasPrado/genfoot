@@ -17,6 +17,9 @@ class MemPushTokens implements PushTokenRepository {
   public findByAccount(accountId: string): Promise<readonly PushTokenRecord[]> {
     return Promise.resolve(this.rows.filter((r) => r.accountId === accountId));
   }
+  public findTokensForClub(): Promise<readonly string[]> {
+    return Promise.resolve([]);
+  }
 }
 
 const ACC = "019b76da-a800-7451-8ea2-7b2378e42050";

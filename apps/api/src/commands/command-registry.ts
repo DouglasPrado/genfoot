@@ -77,6 +77,7 @@ import {
   type PlayerRepository,
   type PushTokenRepository,
   RegisterPushToken,
+  buildTrainingReportMessage,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -108,6 +109,10 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
+import {
+  sendExpoPush,
+  type ExpoPushMessage,
+} from "../push/expo-push-sender.js";
 
 /**
  * O barramento de commands depois do extermínio da arquitetura morta (R-175).
@@ -634,7 +639,10 @@ async function applySeasonTurns(
  * liberado — sem coleta manual. Idempotente (a sessão vira inativa ao settlar).
  */
 async function settleDueTraining(
-  deps: Pick<CommandContext, "trainingSessionUnitOfWork">,
+  deps: Pick<
+    CommandContext,
+    "trainingSessionUnitOfWork" | "pushTokenRepository"
+  >,
   world: {
     readonly worldId: string;
     readonly seed: string;
@@ -642,12 +650,37 @@ async function settleDueTraining(
     readonly rulesetVersion: string;
   },
 ): Promise<void> {
-  await new SettleDueTrainingSessions(deps.trainingSessionUnitOfWork).execute({
+  const result = await new SettleDueTrainingSessions(
+    deps.trainingSessionUnitOfWork,
+  ).execute({
     gameWorldId: world.worldId,
     worldSeed: world.seed,
     worldDate: world.currentDate,
     rulesetVersion: world.rulesetVersion as never,
   });
+  if (!result.ok) return;
+
+  // Push de treino completo (best-effort, FORA da transação do domínio): para
+  // cada sessão settlada, avisa o DONO do clube — jogador + atributo antes→depois.
+  // Clube de IA (sem controlador) não tem token: a lista sai vazia e nada é enviado.
+  const messages: ExpoPushMessage[] = [];
+  for (const report of result.value.reports) {
+    const tokens = await deps.pushTokenRepository.findTokensForClub(
+      world.worldId,
+      report.clubId,
+    );
+    if (tokens.length === 0) continue;
+    const text = buildTrainingReportMessage({
+      playerName: report.playerName,
+      attributeCode: report.attributeCode,
+      before: report.before,
+      after: report.after,
+    });
+    for (const to of tokens) {
+      messages.push({ to, title: text.title, body: text.body });
+    }
+  }
+  await sendExpoPush(messages);
 }
 
 /**
@@ -851,6 +884,7 @@ const handlers: Record<string, CommandHandler> = {
     seasonLifecycle,
     trainingSessionUnitOfWork,
     groupTrainingUnitOfWork,
+    pushTokenRepository,
     playerRepository,
     envelope,
   }) => {
@@ -912,7 +946,7 @@ const handlers: Record<string, CommandHandler> = {
     // avanço pode pular vários dias, uma sessão que venceu no meio é settlada
     // aqui na data final — o ganho é tetado na duração, então não infla.
     await settleDueTraining(
-      { trainingSessionUnitOfWork },
+      { trainingSessionUnitOfWork, pushTokenRepository },
       {
         worldId,
         seed: worldSeed,
@@ -1698,6 +1732,7 @@ const handlers: Record<string, CommandHandler> = {
     seasonLifecycle,
     trainingSessionUnitOfWork,
     groupTrainingUnitOfWork,
+    pushTokenRepository,
     playerRepository,
     envelope,
   }) => {
@@ -1729,9 +1764,10 @@ const handlers: Record<string, CommandHandler> = {
         },
         result.value.seasonsClosed,
       );
-      // Virada do dia: libera quem terminou o treino de sessão (1 dia).
+      // Virada do dia: libera quem terminou o treino de sessão (1 dia) e avisa
+      // o dono por push (treino completo).
       await settleDueTraining(
-        { trainingSessionUnitOfWork },
+        { trainingSessionUnitOfWork, pushTokenRepository },
         {
           worldId: after.value.worldId,
           seed: after.value.snapshot.seed,

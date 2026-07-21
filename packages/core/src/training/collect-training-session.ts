@@ -42,6 +42,13 @@ export interface CollectTrainingSessionResult {
   readonly gainPoints: number;
   readonly elapsedDays: number;
   readonly complete: boolean;
+  /** Quem treinou (para o aviso de treino completo). */
+  readonly playerId: string;
+  readonly clubId: string;
+  readonly playerName: string;
+  /** Valor do atributo-foco antes e depois (efetivo, pós-teto). */
+  readonly before: number;
+  readonly after: number;
 }
 
 
@@ -147,11 +154,17 @@ export async function settleTrainingSession(
     snapshot.player.version,
   );
 
+  const before = current ?? 0;
   return succeed({
     attributeCode: session.attributeCode,
     gainPoints,
     elapsedDays,
     complete: elapsedDays >= session.durationDays,
+    playerId: session.playerId,
+    clubId: session.clubId,
+    playerName: `${snapshot.person.firstName} ${snapshot.person.lastName}`,
+    before,
+    after: before + gainPoints,
   });
 }
 

@@ -19,6 +19,15 @@ export interface PushTokenRepository {
   upsertByToken(record: PushTokenRecord): Promise<void>;
   /** Tokens de uma conta — para o envio (um usuário pode ter vários devices). */
   findByAccount(accountId: string): Promise<readonly PushTokenRecord[]>;
+  /**
+   * Tokens do DONO de um clube (o controlador ativo) — para avisar o técnico
+   * humano. Clube de IA (sem controle) devolve vazio. Junta
+   * ClubControl(ativo) → WorldParticipant → PushDeviceToken.
+   */
+  findTokensForClub(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<readonly string[]>;
 }
 
 /** Formato do token do Expo: `ExponentPushToken[...]` ou `ExpoPushToken[...]`. */

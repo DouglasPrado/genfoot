@@ -37,4 +37,23 @@ export class PrismaPushTokenRepository implements PushTokenRepository {
       platform: r.platform,
     }));
   }
+
+  public async findTokensForClub(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<readonly string[]> {
+    // Clube → controlador ativo → conta → tokens. Clube de IA (sem controle
+    // ativo) resolve para lista vazia.
+    const controls = await this.client.clubControl.findMany({
+      where: { gameWorldId, clubId, status: "ACTIVE" },
+      select: { worldParticipant: { select: { userId: true } } },
+    });
+    const accountIds = controls.map((c) => c.worldParticipant.userId);
+    if (accountIds.length === 0) return [];
+    const tokens = await this.client.pushDeviceToken.findMany({
+      where: { accountId: { in: accountIds } },
+      select: { expoPushToken: true },
+    });
+    return tokens.map((t) => t.expoPushToken);
+  }
 }
