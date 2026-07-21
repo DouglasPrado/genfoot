@@ -185,6 +185,8 @@ describe.skipIf(!hasDatabase)(
       "identity-detail",
       // A caixa de entrada (C12, M-HOME): pendências do clube.
       "inbox",
+      // A LISTA de avisos do clube (tela de avisos): itens com título/corpo.
+      "inbox-items",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
       // A escalação corrente do clube (M-LINEUP, R-220 Fase 1): recorte por clubId.

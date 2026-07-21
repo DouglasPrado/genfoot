@@ -285,6 +285,20 @@ const handlers: Record<string, QueryHandler> = {
       await inboxReadModel.summaryForClubs(worldId, clubId === null ? [] : [clubId]),
     );
   },
+  "inbox-items": async ({ inboxReadModel }, worldId, params) => {
+    // A LISTA de avisos do clube (tela de avisos). Exige clubId — a lista é de UM clube.
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "inbox-items exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed({ items: await inboxReadModel.listForClub(worldId, clubId) });
+  },
   youth: async ({ squadReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     if (clubId === null) {

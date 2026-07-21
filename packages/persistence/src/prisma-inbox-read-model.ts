@@ -1,4 +1,8 @@
-import type { InboxReadModel, InboxSummary } from "@grinta/core";
+import type {
+  InboxNotificationView,
+  InboxReadModel,
+  InboxSummary,
+} from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
 import type { PrismaClient } from "./prisma-connection.js";
@@ -28,5 +32,26 @@ export class PrismaInboxReadModel implements InboxReadModel {
       this.client.notification.count({ where: clubFilter }),
     ]);
     return { openNotificationCount, timelineCount, reportCount: 0 };
+  }
+
+  public async listForClub(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    limit = 50,
+  ): Promise<readonly InboxNotificationView[]> {
+    const rows = await this.client.notification.findMany({
+      where: { gameWorldId, clubId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      title: r.title,
+      message: r.message,
+      priority: r.priority,
+      isRead: r.isRead,
+      createdOn: r.createdAt.toISOString().slice(0, 10),
+    }));
   }
 }
