@@ -4,6 +4,7 @@ import {
   attributeAssists,
   attributeShots,
   drawCards,
+  distributeOnTarget,
   drawFouls,
   splitOnTarget,
   type IncidentCandidate,
@@ -231,5 +232,48 @@ describe("drawFouls", () => {
       expect(total).toBeGreaterThanOrEqual(6);
       expect(total).toBeLessThanOrEqual(20);
     }
+  });
+});
+
+describe("distributeOnTarget", () => {
+  const shots = [
+    { playerId: "st", shots: 4 },
+    { playerId: "lw", shots: 3 },
+    { playerId: "cm", shots: 1 },
+  ];
+
+  it("a soma fecha EXATAMENTE com o total do time", () => {
+    for (const total of [0, 1, 3, 5, 8]) {
+      const rows = distributeOnTarget(shots, new Map(), total);
+      expect(rows.reduce((sum, r) => sum + r.shots, 0)).toBe(total);
+    }
+  });
+
+  it("quem marcou tem pelo menos os gols dele no alvo", () => {
+    const rows = distributeOnTarget(
+      shots,
+      new Map([["cm", 1]]),
+      2,
+    );
+    const byPlayer = new Map(rows.map((r) => [r.playerId, r.shots]));
+    expect(byPlayer.get("cm") ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  it("ninguém acerta mais chutes do que deu", () => {
+    const rows = distributeOnTarget(shots, new Map(), 8);
+    for (const row of rows) {
+      const dado = shots.find((s) => s.playerId === row.playerId)!.shots;
+      expect(row.shots).toBeLessThanOrEqual(dado);
+    }
+  });
+
+  it("é determinístico", () => {
+    expect(distributeOnTarget(shots, new Map(), 4)).toEqual(
+      distributeOnTarget(shots, new Map(), 4),
+    );
+  });
+
+  it("sem finalização não há alvo", () => {
+    expect(distributeOnTarget([], new Map(), 5)).toEqual([]);
   });
 });

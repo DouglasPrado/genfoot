@@ -8,6 +8,7 @@ import {
   type ScorerCandidate,
   type SimulatedMatchResult,
 } from "@grinta/core";
+import { distributeOnTarget } from "@grinta/core";
 import type { GameWorldId } from "@grinta/shared";
 
 import type { PrismaClient } from "./prisma-connection.js";
@@ -241,20 +242,22 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       for (const foul of [...result.homeFouls, ...result.awayFouls]) {
         bump(foul.playerId, "fouls", foul.fouls);
       }
-      // O chute no alvo e do TIME; reparte-se proporcionalmente ao que cada um
-      // finalizou, com o piso do gol (gol e sempre no alvo).
+      // O chute no alvo e do TIME. A reparticao FECHA com o total (metodo do
+      // maior resto): somar um piso por jogador estourava a conta e produzia
+      // "8 finalizacoes, 8 no alvo" num jogo de 4 gols.
+      const goalsByPlayer = new Map(
+        [...perPlayer].map(([playerId, row]) => [playerId, row.goals]),
+      );
       for (const [playerShots, teamOnTarget] of [
         [result.homePlayerShots, result.homeShotsOnTarget],
         [result.awayPlayerShots, result.awayShotsOnTarget],
       ] as const) {
-        const teamShots = playerShots.reduce((sum, s) => sum + s.shots, 0);
-        for (const entry of playerShots) {
-          const goals = perPlayer.get(entry.playerId)?.goals ?? 0;
-          const share =
-            teamShots === 0
-              ? goals
-              : Math.round((entry.shots / teamShots) * teamOnTarget);
-          bump(entry.playerId, "shotsOnTarget", Math.max(goals, share));
+        for (const entry of distributeOnTarget(
+          playerShots,
+          goalsByPlayer,
+          teamOnTarget,
+        )) {
+          bump(entry.playerId, "shotsOnTarget", entry.shots);
         }
       }
       // A defesa e do goleiro: sem escalacao, o goleiro do jogo e o de maior

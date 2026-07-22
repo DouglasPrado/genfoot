@@ -349,3 +349,58 @@ export function drawFouls(
     .map(([playerId, fouls]) => ({ playerId, fouls }))
     .sort((a, b) => b.fouls - a.fouls || a.playerId.localeCompare(b.playerId));
 }
+
+/**
+ * Reparte as finalizações NO ALVO do time entre os jogadores.
+ *
+ * A soma tem de fechar EXATAMENTE com o total do time: somar um piso por
+ * jogador (cada um pelo menos os seus gols) estoura a conta e a tela mostra "8
+ * finalizações, 8 no alvo" num jogo de 4 gols — aproveitamento impossível.
+ *
+ * Regra: cada jogador começa com os gols que fez (gol é sempre no alvo); o que
+ * sobra vai para quem mais finalizou, pelo método do maior resto. Determinístico
+ * e sem sorteio — é repartição, não sorte.
+ */
+export function distributeOnTarget(
+  playerShots: readonly PlayerShots[],
+  goalsByPlayer: ReadonlyMap<string, number>,
+  teamOnTarget: number,
+): PlayerShots[] {
+  if (playerShots.length === 0) return [];
+
+  const floor = new Map<string, number>();
+  for (const entry of playerShots) {
+    // O piso não pode passar do que o jogador finalizou.
+    const goals = Math.min(goalsByPlayer.get(entry.playerId) ?? 0, entry.shots);
+    floor.set(entry.playerId, goals);
+  }
+  const used = [...floor.values()].reduce((sum, n) => sum + n, 0);
+  let remaining = Math.max(0, teamOnTarget - used);
+
+  // Quem tem mais chute ainda não contado recebe primeiro; empate desempata por
+  // id para a repartição ser estável entre reprocessamentos.
+  const room = playerShots
+    .map((entry) => ({
+      playerId: entry.playerId,
+      room: entry.shots - (floor.get(entry.playerId) ?? 0),
+    }))
+    .filter((entry) => entry.room > 0)
+    .sort((a, b) => b.room - a.room || a.playerId.localeCompare(b.playerId));
+
+  // Distribui de um em um, circulando: espalha em vez de encher o primeiro.
+  let index = 0;
+  while (remaining > 0 && room.length > 0) {
+    const entry = room[index % room.length]!;
+    if (entry.room > 0) {
+      floor.set(entry.playerId, (floor.get(entry.playerId) ?? 0) + 1);
+      entry.room -= 1;
+      remaining -= 1;
+    }
+    index += 1;
+    if (room.every((e) => e.room === 0)) break;
+  }
+
+  return [...floor]
+    .filter(([, onTarget]) => onTarget > 0)
+    .map(([playerId, shots]) => ({ playerId, shots }));
+}

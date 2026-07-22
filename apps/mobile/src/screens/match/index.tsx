@@ -1,5 +1,13 @@
 import { useCallback, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ImageBackground,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ImageSourcePropType,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -19,7 +27,17 @@ import {
   type MatchFeedCoverageSource,
   type MatchFeedEventSource,
 } from "@/screens/match/match-model";
+import {
+  FeedMark,
+  StatSplit,
+  markKindOf,
+  sideColor,
+} from "@/screens/match/match-visuals";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
+
+/** Arte do bundle (decorativa): o gramado atrás do placar, como no protótipo. */
+const FIELD_BG =
+  require("../../../assets/home-field-bg.jpg") as ImageSourcePropType;
 
 interface MatchClubBadgeSource {
   readonly clubId: string;
@@ -28,6 +46,20 @@ interface MatchClubBadgeSource {
   readonly primaryColor: string | null;
   readonly secondaryColor: string | null;
   readonly crestTemplateId: string | null;
+}
+
+interface PlayerRatingSource {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly clubId: string;
+  readonly position: string;
+  readonly rating: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly saves: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
 }
 
 interface MatchDetailProjection {
@@ -46,6 +78,11 @@ interface MatchDetailProjection {
   readonly homeShots: number | null;
   readonly awayShots: number | null;
   readonly homePossession: number | null;
+  readonly homeExpectedGoals: number | null;
+  readonly awayExpectedGoals: number | null;
+  readonly homeShotsOnTarget: number | null;
+  readonly awayShotsOnTarget: number | null;
+  readonly ratings: readonly PlayerRatingSource[];
   readonly events: readonly MatchFeedEventSource[];
   readonly feedCoverage: MatchFeedCoverageSource;
 }
@@ -77,6 +114,9 @@ export function Match() {
     () => (detail == null ? [] : missingFeedFamilies(detail.feedCoverage)),
     [detail],
   );
+
+  const homeColor = sideColor(detail?.home.primaryColor ?? null, color.primary);
+  const awayColor = sideColor(detail?.away.primaryColor ?? null, color.info);
 
   const refresh = useCallback(() => query.refetch(), [query.refetch]);
 
@@ -123,20 +163,41 @@ export function Match() {
           >
             <Icon name="arrow-back" size={22} color={color.text} />
           </Pressable>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>
-              {detail.finished ? "FIM DE JOGO" : "PARTIDA AGENDADA"}
-            </Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {detail.competitionName ?? "Amistoso"} · rodada{" "}
-              {detail.roundNumber} · {detail.scheduledOn}
-            </Text>
-          </View>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {detail.finished ? "FIM DE JOGO" : "PARTIDA AGENDADA"}
+          </Text>
         </View>
 
-        {/* O placar. Partida não jogada mostra "×", nunca 0–0: zero a zero é um
-            resultado, e afirmá-lo antes da bola rolar seria inventar. */}
-        <Card>
+        {/* O placar-herói, na composição do protótipo: etiqueta de estado, a
+            competição por cima, escudos nas pontas com o sublinhado na cor do
+            clube, e o placar grande no centro. Partida não jogada mostra "×",
+            nunca 0–0 — zero a zero é um resultado, e afirmá-lo antes da bola
+            rolar seria inventar. */}
+        <View style={styles.hero}>
+          <ImageBackground
+            source={FIELD_BG}
+            style={StyleSheet.absoluteFill}
+            imageStyle={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.heroScrim} pointerEvents="none" />
+
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: detail.finished ? color.textFaint : color.primary },
+              ]}
+            />
+            <Text style={styles.statusText}>
+              {detail.finished ? "ENCERRADA" : "A JOGAR"}
+            </Text>
+          </View>
+          <Text style={styles.competition} numberOfLines={1}>
+            {(detail.competitionName ?? "Amistoso").toUpperCase()} · RODADA{" "}
+            {detail.roundNumber}
+          </Text>
+
           <View style={styles.scoreboard}>
             <Pressable
               accessibilityRole="button"
@@ -144,6 +205,10 @@ export function Match() {
               onPress={() => router.push(`/clubes/${detail.home.clubId}`)}
               style={styles.side}
             >
+              <Text style={styles.sideName} numberOfLines={1}>
+                {detail.home.clubName}
+              </Text>
+              <View style={[styles.sideRule, { backgroundColor: homeColor }]} />
               <ClubCrest
                 {...clubCrestData(
                   detail.home.clubName,
@@ -151,24 +216,21 @@ export function Match() {
                   detail.home.secondaryColor,
                   detail.home.crestTemplateId,
                 )}
-                size={56}
+                size={64}
               />
-              <Text style={styles.sideName} numberOfLines={2}>
-                {detail.home.clubName}
-              </Text>
             </Pressable>
 
             <View style={styles.scoreBox}>
               {detail.finished ? (
                 <Text style={styles.score}>
-                  {detail.homeGoals}–{detail.awayGoals}
+                  {detail.homeGoals}
+                  <Text style={styles.scoreDash}> - </Text>
+                  {detail.awayGoals}
                 </Text>
               ) : (
                 <Text style={styles.scorePending}>×</Text>
               )}
-              <Text style={styles.scoreCaption}>
-                {detail.finished ? "encerrada" : "a jogar"}
-              </Text>
+              <Text style={styles.kickoff}>{detail.scheduledOn}</Text>
             </View>
 
             <Pressable
@@ -177,6 +239,10 @@ export function Match() {
               onPress={() => router.push(`/clubes/${detail.away.clubId}`)}
               style={styles.side}
             >
+              <Text style={styles.sideName} numberOfLines={1}>
+                {detail.away.clubName}
+              </Text>
+              <View style={[styles.sideRule, { backgroundColor: awayColor }]} />
               <ClubCrest
                 {...clubCrestData(
                   detail.away.clubName,
@@ -184,14 +250,11 @@ export function Match() {
                   detail.away.secondaryColor,
                   detail.away.crestTemplateId,
                 )}
-                size={56}
+                size={64}
               />
-              <Text style={styles.sideName} numberOfLines={2}>
-                {detail.away.clubName}
-              </Text>
             </Pressable>
           </View>
-        </Card>
+        </View>
 
         {!detail.finished ? (
           <Card>
@@ -284,6 +347,22 @@ export function Match() {
                     away={`${100 - detail.homePossession}%`}
                   />
                 ) : null}
+                {detail.homeShotsOnTarget !== null &&
+                detail.awayShotsOnTarget !== null ? (
+                  <StatLine
+                    label="No alvo"
+                    home={detail.homeShotsOnTarget}
+                    away={detail.awayShotsOnTarget}
+                  />
+                ) : null}
+                {detail.homeExpectedGoals !== null &&
+                detail.awayExpectedGoals !== null ? (
+                  <StatLine
+                    label="xG (gols esperados)"
+                    home={detail.homeExpectedGoals.toFixed(2)}
+                    away={detail.awayExpectedGoals.toFixed(2)}
+                  />
+                ) : null}
                 <StatLine
                   label="Gols"
                   home={detail.homeGoals ?? 0}
@@ -291,6 +370,48 @@ export function Match() {
                 />
               </>
             )}
+          </Card>
+        ) : null}
+
+        {/* As notas (doc 05 §16). O primeiro é o melhor em campo e o último o
+            pior — a ordem já vem do servidor. */}
+        {detail.finished && detail.ratings.length > 0 ? (
+          <Card>
+            <SectionHeader title="NOTAS" />
+            {detail.ratings.map((row, index) => (
+              <View key={row.playerId} style={styles.ratingRow}>
+                <View
+                  style={[
+                    styles.sideMark,
+                    row.clubId === detail.homeClubId && styles.sideMarkHome,
+                    row.clubId === detail.awayClubId && styles.sideMarkAway,
+                  ]}
+                />
+                <View style={styles.eventText}>
+                  <Text style={styles.eventLabel} numberOfLines={1}>
+                    {row.playerName}
+                    {index === 0 ? "  ★" : ""}
+                  </Text>
+                  <Text style={styles.eventWho} numberOfLines={1}>
+                    {row.position}
+                    {row.goals > 0 ? ` · ${row.goals} gol${row.goals > 1 ? "s" : ""}` : ""}
+                    {row.assists > 0 ? ` · ${row.assists} assist.` : ""}
+                    {row.saves > 0 ? ` · ${row.saves} defesas` : ""}
+                    {row.yellowCards > 0 ? " · amarelo" : ""}
+                    {row.redCards > 0 ? " · VERMELHO" : ""}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.ratingValue,
+                    row.rating >= 7.5 && styles.ratingGood,
+                    row.rating < 5 && styles.ratingBad,
+                  ]}
+                >
+                  {row.rating.toFixed(1)}
+                </Text>
+              </View>
+            ))}
           </Card>
         ) : null}
 
@@ -345,39 +466,87 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerText: { flex: 1, gap: space.xs },
-  title: {
+  headerTitle: {
+    flex: 1,
     color: color.text,
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold as "700",
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
   },
   subtitle: { color: color.textMuted, fontSize: fontSize.xs },
   count: { color: color.textMuted, fontSize: fontSize.xs },
 
-  scoreboard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  hero: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: color.borderStrong,
+    overflow: "hidden",
+    paddingVertical: space.lg,
+    paddingHorizontal: space.md,
     gap: space.sm,
   },
-  side: { flex: 1, alignItems: "center", gap: space.sm },
+  heroImage: { opacity: 0.5 },
+  heroScrim: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(10,11,13,0.78)",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+  },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: {
+    color: color.text,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 1,
+  },
+  competition: {
+    textAlign: "center",
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    letterSpacing: 0.5,
+  },
+  scoreboard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: space.sm,
+    marginTop: space.xs,
+  },
+  side: { flex: 1, alignItems: "center", gap: space.xs },
   sideName: {
     color: color.text,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
+    fontStyle: "italic",
+    fontWeight: fontWeight.bold as "700",
+    textTransform: "uppercase",
     textAlign: "center",
   },
-  scoreBox: { alignItems: "center", gap: space.xs, minWidth: 88 },
+  /** O sublinhado na cor do clube — o "time da casa/visitante" do protótipo. */
+  sideRule: { width: 46, height: 2, borderRadius: 1, marginBottom: space.xs },
+  scoreBox: { alignItems: "center", gap: 2, minWidth: 110 },
   score: {
     color: color.text,
-    fontSize: fontSize.xl2,
+    fontSize: fontSize.xl3,
     fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
   },
+  scoreDash: { color: color.textFaint, fontSize: fontSize.xl2 },
   scorePending: {
     color: color.textFaint,
-    fontSize: fontSize.xl2,
+    fontSize: fontSize.xl3,
     fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
   },
-  scoreCaption: { color: color.textMuted, fontSize: fontSize.xs },
+  kickoff: { color: color.primary, fontSize: fontSize.xs },
 
   halfLabel: {
     color: color.primary,
@@ -439,6 +608,26 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   statLabel: { flex: 1, textAlign: "center", color: color.textMuted, fontSize: fontSize.xs },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  ratingValue: {
+    minWidth: 44,
+    textAlign: "center",
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold as "700",
+    backgroundColor: color.background,
+    borderRadius: radius.sm,
+    paddingVertical: 2,
+  },
+  ratingGood: { color: color.success },
+  ratingBad: { color: color.danger },
   unavailableTitle: {
     color: color.warning,
     fontSize: fontSize.sm,

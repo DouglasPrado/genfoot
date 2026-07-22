@@ -26,6 +26,8 @@ export interface MatchFeedCoverageSource {
   readonly substitutions: boolean;
   readonly shots: boolean;
   readonly teamStats: boolean;
+  readonly ratings: boolean;
+  readonly passingAndDefending: boolean;
 }
 
 export type EventSide = "home" | "away" | null;
@@ -159,5 +161,9 @@ export function missingFeedFamilies(
   if (!coverage.substitutions) missing.push("substituições");
   if (!coverage.shots) missing.push("finalizações lance a lance");
   if (!coverage.teamStats) missing.push("estatísticas de time");
+  if (!coverage.ratings) missing.push("notas dos jogadores");
+  if (!coverage.passingAndDefending) {
+    missing.push("passe certo, desarme e interceptação");
+  }
   return missing;
 }

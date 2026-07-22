@@ -130,6 +130,8 @@ describe("missingFeedFamilies", () => {
       substitutions: false,
       shots: false,
       teamStats: true,
+      ratings: true,
+      passingAndDefending: false,
     });
     // O que o motor produz hoje: gol, assistência, cartão e estatística de
     // time. Falta a substituição (sem escalação, ninguém sabe quem está em
@@ -137,6 +139,7 @@ describe("missingFeedFamilies", () => {
     expect(missing).toEqual([
       "substituições",
       "finalizações lance a lance",
+      "passe certo, desarme e interceptação",
     ]);
   });
 
@@ -149,6 +152,8 @@ describe("missingFeedFamilies", () => {
         substitutions: true,
         shots: true,
         teamStats: true,
+        ratings: true,
+        passingAndDefending: true,
       }),
     ).toEqual([]);
   });
@@ -161,6 +166,8 @@ describe("missingFeedFamilies", () => {
       substitutions: true,
       shots: true,
       teamStats: true,
+      ratings: true,
+      passingAndDefending: true,
     });
     expect(missing).toEqual(["gols"]);
   });
