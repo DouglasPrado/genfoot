@@ -44,6 +44,7 @@ import {
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
+  PrismaLiveMatchRepository,
   PrismaPresenceRepository,
   PrismaWorldClockRepository,
   PrismaTransferUnitOfWork,
@@ -108,6 +109,7 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  LIVE_MATCH_REPOSITORY,
   PRESENCE_REPOSITORY,
   WORLD_CLOCK_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
@@ -422,6 +424,12 @@ import {
         new PrismaMatchPlayRepository(client),
     },
     {
+      provide: LIVE_MATCH_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaLiveMatchRepository =>
+        new PrismaLiveMatchRepository(client),
+    },
+    {
       provide: PRESENCE_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaPresenceRepository =>
@@ -535,6 +543,7 @@ import {
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
+    LIVE_MATCH_REPOSITORY,
     PRESENCE_REPOSITORY,
     WORLD_CLOCK_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,

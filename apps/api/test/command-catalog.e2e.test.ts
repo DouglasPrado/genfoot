@@ -118,6 +118,9 @@ describe.skipIf(!hasDatabase)(
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // C5-V2: a partida ao vivo — apito inicial e as ordens do técnico (§11).
+      "match:start",
+      "match:submit-command",
       // Departamento médico (M-MEDICAL / M-MEDICAL-CASE): a máquina MED-1..MED-9.
       "medical:advance-rehab",
       "medical:diagnose",
@@ -183,7 +186,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(61);
+    expect(response.body.commandCount).toBe(63);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");

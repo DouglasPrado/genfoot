@@ -57,6 +57,8 @@ import {
   type MatchPlayRepository,
   type PresenceRepository,
   type WorldClockRepository,
+  LiveMatch,
+  type LiveMatchRepository,
   type CompetitionReadModel,
   type TrainingPlanRepository,
   type TrainingContextReader,
@@ -178,6 +180,8 @@ export interface CommandContext {
   readonly genesisUnitOfWork: GenesisUnitOfWork;
   /** C5 — joga a próxima rodada da liga (simulação determinística). */
   readonly matchPlay: MatchPlayRepository;
+  /** C5-V2: a partida ao vivo — apito, ordens do técnico, apito final. */
+  readonly liveMatch: LiveMatchRepository;
   /** X-001 — a presença do usuário no mundo (heartbeat). */
   readonly presence: PresenceRepository;
   /** MUNDO-V1 — o relógio do mundo (config de tempo por dia lógico). */
@@ -299,6 +303,21 @@ const applyClubIdentityPayload = z.object({
 const promoteYouthPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
+});
+
+/**
+ * As ordens do técnico durante a partida (doc 05 §11).
+ *
+ * O `delta` é a intenção traduzida em ajuste de força — atacar empurra, recuar
+ * segura. O domínio o limita (`COACH_DELTA_LIMIT`); aqui só se valida a forma.
+ */
+const matchIdPayload = z.object({ matchId: z.string().uuid() });
+
+const coachCommandPayload = z.object({
+  matchId: z.string().uuid(),
+  side: z.enum(["HOME", "AWAY"]),
+  delta: z.number().int(),
+  commandType: z.string().min(1).max(64),
 });
 
 const signPlayerPayload = z.object({
@@ -1252,6 +1271,87 @@ const handlers: Record<string, CommandHandler> = {
    * A compra de verdade (C6/R-192). Dinheiro, contrato e elenco num só commit —
    * ou os três, ou nenhum. A taxa é validada na faixa da R-26 dentro do domínio.
    */
+  /**
+   * Apita o início (C5-V2). Congela o manifesto e põe a partida a correr — a
+   * partir daqui o minuto é derivado do relógio do mundo, não de uma coluna.
+   */
+  "match:start": async ({ worlds, liveMatch, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = matchIdPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const current = await liveMatch.findLive(
+      world.value.worldId,
+      parsed.data.matchId,
+    );
+    if (current === null) {
+      return fail(
+        new DomainError("MATCH_NOT_FOUND", "Partida não encontrada neste mundo.", {
+          matchId: parsed.data.matchId,
+        }),
+      );
+    }
+    const started = LiveMatch.fromSnapshot(current).start();
+    if (!started.ok) return started;
+    await liveMatch.startMatch(world.value.worldId, parsed.data.matchId);
+    return succeed({ resource: `match:${parsed.data.matchId}` });
+  },
+
+  /**
+   * A ordem do técnico. O agregado decide se ela cabe (partida em andamento,
+   * delta na faixa, chave não repetida) e em que posição do log ela entra; o
+   * repositório só a grava, e recusa se alguém tomou a posição primeiro.
+   */
+  "match:submit-command": async ({ worlds, liveMatch, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = coachCommandPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const current = await liveMatch.findLive(
+      world.value.worldId,
+      parsed.data.matchId,
+    );
+    if (current === null) {
+      return fail(
+        new DomainError("MATCH_NOT_FOUND", "Partida não encontrada neste mundo.", {
+          matchId: parsed.data.matchId,
+        }),
+      );
+    }
+    const decided = LiveMatch.fromSnapshot(current).submitCoachCommand({
+      side: parsed.data.side,
+      delta: parsed.data.delta,
+      actor: envelope.idempotencyKey,
+      commandType: parsed.data.commandType,
+      idempotencyKey: envelope.idempotencyKey,
+    });
+    if (!decided.ok) return decided;
+
+    const entry = decided.value.commandLog.at(-1);
+    // Sem entrada nova = a chave já tinha sido aplicada. O domínio tratou como
+    // idempotente, e repetir a gravação seria desfazer essa garantia.
+    if (entry === undefined || entry.idempotencyKey !== envelope.idempotencyKey) {
+      return succeed({ resource: `match:${parsed.data.matchId}` });
+    }
+    const written = await liveMatch.appendCommand(
+      world.value.worldId,
+      parsed.data.matchId,
+      entry,
+    );
+    if (!written) {
+      return fail(
+        new DomainError(
+          "MATCH_COMMAND_WINDOW_CLOSED",
+          "Outra ordem ocupou esta posição do log; tente de novo.",
+          { matchId: parsed.data.matchId, sequence: entry.matchSequence },
+        ),
+      );
+    }
+    return succeed({ resource: `match:${parsed.data.matchId}` });
+  },
+
   "market:sign-player": async ({ worlds, transferUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;

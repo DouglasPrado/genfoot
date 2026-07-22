@@ -34,10 +34,11 @@ const PENDENTES: readonly string[] = [
   "competition:homologate",
   "season:rollover:start",
   "season:rollover:resume",
-  // GP-007 — preparação e partida
+  // GP-007 — preparação e partida. `match:start` e `match:submit-command`
+  // SAÍRAM desta lista porque foram construídos (C5-V2): a partida existe no
+  // tempo e aceita ordem do técnico. Sobram o manifesto pré-jogo e o apito
+  // final, que ainda não têm command próprio.
   "match:create-manifest",
-  "match:start",
-  "match:submit-command",
   "match:finalize",
   // GP-008/009/010 — mercado (contratação, venda, empréstimo)
   "market:request-scouting",

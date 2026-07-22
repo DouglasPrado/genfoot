@@ -52,6 +52,7 @@ export * from "./prisma-transfer-listing-repository.js";
 export * from "./prisma-list-unit-of-work.js";
 export * from "./prisma-inbox-read-model.js";
 export * from "./prisma-match-play-repository.js";
+export * from "./prisma-live-match-repository.js";
 export * from "./prisma-matches-read-model.js";
 export * from "./prisma-market-read-model.js";
 export * from "./prisma-contract-repository.js";
