@@ -159,6 +159,11 @@ export * from "./automation/ai-club-training.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";
 
+// Medicina — máquina do episódio (MED-1..MED-9) e F13/R-21.
+export * from "./medical/injury-episode-types.js";
+export * from "./medical/injury-episode.js";
+export * from "./medical/injury-risk.js";
+
 // Treino — a fórmula de evolução do §6 (R-212).
 export * from "./training/development-gain.js";
 export * from "./training/training-types.js";
