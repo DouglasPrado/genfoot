@@ -47,6 +47,19 @@ export interface MatchFeedEvent {
   readonly description: string;
 }
 
+/**
+ * A cara de um clube na partida: nome vigente, sigla, cores e escudo (R-211).
+ * Mesma forma do `ClubBadgeView` de C7 — a tela desenha escudo, não UUID.
+ */
+export interface MatchClubBadge {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly shortCode: string;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
+}
+
 /** O detalhe de UMA partida (C5-V1): placar, clubes e o feed de eventos. */
 export interface MatchDetailView {
   readonly matchId: string;
@@ -58,9 +71,94 @@ export interface MatchDetailView {
   readonly awayClubId: string;
   readonly homeClubName: string;
   readonly awayClubName: string;
+  /** Os clubes com escudo e cores, para `M-POSTMATCH` desenhar o placar. */
+  readonly home: MatchClubBadge;
+  readonly away: MatchClubBadge;
+  /** A competição da partida; `null` num amistoso sem edição. */
+  readonly competitionName: string | null;
   readonly homeGoals: number | null;
   readonly awayGoals: number | null;
+  /**
+   * Estatisticas de time que o kernel produz. `null` quando a partida nao foi
+   * jogada, ou quando ela e ANTERIOR a migration que criou as colunas — nesse
+   * caso o dado nao existe, e a tela diz isso em vez de mostrar zero.
+   */
+  readonly homeShots: number | null;
+  readonly awayShots: number | null;
+  readonly homePossession: number | null;
+  /** xG: soma das probabilidades das chances criadas. `null` = partida antiga. */
+  readonly homeExpectedGoals: number | null;
+  readonly awayExpectedGoals: number | null;
+  readonly homeShotsOnTarget: number | null;
+  readonly awayShotsOnTarget: number | null;
+  /** As notas do jogo, da maior para a menor (doc 05 §16). */
+  readonly ratings: readonly MatchPlayerRating[];
   readonly events: readonly MatchFeedEvent[];
+  /**
+   * O que o motor REGISTRA no feed desta partida.
+   *
+   * O simulador só emite `GOAL` (`prisma-match-play-repository.ts`): não há
+   * cartão, substituição, finalização nem posse. Sem esta bandeira, um feed com
+   * 3 linhas se leria como "a partida teve 3 lances" — e o que houve foi 3 gols
+   * num jogo do qual o resto não foi gravado.
+   */
+  readonly feedCoverage: MatchFeedCoverage;
+}
+
+/** A nota de um jogador na partida, com o que a sustenta. */
+export interface MatchPlayerRating {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly clubId: string;
+  readonly position: string;
+  readonly rating: number;
+  readonly goals: number;
+  readonly assists: number;
+  readonly shots: number;
+  readonly saves: number;
+  readonly yellowCards: number;
+  readonly redCards: number;
+}
+
+/** Quais famílias de evento o motor de partida produz hoje. */
+export interface MatchFeedCoverage {
+  readonly goals: boolean;
+  readonly assists: boolean;
+  readonly cards: boolean;
+  readonly substitutions: boolean;
+  /** Finalizações no feed, lance a lance (não o total por time). */
+  readonly shots: boolean;
+  /** Estatísticas agregadas (posse, finalizações) por time. */
+  readonly teamStats: boolean;
+  /** Notas por jogador e melhor/pior em campo (doc 05 §16). */
+  readonly ratings: boolean;
+  /** Passe certo, desarme e interceptação — exigem simular posse (§6). */
+  readonly passingAndDefending: boolean;
+}
+
+/** A ficha disciplinar de um jogador do clube (M-CLUB-VIEW). */
+export interface PlayerDisciplineRow {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly position: string;
+  readonly yellowCards: number;
+  readonly redCards: number;
+}
+
+/**
+ * A disciplina do elenco de um clube no mundo.
+ *
+ * Conta cartões — NÃO diz quem está suspenso nem "pendurado": quantos amarelos
+ * suspendem e quando a contagem zera é regra de campeonato, e não existe decisão
+ * ratificada. Contar é fato; suspender seria inventar regra.
+ */
+export interface ClubDisciplineView {
+  readonly clubId: string;
+  readonly players: readonly PlayerDisciplineRow[];
+  /** `false` enquanto o motor não produzir cartão — a tela declara em vez de zerar. */
+  readonly cardsTracked: boolean;
+  /** Não há regra de suspensão no domínio; a tela não pode afirmar pendurado. */
+  readonly suspensionRuleExists: boolean;
 }
 
 export interface MatchesReadModel {
@@ -72,6 +170,12 @@ export interface MatchesReadModel {
     gameWorldId: GameWorldId,
     clubId: string | null,
   ): Promise<MatchesView>;
+
+  /** A ficha disciplinar do elenco de um clube (M-CLUB-VIEW). */
+  clubDiscipline(
+    gameWorldId: GameWorldId,
+    clubId: string,
+  ): Promise<ClubDisciplineView>;
 
   /** O detalhe de uma partida (C5-V1). `null` se não existe neste mundo. */
   matchDetail(

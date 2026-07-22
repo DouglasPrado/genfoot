@@ -112,6 +112,15 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
         data: {
           homeGoals: result.homeGoals,
           awayGoals: result.awayGoals,
+          // O kernel ja calculava isto; ate a migration `match_team_stats` nao
+          // havia onde gravar, e o dado morria no objeto.
+          homeShots: result.homeShots,
+          awayShots: result.awayShots,
+          homePossession: result.homePossession,
+          // xG: a soma das probabilidades contra as quais cada chute foi
+          // sorteado. Nao e estimativa — e a conta do proprio kernel.
+          homeExpectedGoals: result.homeExpectedGoals,
+          awayExpectedGoals: result.awayExpectedGoals,
           runtimeStatus: "FINISHED",
           resultStatus: "NORMAL",
           simulationSeed: result.resultHash,
@@ -121,6 +130,20 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       // Só processa a partida que ESTE `saveResults` fechou — reprocessar (já
       // FINISHED) não duplica nada.
       if (count === 0) continue;
+
+      // Os clubes vem antes de tudo: as estatisticas individuais precisam saber
+      // de que lado cada jogador esta (o goleiro que defendeu, por exemplo).
+      const match = await this.client.match.findUnique({
+        where: { id: result.matchId },
+        select: { homeClubId: true, awayClubId: true },
+      });
+      if (match === null) continue;
+      const squads = await this.scorerCandidates(gameWorldId, [
+        match.homeClubId,
+        match.awayClubId,
+      ]);
+      const homeSquad = squads.get(match.homeClubId) ?? [];
+      const awaySquad = squads.get(match.awayClubId) ?? [];
 
       // A FORMA (R-221 Fase 2b): o resultado move a forma de quem jogou —
       // vencedor sobe, perdedor desce; artilheiro embala. Aplicado uma vez (só
@@ -150,30 +173,139 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
         },
       });
 
-      // A artilharia da partida (C7-V5). Reescrita — reprocessar não soma.
-      const goals = [...result.homeScorers, ...result.awayScorers];
-      if (goals.length > 0) {
-        await this.client.playerMatchStats.deleteMany({
-          where: { matchId: result.matchId },
-        });
+      // As estatisticas individuais da partida. Reescritas — reprocessar nao
+      // soma. Ate a R-206b so `goals` era real: assistencia, cartao e
+      // finalizacao entravam com ZERO FIXO, e a tela lia isso como "ninguem
+      // assistiu, ninguem foi advertido". Agora vem do simulador.
+      const perPlayer = new Map<
+        string,
+        {
+          goals: number;
+          assists: number;
+          shots: number;
+          shotsOnTarget: number;
+          fouls: number;
+          saves: number;
+          goalsConceded: number;
+          yellowCards: number;
+          redCards: number;
+        }
+      >();
+      const bump = (
+        playerId: string,
+        field:
+          | "goals"
+          | "assists"
+          | "shots"
+          | "shotsOnTarget"
+          | "fouls"
+          | "saves"
+          | "goalsConceded"
+          | "yellowCards"
+          | "redCards",
+        by = 1,
+      ) => {
+        const row = perPlayer.get(playerId) ?? {
+          goals: 0,
+          assists: 0,
+          shots: 0,
+          shotsOnTarget: 0,
+          fouls: 0,
+          saves: 0,
+          goalsConceded: 0,
+          yellowCards: 0,
+          redCards: 0,
+        };
+        row[field] += by;
+        perPlayer.set(playerId, row);
+      };
+
+      for (const scorer of [...result.homeScorers, ...result.awayScorers]) {
+        bump(scorer.playerId, "goals", scorer.goals);
+      }
+      for (const assist of [...result.homeAssists, ...result.awayAssists]) {
+        bump(assist.playerId, "assists");
+      }
+      for (const shot of [
+        ...result.homePlayerShots,
+        ...result.awayPlayerShots,
+      ]) {
+        bump(shot.playerId, "shots", shot.shots);
+      }
+      for (const card of [...result.homeCards, ...result.awayCards]) {
+        bump(
+          card.playerId,
+          card.type === "YELLOW_CARD" ? "yellowCards" : "redCards",
+        );
+      }
+      for (const foul of [...result.homeFouls, ...result.awayFouls]) {
+        bump(foul.playerId, "fouls", foul.fouls);
+      }
+      // O chute no alvo e do TIME; reparte-se proporcionalmente ao que cada um
+      // finalizou, com o piso do gol (gol e sempre no alvo).
+      for (const [playerShots, teamOnTarget] of [
+        [result.homePlayerShots, result.homeShotsOnTarget],
+        [result.awayPlayerShots, result.awayShotsOnTarget],
+      ] as const) {
+        const teamShots = playerShots.reduce((sum, s) => sum + s.shots, 0);
+        for (const entry of playerShots) {
+          const goals = perPlayer.get(entry.playerId)?.goals ?? 0;
+          const share =
+            teamShots === 0
+              ? goals
+              : Math.round((entry.shots / teamShots) * teamOnTarget);
+          bump(entry.playerId, "shotsOnTarget", Math.max(goals, share));
+        }
+      }
+      // A defesa e do goleiro: sem escalacao, o goleiro do jogo e o de maior
+      // habilidade do elenco. E aproximacao declarada — quando houver
+      // escalacao, vira o GK escalado.
+      const gk = (side: "home" | "away") => {
+        const squad = side === "home" ? homeSquad : awaySquad;
+        const keepers = squad.filter((c) => c.primaryPosition === "GK");
+        return keepers.sort((a, b) => b.ability - a.ability)[0]?.playerId ?? null;
+      };
+      const homeKeeper = gk("home");
+      const awayKeeper = gk("away");
+      if (homeKeeper !== null) {
+        bump(homeKeeper, "saves", result.homeSaves);
+        bump(homeKeeper, "goalsConceded", result.awayGoals);
+      }
+      if (awayKeeper !== null) {
+        bump(awayKeeper, "saves", result.awaySaves);
+        bump(awayKeeper, "goalsConceded", result.homeGoals);
+      }
+
+      const ratingByPlayer = new Map(
+        result.ratings.map((r) => [r.playerId, r.rating]),
+      );
+
+      await this.client.playerMatchStats.deleteMany({
+        where: { matchId: result.matchId },
+      });
+      if (perPlayer.size > 0) {
         await this.client.playerMatchStats.createMany({
-          data: goals.map((scorer) => ({
+          data: [...perPlayer].map(([playerId, row]) => ({
             matchId: result.matchId,
-            playerId: scorer.playerId,
-            goals: scorer.goals,
-            // Só gols são simulados hoje; o resto fica zerado até o motor evoluir.
-            assists: 0,
-            shots: 0,
-            shotsOnTarget: 0,
+            playerId,
+            goals: row.goals,
+            assists: row.assists,
+            shots: row.shots,
+            shotsOnTarget: row.shotsOnTarget,
+            foulsCommitted: row.fouls,
+            yellowCards: row.yellowCards,
+            redCards: row.redCards,
+            saves: row.saves,
+            goalsConceded: row.goalsConceded,
+            rating: ratingByPlayer.get(playerId) ?? 6,
+            // Passe, desarme e interceptacao exigem o motor simular POSSE lance
+            // a lance (doc 05 §6, os 9 passos do ataque), que ele ainda nao faz.
+            // Zero aqui e ausencia de motor, e a tela declara isso.
             passesAttempted: 0,
             passesCompleted: 0,
             tackles: 0,
             interceptions: 0,
-            foulsCommitted: 0,
-            yellowCards: 0,
-            redCards: 0,
-            saves: 0,
-            goalsConceded: 0,
+            // Fadiga por jogador exige minutos em campo, que exigem escalacao.
             fatigueStart: 0,
             fatigueEnd: 0,
           })),
@@ -181,26 +313,93 @@ export class PrismaMatchPlayRepository implements MatchPlayRepository {
       }
 
       // O feed da partida (C5-V1): um MatchEvent GOAL por gol, já com minuto e
-      // ordem total (eventSequence). O clube vem do lado. Reescrito, não somado.
-      if (result.goalEvents.length === 0) continue;
-      const match = await this.client.match.findUnique({
-        where: { id: result.matchId },
-        select: { homeClubId: true, awayClubId: true },
-      });
-      if (match === null) continue;
+      // ordem total (eventSequence). O clube vem do lado. Reescrito, nao somado.
+      const clubOf = (side: "home" | "away") =>
+        side === "home" ? match.homeClubId : match.awayClubId;
+
+      // Um so feed com TODAS as familias que o motor produz, ordenado pelo
+      // minuto. A `eventSequence` sai desta ordem — ela e a ordem oficial do
+      // relato (`@@unique(matchId, eventSequence)`), e a tela le por ela.
+      const feed: {
+        minute: number;
+        clubId: string;
+        playerId: string;
+        type: "GOAL" | "ASSIST" | "YELLOW_CARD" | "RED_CARD";
+        description: string;
+        importance: number;
+      }[] = [];
+
+      for (const goal of result.goalEvents) {
+        feed.push({
+          minute: goal.minute,
+          clubId: clubOf(goal.side),
+          playerId: goal.playerId,
+          type: "GOAL",
+          description: "Gol",
+          importance: 3,
+        });
+      }
+      for (const [side, assists] of [
+        ["home", result.homeAssists],
+        ["away", result.awayAssists],
+      ] as const) {
+        for (const assist of assists) {
+          feed.push({
+            minute: assist.minute,
+            clubId: clubOf(side),
+            playerId: assist.playerId,
+            type: "ASSIST",
+            description: "Assistencia",
+            importance: 2,
+          });
+        }
+      }
+      for (const [side, cards] of [
+        ["home", result.homeCards],
+        ["away", result.awayCards],
+      ] as const) {
+        for (const card of cards) {
+          feed.push({
+            minute: card.minute,
+            clubId: clubOf(side),
+            playerId: card.playerId,
+            type: card.type,
+            description:
+              card.type === "YELLOW_CARD" ? "Cartao amarelo" : "Cartao vermelho",
+            importance: card.type === "RED_CARD" ? 3 : 1,
+          });
+        }
+      }
+
       await this.client.matchEvent.deleteMany({
         where: { matchId: result.matchId },
       });
+      if (feed.length === 0) continue;
+      // A assistencia vem ANTES do gol no mesmo minuto (o passe precede a
+      // conclusao); fora isso, a ordem e o minuto. Desempate final por playerId
+      // para a sequencia ser estavel entre reprocessamentos.
+      const ORDER: Record<string, number> = {
+        ASSIST: 0,
+        GOAL: 1,
+        YELLOW_CARD: 2,
+        RED_CARD: 3,
+      };
+      feed.sort(
+        (a, b) =>
+          a.minute - b.minute ||
+          (ORDER[a.type] ?? 9) - (ORDER[b.type] ?? 9) ||
+          a.playerId.localeCompare(b.playerId),
+      );
       await this.client.matchEvent.createMany({
-        data: result.goalEvents.map((goal, index) => ({
+        data: feed.map((event, index) => ({
           matchId: result.matchId,
-          clubId: goal.side === "home" ? match.homeClubId : match.awayClubId,
-          playerId: goal.playerId,
-          type: "GOAL" as const,
-          minute: goal.minute,
+          clubId: event.clubId,
+          playerId: event.playerId,
+          type: event.type,
+          minute: event.minute,
           eventSequence: index + 1,
-          description: "Gol",
-          importance: 3,
+          description: event.description,
+          importance: event.importance,
         })),
       });
     }

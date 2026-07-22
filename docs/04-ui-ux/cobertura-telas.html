@@ -388,7 +388,7 @@
         <span class="stat-l">Prontas</span>
       </div>
       <div class="stat is-partial">
-        <span class="stat-n">19</span>
+        <span class="stat-n">22</span>
         <span class="stat-l">Parciais</span>
       </div>
       <div class="stat is-read">
@@ -396,14 +396,14 @@
         <span class="stat-l">Fragmento de leitura</span>
       </div>
       <div class="stat is-missing">
-        <span class="stat-n">89</span>
+        <span class="stat-n">86</span>
         <span class="stat-l">Zero implementação</span>
       </div>
     </div>
 
-    <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 19 amarelas têm caminho real, mas não fecham.</p>
+    <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 22 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-22</b> · commit <b>cd821f9</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-22</b> · commit <b>2022e03</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -485,14 +485,14 @@
         <span class="arch-id">L-M02</span>
         <span class="arch-name">Listas e centrais — KPIs, filtros, lista virtualizada</span>
         <span class="risk low">Risco baixo</span>
-        <span class="arch-count"><b>3</b> parciais / 14</span>
+        <span class="arch-count"><b>4</b> parciais / 14</span>
       </div>
       <div class="chips">
         <div class="chip missing"><span class="chip-id">M-DECISIONS</span><span class="chip-d">Central de decisões — o coração do ciclo semanal</span></div>
         <div class="chip partial"><span class="chip-id">M-SQUAD</span><span class="chip-d">Elenco — a única lista é o banco, dentro do modal de substituição</span><span class="tag">parcial</span></div>
         <div class="chip missing"><span class="chip-id">M-MEDICAL</span><span class="chip-d">Departamento médico / lesões</span></div>
         <div class="chip missing"><span class="chip-id">M-ACADEMY</span><span class="chip-d">Categorias de base</span></div>
-        <div class="chip missing"><span class="chip-id">M-COMPETITIONS</span><span class="chip-d">Lista de competições — só um contador na Home</span></div>
+        <div class="chip partial"><span class="chip-id">M-COMPETITIONS</span><span class="chip-d">Lista de competições em <code>/competicoes</code>, alcançável por <b>VER COMPETIÇÕES</b> no cartão TEMPORADA da Home. Duas seções como o doc pede — <b>DO SEU CLUBE</b> (onde ele joga) e <b>NO MUNDO</b> —, cada linha com formato, ciclo de vida, rodada corrente e a <b>posição do clube</b>; tocar abre <code>M-COMPETITION</code>. A query <code>competitions-list</code> ganhou recorte por <code>clubId</code> (participação + posição, calculada <b>dentro do grupo</b> quando há fase de grupos); sem <code>clubId</code> — o admin — os campos vêm <code>null</code> em vez de mentir. Posição só aparece <b>depois</b> de haver rodada jogada: "1º" antes da bola rolar é ordem alfabética disfarçada de liderança. <b>Não fecha:</b> o doc pede tipo/país-região e o link para o calendário (<code>M-CALENDAR</code> não existe), e nada disso foi exercitado no app rodando</span><span class="tag">aguardando confirmação + falta país/região e link do calendário</span></div>
         <div class="chip missing"><span class="chip-id">M-CALENDAR</span><span class="chip-d">Calendário / agenda da temporada</span></div>
         <div class="chip partial"><span class="chip-id">M-MARKET</span><span class="chip-d">Mercado — listagens, busca e livres</span><span class="tag">aba MERCADO</span></div>
         <div class="chip partial"><span class="chip-id">M-SCOUTING</span><span class="chip-d">Scouting — botão e badge; payload fixo, relatório nunca visível</span><span class="tag">só o command</span></div>
@@ -511,7 +511,7 @@
         <span class="arch-id">L-M03</span>
         <span class="arch-name">Perfil e detalhe — hero, tabs, seções</span>
         <span class="risk low">Risco baixo</span>
-        <span class="arch-count"><b>4</b> parciais / 36</span>
+        <span class="arch-count"><b>6</b> parciais / 36</span>
       </div>
       <div class="chips">
         <div class="chip partial"><span class="chip-id">M-HOME</span><span class="chip-d">Home — contadores read-only, sem drill-in nem decisão</span><span class="tag">parcial</span></div>
@@ -527,7 +527,7 @@
         <div class="chip missing"><span class="chip-id">M-SCOUT-OPP</span><span class="chip-d">Dossiê do adversário</span></div>
         <div class="chip missing"><span class="chip-id">M-PREMATCH</span><span class="chip-d">Pré-jogo / contexto</span></div>
         <div class="chip missing"><span class="chip-id">M-POSTMATCH</span><span class="chip-d">Relatório pós-jogo</span></div>
-        <div class="chip missing"><span class="chip-id">M-COMPETITION</span><span class="chip-d">Tabela, chaveamento, rodadas, artilharia</span></div>
+        <div class="chip partial"><span class="chip-id">M-COMPETITION</span><span class="chip-d">A competição em abas, em <code>/competicoes/[competitionId]</code> — <b>a tela mais densa construída até aqui</b>. Abas: <b>Tabela</b> (ou <b>Grupos</b>, uma tabela por grupo) com faixa de <b>acesso/rebaixamento</b> pelas vagas da config imutável (R-52 — divisão única 0/0 não pinta nada), <b>Chaveamento</b> (só aparece se houver mata-mata de fato), <b>Jogos</b> (TODOS, agrupados por rodada, com escudo e cores dos dois lados; placar <code>null</code> em vez de 0×0 no jogo futuro), <b>Artilharia</b>, <b>Assistências</b>, <b>Premiação</b> e <b>Regulamento</b>. Cada aba tem a <b>sua</b> query e o seu <em>loading</em>, como o doc pede — abrir a tela não baixa o campeonato inteiro. Cinco queries novas (<code>competition-detail/-table/-bracket/-matches/-stats</code>) sobre um read model provado contra o <b>Postgres real</b> (17 testes) e lógica pura de grupos/chaveamento (11 testes: ida-e-volta viram UM confronto com agregado, perna por jogar não declara vencedor). Linhas da tabela e times dos jogos levam a <code>M-CLUB-VIEW</code>. <b>Não fecha (e o gap é de MOTOR, não de tela):</b> a aba <b>Assistências</b> mostra <b>INDISPONÍVEL</b> declarado — a simulação grava <code>assists</code> com zero fixo (<code>prisma-match-play-repository.ts:165</code>), e uma lista de zeros afirmaria que ninguém deu passe para gol; empate no agregado de mata-mata fica <b>sem vencedor</b> porque gol fora/prorrogação/pênaltis não existem no domínio; a <b>Premiação</b> só tem campeão/acesso/rebaixamento/artilheiro (craque, revelação e seleção da temporada não são apurados); o <b>Regulamento</b> não expõe limites de inscrição/estrangeiros/idade; e não há <b>sorteio ao vivo</b> nem atualização por <code>worldSequence</code>. Não exercitada no app rodando</span><span class="tag">aguardando confirmação + assistência/desempate/prêmios subjetivos sem motor</span></div>
         <div class="chip missing"><span class="chip-id">M-CALENDAR-DAY</span><span class="chip-d">Detalhe do dia</span></div>
         <div class="chip missing"><span class="chip-id">M-NATIONAL</span><span class="chip-d">Seleções / convocações</span></div>
         <div class="chip missing"><span class="chip-id">M-AGENT</span><span class="chip-d">Empresário</span></div>
@@ -543,7 +543,7 @@
         <div class="chip read"><span class="chip-id">M-REPUTATION</span><span class="chip-d">Reputação — uma barra de progresso</span><span class="tag">fragmento</span></div>
         <div class="chip missing"><span class="chip-id">M-SPONSORS-IMAGE</span><span class="chip-d">Imagem pública / patrocinadores</span></div>
         <div class="chip partial"><span class="chip-id">M-CLUB-PROFILE</span><span class="chip-d">Perfil do clube — hero, reputação, infra, estádio</span><span class="tag">parcial</span></div>
-        <div class="chip missing"><span class="chip-id">M-CLUB-VIEW</span><span class="chip-d">Perfil público de outro clube</span></div>
+        <div class="chip partial"><span class="chip-id">M-CLUB-VIEW</span><span class="chip-d">Perfil público de outro clube em <code>/clubes/[clubId]</code> — o destino dos links de <code>M-COMPETITION</code> (linha da tabela, time de cada jogo). Escudo e cores reais, estádio e capacidade, sigla, faixa de reputação, entrosamento, e <b>quem comanda</b> (gestor ou IA — a IA é a ausência de controle, R-180). O <b>elenco do adversário</b> vem da query oficial <code>roster</code> recortada por <code>clubId</code>: camisa, posição, idade, nota e disponibilidade. Somente leitura — mexer no elenco alheio não é decisão do usuário. <b>Não fecha:</b> <b>cartões, pendurados e suspensões não existem</b> — a simulação grava <code>yellowCards</code>/<code>redCards</code> com zero fixo e o domínio não tem conceito de suspensão, então a tela declara <b>INDISPONÍVEL</b> em vez de listar uma ficha limpa que seria mentira; falta também o histórico/títulos do clube e o link para o gestor. Não exercitada no app rodando</span><span class="tag">aguardando confirmação + cartões/suspensão sem motor</span></div>
         <div class="chip missing"><span class="chip-id">M-MANAGER-PROFILE</span><span class="chip-d">Perfil público de outro gestor</span></div>
         <div class="chip missing"><span class="chip-id">M-WORLD-STRUCTURE</span><span class="chip-d">Estrutura do mundo (divisões / pirâmide)</span></div>
         <div class="chip missing"><span class="chip-id">M-TEAMBALANCE</span><span class="chip-d">Entrosamento e equilíbrio do elenco</span></div>
@@ -683,6 +683,13 @@
 
     <div class="blockers">
       <div class="blocker">
+        <h3>O motor de partida só produz GOL — assistência, cartão e suspensão não existem</h3>
+        <p><b>Trava NOVA, achada construindo <code>M-COMPETITION</code> e <code>M-CLUB-VIEW</code>.</b> A tabela <code>PlayerMatchStats</code> tem as colunas <code>assists</code>, <code>yellowCards</code> e <code>redCards</code>, e a simulação as grava com <b>zero fixo</b> — <code>packages/persistence/src/prisma-match-play-repository.ts:165</code>, com o comentário honesto do próprio código: <em>"Só gols são simulados hoje; o resto fica zerado até o motor evoluir"</em>. O <code>enum MatchEventType</code> declara <code>ASSIST</code>, <code>YELLOW_CARD</code> e <code>RED_CARD</code>, mas o simulador só emite <code>GOAL</code>. E <b>suspensão não existe em lugar nenhum</b> do domínio: zero ocorrências em <code>packages/core</code> — não há regra de quantos amarelos suspendem, nem quando a contagem zera.</p>
+        <p><b>Por que isto é trava e não detalhe:</b> zero aqui <b>não é um fato do jogo</b>. Uma aba de assistências com todo mundo em 0 afirma que ninguém deu passe para gol; uma lista de "sem cartões" afirma que a ficha do elenco adversário está limpa. As duas seriam mentira produzida pela tela. Enquanto o motor não evoluir, <code>M-COMPETITION</code> (aba Assistências) e <code>M-CLUB-VIEW</code> (Cartões e suspensões) <b>declaram INDISPONÍVEL</b> e nomeiam a causa — e por isso nenhuma das duas pode fechar o doc.</p>
+        <p><b>Onde a bandeira mora:</b> <code>MATCH_STATS_COVERAGE</code> em <code>prisma-competition-read-model.ts</code> (<code>goals:true, assists:false, cards:false</code>), servida pela query <code>competition-stats</code>. Há uma <b>catraca</b> no teste de Postgres: quando o motor passar a produzir, a expectativa quebra e obriga a revisar as telas que hoje dizem "indisponível".</p>
+        <p><b>Impede também:</b> o <b>desempate de mata-mata</b> — gol fora, prorrogação e pênaltis não existem nas regras do mundo, então um confronto empatado no agregado fica <b>sem vencedor</b> no chaveamento, com o motivo declarado (<code>AGGREGATE_TIE</code>). E os <b>prêmios subjetivos</b> da aba Premiação (craque, revelação, garçom, seleção da temporada) não são apurados por nada: só campeão/acesso/rebaixamento/artilheiro saem de dado real.</p>
+      </div>
+      <div class="blocker">
         <h3>Cuidado permanente: <code>pnpm test</code> sem <code>TEST_DATABASE_URL</code> é verde vazio</h3>
         <p><b>Não é trava — é armadilha de leitura, e fica registrada para não voltar a enganar.</b> A trava que estava aqui (gate vermelho + 26 falhas na suíte de Postgres) <b>caiu por inteiro</b>; o histórico está no Registro abaixo.<br><br><b>O que sobra é uma distinção que precisa ficar visível:</b> a suíte de Postgres lê <code>TEST_DATABASE_URL</code>, nunca <code>DATABASE_URL</code> (a separação existe porque a suíte dá <code>TRUNCATE ... CASCADE</code> e já apagou o banco de dev uma vez). Sem a variável, esses testes <b>se pulam anunciando o motivo</b> e o gate fecha verde com <span class="num">~200</span> testes pulados — <b>sem atravessar banco nenhum</b>.<br><br><b>Verde por skip não prova persistência.</b> Ao mexer em repositório, read model, query ou migration, o gate só vale com o banco: <code>TEST_DATABASE_URL="postgresql://grinta:grinta@localhost:5433/grinta_test?schema=public" pnpm test</code>. Referência de saúde (2026-07-20): <b>142 arquivos / 1262 testes, tudo passando, zero pulado</b>. Receita e diagnóstico de schema atrasado documentados em <code>CLAUDE.md §9</code>.</p>
       </div>
@@ -745,6 +752,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-22</span>
+        <span class="log-text"><b>A temporada ganha tela: <code>M-COMPETITIONS</code>, <code>M-COMPETITION</code> e <code>M-CLUB-VIEW</code> saem de ausentes para 🟡 (aguardando confirmação) — 19 → 22 amarelas.</b> Pedido do dono: ver todos os campeonatos da temporada, tabela por liga/grupo, mata-mata só se existir, artilharia, assistências, premiações, todos os jogos com nome e escudo, e o elenco do adversário. <b>Lógica pura primeiro</b> (vista falhando antes de existir): <code>competition-phases.ts</code> com tabelas por grupo e chaveamento — ida-e-volta viram UM confronto (chave = rodada + par ordenado), agregado do ponto de vista do mandante da ida, e <b>nenhum vencedor</b> quando falta perna (<code>PENDING_LEG</code>) ou o agregado empata (<code>AGGREGATE_TIE</code>). <b>Leitura fina</b>: 5 queries novas (<code>competition-detail/-table/-bracket/-matches/-stats</code>) + <code>competition-outcome</code> e <code>competitions-list</code> passando a aceitar recorte (<code>competitionId</code>, <code>clubId</code>), sobre um read model provado contra o <b>Postgres real</b> — 17 testes: jogo AGENDADO não vira empate 0×0, competição de outro mundo não vaza, grupo B não conta no grupo A, campeão só com a edição homologada. <b>Três telas</b> em <code>/competicoes</code>, <code>/competicoes/[id]</code> e <code>/clubes/[id]</code>, com aba por query (<em>loading</em> por aba, como o doc pede) e escudo/cores reais em tabela, jogos e chaveamento. <b>Trava NOVA registrada</b>: o motor de partida só produz GOL — assistência, cartão e suspensão são zero fixo, então as abas correspondentes declaram <b>INDISPONÍVEL</b> em vez de mostrar zeros que se leriam como fato do jogo. <b>Nenhuma virou verde</b>: nada foi exercitado no app rodando, e nenhuma fecha o doc (falta país/região, calendário, sorteio ao vivo, prêmios subjetivos, limites de inscrição).</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-22</span>
         <span class="log-text"><b>Plano COLETIVO volta a desenvolver na virada + aviso-resumo (<code>b4a4140</code>) — o dono viu que não evoluía.</b> Era consequência da R-221 (o crescimento saiu da virada para as sessões, deixando o plano coletivo inerte — só as sessões notificavam). O crescimento volta à virada, mas IMEDIATO (não bufferizado): <code>SettleDueCollectiveTraining</code> desenvolve cada jogador apto rumo ao FOCO da sua entrada (<code>focus-attributes</code> mapeia físico/técnico/tático/mental/defensivo/ofensivo/bola parada/individual→atributos; RECOVERY = descanso), espalhado nos mais fracos, com orçamento modesto escalado pela carga (poupando 0 · leve 1 · firme/pesado 2, tetado pela folga). Aditivo à sessão/plano individual. Emite <b>UM aviso-resumo por clube</b>. Extraí <code>spreadBudget</code> como fonte única. <b>Provado por HTTP</b>: foco TÉCNICO carga 80 → as 2 técnicas mais fracas do jovem +1 (heading 22→23, finishing 24→25), físicos parados; aviso "1 jogador evoluiu no treino coletivo". Gate com banco: <b>165 arq / 1436 testes</b>, zero pulado. Mapa foco→atributos e magnitude são VAL-001. <b>Nenhuma tela mudou de cor</b> — conserto de comportamento.</span>

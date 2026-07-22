@@ -11,7 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
-import { hasDatabase, skipReason } from "./postgres.guard.js";
+import {
+  hasDatabase,
+  resetWorldFixtures,
+  skipReason,
+} from "./postgres.guard.js";
 
 describe.skipIf(!hasDatabase)(
   `API auth guard + RBAC (e2e)${hasDatabase ? "" : ` — PULADO: ${skipReason}`}`,
@@ -29,6 +33,9 @@ describe.skipIf(!hasDatabase)(
   }
 
   beforeAll(async () => {
+    // Banco limpo ANTES de criar o mundo: estes e2e usam idempotencyKey fixa,
+    // e um registro sobrevivente aponta para um mundo truncado (404 em tudo).
+    await resetWorldFixtures();
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiauth-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     delete process.env.GRINTA_API_ALLOW_ANONYMOUS; // guard real, sem bypass

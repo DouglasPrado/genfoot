@@ -12,7 +12,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registeredCommandTypes } from "../src/commands/command-registry.js";
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
-import { hasDatabase, skipReason } from "./postgres.guard.js";
+import {
+  hasDatabase,
+  resetWorldFixtures,
+  skipReason,
+} from "./postgres.guard.js";
 
 const VALID_STATUSES = new Set(["ACCEPTED", "ALREADY_APPLIED", "REJECTED"]);
 
@@ -24,6 +28,9 @@ describe.skipIf(!hasDatabase)(
   let worldId = "";
 
   beforeAll(async () => {
+    // Banco limpo ANTES de criar o mundo: estes e2e usam idempotencyKey fixa,
+    // e um registro sobrevivente aponta para um mundo truncado (404 em tudo).
+    await resetWorldFixtures();
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apicat-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
@@ -182,6 +189,8 @@ describe.skipIf(!hasDatabase)(
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // A ficha disciplinar do elenco de um clube (M-CLUB-VIEW): cartões somados.
+      "club-discipline",
       // M-COMPETITION aba Chaveamento: os confrontos de mata-mata da edição.
       "competition-bracket",
       // M-COMPETITION: cabeçalho + regulamento de UMA competição.

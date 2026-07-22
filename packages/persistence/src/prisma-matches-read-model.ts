@@ -1,5 +1,9 @@
 import type {
+  ClubDisciplineView,
+  MatchClubBadge,
+  MatchPlayerRating,
   MatchDetailView,
+  MatchFeedCoverage,
   MatchFeedEvent,
   MatchListItem,
   MatchesReadModel,
@@ -85,6 +89,61 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
     };
   }
 
+  public async clubDiscipline(
+    gameWorldId: GameWorldId,
+    clubId: string,
+  ): Promise<ClubDisciplineView> {
+    // Cartoes somados dos `PlayerMatchStats` das partidas DESTE mundo, para os
+    // jogadores do elenco profissional do clube. Projecao, como a artilharia —
+    // nao existe coluna "cartoes na temporada".
+    const rows = await this.client.$queryRaw<
+      {
+        playerId: string;
+        firstName: string;
+        lastName: string;
+        primaryPosition: string;
+        yellowCards: number;
+        redCards: number;
+      }[]
+    >`
+      SELECT p.id AS "playerId",
+             pe."firstName" AS "firstName",
+             pe."lastName" AS "lastName",
+             p."primaryPosition" AS "primaryPosition",
+             COALESCE(SUM(pms."yellowCards"), 0)::int AS "yellowCards",
+             COALESCE(SUM(pms."redCards"), 0)::int AS "redCards"
+      FROM "Player" p
+      JOIN "Person" pe ON pe.id = p."personId"
+      JOIN "SquadMembership" sm ON sm."playerId" = p.id AND sm."isActive" = true
+      JOIN "Squad" s ON s.id = sm."squadId"
+        AND s."clubId" = ${clubId}::uuid
+        AND s.category = 'FIRST_TEAM'
+      LEFT JOIN "PlayerMatchStats" pms ON pms."playerId" = p.id
+      LEFT JOIN "Match" m ON m.id = pms."matchId" AND m."gameWorldId" = ${gameWorldId}::uuid
+      WHERE p."gameWorldId" = ${gameWorldId}::uuid
+      GROUP BY p.id, pe."firstName", pe."lastName", p."primaryPosition"
+      HAVING COALESCE(SUM(pms."yellowCards"), 0) > 0
+          OR COALESCE(SUM(pms."redCards"), 0) > 0
+      ORDER BY COALESCE(SUM(pms."redCards"), 0) DESC,
+               COALESCE(SUM(pms."yellowCards"), 0) DESC
+    `;
+
+    return {
+      clubId,
+      players: rows.map((row) => ({
+        playerId: row.playerId,
+        playerName: `${row.firstName} ${row.lastName}`,
+        position: row.primaryPosition,
+        yellowCards: row.yellowCards,
+        redCards: row.redCards,
+      })),
+      cardsTracked: MATCH_FEED_COVERAGE.cards,
+      // Nao existe regra de suspensao no dominio: zero ocorrencias em
+      // packages/core. A tela conta cartao, nao afirma pendurado.
+      suspensionRuleExists: false,
+    };
+  }
+
   public async matchDetail(
     gameWorldId: GameWorldId,
     matchId: string,
@@ -92,6 +151,25 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
     const match = await this.client.match.findFirst({
       where: { id: matchId, gameWorldId },
       include: {
+        competitionSeason: {
+          select: { competition: { select: { name: true } } },
+        },
+        playerStats: {
+          include: {
+            player: {
+              select: {
+                id: true,
+                primaryPosition: true,
+                person: { select: { firstName: true, lastName: true } },
+                squadMemberships: {
+                  where: { squad: { category: "FIRST_TEAM" } },
+                  take: 1,
+                  select: { squad: { select: { clubId: true } } },
+                },
+              },
+            },
+          },
+        },
         events: {
           orderBy: { eventSequence: "asc" },
           include: {
@@ -112,6 +190,33 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
     ]);
     const finished =
       match.runtimeStatus === "FINISHED" || match.runtimeStatus === "PROCESSED";
+
+    // As notas saem dos PlayerMatchStats — a nota e coluna, calculada pelo
+    // simulador; aqui so se resolve nome e clube. Ordenada da maior para a
+    // menor: o primeiro e o melhor em campo, o ultimo o pior.
+    const ratings: MatchPlayerRating[] = match.playerStats
+      .map((row) => ({
+        playerId: row.playerId,
+        playerName: `${row.player.person.firstName} ${row.player.person.lastName}`,
+        clubId: row.player.squadMemberships[0]?.squad.clubId ?? "",
+        position: row.player.primaryPosition,
+        rating: Number(row.rating),
+        goals: row.goals,
+        assists: row.assists,
+        shots: row.shots,
+        saves: row.saves,
+        yellowCards: row.yellowCards,
+        redCards: row.redCards,
+      }))
+      .sort((a, b) => b.rating - a.rating || a.playerName.localeCompare(b.playerName));
+
+    // Chute no alvo por time: soma do que cada jogador do lado acertou.
+    const onTarget = { home: 0, away: 0 };
+    for (const row of match.playerStats) {
+      const clubId = row.player.squadMemberships[0]?.squad.clubId ?? "";
+      if (clubId === match.homeClubId) onTarget.home += row.shotsOnTarget;
+      else if (clubId === match.awayClubId) onTarget.away += row.shotsOnTarget;
+    }
 
     const events: MatchFeedEvent[] = match.events.map((e) => ({
       sequence: e.eventSequence,
@@ -135,9 +240,24 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
       awayClubId: match.awayClubId,
       homeClubName: names.get(match.homeClubId)?.name ?? "—",
       awayClubName: names.get(match.awayClubId)?.name ?? "—",
+      home: matchBadge(match.homeClubId, names),
+      away: matchBadge(match.awayClubId, names),
+      competitionName: match.competitionSeason?.competition.name ?? null,
       homeGoals: finished ? match.homeGoals : null,
       awayGoals: finished ? match.awayGoals : null,
+      // `null` sobrevive de proposito: partida jogada ANTES da migration
+      // `match_team_stats` nao tem estes numeros, e zero ali afirmaria um jogo
+      // sem nenhuma finalizacao.
+      homeShots: finished ? match.homeShots : null,
+      awayShots: finished ? match.awayShots : null,
+      homePossession: finished ? match.homePossession : null,
+      homeExpectedGoals: finished ? toNumber(match.homeExpectedGoals) : null,
+      awayExpectedGoals: finished ? toNumber(match.awayExpectedGoals) : null,
+      homeShotsOnTarget: finished ? onTarget.home : null,
+      awayShotsOnTarget: finished ? onTarget.away : null,
+      ratings,
       events,
+      feedCoverage: MATCH_FEED_COVERAGE,
     };
   }
 
@@ -184,4 +304,60 @@ export class PrismaMatchesReadModel implements MatchesReadModel {
       ]),
     );
   }
+}
+
+/**
+ * O que o motor de partida grava no feed HOJE.
+ *
+ * `saveResults` (prisma-match-play-repository) cria UM `MatchEvent` do tipo
+ * `GOAL` por gol e nada mais — cartão, substituição e finalização existem no
+ * `enum MatchEventType` mas nenhum é emitido, e `PlayerMatchStats` recebe zero
+ * fixo em tudo que não é gol. `M-POSTMATCH` usa isto para dizer o que NÃO foi
+ * registrado, em vez de deixar o feed curto passar por partida morna.
+ */
+const MATCH_FEED_COVERAGE: MatchFeedCoverage = {
+  goals: true,
+  assists: true,
+  cards: true,
+  // O motor nao sabe QUEM esta em campo (nao ha escalacao para clube de IA),
+  // entao uma substituicao seria uma decisao que ninguem tomou.
+  substitutions: false,
+  // Finalizacao existe por TIME e por JOGADOR (PlayerMatchStats), mas nao como
+  // lance no feed: o kernel da o total, nao o instante de cada chute.
+  shots: false,
+  teamStats: true,
+  ratings: true,
+  // Passe certo, desarme e intercepcao exigem o motor simular POSSE lance a
+  // lance (doc 05 §6). O kernel resolve chance -> gol, sem meio-campo.
+  passingAndDefending: false,
+};
+
+/** Decimal do Prisma -> number. `null` sobrevive: partida antiga nao tem xG. */
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return Number(value);
+}
+
+function matchBadge(
+  clubId: string,
+  names: Map<
+    string,
+    {
+      name: string;
+      shortCode: string;
+      primaryColor: string | null;
+      secondaryColor: string | null;
+      crestTemplateId: string | null;
+    }
+  >,
+): MatchClubBadge {
+  const identity = names.get(clubId);
+  return {
+    clubId,
+    clubName: identity?.name ?? "—",
+    shortCode: identity?.shortCode ?? "",
+    primaryColor: identity?.primaryColor ?? null,
+    secondaryColor: identity?.secondaryColor ?? null,
+    crestTemplateId: identity?.crestTemplateId ?? null,
+  };
 }

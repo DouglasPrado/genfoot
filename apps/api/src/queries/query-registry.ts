@@ -380,6 +380,20 @@ const handlers: Record<string, QueryHandler> = {
   },
   "youth-intake": async ({ youthIntakeReadModel }, worldId) =>
     succeed({ candidates: await youthIntakeReadModel.candidates(worldId) }),
+  /** A ficha disciplinar do elenco de um clube (M-CLUB-VIEW). */
+  "club-discipline": async ({ matchesReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "club-discipline exige o parametro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await matchesReadModel.clubDiscipline(worldId, clubId));
+  },
   "match-detail": async ({ matchesReadModel }, worldId, params) => {
     const matchId = typeof params.matchId === "string" ? params.matchId : null;
     if (matchId === null) {

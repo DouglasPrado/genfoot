@@ -2165,6 +2165,12 @@ model Match {
   awayGoals           Int                @default(0)
   homeExpectedGoals   Decimal?           @db.Decimal(8, 4) // xG: não-monetário
   awayExpectedGoals   Decimal?           @db.Decimal(8, 4)
+  // Estatísticas de time que o kernel JÁ produz e o banco descartava: sem
+  // coluna, `M-POSTMATCH` não tinha como mostrar posse e finalizações, e o dado
+  // morria no `SimulatedMatchResult`. `null` = partida ainda não jogada.
+  homeShots           Int?
+  awayShots           Int?
+  homePossession      Int? // 0..100; o do visitante é 100 − este
   simulationSeed      String? // replay determinístico
   simulatedOffline    Boolean            @default(false) // + MatchControlSource
   version             Int                @default(1)
