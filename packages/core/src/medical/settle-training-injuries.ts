@@ -24,11 +24,16 @@ import type { OpenInjuryEpisode } from "./medical-use-cases.js";
  * Quantos "ticks" de risco vale um dia de treino.
  *
  * ⚠️ **Calibração VAL-MED-002, não ratificada.** R-21 fixa `p_lesão` por tick
- * de PARTIDA (90 ticks). Não há decisão que diga quanto risco um dia de treino
- * carrega; 30 mantém o treino visivelmente menos perigoso que um jogo, o que é
- * a única propriedade que a regra qualitativa exige.
+ * de PARTIDA (90 ticks); não há decisão sobre o dia de treino.
+ *
+ * O primeiro valor tentado foi 30 (um terço de um jogo) e **provou-se errado
+ * contra a API real**: 40 dias de mundo lesionaram 260 dos 700 jogadores — 37%
+ * do mundo. O erro é de razão, não de fórmula: treina-se TODO dia e joga-se uma
+ * vez por semana, então o risco diário do treino tem de ser uma fração pequena
+ * do de um jogo. Com 3, um jogador acumula ≈4% de chance de lesão em 40 dias,
+ * o que dá da ordem de UM caso por elenco no período.
  */
-export const TRAINING_DAY_RISK_TICKS = 30;
+export const TRAINING_DAY_RISK_TICKS = 3;
 
 /** Regiões possíveis do sorteio — a região alimenta o `recorrente ×3` (R-21). */
 export const INJURY_REGIONS = [
@@ -53,6 +58,15 @@ export interface TrainingLoadEntry {
   readonly age: number;
   /** Intensidade da carga do dia, 0–100. */
   readonly intensity: number;
+  /**
+   * O jogador está sob plano de treino dirigido?
+   *
+   * Sem plano ele ainda acumula DESGASTE — o clube treina de todo jeito, e §16
+   * lista desgaste como causa ao lado de partida e treino. Tratar "sem plano"
+   * como risco zero deixaria o departamento médico permanentemente vazio em
+   * qualquer clube que nunca abriu a tela de treino.
+   */
+  readonly underPlan: boolean;
   /** Regiões com histórico de lesão — pesam no tipo `recorrente`. */
   readonly injuredRegionHistory: readonly string[];
 }
@@ -151,7 +165,7 @@ export class SettleTrainingInjuries {
         worldSeed: input.worldSeed,
         occurredOn: input.worldDate,
         injuryType,
-        cause: InjuryCause.TRAINING,
+        cause: entry.underPlan ? InjuryCause.TRAINING : InjuryCause.WEAR,
         region,
       });
       // Um episódio que falha é PULADO, não derruba a virada — mesma política

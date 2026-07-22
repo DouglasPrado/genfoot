@@ -24,12 +24,14 @@ import {
   injuryTypeLabel,
   rehabProgress,
   rehabStageLabel,
+  restrictionLabel,
   returnEstimateLabel,
   severityLabel,
   sortCases,
   stateLabel,
   type MedicalCase,
   type MedicalDepartment,
+  type MedicalRestriction,
 } from "@/screens/medical/medical-model";
 import { color, fontSize, fontWeight, radius, space } from "@/theme";
 
@@ -69,6 +71,7 @@ export function Medical() {
 
   const department = medicalQuery.data ?? null;
   const cases = sortCases(department?.cases ?? []);
+  const restrictions = department?.restrictions ?? [];
   const screenState = deriveScreenState({
     session: status,
     query:
@@ -119,7 +122,21 @@ export function Medical() {
             </Text>
           </Card>
 
-          {cases.length === 0 ? (
+          {restrictions.length === 0 ? null : (
+            <Card>
+              <Text style={styles.sectionTitle}>SEM CASO REGISTRADO</Text>
+              <Text style={styles.note}>
+                O elenco marca estes jogadores como indisponíveis, mas não há
+                episódio médico para conduzir — provavelmente vieram de um mundo
+                anterior ao departamento médico.
+              </Text>
+              {restrictions.map((item) => (
+                <RestrictionRow key={item.playerId} item={item} />
+              ))}
+            </Card>
+          )}
+
+          {cases.length === 0 && restrictions.length === 0 ? (
             <Card>
               <View style={styles.emptyBox}>
                 <Icon name="checkmark-circle" size={28} color={color.success} />
@@ -140,6 +157,24 @@ export function Medical() {
         </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function RestrictionRow({ item }: { readonly item: MedicalRestriction }) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.info}>
+        <Text style={styles.name} numberOfLines={1}>
+          {item.playerName}
+        </Text>
+        <Text style={styles.detail} numberOfLines={1}>
+          {item.position} · condição {item.condition}
+        </Text>
+        <Text style={styles.note} numberOfLines={2}>
+          {restrictionLabel(item)}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -212,6 +247,13 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   level: { color: color.textMuted, fontSize: fontSize.xs, marginTop: 4 },
+  sectionTitle: {
+    color: color.textMuted,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
+  note: { color: color.textMuted, fontSize: fontSize.xs, marginTop: 2 },
   emptyBox: { alignItems: "center", gap: space.xs, paddingVertical: space.md },
   emptyTitle: {
     color: color.text,

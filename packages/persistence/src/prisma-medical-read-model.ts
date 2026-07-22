@@ -50,7 +50,12 @@ export interface MedicalCaseRow {
   readonly minimumDays: number | null;
   readonly maximumDays: number | null;
   readonly treatmentOption: string | null;
-  readonly relapseRisk: number;
+  /**
+   * Risco de recaída 0–100 — só existe DENTRO da reabilitação. Fora dela é
+   * `null`: quem nem começou a tratar não tem o que recair, e mostrar 97% num
+   * caso em avaliação é número inventado com cara de medição.
+   */
+  readonly relapseRisk: number | null;
   readonly returnRiskScore: number | null;
   readonly relapseCount: number;
   /** Fadiga 0–100 e a condição geral derivada dela. */
@@ -60,8 +65,28 @@ export interface MedicalCaseRow {
   readonly backInTraining: boolean;
 }
 
+/**
+ * Jogador impedido por motivo médico SEM episódio aberto.
+ *
+ * Existe por duas razões legítimas: §16 prevê dor/fadiga/restrição sem lesão
+ * diagnosticada, e mundos criados antes desta vertical têm `availability`
+ * marcada sem nenhum `PlayerInjury` por trás. Em ambos os casos o elenco mostra
+ * o jogador como indisponível — se o departamento médico o omitisse, as duas
+ * telas se contradiriam, e a contradição é pior que a lacuna.
+ */
+export interface MedicalRestrictionRow {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly position: string;
+  readonly availability: string;
+  readonly fatigue: number;
+  readonly condition: number;
+}
+
 export interface MedicalDepartmentView {
   readonly cases: readonly MedicalCaseRow[];
+  /** Impedidos sem caso registrado — a tela diz que não há o que conduzir. */
+  readonly restrictions: readonly MedicalRestrictionRow[];
   readonly squadSize: number;
   readonly healthyCount: number;
   /**
@@ -90,7 +115,7 @@ export class PrismaMedicalReadModel {
       this.client,
     ).listOpenByClub(gameWorldId, clubId);
 
-    const [rows, squadSize, departmentLevel] = await Promise.all([
+    const [rows, squadSize, departmentLevel, blocked] = await Promise.all([
       this.playerRows(
         gameWorldId,
         episodes.map((episode) => episode.playerId),
@@ -99,18 +124,68 @@ export class PrismaMedicalReadModel {
         where: { isActive: true, squad: { clubId }, player: { gameWorldId } },
       }),
       this.departmentLevel(gameWorldId, clubId),
+      this.medicallyBlocked(gameWorldId, clubId),
     ]);
 
     const cases = episodes
       .map((episode) => toCaseRow(episode, rows.get(episode.playerId)))
       .filter((row): row is MedicalCaseRow => row !== null);
 
+    const withCase = new Set(cases.map((row) => row.playerId));
+    const restrictions = blocked.filter((row) => !withCase.has(row.playerId));
+
     return {
       cases,
+      restrictions,
       squadSize,
-      healthyCount: Math.max(0, squadSize - cases.length),
+      healthyCount: Math.max(0, squadSize - cases.length - restrictions.length),
       departmentLevel,
     };
+  }
+
+  /**
+   * Quem o elenco mostra como impedido por motivo MÉDICO.
+   *
+   * Só `INJURED`. `SUSPENDED` é disciplina, e **`UNAVAILABLE` não é médico**:
+   * no domínio ele é o jogador em sessão de treino (`Player.beginTraining`,
+   * `player.ts:328`), que sai sozinho quando a sessão fecha — o mesmo cuidado
+   * que `availability-model.ts:21` já toma na escalação. Listá-lo aqui poria o
+   * elenco inteiro em recuperação num dia de treino.
+   */
+  private async medicallyBlocked(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<readonly MedicalRestrictionRow[]> {
+    const rows = await this.client.squadMembership.findMany({
+      where: {
+        isActive: true,
+        squad: { clubId },
+        player: {
+          gameWorldId,
+          availability: "INJURED",
+        },
+      },
+      include: {
+        player: {
+          select: {
+            id: true,
+            fatigue: true,
+            availability: true,
+            primaryPosition: true,
+            person: { select: { firstName: true, lastName: true } },
+          },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      playerId: row.player.id,
+      playerName:
+        `${row.player.person.firstName} ${row.player.person.lastName}`.trim(),
+      position: row.player.primaryPosition,
+      availability: row.player.availability,
+      fatigue: row.player.fatigue,
+      condition: Math.max(0, 100 - row.player.fatigue),
+    }));
   }
 
   public async case(
@@ -213,7 +288,8 @@ function toCaseRow(
     minimumDays: episode.diagnosis?.minimumDays ?? null,
     maximumDays: episode.diagnosis?.maximumDays ?? null,
     treatmentOption: episode.treatment?.option ?? null,
-    relapseRisk: relapseRiskScore(episode),
+    relapseRisk:
+      episode.state === "REHAB" ? relapseRiskScore(episode) : null,
     returnRiskScore: episode.diagnosis?.returnRiskScore ?? null,
     relapseCount: episode.relapseCount,
     fatigue: player.fatigue,

@@ -15,6 +15,14 @@ import { PrismaInjuryEpisodeRepository } from "./prisma-injury-episode-repositor
  * de disponibilidade.
  */
 
+/**
+ * Intensidade de rotina de quem não tem plano — o clube treina de todo jeito.
+ *
+ * ⚠️ Calibração VAL-MED-002. 40 fica abaixo do neutro (50) do `riscoScore`:
+ * quem não recebeu diretiva treina em ritmo menor que quem recebeu.
+ */
+const ROUTINE_INTENSITY = 40;
+
 function ageOn(birthDate: Date, worldDate: string): number {
   const born = birthDate.toISOString().slice(0, 10);
   const today = worldDate.slice(0, 10);
@@ -29,7 +37,10 @@ function ageOn(birthDate: Date, worldDate: string): number {
  * Só entra quem está DISPONÍVEL: lesionado não treina, então não sorteia lesão
  * nova — quem já tem episódio aberto continua no episódio, não ganha outro.
  * A intensidade é a do plano individual quando existe; senão, a do coletivo do
- * clube; sem nenhum plano, o jogador não está sob carga dirigida e fica fora.
+ * clube. Sem nenhum plano o jogador NÃO fica de fora: ele treina do mesmo jeito,
+ * em intensidade de rotina, e acumula desgaste (§16). Excluí-lo faria o
+ * departamento médico ficar vazio para sempre em todo clube sem plano — que é a
+ * maioria.
  */
 export class PrismaTrainingLoadReader implements TrainingLoadReader {
   public constructor(private readonly client: Prisma.TransactionClient) {}
@@ -82,12 +93,10 @@ export class PrismaTrainingLoadReader implements TrainingLoadReader {
 
     const entries: TrainingLoadEntry[] = [];
     for (const row of memberships) {
-      const intensity =
+      const planned =
         individualIntensity.get(row.player.id) ??
         collectiveIntensity.get(row.squad.clubId);
-      // Sem plano nenhum não há carga dirigida — e sem carga o risco desta
-      // regra não existe (a lesão de partida entra por outro gatilho).
-      if (intensity === undefined) continue;
+      const intensity = planned ?? ROUTINE_INTENSITY;
 
       entries.push({
         playerId: row.player.id,
@@ -95,6 +104,7 @@ export class PrismaTrainingLoadReader implements TrainingLoadReader {
         fatigue: row.player.fatigue,
         age: ageOn(row.player.person.birthDate, worldDate),
         intensity,
+        underPlan: planned !== undefined,
         injuredRegionHistory: [
           ...new Set(row.player.injuries.map((injury) => injury.region)),
         ],

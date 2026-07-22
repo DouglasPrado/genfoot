@@ -38,7 +38,8 @@ export interface MedicalCase {
   readonly minimumDays: number | null;
   readonly maximumDays: number | null;
   readonly treatmentOption: string | null;
-  readonly relapseRisk: number;
+  /** Só existe dentro da reabilitação; `null` fora dela. */
+  readonly relapseRisk: number | null;
   readonly returnRiskScore: number | null;
   readonly relapseCount: number;
   readonly fatigue: number;
@@ -46,8 +47,25 @@ export interface MedicalCase {
   readonly backInTraining: boolean;
 }
 
+/**
+ * Impedido por motivo médico SEM episódio aberto.
+ *
+ * O elenco marca "Lesionado" a partir de `availability`; o departamento lista
+ * episódios. Quando um existe sem o outro, esta linha é o que impede as duas
+ * telas de se contradizerem.
+ */
+export interface MedicalRestriction {
+  readonly playerId: string;
+  readonly playerName: string;
+  readonly position: string;
+  readonly availability: string;
+  readonly fatigue: number;
+  readonly condition: number;
+}
+
 export interface MedicalDepartment {
   readonly cases: readonly MedicalCase[];
+  readonly restrictions: readonly MedicalRestriction[];
   readonly squadSize: number;
   readonly healthyCount: number;
   readonly departmentLevel: number | null;
@@ -227,7 +245,9 @@ export interface RiskWarning {
  * longe de S7, maior a chance de recaída — e a recaída pode agravar a lesão.
  */
 export function forceReturnWarning(medicalCase: MedicalCase): RiskWarning {
-  const risk = medicalCase.relapseRisk;
+  // Chamada só a partir da reabilitação (`canForceReturn`), onde o risco
+  // existe; o zero é a defesa contra um caso fora dela chegar aqui.
+  const risk = medicalCase.relapseRisk ?? 0;
   const stagesLeft =
     medicalCase.rehabStage === null
       ? medicalCase.rehabStageTotal
@@ -276,16 +296,35 @@ export function formatWorldDate(worldDate: string): string {
 
 /** Resumo do topo da lista — a "incidência agregada" que o doc pede. */
 export function departmentSummary(department: MedicalDepartment): string {
-  if (department.cases.length === 0) {
+  const restrictions = department.restrictions.length;
+  if (department.cases.length === 0 && restrictions === 0) {
     return department.squadSize === 0
       ? "Sem elenco registrado"
       : `Elenco saudável — ${department.squadSize} jogadores disponíveis`;
+  }
+  if (department.cases.length === 0) {
+    return `${restrictions} ${restrictions === 1 ? "jogador impedido" : "jogadores impedidos"} sem caso registrado · ${department.healthyCount} sãos`;
   }
   const total = department.cases.length;
   const inRehab = department.cases.filter(
     (item) => item.state === "REHAB",
   ).length;
-  return `${total} ${total === 1 ? "caso aberto" : "casos abertos"} · ${inRehab} em reabilitação · ${department.healthyCount} sãos`;
+  const base = `${total} ${total === 1 ? "caso aberto" : "casos abertos"} · ${inRehab} em reabilitação · ${department.healthyCount} sãos`;
+  return restrictions === 0
+    ? base
+    : `${base} · ${restrictions} sem caso registrado`;
+}
+
+/**
+ * Rótulo do impedimento sem episódio.
+ *
+ * Só chega aqui quem está `INJURED` — `UNAVAILABLE` é sessão de treino, não
+ * medicina, e fica fora ainda na query.
+ */
+export function restrictionLabel(restriction: MedicalRestriction): string {
+  return restriction.availability === "INJURED"
+    ? "Marcado como lesionado, sem caso médico aberto"
+    : "Indisponível, sem caso médico aberto";
 }
 
 /** Nível da comissão médica; `null` = clube sem médico contratado. */

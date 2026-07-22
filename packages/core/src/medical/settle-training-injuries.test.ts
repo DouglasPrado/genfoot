@@ -67,6 +67,7 @@ const entry = (
   fatigue: 30,
   age: 25,
   intensity: 50,
+  underPlan: true,
   injuredRegionHistory: [],
   ...overrides,
 });
@@ -80,9 +81,15 @@ function settleWith(entries: readonly TrainingLoadEntry[]) {
   return { repository, settle };
 }
 
-/** Um elenco grande o bastante para a incidência aparecer. */
+/**
+ * Uma população grande o bastante para a incidência de UM dia aparecer.
+ *
+ * Com a calibração correta o risco diário é da ordem de 0,5%: um elenco de 23
+ * não produz caso nenhum na maioria dos dias — que é o comportamento desejado,
+ * mas não serve para testar a incidência. Daí o lote.
+ */
 const squad = (overrides: Partial<TrainingLoadEntry> = {}) =>
-  Array.from({ length: 240 }, (_, index) =>
+  Array.from({ length: 2000 }, (_, index) =>
     entry(`3333333-3333-7333-8333-3333333${String(index).padStart(5, "0")}`, overrides),
   );
 
@@ -96,12 +103,28 @@ describe("risco de treino", () => {
     );
   });
 
-  it("o dia de treino é menos perigoso que uma partida inteira", () => {
+  it("o dia de treino é MUITO menos perigoso que uma partida inteira", () => {
     const perDay = trainingInjuryProbability(entry("p"));
 
-    // A partida-base de 90 ticks dá ≈3,6% (R-21).
-    expect(perDay).toBeLessThan(0.036);
+    // A partida-base de 90 ticks dá ≈3,6% (R-21). Treina-se todo dia e joga-se
+    // uma vez por semana: o dia de treino tem de ficar bem abaixo de um décimo.
+    expect(perDay).toBeLessThan(0.0036);
     expect(perDay).toBeGreaterThan(0);
+  });
+
+  /**
+   * Guarda contra a regressão que a primeira calibração produziu: com 30 ticks
+   * por dia, 40 dias lesionaram 37% do mundo. A propriedade que importa não é
+   * a taxa diária isolada, é o ACÚMULO ao longo de uma janela de calendário.
+   */
+  it("em 40 dias de rotina, a incidência acumulada fica na casa de poucos por cento", () => {
+    const perDay = trainingInjuryProbability(
+      entry("p", { fatigue: 0, intensity: 40 }),
+    );
+    const overForty = 1 - (1 - perDay) ** 40;
+
+    expect(overForty).toBeLessThan(0.08);
+    expect(overForty).toBeGreaterThan(0.005);
   });
 
   it("jogador exausto corre mais risco no mesmo treino", () => {
@@ -123,8 +146,8 @@ describe("virada do dia", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.evaluatedCount).toBe(240);
-    expect(result.value.openedEpisodes.length).toBeLessThan(5);
+    expect(result.value.evaluatedCount).toBe(2000);
+    expect(result.value.openedEpisodes.length).toBeLessThan(15);
   });
 
   it("sobrecarga em elenco exausto produz lesão — o laço com a decisão anterior", async () => {
@@ -165,6 +188,23 @@ describe("virada do dia", () => {
     expect(episode?.state).toBe(MedicalEpisodeState.EVALUATION);
     expect(episode?.cause).toBe("TRAINING");
     expect(episode?.region.length).toBeGreaterThan(0);
+  });
+
+  it("quem treina sem plano se lesiona por DESGASTE, não por treino dirigido", async () => {
+    const { settle } = settleWith(
+      squad({ fatigue: 95, intensity: 100, underPlan: false }),
+    );
+
+    const result = await settle.execute({
+      gameWorldId: WORLD,
+      worldSeed: "seed-1",
+      worldDate: "2026-07-22",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.openedEpisodes.length).toBeGreaterThan(0);
+    expect(result.value.openedEpisodes[0]?.cause).toBe("WEAR");
   });
 
   it("mesma semente, mesmo dia: a virada é reproduzível", async () => {

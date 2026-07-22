@@ -10,10 +10,21 @@ import {
   rehabProgress,
   rehabStageLabel,
   returnEstimateLabel,
+  restrictionLabel,
   severityLabel,
   sortCases,
   type MedicalCase,
+  type MedicalRestriction,
 } from "./medical-model.js";
+
+const restriction: MedicalRestriction = {
+  playerId: "player-9",
+  playerName: "Ademir Souza",
+  position: "CB",
+  availability: "INJURED",
+  fatigue: 30,
+  condition: 70,
+};
 
 const baseCase: MedicalCase = {
   injuryId: "injury-1",
@@ -153,6 +164,15 @@ describe("aviso do retorno forçado", () => {
     expect(warning.message).toContain("25%");
   });
 
+  it("caso fora da reabilitação não inventa risco — trata como zero", () => {
+    const warning = forceReturnWarning(
+      withCase({ state: "EVALUATION", rehabStage: null, relapseRisk: null }),
+    );
+
+    expect(warning.tone).toBe("info");
+    expect(warning.message).toContain("0%");
+  });
+
   it("singular quando falta um estágio só", () => {
     expect(
       forceReturnWarning(withCase({ rehabStage: 6 })).message,
@@ -196,6 +216,7 @@ describe("resumo do departamento", () => {
     expect(
       departmentSummary({
         cases: [],
+        restrictions: [],
         squadSize: 23,
         healthyCount: 23,
         departmentLevel: 55,
@@ -206,12 +227,49 @@ describe("resumo do departamento", () => {
   it("com casos, mostra a incidência agregada", () => {
     const summary = departmentSummary({
       cases: [withCase({ state: "REHAB" }), withCase({ state: "EXAMS" })],
+      restrictions: [],
       squadSize: 23,
       healthyCount: 21,
       departmentLevel: 55,
     });
 
     expect(summary).toBe("2 casos abertos · 1 em reabilitação · 21 sãos");
+  });
+
+  it("jogador impedido sem episódio NÃO some — senão o elenco e o médico se contradizem", () => {
+    const summary = departmentSummary({
+      cases: [],
+      restrictions: [restriction],
+      squadSize: 23,
+      healthyCount: 22,
+      departmentLevel: 55,
+    });
+
+    expect(summary).toBe(
+      "1 jogador impedido sem caso registrado · 22 sãos",
+    );
+  });
+
+  it("com caso E impedido sem episódio, o resumo cita os dois", () => {
+    const summary = departmentSummary({
+      cases: [withCase({ state: "REHAB" })],
+      restrictions: [restriction],
+      squadSize: 23,
+      healthyCount: 21,
+      departmentLevel: 55,
+    });
+
+    expect(summary).toContain("1 caso aberto");
+    expect(summary).toContain("1 sem caso registrado");
+  });
+
+  it("o rótulo do impedido diz o motivo real, sem inventar lesão", () => {
+    expect(restrictionLabel(restriction)).toBe(
+      "Marcado como lesionado, sem caso médico aberto",
+    );
+    expect(
+      restrictionLabel({ ...restriction, availability: "UNAVAILABLE" }),
+    ).toBe("Indisponível, sem caso médico aberto");
   });
 
   it("clube sem médico contratado diz isso, não inventa nível", () => {
