@@ -14,8 +14,13 @@ import {
   type PlayerLifecycleSnapshot,
 } from "../players/player-lifecycle-types.js";
 import type { PlayerAggregateSnapshot, PlayerRepository } from "../players/player-repository.js";
+import type {
+  NotificationItemSnapshot,
+  NotificationRepository,
+} from "../notifications/notification-types.js";
 
 import { CollectTrainingSession } from "./collect-training-session.js";
+import { SettleDueTrainingSessions } from "./settle-due-training-sessions.js";
 import { StartTrainingSession } from "./start-training-session.js";
 import type {
   TrainingSessionRepositories,
@@ -90,6 +95,9 @@ class MemSessions implements TrainingSessionRepository {
   public findActiveByPlayer(): Promise<TrainingSessionSnapshot | null> {
     return Promise.resolve(this.current?.active ? this.current : null);
   }
+  public findAllActive(): Promise<readonly TrainingSessionSnapshot[]> {
+    return Promise.resolve(this.current?.active ? [this.current] : []);
+  }
   /** Espelha o banco: o id existe mesmo depois da sessão ser coletada. */
   public existsWithId(_gameWorldId: string, id: string): Promise<boolean> {
     return Promise.resolve(this.current?.id === id);
@@ -99,8 +107,20 @@ class MemSessions implements TrainingSessionRepository {
     return Promise.resolve();
   }
 }
-function uowOf(sessions: MemSessions, players: MemPlayers): TrainingSessionUnitOfWork {
-  const repos: TrainingSessionRepositories = { sessions, players };
+class MemNotifications implements NotificationRepository {
+  public items: NotificationItemSnapshot[] = [];
+  public append(item: NotificationItemSnapshot): Promise<void> {
+    // Idempotente por id, como o adapter.
+    if (!this.items.some((i) => i.id === item.id)) this.items.push(item);
+    return Promise.resolve();
+  }
+}
+function uowOf(
+  sessions: MemSessions,
+  players: MemPlayers,
+  notifications: MemNotifications = new MemNotifications(),
+): TrainingSessionUnitOfWork {
+  const repos: TrainingSessionRepositories = { sessions, players, notifications };
   return { run: (work) => work(repos) };
 }
 
@@ -109,7 +129,7 @@ describe("StartTrainingSession", () => {
     const players = new MemPlayers(aggregate());
     const sessions = new MemSessions();
     const r = await new StartTrainingSession(uowOf(sessions, players)).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: ["shortPassing"],
       worldSeed: SEED, worldDate: "2026-03-01",
     });
     expect(r.ok).toBe(true);
@@ -130,7 +150,7 @@ describe("StartTrainingSession", () => {
     const uow = uowOf(sessions, players);
     const args = {
       gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
-      attributeCode: "shortPassing", worldSeed: SEED, worldDate: "2026-03-01",
+      attributeCodes: ["shortPassing"], worldSeed: SEED, worldDate: "2026-03-01",
     } as const;
     const primeira = await new StartTrainingSession(uow).execute(args);
     expect(primeira.ok).toBe(true);
@@ -155,7 +175,7 @@ describe("StartTrainingSession", () => {
     const uow = uowOf(sessions, players);
     const base = {
       gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
-      attributeCode: "shortPassing", worldSeed: SEED,
+      attributeCodes: ["shortPassing"], worldSeed: SEED,
     } as const;
     await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
     if (sessions.current !== null) {
@@ -173,11 +193,11 @@ describe("StartTrainingSession", () => {
     const sessions = new MemSessions();
     const uow = uowOf(sessions, players);
     await new StartTrainingSession(uow).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: ["shortPassing"],
       worldSeed: SEED, worldDate: "2026-03-01",
     });
     const r2 = await new StartTrainingSession(uow).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "dribbling",
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: ["dribbling"],
       worldSeed: SEED, worldDate: "2026-03-02",
     });
     expect(r2.ok).toBe(false);
@@ -187,7 +207,7 @@ describe("StartTrainingSession", () => {
   it("recusa atributo que não se aplica (grid de goleiro num zagueiro)", async () => {
     const players = new MemPlayers(aggregate());
     const r = await new StartTrainingSession(uowOf(new MemSessions(), players)).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: GOALKEEPING_ATTRIBUTES[0],
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: [GOALKEEPING_ATTRIBUTES[0]],
       worldSeed: SEED, worldDate: "2026-03-01",
     });
     expect(r.ok).toBe(false);
@@ -200,7 +220,7 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
     const sessions = new MemSessions();
     const uow = uowOf(sessions, players);
     await new StartTrainingSession(uow).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: ["shortPassing"],
       worldSeed: SEED, worldDate: "2026-03-01",
     });
     const before = players.agg.player.attributes.shortPassing;
@@ -244,7 +264,7 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
     const sessions = new MemSessions();
     const uow = uowOf(sessions, players);
     await new StartTrainingSession(uow).execute({
-      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCode: "shortPassing",
+      gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER, attributeCodes: ["shortPassing"],
       worldSeed: SEED, worldDate: "2026-03-01",
     });
     const before = players.agg.player.attributes.shortPassing;
@@ -253,5 +273,62 @@ describe("CollectTrainingSession — aplicação instantânea", () => {
     });
     const after = players.agg.player.attributes.shortPassing;
     expect(after).toBe(before); // sem headroom, sem ganho
+  });
+});
+
+describe("SettleDueTrainingSessions — liberação na virada do dia (1 dia lógico)", () => {
+  const base = {
+    gameWorldId: WORLD, clubId: CLUB, playerId: PLAYER,
+    attributeCodes: ["shortPassing"], worldSeed: SEED,
+  } as const;
+
+  it("NO MESMO dia a sessão NÃO é settlada — jogador segue indisponível", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    const r = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-01", rulesetVersion: RULESET,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.settledCount).toBe(0);
+    expect(sessions.current?.active).toBe(true);
+    expect(players.agg.player.availability).toBe(PlayerAvailability.UNAVAILABLE);
+  });
+
+  it("NA VIRADA (dia seguinte) a sessão settla SOZINHA: ganho aplicado, jogador APTO, sessão fechada, e grava o AVISO", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const notifications = new MemNotifications();
+    const uow = uowOf(sessions, players, notifications);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    const before = players.agg.player.attributes.shortPassing;
+    const r = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-02", rulesetVersion: RULESET,
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.settledCount).toBe(1);
+    expect(sessions.current?.active).toBe(false);
+    expect(players.agg.player.availability).toBe(PlayerAvailability.AVAILABLE);
+    expect(players.agg.player.attributes.shortPassing).toBeGreaterThan(before);
+    // Aviso IN-APP gravado (C12) — título/mensagem do treino completo.
+    expect(notifications.items).toHaveLength(1);
+    expect(notifications.items[0]?.type).toBe("TRAINING_REPORT");
+    expect(notifications.items[0]?.title).toContain("completou o treino");
+  });
+
+  it("reavançar não settla de novo — a sessão já está inativa (idempotente)", async () => {
+    const players = new MemPlayers(aggregate());
+    const sessions = new MemSessions();
+    const uow = uowOf(sessions, players);
+    await new StartTrainingSession(uow).execute({ ...base, worldDate: "2026-03-01" });
+    await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-02", rulesetVersion: RULESET,
+    });
+    const again = await new SettleDueTrainingSessions(uow).execute({
+      gameWorldId: WORLD, worldSeed: SEED, worldDate: "2026-03-03", rulesetVersion: RULESET,
+    });
+    expect(again.ok).toBe(true);
+    if (again.ok) expect(again.value.settledCount).toBe(0);
   });
 });

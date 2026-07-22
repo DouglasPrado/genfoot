@@ -13,6 +13,7 @@ import {
   PHYSICAL_ATTRIBUTES,
   MENTAL_ATTRIBUTES,
   GOALKEEPING_ATTRIBUTES,
+  attributeLabelPt,
 } from "@grinta/core";
 import { ProgressBar } from "@/components/progress-bar";
 import { PlayerAvatar } from "@/components/player-avatar";
@@ -52,48 +53,6 @@ export interface PlayerSkillCardData {
 }
 
 /** Rótulos PT dos 39 atributos (R-188). */
-const ATTR_LABEL: Record<string, string> = {
-  finishing: "Finalização",
-  longShots: "Chute de longe",
-  shortPassing: "Passe curto",
-  longPassing: "Passe longo",
-  crossing: "Cruzamento",
-  dribbling: "Drible",
-  firstTouch: "Domínio",
-  marking: "Marcação",
-  tackling: "Desarme",
-  heading: "Cabeceio",
-  setPieces: "Bola parada",
-  vision: "Visão",
-  pace: "Velocidade",
-  acceleration: "Aceleração",
-  strength: "Força",
-  stamina: "Resistência",
-  jumping: "Impulsão",
-  agility: "Agilidade",
-  balance: "Equilíbrio",
-  explosiveness: "Explosão",
-  recovery: "Recuperação",
-  positioning: "Posicionamento",
-  decisions: "Decisão",
-  concentration: "Concentração",
-  discipline: "Disciplina",
-  composure: "Frieza",
-  determination: "Determinação",
-  leadership: "Liderança",
-  consistency: "Regularidade",
-  bravery: "Coragem",
-  resilience: "Resiliência",
-  goalkeeperReflexes: "Reflexos",
-  goalkeeperPositioning: "Posic. de gol",
-  goalkeeperHandling: "Saída de gol",
-  goalkeeperKicking: "Reposição",
-  goalkeeperAerial: "Jogo aéreo",
-  goalkeeperOneOnOne: "Um-a-um",
-  goalkeeperPenalty: "Pênalti",
-  goalkeeperCommand: "Comando de área",
-};
-
 function tintFor(v: number): string {
   return v >= 80
     ? color.success
@@ -126,7 +85,7 @@ function AttrItem({ code, value }: { code: string; value: number | null }) {
     <View style={styles.attrItem}>
       <View style={styles.attrHead}>
         <Text style={styles.attrLabel} numberOfLines={1}>
-          {ATTR_LABEL[code] ?? code}
+          {attributeLabelPt(code)}
         </Text>
         <Text style={[styles.attrValue, { color: tint }]}>
           {has ? value : "—"}

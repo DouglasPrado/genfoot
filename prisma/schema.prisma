@@ -699,6 +699,7 @@ model UserAccount {
   sessions            UserSession[]
   worldParticipations WorldParticipant[]
   notifications       Notification[]
+  pushDeviceTokens    PushDeviceToken[] // push remoto (Expo) por dispositivo
   credential          UserCredential? // C-12: autenticação
   refreshTokens       AuthRefreshToken[] // C-12: rotação/detecção de reuso
 }
@@ -1720,6 +1721,47 @@ model TrainingPlayerEntry {
   @@index([playerId])
 }
 
+/// Plano de treino INDIVIDUAL (M-TRAINING-INDIV): a diretiva de desenvolvimento
+/// de UM jogador rumo a um alvo (atributo ou posição), aplicada na virada do
+/// dia. Um por jogador. Sem FK relacional por ora (o cascade de exclusão fica
+/// como follow-up) — o banco de dev é descartável.
+model IndividualTrainingPlan {
+  id                  String  @id @default(uuid(7)) @db.Uuid
+  gameWorldId         String  @db.Uuid
+  clubId              String  @db.Uuid
+  playerId            String  @db.Uuid
+  /// "ATTRIBUTE" | "POSITION" | "GK_ARCHETYPE"
+  targetKind          String
+  /// preenchido quando targetKind = ATTRIBUTE — até 5 habilidades (ganho dividido)
+  targetAttributeCodes String[]
+  /// preenchido quando targetKind = POSITION
+  targetPosition      String?
+  /// preenchido quando targetKind = GK_ARCHETYPE
+  targetArchetype     String?
+  intensity           Int
+  version             Int     @default(1)
+
+  @@unique([gameWorldId, playerId]) // um plano individual por jogador
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId])
+}
+
+/// Vínculo de MENTORIA (M-MENTORING): um mentor (veterano/líder) acelera o
+/// desenvolvimento de um pupilo. Um mentor por pupilo. Sem FK relacional por
+/// ora (cascade é follow-up) — o banco de dev é descartável.
+model Mentorship {
+  id          String @id @default(uuid(7)) @db.Uuid
+  gameWorldId String @db.Uuid
+  clubId      String @db.Uuid
+  menteeId    String @db.Uuid
+  mentorId    String @db.Uuid
+  version     Int    @default(1)
+
+  @@unique([gameWorldId, menteeId]) // um mentor por pupilo
+  @@index([gameWorldId, clubId])
+  @@index([gameWorldId])
+}
+
 /// Escalação CORRENTE do clube (R-220 Fase 1): formação + 11 titulares nos slots
 /// + banco. Per (mundo, clube); a partida lê ISTO para saber quem entra em campo,
 /// com fallback à média do elenco quando não há escalação. Não confundir com o
@@ -1760,20 +1802,36 @@ model ClubLineupStarter {
 /// jogador fica indisponível; ao coletar, o ganho aplica na hora e a sessão
 /// encerra. Uma ativa por jogador (garantido no caso de uso).
 model TrainingSession {
-  id            String   @id @default(uuid(7)) @db.Uuid
-  gameWorldId   String   @db.Uuid
-  clubId        String   @db.Uuid
-  playerId      String   @db.Uuid
-  attributeCode String
-  startDate     DateTime
-  durationDays  Int
-  active        Boolean  @default(true)
-  version       Int      @default(1)
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  playerId       String   @db.Uuid
+  attributeCodes String[] // 1..5 habilidades; o ganho é dividido entre elas
+  startDate      DateTime
+  durationDays   Int
+  active         Boolean  @default(true)
+  version        Int      @default(1)
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   @@index([gameWorldId, playerId])
   @@index([playerId, active])
+}
+
+/// Sessão de treino em GRUPO (R-220.2): o time treina uma formação por um tempo
+/// e entrosa. Uma ativa por clube; os participantes ficam indisponíveis.
+model GroupTrainingSession {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  gameWorldId    String   @db.Uuid
+  clubId         String   @db.Uuid
+  formation      String
+  participantIds String[] @db.Uuid
+  startDate      DateTime
+  durationDays   Int
+  active         Boolean  @default(true)
+  version        Int      @default(1)
+
+  @@index([gameWorldId, clubId, active])
 }
 
 /// Presença operacional no elenco — NÃO substitui contrato/registro/empréstimo.
@@ -2370,6 +2428,22 @@ model Notification {
 
   @@index([gameWorldId])
   @@index([userId])
+}
+
+/// Token de push de um dispositivo, por conta (Expo push token). Uma linha por
+/// token (o mesmo device dá o mesmo token, então upsert por token). Alimenta o
+/// envio de push remoto (ex.: treino completo) do servidor para o device.
+model PushDeviceToken {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  accountId      String   @db.Uuid
+  expoPushToken  String   @unique
+  platform       String   @default("ios")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account UserAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
 }
 
 /// Projeção transversal de auditoria — referência genérica (entity/entityId)

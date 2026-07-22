@@ -7,6 +7,7 @@ import type {
 
 import type { Prisma } from "./generated/prisma/client.js";
 import type { PrismaClient } from "./prisma-connection.js";
+import { PrismaNotificationRepository } from "./prisma-notification-repository.js";
 import { PrismaPlayerRepository } from "./prisma-player-repository.js";
 
 /**
@@ -34,6 +35,7 @@ function bind(tx: Prisma.TransactionClient): TrainingSessionRepositories {
   return {
     players: new PrismaPlayerRepository(tx),
     sessions: new PrismaTrainingSessionRepository(tx),
+    notifications: new PrismaNotificationRepository(tx),
   };
 }
 
@@ -59,12 +61,31 @@ export class PrismaTrainingSessionRepository
       gameWorldId: row.gameWorldId,
       clubId: row.clubId,
       playerId: row.playerId,
-      attributeCode: row.attributeCode,
+      attributeCodes: row.attributeCodes,
       startDate: isoDate(row.startDate),
       durationDays: row.durationDays,
       active: row.active,
       version: row.version,
     };
+  }
+
+  public async findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly TrainingSessionSnapshot[]> {
+    const rows = await this.client.trainingSession.findMany({
+      where: { gameWorldId, active: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      gameWorldId: row.gameWorldId,
+      clubId: row.clubId,
+      playerId: row.playerId,
+      attributeCodes: row.attributeCodes,
+      startDate: isoDate(row.startDate),
+      durationDays: row.durationDays,
+      active: row.active,
+      version: row.version,
+    }));
   }
 
   public async existsWithId(
@@ -89,7 +110,7 @@ export class PrismaTrainingSessionRepository
           gameWorldId: session.gameWorldId,
           clubId: session.clubId,
           playerId: session.playerId,
-          attributeCode: session.attributeCode,
+          attributeCodes: [...session.attributeCodes],
           startDate: new Date(`${session.startDate}T00:00:00.000Z`),
           durationDays: session.durationDays,
           active: session.active,

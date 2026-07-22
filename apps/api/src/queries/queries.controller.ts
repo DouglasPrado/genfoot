@@ -1,6 +1,7 @@
 import type {
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
+  GroupTrainingSessionsReadModel,
   WorldSeasonReadModel,
   YouthIntakeReadModel,
 } from "@grinta/persistence";
@@ -17,6 +18,8 @@ import type {
   MatchesReadModel,
   WorldClockRepository,
   TrainingPlanRepository,
+  IndividualTrainingPlanRepository,
+  MentorshipRepository,
   LineupRepository,
   SquadReadModel,
   WorldReadModel,
@@ -53,9 +56,12 @@ import {
   MATCHES_READ_MODEL,
   WORLD_CLOCK_REPOSITORY,
   TRAINING_PLAN_REPOSITORY,
+  INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+  MENTORSHIP_REPOSITORY,
   CLUB_LINEUP_REPOSITORY,
   PLAYER_DEVELOPMENT_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
+  GROUP_TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   YOUTH_INTAKE_READ_MODEL,
   MARKET_READ_MODEL,
@@ -112,6 +118,10 @@ export class QueriesController {
     private readonly worldClock: WorldClockRepository,
     @Inject(TRAINING_PLAN_REPOSITORY)
     private readonly trainingPlanRepository: TrainingPlanRepository,
+    @Inject(INDIVIDUAL_TRAINING_PLAN_REPOSITORY)
+    private readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository,
+    @Inject(MENTORSHIP_REPOSITORY)
+    private readonly mentorshipRepository: MentorshipRepository,
     @Inject(CLUB_LINEUP_REPOSITORY)
     private readonly clubLineupRepository: LineupRepository,
     @Inject(PLAYER_DEVELOPMENT_READ_MODEL)
@@ -120,6 +130,8 @@ export class QueriesController {
     private readonly trainingSessionsReadModel: TrainingSessionsReadModel,
     @Inject(WORLD_SEASON_READ_MODEL)
     private readonly worldSeasonReadModel: WorldSeasonReadModel,
+    @Inject(GROUP_TRAINING_SESSIONS_READ_MODEL)
+    private readonly groupTrainingSessionsReadModel: GroupTrainingSessionsReadModel,
     @Inject(YOUTH_INTAKE_READ_MODEL)
     private readonly youthIntakeReadModel: YouthIntakeReadModel,
     @Inject(MARKET_READ_MODEL)
@@ -319,10 +331,13 @@ export class QueriesController {
         matchesReadModel: this.matchesReadModel,
         worldClock: this.worldClock,
         trainingPlanRepository: this.trainingPlanRepository,
+        individualTrainingPlanRepository: this.individualTrainingPlanRepository,
+        mentorshipRepository: this.mentorshipRepository,
         clubLineupRepository: this.clubLineupRepository,
         playerDevelopmentReadModel: this.playerDevelopmentReadModel,
         trainingSessionsReadModel: this.trainingSessionsReadModel,
         worldSeasonReadModel: this.worldSeasonReadModel,
+        groupTrainingSessionsReadModel: this.groupTrainingSessionsReadModel,
         youthIntakeReadModel: this.youthIntakeReadModel,
         marketReadModel: this.marketReadModel,
         fanbaseReadModel: this.fanbaseReadModel,

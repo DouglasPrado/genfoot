@@ -61,6 +61,10 @@ export interface TrainingPlanRepository {
     plan: TrainingPlanSnapshot,
     expectedVersion: number | null,
   ): Promise<void>;
+  /** Todos os planos coletivos do mundo — o settle da virada percorre. */
+  findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly TrainingPlanSnapshot[]>;
 }
 
 /**

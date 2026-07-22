@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { projectSessionGainPoints } from "./session-gain.js";
+import {
+  perAttributeGain,
+  projectSessionGainPoints,
+  sessionRawGainPoints,
+} from "./session-gain.js";
 
 const base = {
   attributeCurrentValue: 50,
@@ -61,5 +65,43 @@ describe("projectSessionGainPoints (R-221)", () => {
     });
     const withHeadroom = projectSessionGainPoints(base);
     expect(noHeadroom).toBeLessThanOrEqual(withHeadroom);
+  });
+});
+
+describe("perAttributeGain — divisão do ganho entre habilidades (arredonda pra baixo)", () => {
+  const attr = 50; // muito headroom até 100
+
+  it("1 habilidade rende o bruto inteiro", () => {
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 1, attributeCurrentValue: attr })).toBe(6);
+  });
+
+  it("divide igual quando cabe (6/2=3, 6/3=2)", () => {
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 2, attributeCurrentValue: attr })).toBe(3);
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 3, attributeCurrentValue: attr })).toBe(2);
+  });
+
+  it("arredonda PARA BAIXO — 6/4=1, 6/5=1 (o resto se perde)", () => {
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 4, attributeCurrentValue: attr })).toBe(1);
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 5, attributeCurrentValue: attr })).toBe(1);
+  });
+
+  it("tetado no 100 do atributo (98 → no máximo +2)", () => {
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 1, attributeCurrentValue: 98 })).toBe(2);
+  });
+
+  it("atributo null ou 0 habilidades → 0", () => {
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 3, attributeCurrentValue: null })).toBe(0);
+    expect(perAttributeGain({ rawGain: 6, attributeCount: 0, attributeCurrentValue: attr })).toBe(0);
+  });
+});
+
+describe("sessionRawGainPoints", () => {
+  it("é o bruto (>=0), tetado em +6", () => {
+    const g = sessionRawGainPoints({
+      usableCeiling: 99, currentAbility: 40, morale: 70, fatigue: 0,
+      age: 20, elapsedDays: 30, durationDays: 7,
+    });
+    expect(g).toBeGreaterThan(0);
+    expect(g).toBeLessThanOrEqual(6);
   });
 });

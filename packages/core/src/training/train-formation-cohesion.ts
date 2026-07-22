@@ -19,8 +19,16 @@ export interface LineupPresenceReader {
 }
 
 export interface CohesionWriter {
-  /** Sobe a coesão do clube pelo ganho de treino de formação (teto 100). */
-  raiseByFormationTraining(gameWorldId: string, clubId: string): Promise<void>;
+  /**
+   * Sobe a coesão do clube pelo ganho de treino de formação (teto 100).
+   * `bonusPoints` (default 0) soma ao ganho base — usado pelo bônus de
+   * ADAPTAÇÃO do treino em grupo (participantes fora do ofício entrosam mais).
+   */
+  raiseByFormationTraining(
+    gameWorldId: string,
+    clubId: string,
+    bonusPoints?: number,
+  ): Promise<void>;
 }
 
 /** Escalação e coesão mudam no MESMO commit — checar e subir é um efeito só. */

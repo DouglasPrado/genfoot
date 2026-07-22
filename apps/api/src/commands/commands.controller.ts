@@ -38,9 +38,17 @@ import type {
   SeasonLifecycleRepository,
   TrainingSessionUnitOfWork,
   CohesionTrainingUnitOfWork,
+  GroupTrainingSessionUnitOfWork,
   LineupRepository,
   LineupContextReader,
   PlayerRepository,
+  PushTokenRepository,
+  AiTrainingUnitOfWork,
+  IndividualTrainingPlanRepository,
+  IndividualTrainingUnitOfWork,
+  MentorshipRepository,
+  MentorshipUnitOfWork,
+  CollectiveTrainingUnitOfWork,
   AutomationUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -77,9 +85,17 @@ import {
   SEASON_LIFECYCLE_REPOSITORY,
   TRAINING_SESSION_UNIT_OF_WORK,
   COHESION_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_UNIT_OF_WORK,
   CLUB_LINEUP_REPOSITORY,
   LINEUP_CONTEXT_READER,
   PLAYER_REPOSITORY,
+  PUSH_TOKEN_REPOSITORY,
+  AI_TRAINING_UNIT_OF_WORK,
+  INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+  INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MENTORSHIP_REPOSITORY,
+  MENTORSHIP_UNIT_OF_WORK,
+  COLLECTIVE_TRAINING_UNIT_OF_WORK,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
@@ -151,12 +167,28 @@ export class CommandsController {
     private readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork,
     @Inject(COHESION_TRAINING_UNIT_OF_WORK)
     private readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork,
+    @Inject(GROUP_TRAINING_UNIT_OF_WORK)
+    private readonly groupTrainingUnitOfWork: GroupTrainingSessionUnitOfWork,
     @Inject(CLUB_LINEUP_REPOSITORY)
     private readonly clubLineupRepository: LineupRepository,
     @Inject(LINEUP_CONTEXT_READER)
     private readonly lineupContextReader: LineupContextReader,
     @Inject(PLAYER_REPOSITORY)
     private readonly playerRepository: PlayerRepository,
+    @Inject(PUSH_TOKEN_REPOSITORY)
+    private readonly pushTokenRepository: PushTokenRepository,
+    @Inject(AI_TRAINING_UNIT_OF_WORK)
+    private readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork,
+    @Inject(INDIVIDUAL_TRAINING_PLAN_REPOSITORY)
+    private readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository,
+    @Inject(INDIVIDUAL_TRAINING_UNIT_OF_WORK)
+    private readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork,
+    @Inject(MENTORSHIP_REPOSITORY)
+    private readonly mentorshipRepository: MentorshipRepository,
+    @Inject(MENTORSHIP_UNIT_OF_WORK)
+    private readonly mentorshipUnitOfWork: MentorshipUnitOfWork,
+    @Inject(COLLECTIVE_TRAINING_UNIT_OF_WORK)
+    private readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork,
     @Inject(AUTOMATION_UNIT_OF_WORK)
     private readonly automationUnitOfWork: AutomationUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
@@ -319,9 +351,17 @@ export class CommandsController {
         seasonLifecycle: this.seasonLifecycle,
         trainingSessionUnitOfWork: this.trainingSessionUnitOfWork,
         cohesionTrainingUnitOfWork: this.cohesionTrainingUnitOfWork,
+        groupTrainingUnitOfWork: this.groupTrainingUnitOfWork,
         clubLineupRepository: this.clubLineupRepository,
         lineupContextReader: this.lineupContextReader,
         playerRepository: this.playerRepository,
+        pushTokenRepository: this.pushTokenRepository,
+        aiTrainingUnitOfWork: this.aiTrainingUnitOfWork,
+        individualTrainingPlanRepository: this.individualTrainingPlanRepository,
+        individualTrainingUnitOfWork: this.individualTrainingUnitOfWork,
+        mentorshipRepository: this.mentorshipRepository,
+        mentorshipUnitOfWork: this.mentorshipUnitOfWork,
+        collectiveTrainingUnitOfWork: this.collectiveTrainingUnitOfWork,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,

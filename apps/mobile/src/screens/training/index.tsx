@@ -10,8 +10,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import { CommandTrackingStatus } from "@grinta/core";
+import {
+  CommandTrackingStatus,
+  attributeLabelPt,
+  isRecommendedAttribute,
+} from "@grinta/core";
 
+import { AvailabilityFlag } from "@/components/availability-flag";
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
 import { PositionBadge, positionGroupTint } from "@/components/position-badge";
@@ -44,12 +49,20 @@ import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
 } from "@/screens/onboarding/onboarding-model";
+import { formationFit, formationFitRank } from "@/screens/squad/formation-fit";
+import {
+  FORMATION_KEYS,
+  assignToFormation,
+  type FormationKey,
+} from "@/screens/squad/formations";
+import type { PositionGroup, SquadPlayer } from "@/screens/squad/squad-data";
 import {
   buildTalkToSquadPayload,
   STANCE_OPTIONS,
   talkIdempotencyKey,
   type TalkStance,
 } from "@/screens/talk/talk-model";
+import { availabilityBadge } from "@/screens/roster-list/roster-model";
 import {
   cohesionBadge,
   cohesionMatchModifier,
@@ -60,6 +73,7 @@ import {
   buildSetPlanPayload,
   clampIntensity,
   intensityLabel,
+  recoveryRoster,
   type PlanFocus,
 } from "@/screens/training-plan/training-plan-model";
 import {
@@ -68,6 +82,7 @@ import {
   sessionCountdown,
 } from "@/screens/training-session/session-countdown";
 import {
+  MAX_SESSION_ATTRIBUTES,
   buildStartSessionPayload,
   buildTrainingRows,
   summarizeTraining,
@@ -97,17 +112,22 @@ interface RosterProjection {
   readonly players: readonly RosterPlayer[];
 }
 
+interface AttrProjection {
+  readonly attributeCode: string;
+  readonly currentValue: number | null;
+  readonly projectedGainPoints: number;
+  readonly projectedValue: number | null;
+}
+
 interface ActiveSession {
   readonly id: string;
   readonly playerId: string;
-  readonly attributeCode: string;
+  readonly attributeCodes: readonly string[];
   readonly startDate: string;
   readonly durationDays: number;
   readonly elapsedDays: number;
-  /** Projeção do ganho (R-221): o servidor computa com a fórmula da coleta. */
-  readonly attributeCurrentValue: number | null;
-  readonly projectedGainPoints: number;
-  readonly projectedValue: number | null;
+  /** Projeção por habilidade (R-221): o servidor computa com a fórmula da coleta. */
+  readonly projections: readonly AttrProjection[];
 }
 
 interface TrainingSessionsProjection {
@@ -128,29 +148,17 @@ interface WorldClockProjection {
   readonly nextTickAt: string | null;
 }
 
-/** Rótulo PT dos atributos que a tela oferece como foco. */
-const ATTRIBUTE_LABEL: Readonly<Record<string, string>> = {
-  finishing: "Finalização",
-  shortPassing: "Passe curto",
-  longPassing: "Passe longo",
-  dribbling: "Drible",
-  crossing: "Cruzamento",
-  marking: "Marcação",
-  tackling: "Desarme",
-  heading: "Cabeceio",
-  pace: "Velocidade",
-  stamina: "Resistência",
-  strength: "Força",
-  agility: "Agilidade",
-  vision: "Visão de jogo",
-  composure: "Frieza",
-  positioning: "Posicionamento",
-  reflexes: "Reflexos",
-  handling: "Defesa (mãos)",
-  diving: "Elasticidade",
-};
+interface GroupSessionProjection {
+  readonly session: {
+    readonly formation: string;
+    readonly participantIds: readonly string[];
+    readonly startDate: string;
+    readonly durationDays: number;
+  } | null;
+}
 
-const attributeLabel = (code: string): string => ATTRIBUTE_LABEL[code] ?? code;
+/** Rótulo PT do atributo — mapa CANÔNICO único, compartilhado com o core. */
+const attributeLabel = attributeLabelPt;
 
 /** Setor de cada posição — para o tint da PositionBadge, como no elenco. */
 const SECTOR: Readonly<Record<string, "GOL" | "DEF" | "MEI" | "ATA">> = {
@@ -173,7 +181,11 @@ export function Training() {
   const worldId = useRequiredWorldId();
   const toast = useToast();
   const [picking, setPicking] = useState<TrainingRow | null>(null);
+  // Habilidades escolhidas no modal de foco (até 5). Zera ao abrir/fechar.
+  const [pickedAttrs, setPickedAttrs] = useState<readonly string[]>([]);
   const [inspectId, setInspectId] = useState<string | null>(null);
+  const [formationOpen, setFormationOpen] = useState(false);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const [tracking, setTracking] = useState<TrackedCommandResult | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
 
@@ -196,6 +208,14 @@ export function Training() {
     managedClub === null ? null : "roster",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
+  // A BASE (C8): os jovens também podem treinar (individual e em grupo) — o
+  // domínio de treino aceita qualquer playerId APTO, sem filtro de categoria.
+  // Aditiva: se a leitura da base falhar, a tela mostra só o profissional (não
+  // inventa). A query `youth` tem a MESMA forma da `roster`.
+  const youthQuery = useWorldQuery<RosterProjection>(
+    managedClub === null ? null : "youth",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
   const sessionsQuery = useWorldQuery<TrainingSessionsProjection>(
     managedClub === null ? null : "training-sessions",
     managedClub === null ? undefined : { clubId: managedClub.id },
@@ -207,6 +227,17 @@ export function Training() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const plan = planQuery.data?.plan ?? null;
+  // Quais jogadores TÊM plano individual — a listagem marca quem NÃO tem.
+  const individualPlansQuery = useWorldQuery<{ readonly playerIds: readonly string[] }>(
+    managedClub === null ? null : "individual-training-plans",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const plansReady =
+    individualPlansQuery.state === "ready" || individualPlansQuery.state === "empty";
+  const playersWithPlan = useMemo(
+    () => new Set(individualPlansQuery.data?.playerIds ?? []),
+    [individualPlansQuery.data],
+  );
   // O relógio do mundo alimenta a contagem regressiva das sessões.
   const clockQuery = useWorldQuery<WorldClockProjection>("world-clock");
   // Relógio de parede que tica a cada segundo — só efeito de view (a lógica da
@@ -219,9 +250,18 @@ export function Training() {
     return () => clearInterval(id);
   }, [anyTraining]);
   const nowIso = new Date(nowMs).toISOString();
-  // A escalação corrente (R-220 Fase 1): a formação existe? Sem ela não se
-  // treina a formação, e o backend recusaria com NO_LINEUP_TO_TRAIN.
-  const lineupQuery = useWorldQuery<{ lineup: { formation: string } | null }>(
+  // A escalação corrente (R-220 Fase 1): formação + titulares (quem participa do
+  // treino da EQUIPE). Sem ela o backend recusaria com NO_LINEUP_TO_TRAIN.
+  const lineupQuery = useWorldQuery<{
+    lineup: {
+      readonly formation: string;
+      readonly version: number;
+      readonly starters: readonly {
+        readonly playerId: string;
+        readonly slotPosition: string;
+      }[];
+    } | null;
+  }>(
     managedClub === null ? null : "lineup",
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
@@ -230,17 +270,76 @@ export function Training() {
   // mandaria montar uma que talvez já exista).
   const lineupReadable =
     lineupQuery.state === "ready" || lineupQuery.state === "empty";
-  const hasLineup = lineupReadable && lineupQuery.data?.lineup != null;
+  const lineup = lineupQuery.data?.lineup ?? null;
+  const hasLineup = lineupReadable && lineup !== null;
   const trainState = formationTrainState({ lineupReadable, hasLineup });
+  // Quem está no treino da EQUIPE (titulares) NÃO pode treinar individualmente.
+  const starterIds = useMemo(
+    () => new Set((lineup?.starters ?? []).map((s) => s.playerId)),
+    [lineup],
+  );
+  // O POOL de treino: profissional + base juntos. Treino (individual e grupo)
+  // opera sobre os dois; a formação/plano coletivo seguem só o profissional.
+  const allPlayers = useMemo(
+    () => [
+      ...(rosterQuery.data?.players ?? []),
+      ...(youthQuery.data?.players ?? []),
+    ],
+    [rosterQuery.data, youthQuery.data],
+  );
+  // Quais ids são da BASE — para marcar a linha/opção com o selo "BASE".
+  const youthIds = useMemo(
+    () => new Set((youthQuery.data?.players ?? []).map((p) => p.playerId)),
+    [youthQuery.data],
+  );
+  // Quem está APTO — o único conjunto que o backend aceita no treino em grupo
+  // (senão recusa com PLAYER_NOT_AVAILABLE). Lesionado/suspenso/em treino fora.
+  const availableIds = useMemo(
+    () =>
+      new Set(
+        allPlayers
+          .filter((p) => p.availability === "AVAILABLE")
+          .map((p) => p.playerId),
+      ),
+    [allPlayers],
+  );
+  // A sessão de treino em GRUPO ativa (R-220.2): cronometrada, com participantes.
+  const groupQuery = useWorldQuery<GroupSessionProjection>(
+    managedClub === null ? null : "group-training-session",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const groupSession = groupQuery.data?.session ?? null;
+  // Rascunho dos participantes do PRÓXIMO treino em grupo. Default = titulares
+  // APTOS: um titular lesionado/suspenso não pode entrar, então nunca é o padrão
+  // (era o que fazia o start recusar em silêncio antes de o usuário poder mexer).
+  const defaultParticipants = useMemo(
+    () => new Set([...starterIds].filter((id) => availableIds.has(id))),
+    [starterIds, availableIds],
+  );
+  const [groupDraft, setGroupDraft] = useState<Set<string> | null>(null);
+  const groupParticipants = groupDraft ?? defaultParticipants;
+
 
   // O rascunho do plano. `null` = ainda não mexeu; cai no que o servidor tem.
   const [draftFocus, setDraftFocus] = useState<PlanFocus | null>(null);
   const [draftIntensity, setDraftIntensity] = useState<number | null>(null);
+  // "Agendar recuperação" (ação do doc): jogadores APTOS que o gestor escolhe
+  // poupar em RECUPERAÇÃO. É rascunho por edição — a query `training-plan` é
+  // grossa (só name/focus/intensity/version, sem as entries por jogador), então
+  // não há como refletir quem já está persistido em recuperação. Trava de
+  // leitura conhecida; a AÇÃO funciona, o espelho do estado persistido não.
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryIds, setRecoveryIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const focus: PlanFocus =
     draftFocus ?? ((plan?.focus as PlanFocus | undefined) ?? "TECHNICAL");
   const intensity = draftIntensity ?? plan?.intensity ?? 50;
   const dirty =
-    plan === null || focus !== plan.focus || intensity !== plan.intensity;
+    plan === null ||
+    focus !== plan.focus ||
+    intensity !== plan.intensity ||
+    recoveryIds.size > 0;
   /**
    * Só salva com a leitura do plano CONFIRMADA.
    *
@@ -259,19 +358,17 @@ export function Training() {
   const rows = useMemo(
     () =>
       buildTrainingRows(
-        rosterQuery.data?.players ?? [],
+        allPlayers,
         sessionsQuery.data?.sessions ?? [],
         worldDate,
       ),
-    [rosterQuery.data, sessionsQuery.data, worldDate],
+    [allPlayers, sessionsQuery.data, worldDate],
   );
   const summary = useMemo(() => summarizeTraining(rows), [rows]);
 
   const attributesOf = useCallback(
     (playerId: string): readonly { code: string; value: number }[] => {
-      const player = rosterQuery.data?.players.find(
-        (p) => p.playerId === playerId,
-      );
+      const player = allPlayers.find((p) => p.playerId === playerId);
       const grid = player?.attributes ?? null;
       if (grid === null) return [];
       return Object.entries(grid)
@@ -280,21 +377,25 @@ export function Training() {
         // Menor primeiro: é onde sobra mais espaço para crescer.
         .sort((a, b) => a.value - b.value);
     },
-    [rosterQuery.data],
+    [allPlayers],
   );
 
   const refresh = useCallback(() => {
     clubQuery.refetch();
     rosterQuery.refetch();
+    youthQuery.refetch();
     sessionsQuery.refetch();
     planQuery.refetch();
     lineupQuery.refetch();
+    groupQuery.refetch();
   }, [
     clubQuery.refetch,
     rosterQuery.refetch,
+    youthQuery.refetch,
     sessionsQuery.refetch,
     planQuery.refetch,
     lineupQuery.refetch,
+    groupQuery.refetch,
   ]);
 
   /** Despacha start/collect. O efeito oficial é a query voltando, não o retorno. */
@@ -347,7 +448,9 @@ export function Training() {
           result.status === CommandTrackingStatus.APPLIED
         ) {
           setPicking(null);
+          setPickedAttrs([]);
           rosterQuery.refetch();
+          youthQuery.refetch();
           sessionsQuery.refetch();
         }
       });
@@ -359,20 +462,27 @@ export function Training() {
       worldId,
       toast,
       rosterQuery.refetch,
+      youthQuery.refetch,
       sessionsQuery.refetch,
     ],
   );
 
   const startSession = useCallback(
-    (row: TrainingRow, attributeCode: string) => {
+    (row: TrainingRow, attributeCodes: readonly string[]) => {
       if (managedClub === null) return;
       const payload = buildStartSessionPayload({
         clubId: managedClub.id,
         playerId: row.playerId,
-        attributeCode,
+        attributeCodes,
       });
       if ("error" in payload) {
-        toast.show({ tone: "error", text: "Escolha um atributo para treinar." });
+        toast.show({
+          tone: "error",
+          text:
+            payload.error === "TOO_MANY"
+              ? "No máximo 5 habilidades por treino."
+              : "Escolha ao menos uma habilidade para treinar.",
+        });
         return;
       }
       if (worldDate === "") {
@@ -389,7 +499,7 @@ export function Training() {
         { ...payload },
         commandIdempotencyKey({
           commandType: "training:start-session",
-          target: `${row.playerId}:${attributeCode}`,
+          target: `${row.playerId}:${[...payload.attributeCodes].sort().join(",")}`,
           occasion: onDay(worldDate),
         }),
         `Treino iniciado: ${row.name}.`,
@@ -421,7 +531,7 @@ export function Training() {
           target: row.playerId,
           occasion: onEntity(sessionId),
         }),
-        `Ganho coletado: ${row.name} voltou ao elenco.`,
+        `${row.name} liberado do treino e de volta ao elenco.`,
       );
     },
     [dispatch, sessionsQuery.data, toast],
@@ -438,6 +548,7 @@ export function Training() {
       focus,
       intensity,
       players: rosterQuery.data?.players ?? [],
+      recoveryPlayerIds: [...recoveryIds],
       expectedVersion: plan?.version ?? null,
     });
     if ("error" in payload) {
@@ -467,7 +578,14 @@ export function Training() {
     const idempotencyKey = commandIdempotencyKey({
       commandType: "training:set-plan",
       target: managedClub.id,
-      occasion: onRevision(plan?.version ?? 0, focus, intensity),
+      // A recuperação agendada entra na chave: mudar QUEM descansa é outra
+      // edição, e não pode dedupar contra a anterior (mesma versão).
+      occasion: onRevision(
+        plan?.version ?? 0,
+        focus,
+        intensity,
+        [...recoveryIds].sort().join(","),
+      ),
     });
     setTracking({
       status: CommandTrackingStatus.SUBMITTING,
@@ -494,6 +612,7 @@ export function Training() {
       ) {
         setDraftFocus(null);
         setDraftIntensity(null);
+        setRecoveryIds(new Set());
         planQuery.refetch();
       }
     });
@@ -505,60 +624,172 @@ export function Training() {
     plan,
     focus,
     intensity,
+    recoveryIds,
     rosterQuery.data,
     planQuery.refetch,
   ]);
 
-  /** Treina a formação → sobe o entrosamento (R-220 Fase 3). Uma vez por dia. */
-  const trainFormation = useCallback(() => {
+
+  /**
+   * Muda a formação da equipe (item 5). Reusa `assignToFormation` do elenco para
+   * alocar os melhores jogadores nos slots, e persiste com `tactics:set-lineup`.
+   */
+  const changeFormation = useCallback(
+    (key: FormationKey) => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        setFormationOpen(false);
+        return;
+      }
+      const assignable: SquadPlayer[] = (rosterQuery.data?.players ?? []).map(
+        (p) =>
+          ({
+            id: p.playerId,
+            group: sectorOf(p.primaryPosition) as PositionGroup,
+            ovr: p.overall,
+          }) as SquadPlayer,
+      );
+      const starters = assignToFormation(assignable, key);
+      if (starters.length === 0) {
+        toast.show({
+          tone: "error",
+          text: "Elenco vazio — não há como montar a formação.",
+        });
+        setFormationOpen(false);
+        return;
+      }
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "tactics:set-lineup",
+        target: managedClub.id,
+        occasion: onRevision(lineup?.version ?? 0, key),
+      });
+      setFormationOpen(false);
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "tactics:set-lineup",
+        worldId,
+        payload: {
+          clubId: managedClub.id,
+          formation: key,
+          starters,
+          bench: [],
+          expectedVersion: lineup?.version ?? null,
+        },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result) => {
+        const fb = commandFeedback(result, `Formação ${key} montada.`);
+        if (fb !== null) toast.show(fb);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          lineupQuery.refetch();
+          clubQuery.refetch();
+        }
+      });
+    },
+    [
+      managedClub,
+      client,
+      contractVersion,
+      worldId,
+      rosterQuery.data,
+      lineup,
+      toast,
+      lineupQuery.refetch,
+      clubQuery.refetch,
+    ],
+  );
+
+  /** Inicia o treino em GRUPO cronometrado (R-220.2) com os participantes escolhidos. */
+  const startGroupTraining = useCallback(() => {
     if (managedClub === null || client === null || contractVersion === null) {
       return;
     }
-    if (!trainState.enabled) {
-      toast.show({
-        tone: "error",
-        text:
-          trainState.kind === "unreadable"
-            ? "Não foi possível ler a escalação. Recarregue antes de treinar."
-            : "Monte a escalação antes de treinar a formação.",
-      });
+    if (lineup === null) {
+      toast.show({ tone: "error", text: "Monte a formação antes de treinar em grupo." });
+      return;
+    }
+    // Filtro defensivo: só APTOS vão ao backend. Mesmo que um indisponível tenha
+    // sobrado no rascunho, ele não pode entrar — o start recusaria o lote todo.
+    const ids = [...groupParticipants].filter((id) => availableIds.has(id));
+    if (ids.length === 0) {
+      toast.show({ tone: "error", text: "Escolha ao menos um jogador APTO para o grupo." });
       return;
     }
     if (worldDate === "") {
-      toast.show({
-        tone: "error",
-        text: "Sem a data do mundo não dá para treinar. Recarregue.",
-      });
+      toast.show({ tone: "error", text: "Sem a data do mundo não dá para iniciar. Recarregue." });
       return;
     }
     const idempotencyKey = commandIdempotencyKey({
-      commandType: "training:train-formation",
+      commandType: "training:start-group-session",
       target: managedClub.id,
       occasion: onDay(worldDate),
-    });
-    setTracking({
-      status: CommandTrackingStatus.SUBMITTING,
-      commandId: null,
-      resource: null,
-      correlationId: `mobile:${idempotencyKey}`,
-      errorCode: null,
     });
     void submitTrackedCommand(client, {
       clientContractVersion: "v1",
       serverContractVersion: contractVersion,
-      commandType: "training:train-formation",
+      commandType: "training:start-group-session",
       worldId,
-      payload: { clubId: managedClub.id },
+      payload: { clubId: managedClub.id, formation: lineup.formation, participantIds: ids },
       idempotencyKey,
       correlationId: `mobile:${idempotencyKey}`,
     }).then((result) => {
-      setTracking(result);
-      const fb = commandFeedback(result, "Formação treinada — entrosamento subiu.");
+      const fb = commandFeedback(result, "Treino em grupo iniciado.");
       if (fb !== null) toast.show(fb);
       if (
         result.status === CommandTrackingStatus.ACCEPTED ||
         result.status === CommandTrackingStatus.APPLIED
       ) {
+        setGroupDraft(null);
+        groupQuery.refetch();
+        rosterQuery.refetch();
+      }
+    });
+  }, [
+    managedClub,
+    client,
+    contractVersion,
+    worldId,
+    worldDate,
+    lineup,
+    groupParticipants,
+    availableIds,
+    toast,
+    groupQuery.refetch,
+    rosterQuery.refetch,
+  ]);
+
+  /** Coleta o treino em grupo — sobe o entrosamento e libera os participantes. */
+  const collectGroupTraining = useCallback(() => {
+    if (managedClub === null || client === null || contractVersion === null) {
+      return;
+    }
+    // Ocasião = a sessão de grupo (identificada pelo início). Coletar de novo a
+    // mesma sessão dedupe; a próxima sessão é outra ocasião.
+    const idempotencyKey = commandIdempotencyKey({
+      commandType: "training:collect-group-session",
+      target: managedClub.id,
+      occasion: onEntity(`${managedClub.id}:${groupSession?.startDate ?? "none"}`),
+    });
+    void submitTrackedCommand(client, {
+      clientContractVersion: "v1",
+      serverContractVersion: contractVersion,
+      commandType: "training:collect-group-session",
+      worldId,
+      payload: { clubId: managedClub.id },
+      idempotencyKey,
+      correlationId: `mobile:${idempotencyKey}`,
+    }).then((result) => {
+      const fb = commandFeedback(result, "Treino em grupo coletado — entrosamento subiu.");
+      if (fb !== null) toast.show(fb);
+      if (
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED
+      ) {
+        groupQuery.refetch();
+        rosterQuery.refetch();
         clubQuery.refetch();
       }
     });
@@ -568,7 +799,10 @@ export function Training() {
     contractVersion,
     worldId,
     worldDate,
-    trainState,
+    groupSession,
+    toast,
+    groupQuery.refetch,
+    rosterQuery.refetch,
     clubQuery.refetch,
   ]);
 
@@ -698,8 +932,8 @@ export function Training() {
               <Summary label="BLOQUEADOS" value={summary.blocked} tone="warning" />
             </View>
             <Text style={styles.summaryHint}>
-              {summary.collectable > 0
-                ? `${summary.collectable} sessão(ões) podem ser coletadas agora — coletar antes do fim rende ganho parcial.`
+              {summary.training > 0
+                ? `${summary.training} em treino — o ganho é aplicado e cada um volta ao elenco sozinho na virada do dia.`
                 : "Nenhuma sessão em andamento."}
             </Text>
           </Card>
@@ -717,7 +951,7 @@ export function Training() {
                 const mod = cohesionMatchModifier(managedClub.cohesion);
                 return (
                   <Card>
-                    <Text style={styles.cardTitle}>ENTROSAMENTO</Text>
+                    <Text style={styles.cardTitle}>ENTROSAMENTO DO TIME</Text>
                     <View style={styles.cohesionRow}>
                       <Text
                         style={[
@@ -732,35 +966,185 @@ export function Training() {
                         <Text style={styles.cohesionLabel}>{badge.label}</Text>
                         <Text style={styles.summaryHint}>
                           Na partida: {mod >= 0 ? `+${mod}` : mod} de força
-                          coletiva. Sobe jogando e treinando a formação.
+                          coletiva.
                         </Text>
                       </View>
                     </View>
-                    <Pressable
-                      onPress={trainFormation}
-                      disabled={!trainState.enabled}
-                      accessibilityRole="button"
-                      accessibilityLabel="Treinar a formação"
-                      accessibilityState={{ disabled: !trainState.enabled }}
-                      style={[
-                        styles.savePlan,
-                        !trainState.enabled && styles.actionBusy,
-                      ]}
-                    >
-                      <Text style={styles.actionText}>
-                        {trainState.kind === "ready"
-                          ? "TREINAR A FORMAÇÃO"
-                          : trainState.kind === "no-lineup"
-                            ? "MONTE A ESCALAÇÃO PRIMEIRO"
-                            : "LENDO A ESCALAÇÃO…"}
-                      </Text>
-                    </Pressable>
-                    {trainState.kind === "no-lineup" ? (
-                      <Text style={styles.summaryHint}>
-                        Defina os titulares em Elenco ▸ Formação Tática para
-                        treinar o grupo.
-                      </Text>
-                    ) : null}
+                    {/* Barra do entrosamento do time (0..100). */}
+                    <View style={styles.cohTrack}>
+                      <View
+                        style={[
+                          styles.cohFill,
+                          { width: `${badge.value}%` },
+                          badge.tone === "down" && { backgroundColor: color.warning },
+                          badge.tone === "up" && { backgroundColor: color.success },
+                        ]}
+                      />
+                    </View>
+
+                    {groupSession !== null
+                      ? (() => {
+                          // SESSÃO EM ANDAMENTO: barra de TEMPO + coletar.
+                          const cd = sessionCountdown({
+                            realSecondsPerDay:
+                              clockQuery.data?.realSecondsPerDay ?? null,
+                            nextTickAt: clockQuery.data?.nextTickAt ?? null,
+                            elapsedDays: Math.min(
+                              Math.max(
+                                0,
+                                Math.floor(
+                                  (Date.parse(`${worldDate || groupSession.startDate}T00:00:00Z`) -
+                                    Date.parse(`${groupSession.startDate}T00:00:00Z`)) /
+                                    86_400_000,
+                                ),
+                              ),
+                              groupSession.durationDays,
+                            ),
+                            durationDays: groupSession.durationDays,
+                            nowIso,
+                          });
+                          const pct = countdownProgressPercent({
+                            secondsRemaining: cd.secondsRemaining,
+                            elapsedDays: cd.daysRemaining
+                              ? groupSession.durationDays - cd.daysRemaining
+                              : groupSession.durationDays,
+                            durationDays: groupSession.durationDays,
+                            realSecondsPerDay:
+                              clockQuery.data?.realSecondsPerDay ?? null,
+                          });
+                          const collectable =
+                            cd.complete || cd.daysRemaining < groupSession.durationDays;
+                          const names = groupSession.participantIds.map(
+                            (id) =>
+                              allPlayers.find((p) => p.playerId === id)?.name ??
+                              "—",
+                          );
+                          return (
+                            <View style={styles.teamBlock}>
+                              <View style={styles.teamHeadRow}>
+                                <Text style={styles.teamFormation}>
+                                  {groupSession.formation}
+                                </Text>
+                                <Text style={styles.rowStatusTeam}>
+                                  ● treinando
+                                </Text>
+                              </View>
+                              <Text style={styles.cdTimeLarge}>
+                                {cd.complete
+                                  ? "completo — colete o entrosamento"
+                                  : cd.secondsRemaining === null
+                                    ? `faltam ${cd.daysRemaining} dia(s) lógicos`
+                                    : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                              </Text>
+                              <View style={styles.cohTrack}>
+                                <View
+                                  style={[
+                                    styles.cohFill,
+                                    { width: `${cd.complete ? 100 : pct}%` },
+                                    cd.complete && { backgroundColor: color.success },
+                                  ]}
+                                />
+                              </View>
+                              <Text style={styles.summaryHint}>
+                                {names.length} participantes: {names.join(", ")}
+                              </Text>
+                              <Pressable
+                                onPress={collectGroupTraining}
+                                disabled={!collectable}
+                                accessibilityRole="button"
+                                accessibilityLabel="Coletar treino em grupo"
+                                accessibilityState={{ disabled: !collectable }}
+                                style={[
+                                  styles.savePlan,
+                                  { backgroundColor: color.success },
+                                  !collectable && styles.actionBusy,
+                                ]}
+                              >
+                                <Text style={styles.actionText}>
+                                  {collectable
+                                    ? "COLETAR ENTROSAMENTO"
+                                    : "AINDA NÃO RENDEU"}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          );
+                        })()
+                      : (() => {
+                          // SEM SESSÃO: montar e iniciar o treino em grupo.
+                          const draftNames = [...groupParticipants].map(
+                            (id) =>
+                              allPlayers.find((p) => p.playerId === id)?.name ??
+                              "—",
+                          );
+                          return (
+                            <View style={styles.teamBlock}>
+                              <View style={styles.teamHeadRow}>
+                                <Text style={styles.teamFormation}>
+                                  {lineup?.formation ?? "—"}
+                                </Text>
+                                <Pressable
+                                  onPress={() => setFormationOpen(true)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Mudar a formação"
+                                  accessibilityState={{}}
+                                  style={styles.changeFormationBtn}
+                                >
+                                  <Icon name="grid" size={13} color={color.primary} />
+                                  <Text style={styles.changeFormationText}>
+                                    MUDAR FORMAÇÃO
+                                  </Text>
+                                </Pressable>
+                              </View>
+                              <Pressable
+                                onPress={() => {
+                                  setGroupDraft(new Set(defaultParticipants));
+                                  setParticipantsOpen(true);
+                                }}
+                                accessibilityRole="button"
+                                accessibilityLabel="Escolher participantes"
+                                accessibilityState={{}}
+                              >
+                                <Text style={styles.summaryHint}>
+                                  {groupParticipants.size} participantes (toque para
+                                  escolher): {draftNames.slice(0, 4).join(", ")}
+                                  {draftNames.length > 4 ? "…" : ""}
+                                </Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={startGroupTraining}
+                                disabled={!hasLineup || groupParticipants.size === 0}
+                                accessibilityRole="button"
+                                accessibilityLabel="Iniciar treino em grupo"
+                                accessibilityState={{
+                                  disabled: !hasLineup || groupParticipants.size === 0,
+                                }}
+                                style={[
+                                  styles.savePlan,
+                                  (!hasLineup || groupParticipants.size === 0) &&
+                                    styles.actionBusy,
+                                ]}
+                              >
+                                <Text style={styles.actionText}>
+                                  {hasLineup
+                                    ? "INICIAR TREINO EM GRUPO"
+                                    : "MONTE A ESCALAÇÃO PRIMEIRO"}
+                                </Text>
+                              </Pressable>
+                              {!hasLineup ? (
+                                <Pressable
+                                  onPress={() => setFormationOpen(true)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Escolher formação"
+                                  accessibilityState={{}}
+                                >
+                                  <Text style={[styles.summaryHint, { color: color.primary }]}>
+                                    Toque para escolher a formação e montar a escalação.
+                                  </Text>
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          );
+                        })()}
                   </Card>
                 );
               })()
@@ -844,6 +1228,21 @@ export function Training() {
               do grupo — o domínio recusaria o contrário.
             </Text>
 
+            {/* Ação "agendar recuperação": poupar aptos (fatigados/pós-jogo). */}
+            <Pressable
+              onPress={() => setRecoveryOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Agendar recuperação de jogadores"
+              accessibilityState={{}}
+              style={styles.recoveryButton}
+            >
+              <Icon name="medkit" size={16} color={color.primary} />
+              <Text style={styles.recoveryButtonText}>
+                AGENDAR RECUPERAÇÃO
+                {recoveryIds.size > 0 ? ` · ${recoveryIds.size} poupado(s)` : ""}
+              </Text>
+            </Pressable>
+
             <Pressable
               onPress={savePlan}
               disabled={!canSave}
@@ -918,9 +1317,18 @@ export function Training() {
                     tint={positionGroupTint(sectorOf(row.primaryPosition))}
                   />
                   <View style={styles.info}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {row.name}
-                    </Text>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {row.name}
+                      </Text>
+                      {youthIds.has(row.playerId) ? (
+                        <Text style={styles.baseTag}>BASE</Text>
+                      ) : null}
+                      {plansReady && !playersWithPlan.has(row.playerId) ? (
+                        <Text style={styles.noPlanTag}>SEM PLANO</Text>
+                      ) : null}
+                      <AvailabilityFlag availability={row.availability} />
+                    </View>
                     {row.state === "TRAINING" && row.session !== null ? (
                       (() => {
                         const cd = sessionCountdown({
@@ -951,16 +1359,19 @@ export function Training() {
                             <Text style={styles.meta} numberOfLines={1}>
                               Treinando{" "}
                               <Text style={styles.metaSkill}>
-                                {attributeLabel(row.session.attributeCode)}
+                                {row.session.attributeCodes
+                                  .map(attributeLabel)
+                                  .join(", ")}
                               </Text>
                             </Text>
-                            {/* Tempo ACIMA da barra. */}
+                            {/* Tempo ACIMA da barra. Na virada do dia o jogador é
+                                liberado sozinho, com o ganho aplicado. */}
                             <Text style={styles.cdTime} numberOfLines={1}>
                               {cd.complete
-                                ? "pronto para coletar"
+                                ? "pronto — vira apto na virada"
                                 : cd.secondsRemaining === null
-                                  ? `faltam ${cd.daysRemaining} dia(s)`
-                                  : `faltam ${formatCountdown(cd.secondsRemaining)}`}
+                                  ? `apto em ${cd.daysRemaining} dia(s)`
+                                  : `apto em ${formatCountdown(cd.secondsRemaining)}`}
                             </Text>
                             {/* Faixa 100% (cor da posição, esmaecida); progresso
                                 em cima, sólido, enchendo até o fim do treino. */}
@@ -981,7 +1392,9 @@ export function Training() {
                       <Text style={styles.meta} numberOfLines={1}>
                         {row.state === "BLOCKED"
                           ? (row.blockedLabel ?? "Indisponível")
-                          : "Disponível"}
+                          : starterIds.has(row.playerId)
+                            ? "No treino da equipe"
+                            : "Disponível"}
                       </Text>
                     )}
                   </View>
@@ -989,6 +1402,8 @@ export function Training() {
                     <Text style={styles.rowStatusTraining}>●</Text>
                   ) : row.state === "BLOCKED" ? (
                     <Text style={styles.rowStatusBlocked}>●</Text>
+                  ) : starterIds.has(row.playerId) ? (
+                    <Text style={styles.rowStatusTeam}>●</Text>
                   ) : null}
                   <Text style={styles.ovr}>{row.overall}</Text>
                 </Pressable>
@@ -1010,8 +1425,10 @@ export function Training() {
               FOCO DO TREINO — {picking?.name ?? ""}
             </Text>
             <Text style={styles.modalHint}>
-              O menor atributo aparece primeiro: é onde sobra mais espaço para
-              crescer.
+              Escolha até 5 habilidades. As{" "}
+              <Text style={{ color: color.warning }}>★ REC</Text> são recomendadas
+              para a posição. O ganho é DIVIDIDO entre as escolhidas (mais
+              habilidades, menos em cada).
             </Text>
             <ScrollView style={styles.modalList}>
               {picking === null ? null : attributesOf(picking.playerId).length ===
@@ -1021,23 +1438,84 @@ export function Training() {
                   não há foco a escolher.
                 </Text>
               ) : (
-                attributesOf(picking.playerId).map((attr) => (
-                  <Pressable
-                    key={attr.code}
-                    onPress={() => startSession(picking, attr.code)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Treinar ${attributeLabel(attr.code)}`}
-                    accessibilityState={{}}
-                    style={styles.attrRow}
-                  >
-                    <Text style={styles.attrName}>
-                      {attributeLabel(attr.code)}
-                    </Text>
-                    <Text style={styles.attrValue}>{attr.value}</Text>
-                  </Pressable>
-                ))
+                [...attributesOf(picking.playerId)]
+                  // Recomendadas para a posição primeiro; dentro de cada grupo,
+                  // menor valor antes (mais espaço para crescer).
+                  .sort(
+                    (a, b) =>
+                      Number(
+                        isRecommendedAttribute(picking.primaryPosition, b.code),
+                      ) -
+                        Number(
+                          isRecommendedAttribute(
+                            picking.primaryPosition,
+                            a.code,
+                          ),
+                        ) || a.value - b.value,
+                  )
+                  .map((attr) => {
+                  const on = pickedAttrs.includes(attr.code);
+                  const full =
+                    !on && pickedAttrs.length >= MAX_SESSION_ATTRIBUTES;
+                  const recommended = isRecommendedAttribute(
+                    picking.primaryPosition,
+                    attr.code,
+                  );
+                  return (
+                    <Pressable
+                      key={attr.code}
+                      disabled={full}
+                      onPress={() =>
+                        setPickedAttrs((prev) =>
+                          prev.includes(attr.code)
+                            ? prev.filter((c) => c !== attr.code)
+                            : [...prev, attr.code],
+                        )
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`${on ? "Remover" : "Escolher"} ${attributeLabel(attr.code)}${recommended ? ", recomendado" : ""}`}
+                      accessibilityState={{ selected: on, disabled: full }}
+                      style={[styles.attrRow, full && styles.rowDisabled]}
+                    >
+                      <Icon
+                        name="checkmark-circle"
+                        size={18}
+                        color={on ? color.primary : color.textFaint}
+                      />
+                      <Text
+                        style={[styles.attrName, { flex: 1, marginLeft: space.sm }]}
+                      >
+                        {attributeLabel(attr.code)}
+                      </Text>
+                      {recommended ? (
+                        <View style={styles.recTag}>
+                          <Icon name="star" size={9} color={color.warning} />
+                          <Text style={styles.recTagText}>REC</Text>
+                        </View>
+                      ) : null}
+                      <Text style={styles.attrValue}>{attr.value}</Text>
+                    </Pressable>
+                  );
+                })
               )}
             </ScrollView>
+            <Pressable
+              onPress={() => picking !== null && startSession(picking, pickedAttrs)}
+              disabled={pickedAttrs.length === 0}
+              accessibilityRole="button"
+              accessibilityLabel="Iniciar treino com as habilidades escolhidas"
+              accessibilityState={{ disabled: pickedAttrs.length === 0 }}
+              style={[
+                styles.savePlan,
+                pickedAttrs.length === 0 && styles.actionBusy,
+              ]}
+            >
+              <Text style={styles.actionText}>
+                {pickedAttrs.length === 0
+                  ? "ESCOLHA AO MENOS UMA"
+                  : `TREINAR (${pickedAttrs.length})`}
+              </Text>
+            </Pressable>
             <Pressable
               onPress={() => setPicking(null)}
               accessibilityRole="button"
@@ -1061,8 +1539,7 @@ export function Training() {
       >
         {(() => {
           const player =
-            rosterQuery.data?.players.find((p) => p.playerId === inspectId) ??
-            null;
+            allPlayers.find((p) => p.playerId === inspectId) ?? null;
           const row = rows.find((r) => r.playerId === inspectId) ?? null;
           const session = row?.session ?? null;
           const busy = actingId === inspectId;
@@ -1105,29 +1582,62 @@ export function Training() {
                         }
                       />
 
-                      {session !== null && session.projectedValue !== null ? (
+                      {/* Abrir o PLANO INDIVIDUAL (M-TRAINING-INDIV) — a ação
+                          "abrir plano individual" que o doc da M-TRAINING lista. */}
+                      <Pressable
+                        onPress={() => {
+                          const id = inspectId;
+                          setInspectId(null);
+                          if (id !== null) {
+                            router.push(`/elenco/treino-indiv/${id}`);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Abrir plano individual de ${player.name}`}
+                        accessibilityState={{}}
+                        style={styles.individualPlanButton}
+                      >
+                        <Icon name="star" size={16} color={color.primary} />
+                        <Text style={styles.individualPlanText}>
+                          PLANO INDIVIDUAL DE TREINO
+                        </Text>
+                      </Pressable>
+
+                      {session !== null && session.projections.length > 0 ? (
                         <View style={styles.projectionBox}>
                           <Text style={styles.cardTitle}>
-                            TREINANDO · {attributeLabel(session.attributeCode)}
+                            TREINANDO ({session.projections.length}) — o ganho é
+                            dividido
                           </Text>
-                          <View style={styles.projectionRow}>
-                            <Text style={styles.projCurrent}>
-                              {session.attributeCurrentValue}
-                            </Text>
-                            <Icon
-                              name="arrow-forward"
-                              size={18}
-                              color={color.textMuted}
-                            />
-                            <Text style={styles.projTarget}>
-                              {session.projectedValue}
-                            </Text>
-                            <Text style={styles.projDelta}>
-                              {session.projectedGainPoints > 0
-                                ? `+${session.projectedGainPoints}`
-                                : "sem ganho ainda"}
-                            </Text>
-                          </View>
+                          {session.projections.map((pr) => (
+                            <View
+                              key={pr.attributeCode}
+                              style={styles.projectionRow}
+                            >
+                              <Text
+                                style={styles.projAttr}
+                                numberOfLines={1}
+                              >
+                                {attributeLabel(pr.attributeCode)}
+                              </Text>
+                              <Text style={styles.projCurrent}>
+                                {pr.currentValue}
+                              </Text>
+                              <Icon
+                                name="arrow-forward"
+                                size={14}
+                                color={color.textMuted}
+                              />
+                              <Text style={styles.projTarget}>
+                                {pr.projectedValue}
+                              </Text>
+                              <Text style={styles.projDelta}>
+                                {pr.projectedGainPoints > 0
+                                  ? `+${pr.projectedGainPoints}`
+                                  : "—"}
+                              </Text>
+                            </View>
+                          ))}
                           {(() => {
                             const cd = sessionCountdown({
                               realSecondsPerDay:
@@ -1150,16 +1660,16 @@ export function Training() {
                             );
                             return (
                               <>
-                                {/* Tempo ACIMA da barra. */}
+                                {/* Tempo ACIMA da barra — conta até a virada. */}
                                 <Text style={styles.cdTimeLarge}>
                                   {cd.complete
-                                    ? "completo — colete o ganho"
+                                    ? "pronto — vira apto na virada do dia"
                                     : cd.secondsRemaining === null
-                                      ? `faltam ${cd.daysRemaining} dia(s) lógicos`
-                                      : `faltam ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
+                                      ? `apto em ${cd.daysRemaining} dia(s) lógicos`
+                                      : `apto em ${formatCountdown(cd.secondsRemaining)} (tempo real)`}
                                 </Text>
                                 {/* Faixa 100% (cor da posição, esmaecida);
-                                    progresso em cima, sólido, enchendo até o fim. */}
+                                    progresso em cima, sólido, enchendo até a virada. */}
                                 <View
                                   style={[
                                     styles.cdTrackLarge,
@@ -1177,8 +1687,8 @@ export function Training() {
                                   />
                                 </View>
                                 <Text style={styles.summaryHint}>
-                                  {session.elapsedDays}/{session.durationDays}{" "}
-                                  dias treinados
+                                  Na virada do dia lógico o ganho é aplicado e ele
+                                  volta ao elenco sozinho — não precisa coletar.
                                 </Text>
                               </>
                             );
@@ -1186,8 +1696,9 @@ export function Training() {
                         </View>
                       ) : session !== null ? (
                         <Text style={styles.summaryHint}>
-                          Treinando {attributeLabel(session.attributeCode)} ·{" "}
-                          {session.elapsedDays}/{session.durationDays} dias.
+                          Treinando{" "}
+                          {session.attributeCodes.map(attributeLabel).join(", ")}{" "}
+                          · {session.elapsedDays}/{session.durationDays} dias.
                         </Text>
                       ) : row !== null && row.state === "BLOCKED" ? (
                         <Text style={styles.summaryHint}>
@@ -1199,28 +1710,45 @@ export function Training() {
                         </Text>
                       )}
 
-                      {/* AÇÃO no card: treinar ou coletar, conforme o estado. */}
+                      {/* AÇÃO no card. Sob o modelo de 1 dia, o ganho vem na
+                          virada; coletar ANTES só serve para liberar já — e aí
+                          perde o ganho do dia. Por isso o rótulo é honesto. */}
                       {row !== null && row.state === "TRAINING" ? (
-                        <Pressable
-                          onPress={() => collectSession(row)}
-                          disabled={busy}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Coletar treino de ${row.name}`}
-                          accessibilityState={{ disabled: busy }}
-                          style={[
-                            styles.cardAction,
-                            styles.cardActionCollect,
-                            busy && styles.actionBusy,
-                          ]}
-                        >
-                          <Text style={styles.cardActionText}>
-                            {busy ? "…" : "COLETAR TREINO"}
+                        <>
+                          <Pressable
+                            onPress={() => collectSession(row)}
+                            disabled={busy}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Liberar ${row.name} do treino agora`}
+                            accessibilityState={{ disabled: busy }}
+                            style={[
+                              styles.cardAction,
+                              styles.cardActionCollect,
+                              busy && styles.actionBusy,
+                            ]}
+                          >
+                            <Text style={styles.cardActionText}>
+                              {busy ? "…" : "LIBERAR AGORA"}
+                            </Text>
+                          </Pressable>
+                          <Text style={styles.summaryHint}>
+                            Libera na hora, mas perde o ganho deste dia (ele viria
+                            na virada). Deixe treinando para o ganho valer.
                           </Text>
-                        </Pressable>
+                        </>
+                      ) : row !== null &&
+                        row.state === "IDLE" &&
+                        starterIds.has(row.playerId) ? (
+                        // Titular está no treino da EQUIPE — sem individual.
+                        <Text style={styles.summaryHint}>
+                          Está no treino da equipe (titular) — não pode treinar
+                          individualmente. Tire-o da escalação para liberar.
+                        </Text>
                       ) : row !== null && row.state === "IDLE" ? (
                         <Pressable
                           onPress={() => {
                             setInspectId(null);
+                            setPickedAttrs([]);
                             setPicking(row);
                           }}
                           disabled={busy}
@@ -1251,6 +1779,294 @@ export function Training() {
             </View>
           );
         })()}
+      </Modal>
+
+      {/* Escolher a formação da equipe (item 5) — como na Formação Tática. */}
+      <Modal
+        visible={formationOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFormationOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>ESCOLHA A FORMAÇÃO</Text>
+            <Text style={styles.modalHint}>
+              Os melhores jogadores de cada posição entram na escalação. Treinar
+              nela sobe o entrosamento do time.
+            </Text>
+            <View style={styles.formationGrid}>
+              {FORMATION_KEYS.map((key) => {
+                const active = lineup?.formation === key;
+                return (
+                  <Pressable
+                    key={key}
+                    onPress={() => changeFormation(key)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Formação ${key}`}
+                    accessibilityState={{ selected: active }}
+                    style={[
+                      styles.formationChip,
+                      active && styles.formationChipActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.formationChipText,
+                        active && styles.formationChipTextActive,
+                      ]}
+                    >
+                      {key}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => setFormationOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar escolha de formação"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>CANCELAR</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Escolher os participantes do treino em grupo — só disponíveis entram. */}
+      <Modal
+        visible={participantsOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setParticipantsOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>QUEM TREINA EM GRUPO</Text>
+            <Text style={styles.modalHint}>
+              Só APTOS entram. Indisponíveis (lesão, suspensão, já em treino)
+              aparecem travados. <Text style={{ color: color.warning }}>ADAPTA</Text> = joga fora do
+              ofício na formação escolhida (ofício aparece primeiro).
+            </Text>
+            <ScrollView style={styles.modalList}>
+              {[...allPlayers]
+                // Aptos primeiro; entre aptos, ofício antes de adaptado.
+                .sort(
+                  (a, b) =>
+                    Number(b.availability === "AVAILABLE") -
+                      Number(a.availability === "AVAILABLE") ||
+                    formationFitRank(
+                      formationFit(a.primaryPosition, lineup?.formation ?? ""),
+                    ) -
+                      formationFitRank(
+                        formationFit(b.primaryPosition, lineup?.formation ?? ""),
+                      ),
+                )
+                .map((p) => {
+                  const badge = availabilityBadge(p.availability);
+                  const unavailable = badge !== null;
+                  const isBase = youthIds.has(p.playerId);
+                  // Encaixe na formação da escalação: adaptado ganha o selo ADAPTA
+                  // (joga fora do ofício) — e é quem o bônus de entrosamento premia.
+                  const fit = formationFit(
+                    p.primaryPosition,
+                    lineup?.formation ?? "",
+                  );
+                  const on = groupParticipants.has(p.playerId) && !unavailable;
+                  return (
+                    <Pressable
+                      key={p.playerId}
+                      disabled={unavailable}
+                      onPress={() => {
+                        const next = new Set(groupParticipants);
+                        if (on) next.delete(p.playerId);
+                        else next.add(p.playerId);
+                        setGroupDraft(next);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        unavailable
+                          ? `${p.name} indisponível: ${badge.label}`
+                          : `${on ? "Remover" : "Adicionar"} ${p.name}`
+                      }
+                      accessibilityState={{
+                        selected: on,
+                        disabled: unavailable,
+                      }}
+                      style={[styles.attrRow, unavailable && styles.rowDisabled]}
+                    >
+                      <Icon
+                        name={unavailable ? "warning" : "checkmark-circle"}
+                        size={18}
+                        color={
+                          unavailable
+                            ? badge.tone === "danger"
+                              ? color.danger
+                              : color.warning
+                            : on
+                              ? color.primary
+                              : color.textFaint
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.attrName,
+                          { flex: 1, marginLeft: space.sm },
+                          unavailable && { color: color.textMuted },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                      {isBase ? <Text style={styles.baseTag}>BASE</Text> : null}
+                      {!unavailable && fit === "adapted" ? (
+                        <Text style={styles.adaptTag}>ADAPTA</Text>
+                      ) : null}
+                      {unavailable ? (
+                        <Text
+                          style={[
+                            styles.statusTag,
+                            {
+                              color:
+                                badge.tone === "danger"
+                                  ? color.danger
+                                  : color.warning,
+                            },
+                          ]}
+                        >
+                          {badge.label}
+                        </Text>
+                      ) : (
+                        <Text style={styles.attrValue}>
+                          {p.primaryPosition} · {p.overall}
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            <Pressable
+              onPress={() => setParticipantsOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Confirmar participantes"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>
+                PRONTO ({groupParticipants.size})
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Agendar recuperação: escolher aptos para descansar em RECUPERAÇÃO. O
+          lesionado aparece travado (o domínio já o obriga a recuperar). */}
+      <Modal
+        visible={recoveryOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRecoveryOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>AGENDAR RECUPERAÇÃO</Text>
+            <Text style={styles.modalHint}>
+              Poupe aptos (fatigados, pós-jogo): eles descansam em RECUPERAÇÃO em
+              vez do foco do grupo. Lesionados já entram travados — o domínio os
+              obriga a recuperar.
+            </Text>
+            <ScrollView style={styles.modalList}>
+              {[...recoveryRoster(rosterQuery.data?.players ?? [], recoveryIds)]
+                // Já em recuperação primeiro (travados no topo), depois o resto.
+                .sort(
+                  (a, b) =>
+                    Number(b.onRecovery) - Number(a.onRecovery) ||
+                    Number(b.locked) - Number(a.locked),
+                )
+                .map((entry) => {
+                  const p = (rosterQuery.data?.players ?? []).find(
+                    (rp) => rp.playerId === entry.playerId,
+                  );
+                  if (p === undefined) return null;
+                  return (
+                    <Pressable
+                      key={entry.playerId}
+                      disabled={entry.locked}
+                      onPress={() => {
+                        const next = new Set(recoveryIds);
+                        if (next.has(entry.playerId)) next.delete(entry.playerId);
+                        else next.add(entry.playerId);
+                        setRecoveryIds(next);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        entry.locked
+                          ? `${p.name} lesionado: recuperação obrigatória`
+                          : `${entry.onRecovery ? "Tirar de recuperação" : "Poupar"} ${p.name}`
+                      }
+                      accessibilityState={{
+                        selected: entry.onRecovery,
+                        disabled: entry.locked,
+                      }}
+                      style={[styles.attrRow, entry.locked && styles.rowDisabled]}
+                    >
+                      <Icon
+                        name={entry.onRecovery ? "medkit" : "person"}
+                        size={18}
+                        color={
+                          entry.locked
+                            ? color.danger
+                            : entry.onRecovery
+                              ? color.primary
+                              : color.textFaint
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.attrName,
+                          { flex: 1, marginLeft: space.sm },
+                          entry.locked && { color: color.textMuted },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                      {entry.locked ? (
+                        <Text style={[styles.statusTag, { color: color.danger }]}>
+                          LESIONADO
+                        </Text>
+                      ) : entry.onRecovery ? (
+                        <Text style={[styles.statusTag, { color: color.primary }]}>
+                          RECUPERANDO
+                        </Text>
+                      ) : (
+                        <Text style={styles.attrValue}>
+                          {p.primaryPosition} · {p.overall}
+                        </Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+            </ScrollView>
+            <Text style={styles.modalHint}>
+              A recuperação escolhida é aplicada ao SALVAR o plano.
+            </Text>
+            <Pressable
+              onPress={() => setRecoveryOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Concluir recuperação"
+              accessibilityState={{}}
+              style={styles.modalCancel}
+            >
+              <Text style={styles.modalCancelText}>
+                PRONTO ({recoveryIds.size})
+              </Text>
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -1361,7 +2177,9 @@ const styles = StyleSheet.create({
   },
   rowFirst: { borderTopWidth: 0 },
   info: { flex: 1, gap: 2 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
   name: {
+    flexShrink: 1,
     color: color.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
@@ -1415,6 +2233,79 @@ const styles = StyleSheet.create({
   },
   rowStatusTraining: { color: color.primary, fontSize: 10 },
   rowStatusBlocked: { color: color.warning, fontSize: 10 },
+  rowStatusTeam: { color: color.info, fontSize: 10 },
+  cohTrack: {
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+    overflow: "hidden",
+    marginTop: space.sm,
+  },
+  cohFill: { height: "100%", backgroundColor: color.primary },
+  teamBlock: { marginTop: space.md, gap: space.xs },
+  teamHeadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  teamFormation: {
+    color: color.text,
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 1,
+  },
+  changeFormationBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.surface,
+  },
+  changeFormationText: {
+    color: color.primary,
+    fontSize: 10,
+    fontWeight: fontWeight.bold as "700",
+  },
+  participantWrap: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
+  participantChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: color.background,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    maxWidth: "48%",
+  },
+  participantPos: {
+    color: color.textMuted,
+    fontSize: 9,
+    fontWeight: fontWeight.bold as "700",
+    minWidth: 22,
+  },
+  participantName: { color: color.text, fontSize: fontSize.xs, flexShrink: 1 },
+  formationGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: space.sm,
+    marginVertical: space.sm,
+  },
+  formationChip: {
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderRadius: radius.md,
+    backgroundColor: color.surface,
+  },
+  formationChipActive: { backgroundColor: color.primary },
+  formationChipText: {
+    color: color.text,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold as "700",
+  },
+  formationChipTextActive: { color: color.background },
   // Inspeção — estrutura do elenco: backdrop separado, card em View (slide roda).
   inspectRoot: { flex: 1 },
   inspectBackdrop: {
@@ -1454,16 +2345,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
+    paddingVertical: 3,
+  },
+  projAttr: {
+    flex: 1,
+    color: color.text,
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.bold as "700",
   },
   projCurrent: {
     color: color.textMuted,
-    fontSize: 28,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
   projTarget: {
     color: color.success,
-    fontSize: 28,
+    fontSize: fontSize.lg,
     fontWeight: fontWeight.black as "800",
     fontStyle: "italic",
   },
@@ -1471,6 +2369,8 @@ const styles = StyleSheet.create({
     color: color.success,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
+    minWidth: 28,
+    textAlign: "right",
   },
   cohesionRow: {
     flexDirection: "row",
@@ -1546,6 +2446,40 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: color.primary,
   },
+  recoveryButton: {
+    marginTop: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.primary,
+  },
+  recoveryButtonText: {
+    color: color.primary,
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  individualPlanButton: {
+    marginTop: space.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingVertical: space.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: color.primary,
+  },
+  individualPlanText: {
+    color: color.primary,
+    fontWeight: "700",
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
   stanceRow: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
   stance: {
     flex: 1,
@@ -1579,16 +2513,72 @@ const styles = StyleSheet.create({
   modalList: { marginVertical: space.sm },
   attrRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: space.sm,
     borderBottomWidth: 1,
     borderBottomColor: color.border,
   },
+  rowDisabled: { opacity: 0.6 },
   attrName: { color: color.text, fontSize: fontSize.sm },
   attrValue: {
     color: color.textMuted,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
+  },
+  statusTag: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.3,
+  },
+  baseTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.primary,
+    borderWidth: 1,
+    borderColor: color.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  noPlanTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.textMuted,
+    borderWidth: 1,
+    borderColor: color.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  adaptTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.warning,
+    borderWidth: 1,
+    borderColor: color.warning,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  recTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    borderWidth: 1,
+    borderColor: color.warning,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  recTagText: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.3,
+    color: color.warning,
   },
   modalCancel: { alignItems: "center", paddingVertical: space.md },
   modalCancelText: {

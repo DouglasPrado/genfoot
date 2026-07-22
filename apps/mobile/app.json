@@ -21,10 +21,18 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b7e9fab4-4d82-45ca-be98-af951c1accd4"
+      }
+    },
+    "owner": "douglasrprado"
   }
 }

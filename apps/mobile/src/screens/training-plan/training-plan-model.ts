@@ -62,18 +62,52 @@ const MEDICALLY_RESTRICTED = new Set(["INJURED"]);
 /**
  * O foco de UM jogador dentro do plano coletivo.
  *
- * Restrito pelo médico recebe RECUPERAÇÃO em vez do foco do grupo. O domínio
- * recusaria o contrário (`PLAYER_UNDER_MEDICAL_RESTRICTION`), e a razão dele é
- * explícita: a restrição é contra CARGA, não contra recuperação — bloquear a
- * recuperação deixaria o lesionado sem plano nenhum.
+ * Dois caminhos levam à RECUPERAÇÃO em vez do foco do grupo:
+ *  1. **Restrição médica** (lesionado) — automático e obrigatório. O domínio
+ *     recusaria o contrário (`PLAYER_UNDER_MEDICAL_RESTRICTION`), e a razão é
+ *     explícita: a restrição é contra CARGA, não contra recuperação — bloquear
+ *     a recuperação deixaria o lesionado sem plano nenhum.
+ *  2. **Recuperação agendada** (`recoveryIds`) — a ação do doc "agendar
+ *     recuperação": o gestor escolhe poupar um jogador APTO (fatigado, pós-jogo)
+ *     mesmo sem lesão. Ele descansa em vez de treinar o foco do grupo.
  */
 export function entryFocusFor(
   player: PlanPlayerLike,
   collectiveFocus: PlanFocus,
+  recoveryIds?: ReadonlySet<string>,
 ): PlanFocus {
-  return MEDICALLY_RESTRICTED.has(player.availability)
-    ? "RECOVERY"
-    : collectiveFocus;
+  if (MEDICALLY_RESTRICTED.has(player.availability)) return "RECOVERY";
+  if (recoveryIds?.has(player.playerId) === true) return "RECOVERY";
+  return collectiveFocus;
+}
+
+export interface RecoveryRosterEntry {
+  readonly playerId: string;
+  readonly availability: string;
+  /** Está de recuperação (por lesão OU por escolha do gestor). */
+  readonly onRecovery: boolean;
+  /** Travado em recuperação: o lesionado não pode ser tirado (o domínio obriga). */
+  readonly locked: boolean;
+}
+
+/**
+ * O roster da recuperação para a tela: quem está descansando e quem está
+ * travado nisso. O lesionado aparece sempre `onRecovery` e `locked` — o gestor
+ * não o tira; os demais ele liga/desliga à vontade (`recoveryIds`).
+ */
+export function recoveryRoster(
+  players: readonly PlanPlayerLike[],
+  recoveryIds: ReadonlySet<string>,
+): readonly RecoveryRosterEntry[] {
+  return players.map((p) => {
+    const locked = MEDICALLY_RESTRICTED.has(p.availability);
+    return {
+      playerId: p.playerId,
+      availability: p.availability,
+      onRecovery: locked || recoveryIds.has(p.playerId),
+      locked,
+    };
+  });
 }
 
 export interface SetPlanPayload {
@@ -99,12 +133,15 @@ export function buildSetPlanPayload(input: {
   readonly focus: PlanFocus;
   readonly intensity: number;
   readonly players: readonly PlanPlayerLike[];
+  /** Jogadores APTOS agendados para recuperação (a ação "agendar recuperação"). */
+  readonly recoveryPlayerIds?: readonly string[];
   readonly expectedVersion: number | null;
 }): SetPlanResult {
   if (input.name.trim() === "") return { error: "NO_NAME" };
   // "Um plano sem jogador não treina ninguém" — a recusa do domínio, antecipada.
   if (input.players.length === 0) return { error: "NO_PLAYERS" };
   const workload = clampIntensity(input.intensity);
+  const recoveryIds = new Set(input.recoveryPlayerIds ?? []);
   return {
     clubId: input.clubId,
     name: input.name.trim(),
@@ -112,7 +149,7 @@ export function buildSetPlanPayload(input: {
     intensity: workload,
     entries: input.players.map((p) => ({
       playerId: p.playerId,
-      focus: entryFocusFor(p, input.focus),
+      focus: entryFocusFor(p, input.focus, recoveryIds),
       workload,
     })),
     expectedVersion: input.expectedVersion,

@@ -42,6 +42,8 @@ import {
   ApplySeasonAging,
   StartTrainingSession,
   CollectTrainingSession,
+  SettleDueTrainingSessions,
+  SettleDueGroupTrainingSessions,
   TalkToPlayer,
   TalkStance,
   talkStanceFormDelta,
@@ -66,10 +68,30 @@ import {
   type TrainingSessionUnitOfWork,
   type CohesionTrainingUnitOfWork,
   TrainFormationCohesion,
+  StartGroupTrainingSession,
+  CollectGroupTrainingSession,
+  type GroupTrainingSessionUnitOfWork,
   type LineupRepository,
   type LineupContextReader,
   SetClubLineup,
   type PlayerRepository,
+  type PushTokenRepository,
+  type AiTrainingUnitOfWork,
+  type IndividualTrainingPlanRepository,
+  type IndividualTrainingUnitOfWork,
+  type IndividualTrainingTarget,
+  SetIndividualTrainingPlan,
+  SettleDueIndividualTrainingPlans,
+  type MentorshipRepository,
+  type MentorshipUnitOfWork,
+  LinkMentor,
+  UnlinkMentor,
+  SettleDueMentorships,
+  type CollectiveTrainingUnitOfWork,
+  SettleDueCollectiveTraining,
+  RegisterPushToken,
+  RunAiClubsTraining,
+  buildTrainingReportMessage,
   type SeasonFinanceUnitOfWork,
   type TransferUnitOfWork,
   type PromoteYouthUnitOfWork,
@@ -101,6 +123,10 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import type { CommandEnvelope } from "./command-contract.js";
+import {
+  sendExpoPush,
+  type ExpoPushMessage,
+} from "../push/expo-push-sender.js";
 
 /**
  * O barramento de commands depois do extermínio da arquitetura morta (R-175).
@@ -155,10 +181,20 @@ export interface CommandContext {
   /** R-221 Fase 2a — treino de sessão com progresso instantâneo. */
   readonly trainingSessionUnitOfWork: TrainingSessionUnitOfWork;
   readonly cohesionTrainingUnitOfWork: CohesionTrainingUnitOfWork;
+  readonly groupTrainingUnitOfWork: GroupTrainingSessionUnitOfWork;
   /** R-220 Fase 1 — escalação corrente do clube + leitura do elenco. */
   readonly clubLineupRepository: LineupRepository;
   readonly lineupContextReader: LineupContextReader;
   readonly playerRepository: PlayerRepository;
+  /** Push remoto (Expo) — registro do token do device por conta. */
+  readonly pushTokenRepository: PushTokenRepository;
+  /** Treino dos clubes de IA na virada (balanceamento). */
+  readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
+  readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
+  readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
+  readonly mentorshipRepository: MentorshipRepository;
+  readonly mentorshipUnitOfWork: MentorshipUnitOfWork;
+  readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -416,6 +452,11 @@ const presencePayload = z.object({
   online: z.boolean().default(true),
 });
 
+const registerPushTokenPayload = z.object({
+  expoPushToken: z.string().min(1),
+  platform: z.enum(["ios", "android"]).default("ios"),
+});
+
 const runAutopilotPayload = z.object({
   clubId: z.string().uuid(),
   triggerEvent: z.string().min(1),
@@ -487,7 +528,8 @@ const talkToSquadPayload = z.object({
 const startSessionPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
-  attributeCode: z.string(),
+  // 1..5 habilidades; o domínio valida o limite e a aplicabilidade.
+  attributeCodes: z.array(z.string()).min(1).max(5),
 });
 
 const collectSessionPayload = z.object({
@@ -503,6 +545,16 @@ const setLineupPayload = z.object({
 });
 
 const trainFormationPayload = z.object({
+  clubId: z.string().uuid(),
+});
+
+const startGroupTrainingPayload = z.object({
+  clubId: z.string().uuid(),
+  formation: z.string(),
+  participantIds: z.array(z.string().uuid()),
+});
+
+const collectGroupTrainingPayload = z.object({
   clubId: z.string().uuid(),
 });
 
@@ -526,6 +578,30 @@ const trainingPlanPayload = z.object({
     }),
   ),
   expectedVersion: z.number().int().nullable(),
+});
+
+const individualTrainingPlanPayload = z.object({
+  clubId: z.string().uuid(),
+  playerId: z.string().uuid(),
+  target: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("ATTRIBUTE"), attributeCodes: z.array(z.string()) }),
+    z.object({ kind: z.literal("POSITION"), position: z.string() }),
+    z.object({ kind: z.literal("GK_ARCHETYPE"), archetype: z.string() }),
+  ]),
+  intensity: z.number().int(),
+  expectedVersion: z.number().int().nullable(),
+});
+
+const linkMentorPayload = z.object({
+  clubId: z.string().uuid(),
+  menteeId: z.string().uuid(),
+  mentorId: z.string().uuid(),
+  expectedVersion: z.number().int().nullable(),
+});
+
+const unlinkMentorPayload = z.object({
+  clubId: z.string().uuid(),
+  menteeId: z.string().uuid(),
 });
 
 const worldIdentityPayload = z.object({
@@ -599,6 +675,176 @@ async function applySeasonTurns(
     startDate: world.startDate,
     currentDate: world.currentDate,
   });
+}
+
+/**
+ * Liberação do treino de sessão na VIRADA do dia (decisão do dono 2026-07-20,
+ * emenda à R-220.2 / destrava a Trava B-08). Roda DEPOIS de avançar o relógio,
+ * nos dois caminhos (`world:advance-day` / `world:advance-days`): toda sessão
+ * individual que cumpriu sua duração (1 dia) é coletada — ganho aplicado, jogador
+ * liberado — sem coleta manual. Idempotente (a sessão vira inativa ao settlar).
+ */
+async function settleDueTraining(
+  deps: Pick<
+    CommandContext,
+    "trainingSessionUnitOfWork" | "pushTokenRepository"
+  >,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  const result = await new SettleDueTrainingSessions(
+    deps.trainingSessionUnitOfWork,
+  ).execute({
+    gameWorldId: world.worldId,
+    worldSeed: world.seed,
+    worldDate: world.currentDate,
+    rulesetVersion: world.rulesetVersion as never,
+  });
+  if (!result.ok) return;
+
+  // Push de treino completo (best-effort, FORA da transação do domínio): para
+  // cada sessão settlada, avisa o DONO do clube — jogador + atributo antes→depois.
+  // Clube de IA (sem controlador) não tem token: a lista sai vazia e nada é enviado.
+  const messages: ExpoPushMessage[] = [];
+  for (const report of result.value.reports) {
+    const tokens = await deps.pushTokenRepository.findTokensForClub(
+      world.worldId,
+      report.clubId,
+    );
+    if (tokens.length === 0) continue;
+    const text = buildTrainingReportMessage({
+      playerName: report.playerName,
+      changes: report.changes,
+    });
+    for (const to of tokens) {
+      messages.push({ to, title: text.title, body: text.body });
+    }
+  }
+  await sendExpoPush(messages);
+}
+
+/**
+ * Settle do treino em GRUPO na virada (irmão do individual): encerra as sessões
+ * de grupo que cumpriram a duração — sobe o entrosamento e libera os
+ * participantes — para que esquecer de coletar não prenda o grupo. Idempotente.
+ */
+async function settleDueGroupTraining(
+  deps: Pick<CommandContext, "groupTrainingUnitOfWork">,
+  world: { readonly worldId: string; readonly currentDate: string },
+): Promise<void> {
+  await new SettleDueGroupTrainingSessions(deps.groupTrainingUnitOfWork).execute({
+    gameWorldId: world.worldId,
+    worldDate: world.currentDate,
+  });
+}
+
+/**
+ * Treino dos clubes de IA na virada (balanceamento): desenvolve os jogadores e
+ * sobe o entrosamento dos clubes SEM técnico humano, para não ficarem parados
+ * enquanto o do jogador evolui. Best-effort: uma falha não derruba a virada.
+ */
+async function runAiTraining(
+  deps: Pick<CommandContext, "aiTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new RunAiClubsTraining(deps.aiTrainingUnitOfWork).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[ai-training] falha no treino dos clubes de IA: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle dos planos INDIVIDUAIS na virada: aplica cada plano ao seu jogador
+ * (desenvolvimento rumo ao alvo). Best-effort: uma falha não derruba a virada.
+ */
+async function settleIndividualTraining(
+  deps: Pick<CommandContext, "individualTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueIndividualTrainingPlans(
+      deps.individualTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[individual-training] falha no settle individual: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle da MENTORIA na virada: evolução acelerada dos pupilos. Best-effort:
+ * uma falha não derruba a virada.
+ */
+async function settleMentorships(
+  deps: Pick<CommandContext, "mentorshipUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueMentorships(deps.mentorshipUnitOfWork).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[mentorship] falha no settle de mentoria: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle do plano COLETIVO na virada: desenvolve os jogadores pelo foco e grava
+ * o aviso-resumo (fecha a lacuna do plano coletivo inerte). Best-effort.
+ */
+async function settleCollectiveTraining(
+  deps: Pick<CommandContext, "collectiveTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueCollectiveTraining(
+      deps.collectiveTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[collective-training] falha no settle coletivo: ${String(err)}`);
+  }
 }
 
 interface IdentityUseCase {
@@ -785,6 +1031,13 @@ const handlers: Record<string, CommandHandler> = {
     seasonFinanceUnitOfWork,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    trainingSessionUnitOfWork,
+    groupTrainingUnitOfWork,
+    pushTokenRepository,
+    aiTrainingUnitOfWork,
+    individualTrainingUnitOfWork,
+    mentorshipUnitOfWork,
+    collectiveTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -841,6 +1094,58 @@ const handlers: Record<string, CommandHandler> = {
         rulesetVersion: advanced.value.world.rulesetVersion,
       },
       closedNumbers,
+    );
+    // Virada do dia: libera quem terminou o treino de sessão (1 dia). Como o
+    // avanço pode pular vários dias, uma sessão que venceu no meio é settlada
+    // aqui na data final — o ganho é tetado na duração, então não infla.
+    await settleDueTraining(
+      { trainingSessionUnitOfWork, pushTokenRepository },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleDueGroupTraining(
+      { groupTrainingUnitOfWork },
+      { worldId, currentDate: worldDate },
+    );
+    await runAiTraining(
+      { aiTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleIndividualTraining(
+      { individualTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleMentorships(
+      { mentorshipUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleCollectiveTraining(
+      { collectiveTrainingUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
     );
 
     return succeed({
@@ -929,6 +1234,82 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `training-plan:${result.value.plan.id}` });
   },
 
+  /** Treino — define o plano INDIVIDUAL de um jogador (M-TRAINING-INDIV). */
+  "training:set-individual-plan": async ({
+    worlds,
+    individualTrainingPlanRepository,
+    trainingContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = individualTrainingPlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new SetIndividualTrainingPlan(
+      individualTrainingPlanRepository,
+      trainingContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      playerId: parsed.data.playerId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      target: parsed.data.target as IndividualTrainingTarget,
+      intensity: parsed.data.intensity,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    return succeed({
+      resource: `individual-training-plan:${result.value.plan.id}`,
+    });
+  },
+
+  /** Mentoria — vincula um mentor a um pupilo (M-MENTORING). */
+  "mentoring:link-mentor": async ({
+    worlds,
+    mentorshipRepository,
+    trainingContextReader,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = linkMentorPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new LinkMentor(
+      mentorshipRepository,
+      trainingContextReader,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      menteeId: parsed.data.menteeId,
+      mentorId: parsed.data.mentorId,
+      worldSeed: world.value.snapshot.seed,
+      occurredOn: world.value.snapshot.currentDate,
+      expectedVersion: parsed.data.expectedVersion,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `mentorship:${result.value.link.id}` });
+  },
+
+  /** Mentoria — desvincula o mentor de um pupilo. */
+  "mentoring:unlink-mentor": async ({
+    worlds,
+    mentorshipRepository,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = unlinkMentorPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new UnlinkMentor(mentorshipRepository).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      menteeId: parsed.data.menteeId,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `mentorship:${parsed.data.menteeId}` });
+  },
+
   /**
    * Treino da formação como fonte de ENTROSAMENTO (R-220 Fase 3): põe os
    * titulares para treinar a formação escolhida e sobe a coesão do time — o
@@ -951,6 +1332,51 @@ const handlers: Record<string, CommandHandler> = {
     );
     if (!result.ok) return result;
     return succeed({ resource: `club:${parsed.data.clubId}` });
+  },
+
+  /** Treino em GRUPO: inicia a sessão cronometrada da formação (R-220.2). */
+  "training:start-group-session": async ({
+    worlds,
+    groupTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = startGroupTrainingPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new StartGroupTrainingSession(
+      groupTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      formation: parsed.data.formation,
+      participantIds: parsed.data.participantIds,
+      worldSeed: world.value.snapshot.seed,
+      worldDate: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `group-training:${result.value.session.id}` });
+  },
+
+  /** Treino em GRUPO: coleta — sobe o entrosamento e libera os participantes. */
+  "training:collect-group-session": async ({
+    worlds,
+    groupTrainingUnitOfWork,
+    envelope,
+  }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = collectGroupTrainingPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new CollectGroupTrainingSession(
+      groupTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.value.worldId,
+      clubId: parsed.data.clubId,
+      worldDate: world.value.snapshot.currentDate,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `club:${parsed.data.clubId}` } as never);
   },
 
   /** Moral — conversa do treinador: elogiar/criticar move a FORMA (R-221 2c). */
@@ -1010,7 +1436,7 @@ const handlers: Record<string, CommandHandler> = {
       gameWorldId: world.value.worldId,
       clubId: parsed.data.clubId,
       playerId: parsed.data.playerId,
-      attributeCode: parsed.data.attributeCode,
+      attributeCodes: parsed.data.attributeCodes,
       worldSeed: world.value.snapshot.seed,
       worldDate: world.value.snapshot.currentDate,
     });
@@ -1493,6 +1919,32 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({ resource: `presence:${actorId}` });
   },
 
+  // Push remoto: o device registra seu Expo push token, atrelado à conta. Sem
+  // mundo — o token vale para o usuário, não para uma partida.
+  "identity:register-push-token": async ({
+    pushTokenRepository,
+    actorId,
+    envelope,
+  }) => {
+    if (actorId === null) {
+      return fail(
+        new DomainError(
+          "PUSH_TOKEN_REQUIRES_USER",
+          "Registrar o push exige uma sessão de usuário.",
+        ),
+      );
+    }
+    const parsed = registerPushTokenPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await new RegisterPushToken(pushTokenRepository).execute({
+      accountId: actorId,
+      expoPushToken: parsed.data.expoPushToken,
+      platform: parsed.data.platform,
+    });
+    if (!result.ok) return result;
+    return succeed({ resource: `push-token:${actorId}` });
+  },
+
   // X-001 — o executor: roda a automação do clube num gatilho. A precedência
   // (humano presente → IA se cala) decide dentro do caso de uso.
   "automation:run-autopilot": async ({
@@ -1543,6 +1995,13 @@ const handlers: Record<string, CommandHandler> = {
     matchPlay,
     seasonAgingUnitOfWork,
     seasonLifecycle,
+    trainingSessionUnitOfWork,
+    groupTrainingUnitOfWork,
+    pushTokenRepository,
+    aiTrainingUnitOfWork,
+    individualTrainingUnitOfWork,
+    mentorshipUnitOfWork,
+    collectiveTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1573,6 +2032,64 @@ const handlers: Record<string, CommandHandler> = {
           rulesetVersion: after.value.snapshot.rulesetVersion,
         },
         result.value.seasonsClosed,
+      );
+      // Virada do dia: libera quem terminou o treino de sessão (1 dia) e avisa
+      // o dono por push (treino completo).
+      await settleDueTraining(
+        { trainingSessionUnitOfWork, pushTokenRepository },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // E o treino em GRUPO que cumpriu a duração (sobe entrosamento, libera).
+      await settleDueGroupTraining(
+        { groupTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          currentDate: after.value.snapshot.currentDate,
+        },
+      );
+      // Clubes de IA treinam também (balanceamento).
+      await runAiTraining(
+        { aiTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Planos individuais aplicados na virada.
+      await settleIndividualTraining(
+        { individualTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Mentoria: evolução acelerada dos pupilos.
+      await settleMentorships(
+        { mentorshipUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      await settleCollectiveTraining(
+        { collectiveTrainingUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
       );
     }
     return succeed({ resource: `world:${world.value.worldId}` });

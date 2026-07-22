@@ -320,6 +320,16 @@ export function Home() {
                     text="Ainda não há um resumo oficial do período ausente."
                   />
                 )}
+                <Pressable
+                  onPress={() => router.push("/avisos")}
+                  accessibilityRole="button"
+                  accessibilityLabel="Ver avisos"
+                  accessibilityState={{}}
+                  style={styles.inboxLink}
+                >
+                  <Text style={styles.inboxLinkText}>VER AVISOS</Text>
+                  <Icon name="chevron-forward" size={14} color={color.primary} />
+                </Pressable>
               </Card>
 
               <Card>
@@ -925,6 +935,19 @@ const styles = StyleSheet.create({
   },
   subtitle: { color: color.textMuted, fontSize: fontSize.xs },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  inboxLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: space.sm,
+  },
+  inboxLinkText: {
+    color: color.primary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+    letterSpacing: 0.5,
+  },
   metric: {
     minWidth: "30%",
     flexGrow: 1,

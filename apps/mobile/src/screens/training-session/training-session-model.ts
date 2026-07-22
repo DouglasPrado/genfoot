@@ -32,33 +32,36 @@ export interface TrainingPlayerLike {
   readonly availability: string;
 }
 
+/** Projeção do ganho de UMA habilidade (computada no servidor). */
+export interface AttributeProjection {
+  readonly attributeCode: string;
+  readonly currentValue: number | null;
+  readonly projectedGainPoints: number;
+  readonly projectedValue: number | null;
+}
+
 /** O mínimo que a linha lê da query `training-sessions`. */
 export interface ActiveSessionLike {
   readonly playerId: string;
-  readonly attributeCode: string;
+  readonly attributeCodes: readonly string[];
   readonly startDate: string;
   readonly durationDays: number;
   /**
-   * Projeção do ganho, computada no SERVIDOR (o cliente não computa regra de
-   * domínio). Opcional para telas/testes que não a trazem.
+   * Projeção por habilidade, computada no SERVIDOR (o cliente não computa regra
+   * de domínio). Opcional para telas/testes que não a trazem.
    */
-  readonly attributeCurrentValue?: number | null;
-  readonly projectedGainPoints?: number;
-  readonly projectedValue?: number | null;
+  readonly projections?: readonly AttributeProjection[];
 }
 
 export interface SessionProgress {
-  readonly attributeCode: string;
+  /** As habilidades-foco (1..5) que a sessão treina. */
+  readonly attributeCodes: readonly string[];
   /** Dias treinados até a data do mundo, TETADO na duração. */
   readonly elapsedDays: number;
   readonly durationDays: number;
   readonly complete: boolean;
-  /** Valor atual do atributo-foco; `null` quando o servidor não projetou. */
-  readonly attributeCurrentValue: number | null;
-  /** Ganho projetado pelo tempo já treinado (0 se não projetado). */
-  readonly projectedGainPoints: number;
-  /** Valor projetado (atual + ganho); `null` quando não há projeção. */
-  readonly projectedValue: number | null;
+  /** Projeção atual→projetado por habilidade (o ganho já vem dividido). */
+  readonly projections: readonly AttributeProjection[];
 }
 
 export interface TrainingRow {
@@ -67,6 +70,8 @@ export interface TrainingRow {
   readonly shirtNumber: number;
   readonly primaryPosition: string;
   readonly overall: number;
+  /** Availability crua (`PlayerAvailability`) — a flag de lesão/suspensão lê dela. */
+  readonly availability: string;
   readonly state: SessionState;
   /** `null` quando não há sessão ativa — a tela não inventa progresso. */
   readonly session: SessionProgress | null;
@@ -123,19 +128,18 @@ export function buildTrainingRows(
       shirtNumber: p.shirtNumber,
       primaryPosition: p.primaryPosition,
       overall: p.overall,
+      availability: p.availability,
       state,
       session:
         active === null
           ? null
           : {
-              attributeCode: active.attributeCode,
+              attributeCodes: active.attributeCodes,
               elapsedDays,
               durationDays: active.durationDays,
               complete: elapsedDays >= active.durationDays,
               // Projeção vem do servidor (pass-through); ausente = sem projeção.
-              attributeCurrentValue: active.attributeCurrentValue ?? null,
-              projectedGainPoints: active.projectedGainPoints ?? 0,
-              projectedValue: active.projectedValue ?? null,
+              projections: active.projections ?? [],
             },
       blockedLabel:
         state === "BLOCKED" ? (BLOCKED_LABEL[p.availability] ?? "Indisponível") : null,
@@ -182,23 +186,28 @@ export function summarizeTraining(
   return { training, idle, blocked, collectable: training };
 }
 
+/** Até quantas habilidades uma sessão treina (espelha MAX_SESSION_ATTRIBUTES do core). */
+export const MAX_SESSION_ATTRIBUTES = 5;
+
 export interface StartSessionPayload {
   readonly clubId: string;
   readonly playerId: string;
-  readonly attributeCode: string;
+  readonly attributeCodes: readonly string[];
 }
 
 export function buildStartSessionPayload(input: {
   readonly clubId: string;
   readonly playerId: string;
-  readonly attributeCode: string | null;
-}): StartSessionPayload | { readonly error: "NO_ATTRIBUTE" } {
-  if (input.attributeCode === null || input.attributeCode.trim() === "") {
-    return { error: "NO_ATTRIBUTE" };
-  }
+  readonly attributeCodes: readonly string[];
+}):
+  | StartSessionPayload
+  | { readonly error: "NO_ATTRIBUTE" | "TOO_MANY" } {
+  const codes = [...new Set(input.attributeCodes.filter((c) => c.trim() !== ""))];
+  if (codes.length === 0) return { error: "NO_ATTRIBUTE" };
+  if (codes.length > MAX_SESSION_ATTRIBUTES) return { error: "TOO_MANY" };
   return {
     clubId: input.clubId,
     playerId: input.playerId,
-    attributeCode: input.attributeCode,
+    attributeCodes: codes,
   };
 }

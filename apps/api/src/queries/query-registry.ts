@@ -13,11 +13,14 @@ import type {
   StaffReadModel,
   InboxReadModel,
   TrainingPlanRepository,
+  IndividualTrainingPlanRepository,
+  MentorshipRepository,
   LineupRepository,
 } from "@grinta/core";
 import type {
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
+  GroupTrainingSessionsReadModel,
   WorldSeasonReadModel,
   YouthIntakeReadModel,
 } from "@grinta/persistence";
@@ -54,10 +57,13 @@ export interface QueryContext {
   readonly worldClock: WorldClockRepository;
   /** Treino — o plano do clube na temporada (M-TRAINING, doc 23 §9). */
   readonly trainingPlanRepository: TrainingPlanRepository;
+  readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
+  readonly mentorshipRepository: MentorshipRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
   readonly worldSeasonReadModel: WorldSeasonReadModel;
+  readonly groupTrainingSessionsReadModel: GroupTrainingSessionsReadModel;
   readonly youthIntakeReadModel: YouthIntakeReadModel;
   /** Tática — a escalação corrente do clube (M-LINEUP, R-220 Fase 1). */
   readonly clubLineupRepository: LineupRepository;
@@ -152,6 +158,73 @@ const handlers: Record<string, QueryHandler> = {
     );
     return succeed({ plan });
   },
+  /** Plano INDIVIDUAL de um jogador (M-TRAINING-INDIV). `null` = jogador sem plano. */
+  "individual-training-plan": async (
+    { individualTrainingPlanRepository },
+    worldId,
+    params,
+  ) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    if (clubId === null || playerId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "individual-training-plan exige clubId e playerId.",
+          { params: ["clubId", "playerId"] },
+        ),
+      );
+    }
+    const [plan, budget] = await Promise.all([
+      individualTrainingPlanRepository.findByPlayer(worldId, clubId, playerId),
+      // O orçamento diário do jogador, para a tela projetar o ganho com a MESMA
+      // régua da virada. `null` se o jogador sumiu.
+      individualTrainingPlanRepository.dailyBudget(worldId, playerId),
+    ]);
+    return succeed({ plan, budget });
+  },
+  /** Os ids dos jogadores do clube que TÊM plano individual (para a listagem
+   * marcar quem NÃO tem). */
+  "individual-training-plans": async (
+    { individualTrainingPlanRepository },
+    worldId,
+    params,
+  ) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "individual-training-plans exige clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    const playerIds = await individualTrainingPlanRepository.playerIdsWithPlan(
+      worldId,
+      clubId,
+    );
+    return succeed({ playerIds });
+  },
+  /** O mentor atual de um pupilo (M-MENTORING). `mentorId: null` = sem mentor. */
+  "mentorship": async ({ mentorshipRepository }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    const menteeId = typeof params.menteeId === "string" ? params.menteeId : null;
+    if (clubId === null || menteeId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "mentorship exige clubId e menteeId.",
+          { params: ["clubId", "menteeId"] },
+        ),
+      );
+    }
+    const link = await mentorshipRepository.findByMentee(worldId, clubId, menteeId);
+    return succeed({
+      mentorId: link?.mentorId ?? null,
+      version: link?.version ?? null,
+    });
+  },
   "training-sessions": async ({ trainingSessionsReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
     if (clubId === null) {
@@ -167,6 +240,22 @@ const handlers: Record<string, QueryHandler> = {
     // estado vazio (todos disponíveis), não em erro.
     return succeed({
       sessions: await trainingSessionsReadModel.activeByClub(worldId, clubId),
+    });
+  },
+  "group-training-session": async ({ groupTrainingSessionsReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "group-training-session exige o parâmetro clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    // `null` = clube sem treino em grupo ativo. A tela cai no estado vazio.
+    return succeed({
+      session: await groupTrainingSessionsReadModel.activeByClub(worldId, clubId),
     });
   },
   "player-development": async ({ playerDevelopmentReadModel }, worldId, params) => {
@@ -266,6 +355,20 @@ const handlers: Record<string, QueryHandler> = {
     return succeed(
       await inboxReadModel.summaryForClubs(worldId, clubId === null ? [] : [clubId]),
     );
+  },
+  "inbox-items": async ({ inboxReadModel }, worldId, params) => {
+    // A LISTA de avisos do clube (tela de avisos). Exige clubId — a lista é de UM clube.
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "inbox-items exige o parâmetro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed({ items: await inboxReadModel.listForClub(worldId, clubId) });
   },
   youth: async ({ squadReadModel }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;

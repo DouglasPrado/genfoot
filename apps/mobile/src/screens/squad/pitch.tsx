@@ -241,6 +241,24 @@ function Token({
       <Text style={styles.name} numberOfLines={1}>
         {player ? player.name.split(" ").slice(-1)[0] : "—"}
       </Text>
+      {block === null ? null : (
+        <Text
+          style={[
+            styles.blockLabel,
+            {
+              color:
+                block.kind === "medical"
+                  ? color.warning
+                  : block.kind === "suspended"
+                    ? color.danger
+                    : color.textMuted,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {block.label}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -390,6 +408,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: fontWeight.bold as "700",
     marginTop: 2,
+    maxWidth: TOKEN + 14,
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.9)",
+    textShadowRadius: 3,
+  },
+  blockLabel: {
+    fontSize: 8,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.4,
     maxWidth: TOKEN + 14,
     textAlign: "center",
     textShadowColor: "rgba(0,0,0,0.9)",

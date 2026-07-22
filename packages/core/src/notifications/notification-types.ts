@@ -62,6 +62,17 @@ export interface NotificationRepository {
   append(item: NotificationItemSnapshot): Promise<void>;
 }
 
+/** Um item do inbox como a LISTA de avisos o mostra (título, corpo, quando). */
+export interface InboxNotificationView {
+  readonly id: string;
+  readonly type: NotificationType;
+  readonly title: string;
+  readonly message: string;
+  readonly priority: number;
+  readonly isRead: boolean;
+  readonly createdOn: string;
+}
+
 export interface InboxReadModel {
   /**
    * O resumo do inbox dos clubes que o usuário controla. Club-scoped: a caixa de
@@ -71,4 +82,10 @@ export interface InboxReadModel {
     gameWorldId: GameWorldId,
     clubIds: readonly string[],
   ): Promise<InboxSummary>;
+  /** A LISTA de avisos de um clube (mais recentes primeiro), para a tela de avisos. */
+  listForClub(
+    gameWorldId: GameWorldId,
+    clubId: string,
+    limit?: number,
+  ): Promise<readonly InboxNotificationView[]>;
 }

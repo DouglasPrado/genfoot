@@ -101,6 +101,8 @@ describe.skipIf(!hasDatabase)(
       "identity:confirm-onboarding",
       "identity:end-club-control",
       "identity:join-world",
+      // Push remoto: o device registra seu Expo push token, atrelado à conta.
+      "identity:register-push-token",
       "identity:release-club-reservation",
       "identity:request-switch",
       "identity:reserve-club",
@@ -109,6 +111,9 @@ describe.skipIf(!hasDatabase)(
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // M-MENTORING: vincular/desvincular mentor (evolução acelerada).
+      "mentoring:link-mentor",
+      "mentoring:unlink-mentor",
       // R-221 Fase 2c: a decisão (elogiar/criticar) move a forma.
       "morale:talk-to-player",
       "morale:talk-to-squad",
@@ -121,8 +126,11 @@ describe.skipIf(!hasDatabase)(
       "training:apply-season",
       "training:apply-season-aging",
       // Treino de sessão instantâneo (R-221 Fase 2a): inicia e coleta.
+      "training:collect-group-session",
       "training:collect-session",
+      "training:set-individual-plan",
       "training:set-plan",
+      "training:start-group-session",
       "training:start-session",
       // R-220 Fase 3: treinar a formação sobe o entrosamento do time.
       "training:train-formation",
@@ -159,7 +167,7 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(47);
+    expect(response.body.commandCount).toBe(53);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
@@ -176,10 +184,17 @@ describe.skipIf(!hasDatabase)(
       "fanbase",
       // Registrado por trabalho paralelo (finanças/temporada) — reverdejando o gate.
       "finance-snapshot",
+      "group-training-session",
       "identity",
       "identity-detail",
       // A caixa de entrada (C12, M-HOME): pendências do clube.
       "inbox",
+      // A LISTA de avisos do clube (tela de avisos): itens com título/corpo.
+      "inbox-items",
+      // O plano de treino INDIVIDUAL de um jogador (M-TRAINING-INDIV).
+      "individual-training-plan",
+      // Os jogadores do clube que TÊM plano individual (a listagem marca quem não tem).
+      "individual-training-plans",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
       // A escalação corrente do clube (M-LINEUP, R-220 Fase 1): recorte por clubId.
@@ -190,6 +205,8 @@ describe.skipIf(!hasDatabase)(
       "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
+      // O mentor atual de um pupilo (M-MENTORING).
+      "mentorship",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
       "narrative",
       // O desenvolvimento do jogador (M-PLAYER-DEV, R-216): ganho/base por atributo.

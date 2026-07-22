@@ -1,7 +1,8 @@
 import {
   derivePotentialLayers,
-  projectSessionGainPoints,
+  perAttributeGain,
   sessionElapsedDays,
+  sessionRawGainPoints,
   type TrainingSessionSnapshot,
 } from "@grinta/core";
 
@@ -9,22 +10,30 @@ import type { Prisma } from "./generated/prisma/client.js";
 
 /**
  * As sessões de treino ATIVAS de um clube (R-221 Fase 2a, leitura), agora com a
- * PROJEÇÃO do ganho — "onde o atributo vai chegar" pelo tempo já treinado.
+ * PROJEÇÃO do ganho POR HABILIDADE — "onde cada atributo vai chegar" pelo tempo
+ * treinado, já com o ganho DIVIDIDO entre as habilidades escolhidas.
  *
- * A projeção usa a MESMA função pura que a coleta aplica
- * (`projectSessionGainPoints`), então o número que a tela mostra bate com o que
- * a coleta vai render. O cliente NÃO computa isso: regra de domínio mora no
- * servidor (cliente é não-autoritativo).
+ * A projeção usa as MESMAS funções puras que a coleta aplica
+ * (`sessionRawGainPoints` + `perAttributeGain`), então o número que a tela mostra
+ * bate com o que a coleta vai render. O cliente NÃO computa isso.
  */
+export interface TrainingAttributeProjection {
+  readonly attributeCode: string;
+  /** Valor atual (0..100), ou null se não se aplica. */
+  readonly currentValue: number | null;
+  /** Pontos que a coleta renderia agora nesta habilidade (o bruto ÷ N). */
+  readonly projectedGainPoints: number;
+  /** Valor projetado (atual + ganho), ou null. */
+  readonly projectedValue: number | null;
+}
+
 export interface TrainingSessionView extends TrainingSessionSnapshot {
   /** Dias já treinados (tetado na duração). */
   readonly elapsedDays: number;
-  /** Valor atual do atributo-foco (0..100), ou null se não se aplica. */
-  readonly attributeCurrentValue: number | null;
-  /** Pontos que a coleta renderia agora. */
-  readonly projectedGainPoints: number;
-  /** Valor projetado do atributo depois de coletar (atual + ganho). */
-  readonly projectedValue: number | null;
+  /** O bruto projetado da sessão (antes de dividir entre as habilidades). */
+  readonly rawGainPoints: number;
+  /** Projeção por habilidade treinada. */
+  readonly projections: readonly TrainingAttributeProjection[];
 }
 
 export interface TrainingSessionsReadModel {
@@ -73,12 +82,13 @@ export class PrismaTrainingSessionsReadModel
     const worldDate = world?.currentDate ?? null;
 
     return rows.map((row) => {
+      const codes = row.attributeCodes;
       const snapshot: TrainingSessionSnapshot = {
         id: row.id,
         gameWorldId: row.gameWorldId,
         clubId: row.clubId,
         playerId: row.playerId,
-        attributeCode: row.attributeCode,
+        attributeCodes: codes,
         startDate: isoDate(row.startDate),
         durationDays: row.durationDays,
         active: row.active,
@@ -87,19 +97,26 @@ export class PrismaTrainingSessionsReadModel
 
       const player = row.player;
       const attrs = player.attributes as Record<string, unknown> | null;
-      const rawCurrent = attrs?.[row.attributeCode];
-      const attributeCurrentValue =
-        typeof rawCurrent === "number" ? rawCurrent : null;
+      const currentOf = (code: string): number | null => {
+        const raw = attrs?.[code];
+        return typeof raw === "number" ? raw : null;
+      };
 
-      // Sem data do mundo não há projeção honesta — devolve os campos nulos em
-      // vez de inventar tempo decorrido.
+      // Sem data do mundo não há projeção honesta — só os valores atuais.
       if (worldDate === null) {
         return {
           ...snapshot,
           elapsedDays: 0,
-          attributeCurrentValue,
-          projectedGainPoints: 0,
-          projectedValue: attributeCurrentValue,
+          rawGainPoints: 0,
+          projections: codes.map((code) => {
+            const currentValue = currentOf(code);
+            return {
+              attributeCode: code,
+              currentValue,
+              projectedGainPoints: 0,
+              projectedValue: currentValue,
+            };
+          }),
         };
       }
 
@@ -112,8 +129,7 @@ export class PrismaTrainingSessionsReadModel
         baselineAbility: player.baselineAbility,
         currentAbility: player.currentAbility,
       }).usable;
-      const projectedGainPoints = projectSessionGainPoints({
-        attributeCurrentValue,
+      const rawGainPoints = sessionRawGainPoints({
         usableCeiling,
         currentAbility: player.currentAbility,
         morale: player.morale,
@@ -126,12 +142,22 @@ export class PrismaTrainingSessionsReadModel
       return {
         ...snapshot,
         elapsedDays,
-        attributeCurrentValue,
-        projectedGainPoints,
-        projectedValue:
-          attributeCurrentValue === null
-            ? null
-            : attributeCurrentValue + projectedGainPoints,
+        rawGainPoints,
+        projections: codes.map((code) => {
+          const currentValue = currentOf(code);
+          const projectedGainPoints = perAttributeGain({
+            rawGain: rawGainPoints,
+            attributeCount: codes.length,
+            attributeCurrentValue: currentValue,
+          });
+          return {
+            attributeCode: code,
+            currentValue,
+            projectedGainPoints,
+            projectedValue:
+              currentValue === null ? null : currentValue + projectedGainPoints,
+          };
+        }),
       };
     });
   }

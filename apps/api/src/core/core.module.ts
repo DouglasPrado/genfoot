@@ -16,7 +16,16 @@ import {
   PrismaTrainingSessionsReadModel,
   PrismaWorldSeasonReadModel,
   PrismaCohesionTrainingUnitOfWork,
+  PrismaGroupTrainingSessionUnitOfWork,
+  PrismaGroupTrainingSessionsReadModel,
   PrismaPlayerRepository,
+  PrismaPushTokenRepository,
+  PrismaAiTrainingUnitOfWork,
+  PrismaIndividualTrainingPlanRepository,
+  PrismaIndividualTrainingUnitOfWork,
+  PrismaMentorshipRepository,
+  PrismaMentorshipUnitOfWork,
+  PrismaCollectiveTrainingUnitOfWork,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
   PrismaSeasonLifecycleRepository,
@@ -69,7 +78,16 @@ import {
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   COHESION_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_UNIT_OF_WORK,
+  GROUP_TRAINING_SESSIONS_READ_MODEL,
   PLAYER_REPOSITORY,
+  PUSH_TOKEN_REPOSITORY,
+  AI_TRAINING_UNIT_OF_WORK,
+  INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+  INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MENTORSHIP_REPOSITORY,
+  MENTORSHIP_UNIT_OF_WORK,
+  COLLECTIVE_TRAINING_UNIT_OF_WORK,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
@@ -244,6 +262,18 @@ import {
         new PrismaTrainingSessionUnitOfWork(client),
     },
     {
+      provide: GROUP_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaGroupTrainingSessionUnitOfWork =>
+        new PrismaGroupTrainingSessionUnitOfWork(client),
+    },
+    {
+      provide: GROUP_TRAINING_SESSIONS_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaGroupTrainingSessionsReadModel =>
+        new PrismaGroupTrainingSessionsReadModel(client),
+    },
+    {
       provide: COHESION_TRAINING_UNIT_OF_WORK,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaCohesionTrainingUnitOfWork =>
@@ -266,6 +296,48 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaPlayerRepository =>
         new PrismaPlayerRepository(client),
+    },
+    {
+      provide: PUSH_TOKEN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaPushTokenRepository =>
+        new PrismaPushTokenRepository(client),
+    },
+    {
+      provide: AI_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaAiTrainingUnitOfWork =>
+        new PrismaAiTrainingUnitOfWork(client),
+    },
+    {
+      provide: INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaIndividualTrainingPlanRepository =>
+        new PrismaIndividualTrainingPlanRepository(client),
+    },
+    {
+      provide: INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaIndividualTrainingUnitOfWork =>
+        new PrismaIndividualTrainingUnitOfWork(client),
+    },
+    {
+      provide: MENTORSHIP_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMentorshipRepository =>
+        new PrismaMentorshipRepository(client),
+    },
+    {
+      provide: MENTORSHIP_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMentorshipUnitOfWork =>
+        new PrismaMentorshipUnitOfWork(client),
+    },
+    {
+      provide: COLLECTIVE_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaCollectiveTrainingUnitOfWork =>
+        new PrismaCollectiveTrainingUnitOfWork(client),
     },
     {
       provide: YOUTH_INTAKE_READ_MODEL,
@@ -468,9 +540,18 @@ import {
     SEASON_LIFECYCLE_REPOSITORY,
     TRAINING_SESSION_UNIT_OF_WORK,
     COHESION_TRAINING_UNIT_OF_WORK,
+    GROUP_TRAINING_UNIT_OF_WORK,
+    GROUP_TRAINING_SESSIONS_READ_MODEL,
     CLUB_LINEUP_REPOSITORY,
     LINEUP_CONTEXT_READER,
     PLAYER_REPOSITORY,
+    PUSH_TOKEN_REPOSITORY,
+    AI_TRAINING_UNIT_OF_WORK,
+    INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
+    INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+    MENTORSHIP_REPOSITORY,
+    MENTORSHIP_UNIT_OF_WORK,
+    COLLECTIVE_TRAINING_UNIT_OF_WORK,
     YOUTH_INTAKE_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,
