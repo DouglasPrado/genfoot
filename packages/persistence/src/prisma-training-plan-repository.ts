@@ -47,6 +47,31 @@ export class PrismaTrainingPlanRepository implements TrainingPlanRepository {
     };
   }
 
+  public async findAllActive(
+    gameWorldId: string,
+  ): Promise<readonly TrainingPlanSnapshot[]> {
+    const rows = await this.client.trainingPlan.findMany({
+      where: { gameWorldId },
+      include: { entries: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      gameWorldId: row.gameWorldId,
+      clubId: row.clubId,
+      seasonId: row.seasonId,
+      name: row.name,
+      focus: row.focus,
+      intensity: row.intensity,
+      entries: row.entries.map((entry) => ({
+        playerId: entry.playerId,
+        focus: entry.focus,
+        workload: entry.workload,
+      })),
+      qualityFactor: 1,
+      version: row.version,
+    }));
+  }
+
   public async save(
     plan: TrainingPlanSnapshot,
     expectedVersion: number | null,

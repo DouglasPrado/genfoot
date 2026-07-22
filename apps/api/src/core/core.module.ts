@@ -25,6 +25,7 @@ import {
   PrismaIndividualTrainingUnitOfWork,
   PrismaMentorshipRepository,
   PrismaMentorshipUnitOfWork,
+  PrismaCollectiveTrainingUnitOfWork,
   PrismaYouthIntakeReadModel,
   PrismaSeasonAgingUnitOfWork,
   PrismaSeasonLifecycleRepository,
@@ -86,6 +87,7 @@ import {
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
+  COLLECTIVE_TRAINING_UNIT_OF_WORK,
   YOUTH_INTAKE_READ_MODEL,
   SEASON_AGING_UNIT_OF_WORK,
   SEASON_LIFECYCLE_REPOSITORY,
@@ -332,6 +334,12 @@ import {
         new PrismaMentorshipUnitOfWork(client),
     },
     {
+      provide: COLLECTIVE_TRAINING_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaCollectiveTrainingUnitOfWork =>
+        new PrismaCollectiveTrainingUnitOfWork(client),
+    },
+    {
       provide: YOUTH_INTAKE_READ_MODEL,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaYouthIntakeReadModel =>
@@ -543,6 +551,7 @@ import {
     INDIVIDUAL_TRAINING_UNIT_OF_WORK,
     MENTORSHIP_REPOSITORY,
     MENTORSHIP_UNIT_OF_WORK,
+    COLLECTIVE_TRAINING_UNIT_OF_WORK,
     YOUTH_INTAKE_READ_MODEL,
     AUTOMATION_UNIT_OF_WORK,
     SEASON_FINANCE_UNIT_OF_WORK,

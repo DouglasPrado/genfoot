@@ -48,6 +48,7 @@ import type {
   IndividualTrainingUnitOfWork,
   MentorshipRepository,
   MentorshipUnitOfWork,
+  CollectiveTrainingUnitOfWork,
   AutomationUnitOfWork,
   WorldRepository,
 } from "@grinta/core";
@@ -94,6 +95,7 @@ import {
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
+  COLLECTIVE_TRAINING_UNIT_OF_WORK,
   AUTOMATION_UNIT_OF_WORK,
   SEASON_FINANCE_UNIT_OF_WORK,
   GAME_WORLD_REPOSITORY,
@@ -185,6 +187,8 @@ export class CommandsController {
     private readonly mentorshipRepository: MentorshipRepository,
     @Inject(MENTORSHIP_UNIT_OF_WORK)
     private readonly mentorshipUnitOfWork: MentorshipUnitOfWork,
+    @Inject(COLLECTIVE_TRAINING_UNIT_OF_WORK)
+    private readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork,
     @Inject(AUTOMATION_UNIT_OF_WORK)
     private readonly automationUnitOfWork: AutomationUnitOfWork,
     @Inject(SEASON_FINANCE_UNIT_OF_WORK)
@@ -357,6 +361,7 @@ export class CommandsController {
         individualTrainingUnitOfWork: this.individualTrainingUnitOfWork,
         mentorshipRepository: this.mentorshipRepository,
         mentorshipUnitOfWork: this.mentorshipUnitOfWork,
+        collectiveTrainingUnitOfWork: this.collectiveTrainingUnitOfWork,
         automationUnitOfWork: this.automationUnitOfWork,
         seasonFinanceUnitOfWork: this.seasonFinanceUnitOfWork,
         clubReadModel: this.clubReadModel,

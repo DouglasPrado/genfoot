@@ -27,6 +27,10 @@ class MemoryTrainingPlanRepository implements TrainingPlanRepository {
     return Promise.resolve(this.planos.get(this.key(w, c, s)) ?? null);
   }
 
+  findAllActive() {
+    return Promise.resolve([...this.planos.values()] as readonly TrainingPlanSnapshot[]);
+  }
+
   save(plan: TrainingPlanSnapshot, expectedVersion: number | null) {
     const key = this.key(plan.gameWorldId, plan.clubId, plan.seasonId);
     const atual = this.planos.get(key);

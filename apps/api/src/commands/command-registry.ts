@@ -87,6 +87,8 @@ import {
   LinkMentor,
   UnlinkMentor,
   SettleDueMentorships,
+  type CollectiveTrainingUnitOfWork,
+  SettleDueCollectiveTraining,
   RegisterPushToken,
   RunAiClubsTraining,
   buildTrainingReportMessage,
@@ -192,6 +194,7 @@ export interface CommandContext {
   readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
   readonly mentorshipRepository: MentorshipRepository;
   readonly mentorshipUnitOfWork: MentorshipUnitOfWork;
+  readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork;
   /** C6 — a transferência atômica: dinheiro + contrato + elenco (R-192). */
   readonly transferUnitOfWork: TransferUnitOfWork;
   /** C8 — sobe um jovem da base ao profissional (atômico sobre os dois elencos). */
@@ -817,6 +820,33 @@ async function settleMentorships(
   }
 }
 
+/**
+ * Settle do plano COLETIVO na virada: desenvolve os jogadores pelo foco e grava
+ * o aviso-resumo (fecha a lacuna do plano coletivo inerte). Best-effort.
+ */
+async function settleCollectiveTraining(
+  deps: Pick<CommandContext, "collectiveTrainingUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+    readonly rulesetVersion: string;
+  },
+): Promise<void> {
+  try {
+    await new SettleDueCollectiveTraining(
+      deps.collectiveTrainingUnitOfWork,
+    ).execute({
+      gameWorldId: world.worldId,
+      worldSeed: world.seed,
+      worldDate: world.currentDate,
+      rulesetVersion: world.rulesetVersion as never,
+    });
+  } catch (err) {
+    console.warn(`[collective-training] falha no settle coletivo: ${String(err)}`);
+  }
+}
+
 interface IdentityUseCase {
   execute(input: never): Promise<Result<unknown, DomainError>>;
 }
@@ -1007,6 +1037,7 @@ const handlers: Record<string, CommandHandler> = {
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
     mentorshipUnitOfWork,
+    collectiveTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -1100,6 +1131,15 @@ const handlers: Record<string, CommandHandler> = {
     );
     await settleMentorships(
       { mentorshipUnitOfWork },
+      {
+        worldId,
+        seed: worldSeed,
+        currentDate: worldDate,
+        rulesetVersion: advanced.value.world.rulesetVersion,
+      },
+    );
+    await settleCollectiveTraining(
+      { collectiveTrainingUnitOfWork },
       {
         worldId,
         seed: worldSeed,
@@ -1961,6 +2001,7 @@ const handlers: Record<string, CommandHandler> = {
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
     mentorshipUnitOfWork,
+    collectiveTrainingUnitOfWork,
     playerRepository,
     envelope,
   }) => {
@@ -2034,6 +2075,15 @@ const handlers: Record<string, CommandHandler> = {
       // Mentoria: evolução acelerada dos pupilos.
       await settleMentorships(
         { mentorshipUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
+          rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      await settleCollectiveTraining(
+        { collectiveTrainingUnitOfWork },
         {
           worldId: after.value.worldId,
           seed: after.value.snapshot.seed,

@@ -23,6 +23,29 @@ export interface IndividualPlanChange {
   readonly gain: number;
 }
 
+/**
+ * Gasta `rawGainPoints` como +1 nos atributos mais fracos da lista (com folga
+ * até 100). É a régua de ESPALHAR — reusada por posição, arquétipo de goleiro
+ * (projeção individual) e foco do plano coletivo (settle coletivo).
+ */
+export function spreadBudget(
+  codes: readonly string[],
+  rawGainPoints: number,
+  attributeValueOf: (code: string) => number | null,
+): readonly IndividualPlanChange[] {
+  if (rawGainPoints <= 0) return [];
+  const weakestFirst = codes
+    .map((code) => ({ code, value: attributeValueOf(code) }))
+    .filter((c): c is { code: string; value: number } => c.value !== null && c.value < 100)
+    .sort((a, b) => a.value - b.value);
+  const changes: IndividualPlanChange[] = [];
+  for (const { code, value } of weakestFirst) {
+    if (changes.length >= rawGainPoints) break;
+    changes.push({ attributeCode: code, before: value, after: value + 1, gain: 1 });
+  }
+  return changes;
+}
+
 export function projectIndividualPlan(input: {
   readonly target: IndividualTrainingTarget;
   readonly rawGainPoints: number;
@@ -54,15 +77,5 @@ export function projectIndividualPlan(input: {
     input.target.kind === "POSITION"
       ? recommendedAttributes(input.target.position)
       : archetypeAttributes(input.target.archetype);
-  const weakestFirst = spreadCodes
-    .map((code) => ({ code, value: input.attributeValueOf(code) }))
-    .filter((c): c is { code: string; value: number } => c.value !== null && c.value < 100)
-    .sort((a, b) => a.value - b.value);
-
-  const changes: IndividualPlanChange[] = [];
-  for (const { code, value } of weakestFirst) {
-    if (changes.length >= input.rawGainPoints) break;
-    changes.push({ attributeCode: code, before: value, after: value + 1, gain: 1 });
-  }
-  return changes;
+  return spreadBudget(spreadCodes, input.rawGainPoints, input.attributeValueOf);
 }

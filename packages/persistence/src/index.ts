@@ -8,6 +8,7 @@ export * from "./prisma-individual-training-plan-repository.js";
 export * from "./prisma-individual-training-unit-of-work.js";
 export * from "./prisma-mentorship-repository.js";
 export * from "./prisma-mentorship-unit-of-work.js";
+export * from "./prisma-collective-training-unit-of-work.js";
 export * from "./prisma-idempotency-repository.js";
 export * from "./prisma-identity-read-model.js";
 export * from "./prisma-identity-unit-of-work.js";
