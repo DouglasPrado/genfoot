@@ -163,6 +163,7 @@ export * from "./presence/presence-repository.js";
 export * from "./medical/injury-episode-types.js";
 export * from "./medical/injury-episode.js";
 export * from "./medical/injury-risk.js";
+export * from "./medical/medical-use-cases.js";
 
 // Treino — a fórmula de evolução do §6 (R-212).
 export * from "./training/development-gain.js";
