@@ -473,6 +473,14 @@ export function IndividualTraining({ playerId }: { readonly playerId: string }) 
             </View>
           </View>
 
+          {/* Aviso de risco por sobrecarga (doc: "Estados"). Carga alta cansa e
+              sobe o risco de lesão — mesmo limiar do plano coletivo (75). */}
+          {intensity >= 75 ? (
+            <Text style={styles.overloadWarn}>
+              ⚠ Carga alta: sobrecarga cansa mais e sobe o risco de lesão.
+            </Text>
+          ) : null}
+
           <Text style={styles.hint}>
             Aplicado na virada do dia. Jogador lesionado/suspenso ou já em sessão
             manual é pulado — a sessão manual tem precedência.
@@ -587,6 +595,7 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   projectionHint: { color: color.textMuted, fontSize: fontSize.sm },
+  overloadWarn: { color: color.warning, fontSize: fontSize.sm, marginTop: space.sm, fontWeight: fontWeight.bold },
   projectionRow: {
     flexDirection: "row",
     alignItems: "center",
