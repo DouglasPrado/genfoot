@@ -87,6 +87,9 @@ class MemPlans implements IndividualTrainingPlanRepository {
   public dailyBudget(): Promise<number | null> {
     return Promise.resolve(6);
   }
+  public playerIdsWithPlan(): Promise<readonly string[]> {
+    return Promise.resolve([]);
+  }
 }
 
 function uowOf(repos: IndividualTrainingRepositories): IndividualTrainingUnitOfWork {

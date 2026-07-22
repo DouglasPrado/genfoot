@@ -31,6 +31,9 @@ class MemRepo implements IndividualTrainingPlanRepository {
   public dailyBudget(): Promise<number | null> {
     return Promise.resolve(6);
   }
+  public playerIdsWithPlan(): Promise<readonly string[]> {
+    return Promise.resolve([]);
+  }
 }
 
 class MemContext implements TrainingContextReader {

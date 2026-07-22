@@ -227,6 +227,17 @@ export function Training() {
     managedClub === null ? undefined : { clubId: managedClub.id },
   );
   const plan = planQuery.data?.plan ?? null;
+  // Quais jogadores TÊM plano individual — a listagem marca quem NÃO tem.
+  const individualPlansQuery = useWorldQuery<{ readonly playerIds: readonly string[] }>(
+    managedClub === null ? null : "individual-training-plans",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  const plansReady =
+    individualPlansQuery.state === "ready" || individualPlansQuery.state === "empty";
+  const playersWithPlan = useMemo(
+    () => new Set(individualPlansQuery.data?.playerIds ?? []),
+    [individualPlansQuery.data],
+  );
   // O relógio do mundo alimenta a contagem regressiva das sessões.
   const clockQuery = useWorldQuery<WorldClockProjection>("world-clock");
   // Relógio de parede que tica a cada segundo — só efeito de view (a lógica da
@@ -1312,6 +1323,9 @@ export function Training() {
                       </Text>
                       {youthIds.has(row.playerId) ? (
                         <Text style={styles.baseTag}>BASE</Text>
+                      ) : null}
+                      {plansReady && !playersWithPlan.has(row.playerId) ? (
+                        <Text style={styles.noPlanTag}>SEM PLANO</Text>
                       ) : null}
                       <AvailabilityFlag availability={row.availability} />
                     </View>
@@ -2524,6 +2538,17 @@ const styles = StyleSheet.create({
     color: color.primary,
     borderWidth: 1,
     borderColor: color.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  noPlanTag: {
+    fontSize: 9,
+    fontWeight: fontWeight.black as "800",
+    letterSpacing: 0.5,
+    color: color.textMuted,
+    borderWidth: 1,
+    borderColor: color.border,
     borderRadius: radius.sm,
     paddingHorizontal: 4,
     paddingVertical: 1,

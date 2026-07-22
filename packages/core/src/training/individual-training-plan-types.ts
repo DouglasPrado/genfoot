@@ -71,4 +71,12 @@ export interface IndividualTrainingPlanRepository {
     gameWorldId: string,
     playerId: string,
   ): Promise<number | null>;
+  /**
+   * Os ids dos jogadores do clube que TÊM plano individual — para a listagem
+   * marcar quem NÃO tem (sem uma query por jogador).
+   */
+  playerIdsWithPlan(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<readonly string[]>;
 }

@@ -193,6 +193,8 @@ describe.skipIf(!hasDatabase)(
       "inbox-items",
       // O plano de treino INDIVIDUAL de um jogador (M-TRAINING-INDIV).
       "individual-training-plan",
+      // Os jogadores do clube que TÊM plano individual (a listagem marca quem não tem).
+      "individual-training-plans",
       // O resumo financeiro (M-02): contas, lançamentos, caixa por clube (C9).
       "ledger",
       // A escalação corrente do clube (M-LINEUP, R-220 Fase 1): recorte por clubId.

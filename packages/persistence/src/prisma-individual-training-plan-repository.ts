@@ -101,6 +101,17 @@ export class PrismaIndividualTrainingPlanRepository
     return rows.map(toSnapshot);
   }
 
+  public async playerIdsWithPlan(
+    gameWorldId: string,
+    clubId: string,
+  ): Promise<readonly string[]> {
+    const rows = await this.client.individualTrainingPlan.findMany({
+      where: { gameWorldId, clubId },
+      select: { playerId: true },
+    });
+    return rows.map((r) => r.playerId);
+  }
+
   public async dailyBudget(
     gameWorldId: string,
     playerId: string,

@@ -183,6 +183,29 @@ const handlers: Record<string, QueryHandler> = {
     ]);
     return succeed({ plan, budget });
   },
+  /** Os ids dos jogadores do clube que TÊM plano individual (para a listagem
+   * marcar quem NÃO tem). */
+  "individual-training-plans": async (
+    { individualTrainingPlanRepository },
+    worldId,
+    params,
+  ) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "individual-training-plans exige clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    const playerIds = await individualTrainingPlanRepository.playerIdsWithPlan(
+      worldId,
+      clubId,
+    );
+    return succeed({ playerIds });
+  },
   /** O mentor atual de um pupilo (M-MENTORING). `mentorId: null` = sem mentor. */
   "mentorship": async ({ mentorshipRepository }, worldId, params) => {
     const clubId = typeof params.clubId === "string" ? params.clubId : null;
