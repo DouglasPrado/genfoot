@@ -82,7 +82,11 @@ import {
   type IndividualTrainingTarget,
   SetIndividualTrainingPlan,
   SettleDueIndividualTrainingPlans,
+  SettleTrainingInjuries,
+  OpenInjuryEpisode,
   type MentorshipRepository,
+  type MedicalUnitOfWork,
+  type MedicalRepositories,
   type MentorshipUnitOfWork,
   LinkMentor,
   UnlinkMentor,
@@ -192,6 +196,8 @@ export interface CommandContext {
   readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
   readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
   readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
+  /** Departamento médico: settle da virada (gatilho MED-1 por carga). */
+  readonly medicalUnitOfWork: MedicalUnitOfWork;
   readonly mentorshipRepository: MentorshipRepository;
   readonly mentorshipUnitOfWork: MentorshipUnitOfWork;
   readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork;
@@ -769,6 +775,35 @@ async function runAiTraining(
 }
 
 /**
+ * Settle do DEPARTAMENTO MÉDICO na virada: sorteia lesão por carga (F13/R-21)
+ * e abre o episódio em EVALUATION. É o gatilho MED-1 — sem ele a máquina
+ * médica existe mas nada a inicia. Best-effort: uma falha não derruba a virada.
+ */
+async function settleTrainingInjuries(
+  deps: Pick<CommandContext, "medicalUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+  },
+): Promise<void> {
+  try {
+    await deps.medicalUnitOfWork.run(async (repos: MedicalRepositories) =>
+      new SettleTrainingInjuries(
+        repos.loads,
+        new OpenInjuryEpisode(repos.episodes),
+      ).execute({
+        gameWorldId: world.worldId,
+        worldSeed: world.seed,
+        worldDate: world.currentDate,
+      }),
+    );
+  } catch (err) {
+    console.warn(`[medical] falha no settle de lesões: ${String(err)}`);
+  }
+}
+
+/**
  * Settle dos planos INDIVIDUAIS na virada: aplica cada plano ao seu jogador
  * (desenvolvimento rumo ao alvo). Best-effort: uma falha não derruba a virada.
  */
@@ -1036,6 +1071,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    medicalUnitOfWork,
     mentorshipUnitOfWork,
     collectiveTrainingUnitOfWork,
     playerRepository,
@@ -1128,6 +1164,11 @@ const handlers: Record<string, CommandHandler> = {
         currentDate: worldDate,
         rulesetVersion: advanced.value.world.rulesetVersion,
       },
+    );
+    // Departamento médico: a carga do dia pode lesionar (F13/R-21).
+    await settleTrainingInjuries(
+      { medicalUnitOfWork },
+      { worldId, seed: worldSeed, currentDate: worldDate },
     );
     await settleMentorships(
       { mentorshipUnitOfWork },
@@ -2000,6 +2041,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    medicalUnitOfWork,
     mentorshipUnitOfWork,
     collectiveTrainingUnitOfWork,
     playerRepository,
@@ -2070,6 +2112,15 @@ const handlers: Record<string, CommandHandler> = {
           seed: after.value.snapshot.seed,
           currentDate: after.value.snapshot.currentDate,
           rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Departamento médico: a carga do dia pode lesionar (F13/R-21).
+      await settleTrainingInjuries(
+        { medicalUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
         },
       );
       // Mentoria: evolução acelerada dos pupilos.

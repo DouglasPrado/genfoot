@@ -23,6 +23,7 @@ import {
   PrismaAiTrainingUnitOfWork,
   PrismaIndividualTrainingPlanRepository,
   PrismaIndividualTrainingUnitOfWork,
+  PrismaMedicalUnitOfWork,
   PrismaMentorshipRepository,
   PrismaMentorshipUnitOfWork,
   PrismaCollectiveTrainingUnitOfWork,
@@ -85,6 +86,7 @@ import {
   AI_TRAINING_UNIT_OF_WORK,
   INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MEDICAL_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
   COLLECTIVE_TRAINING_UNIT_OF_WORK,
@@ -322,6 +324,12 @@ import {
         new PrismaIndividualTrainingUnitOfWork(client),
     },
     {
+      provide: MEDICAL_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMedicalUnitOfWork =>
+        new PrismaMedicalUnitOfWork(client),
+    },
+    {
       provide: MENTORSHIP_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaMentorshipRepository =>
@@ -549,6 +557,7 @@ import {
     AI_TRAINING_UNIT_OF_WORK,
     INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
     INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+    MEDICAL_UNIT_OF_WORK,
     MENTORSHIP_REPOSITORY,
     MENTORSHIP_UNIT_OF_WORK,
     COLLECTIVE_TRAINING_UNIT_OF_WORK,

@@ -1,7 +1,22 @@
 import type { GameWorldId } from "@grinta/shared";
 
+import type { TieUndecidedReason } from "./competition-phases.js";
 import type { ClubOutcome } from "./season-outcome.js";
 import type { StandingRow } from "./standings.js";
+
+/**
+ * A cara de um clube numa lista: nome vigente, sigla, cores e modelo de escudo
+ * (R-211). É o mínimo para a tela desenhar o escudo em vez de um UUID — a
+ * mesma informação que `MatchListItem` já carrega para a lista de partidas.
+ */
+export interface ClubBadgeView {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly shortCode: string;
+  readonly primaryColor: string | null;
+  readonly secondaryColor: string | null;
+  readonly crestTemplateId: string | null;
+}
 
 /**
  * Uma linha da tabela com o NOME do clube resolvido — a tela mostra "Fúria
@@ -11,6 +26,9 @@ import type { StandingRow } from "./standings.js";
 export interface StandingViewRow extends StandingRow {
   readonly clubName: string;
   readonly shortCode: string;
+  readonly primaryColor?: string | null;
+  readonly secondaryColor?: string | null;
+  readonly crestTemplateId?: string | null;
 }
 
 /**
@@ -43,6 +61,15 @@ export interface CompetitionSummaryView {
   readonly matchCount: number;
   readonly startsOn: string | null;
   readonly endsOn: string | null;
+  /**
+   * O recorte do clube do usuário (M-COMPETITIONS): participa desta competição?
+   * em que posição está? `null` quando a consulta não informou um clube — é o
+   * caso do admin, que lista o mundo inteiro sem dono.
+   */
+  readonly clubParticipates: boolean | null;
+  readonly clubRank: number | null;
+  /** A rodada mais alta já jogada — "em que pé está" na lista. */
+  readonly currentRound: number | null;
 }
 
 /**

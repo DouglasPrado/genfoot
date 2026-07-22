@@ -46,6 +46,7 @@ import type {
   AiTrainingUnitOfWork,
   IndividualTrainingPlanRepository,
   IndividualTrainingUnitOfWork,
+  MedicalUnitOfWork,
   MentorshipRepository,
   MentorshipUnitOfWork,
   CollectiveTrainingUnitOfWork,
@@ -93,6 +94,7 @@ import {
   AI_TRAINING_UNIT_OF_WORK,
   INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MEDICAL_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
   COLLECTIVE_TRAINING_UNIT_OF_WORK,
@@ -183,6 +185,8 @@ export class CommandsController {
     private readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository,
     @Inject(INDIVIDUAL_TRAINING_UNIT_OF_WORK)
     private readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork,
+    @Inject(MEDICAL_UNIT_OF_WORK)
+    private readonly medicalUnitOfWork: MedicalUnitOfWork,
     @Inject(MENTORSHIP_REPOSITORY)
     private readonly mentorshipRepository: MentorshipRepository,
     @Inject(MENTORSHIP_UNIT_OF_WORK)
@@ -359,6 +363,7 @@ export class CommandsController {
         aiTrainingUnitOfWork: this.aiTrainingUnitOfWork,
         individualTrainingPlanRepository: this.individualTrainingPlanRepository,
         individualTrainingUnitOfWork: this.individualTrainingUnitOfWork,
+        medicalUnitOfWork: this.medicalUnitOfWork,
         mentorshipRepository: this.mentorshipRepository,
         mentorshipUnitOfWork: this.mentorshipUnitOfWork,
         collectiveTrainingUnitOfWork: this.collectiveTrainingUnitOfWork,
