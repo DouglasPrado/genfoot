@@ -24,6 +24,7 @@ import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { useWorldQuery, type QueryState } from "@/lib/world";
 import { ClubCrest } from "@/screens/club/customization/crest";
+import { movementBadge } from "@/screens/competition/competition-model";
 import { clubCrestData } from "@/screens/club/customization/visual-identity";
 import {
   deriveOnboardingStep,
@@ -78,6 +79,9 @@ interface CompetitionStandingsProjection {
     readonly drawn: number;
     readonly lost: number;
     readonly goalDifference: number;
+    /** Variação desde a rodada anterior; `null` = não há anterior. */
+    readonly previousRank: number | null;
+    readonly movement: "up" | "down" | "same" | null;
   }[];
 }
 
@@ -110,6 +114,35 @@ function combinedQueryState(states: readonly QueryState[]): QueryState {
   if (states.includes("error")) return "error";
   if (states.includes("empty")) return "empty";
   return "ready";
+}
+
+/**
+ * A variação de posição na tabela da Home — a mesma leitura de
+ * `M-COMPETITION`. Nada desenhado = sem rodada anterior; traço = manteve.
+ */
+function StandingMovement({
+  movement,
+  rank,
+  previousRank,
+}: {
+  movement: "up" | "down" | "same" | null;
+  rank: number;
+  previousRank: number | null;
+}) {
+  const badge = movementBadge(movement, rank, previousRank);
+  if (badge.glyph === null) return <View style={styles.standingMoveGap} />;
+  return (
+    <Text
+      accessibilityLabel={badge.accessibilityLabel}
+      style={[
+        styles.standingMove,
+        badge.tone === "up" && styles.standingMoveUp,
+        badge.tone === "down" && styles.standingMoveDown,
+      ]}
+    >
+      {badge.glyph}
+    </Text>
+  );
 }
 
 /** Painel de comando do clube: somente projeções oficiais, sem seeds de demo. */
@@ -356,6 +389,11 @@ export function Home() {
                       .map((row, index) => (
                         <View key={row.clubId} style={styles.standingRow}>
                           <Text style={styles.standingPos}>{index + 1}</Text>
+                          <StandingMovement
+                            movement={row.movement}
+                            rank={index + 1}
+                            previousRank={row.previousRank}
+                          />
                           <ClubCrest
                             {...clubCrestData(
                               row.clubName,
@@ -938,6 +976,15 @@ const styles = StyleSheet.create({
     color: color.textMuted,
     fontSize: fontSize.xs,
   },
+  standingMove: {
+    width: 12,
+    textAlign: "center",
+    fontSize: 9,
+    color: color.textFaint,
+  },
+  standingMoveUp: { color: color.success },
+  standingMoveDown: { color: color.danger },
+  standingMoveGap: { width: 12 },
   standingWon: { color: color.success },
   standingLost: { color: color.danger },
   standingPoints: {
