@@ -10,10 +10,9 @@ import { color, fontSize, fontWeight, radius, space } from "@/theme";
  * as telas de gestão de jogadores — tática, mercado, base, médico e treino — no
  * estilo do menu vertical do protótipo. Aberto a partir do card ELENCO no Clube.
  *
- * Só entram como ATIVOS os destinos com tela real hoje (tática e mercado). Base,
- * médico e treino têm doc (`docs/04-ui-ux/05`) mas ainda não têm tela: aparecem
- * marcados "EM BREVE", desabilitados — honesto, não um link que leva a lugar
- * nenhum nem uma tela vazia pintada de pronta.
+ * Só entram como ATIVOS os destinos com tela real hoje. `SOON` fica vazio
+ * enquanto não houver destino sem tela: um placeholder "EM BREVE" é honesto,
+ * um link que leva a lugar nenhum não é.
  */
 interface Destination {
   readonly key: string;
@@ -73,16 +72,16 @@ const DESTINATIONS: readonly Destination[] = [
     note: "Jovens em formação e potencial",
     route: "/elenco/base",
   },
-];
-
-const SOON: readonly SoonDestination[] = [
   {
     key: "medico",
     icon: "medkit",
     title: "Departamento Médico",
-    note: "Lesões e reabilitação",
+    note: "Lesões, reabilitação e retorno",
+    route: "/elenco/medico",
   },
 ];
+
+const SOON: readonly SoonDestination[] = [];
 
 /** Menu-hub do Elenco: destinos ativos + placeholders honestos "em breve". */
 export function ElencoHub() {

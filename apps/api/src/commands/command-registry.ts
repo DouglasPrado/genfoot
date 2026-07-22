@@ -84,6 +84,14 @@ import {
   SettleDueIndividualTrainingPlans,
   SettleTrainingInjuries,
   OpenInjuryEpisode,
+  OrderMedicalExam,
+  DiagnoseInjury,
+  SetMedicalPlan,
+  AdvanceRehabStage,
+  ForceMedicalReturn,
+  DischargeFromMedical,
+  RetirePlayerMedically,
+  SeededRandom,
   type MentorshipRepository,
   type MedicalUnitOfWork,
   type MedicalRepositories,
@@ -596,6 +604,38 @@ const individualTrainingPlanPayload = z.object({
   ]),
   intensity: z.number().int(),
   expectedVersion: z.number().int().nullable(),
+});
+
+/**
+ * Payloads do departamento médico. `playerId` identifica o caso: um episódio
+ * aberto por jogador, então não é preciso mandar o `injuryId` — mandá-lo abriria
+ * a porta para comandar um episódio já encerrado.
+ */
+const medicalPlayerPayload = z.object({
+  playerId: z.string().uuid(),
+});
+
+const medicalDiagnosisPayload = z.object({
+  playerId: z.string().uuid(),
+  severity: z.enum(["MINOR", "LIGHT", "MODERATE", "SERIOUS", "CRITICAL"]),
+  returnRiskScore: z.number().int().min(0).max(100),
+});
+
+const medicalPlanPayload = z.object({
+  playerId: z.string().uuid(),
+  option: z.enum(["CONSERVATIVE", "STANDARD", "INTENSIVE", "SURGERY"]),
+});
+
+const medicalForceReturnPayload = z.object({
+  playerId: z.string().uuid(),
+  /** O usuário assume o risco explicitamente (HighRiskConfirm da tela). */
+  acceptRisk: z.literal(true),
+});
+
+const medicalRetirementPayload = z.object({
+  playerId: z.string().uuid(),
+  /** Rito de confirmação: terminal absoluto, sem desfazer (§17). */
+  confirmed: z.literal(true),
 });
 
 const linkMentorPayload = z.object({
@@ -1303,6 +1343,144 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({
       resource: `individual-training-plan:${result.value.plan.id}`,
     });
+  },
+
+  // ---------------------------------------------------------------------
+  // Departamento médico (M-MEDICAL / M-MEDICAL-CASE) — máquina MED-1..MED-9.
+  // Cada command roda numa transação só com o episódio e a disponibilidade do
+  // jogador, para não existir instante com caso aberto e jogador escalável.
+  // ---------------------------------------------------------------------
+
+  /** MED-2 — solicita exames. */
+  "medical:order-exam": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new OrderMedicalExam(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-3/MED-9 — fecha o diagnóstico (ou o revisa, se já havia um). */
+  "medical:diagnose": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalDiagnosisPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new DiagnoseInjury(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        severity: parsed.data.severity,
+        returnRiskScore: parsed.data.returnRiskScore,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-4 — `SetMedicalPlan` do doc 23: escolhe o tratamento e inicia a reabilitação. */
+  "medical:set-plan": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new SetMedicalPlan(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        option: parsed.data.option,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-5/6/7 — avança um estágio; de S7 vira liberação competitiva. */
+  "medical:advance-rehab": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new AdvanceRehabStage(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /**
+   * Retorno antecipado. O sorteio da recaída sai do `SeededRandom` do MUNDO —
+   * o servidor é a autoridade, e o mesmo mundo no mesmo dia dá o mesmo desfecho.
+   */
+  "medical:force-return": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalForceReturnPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const random = new SeededRandom({
+      worldSeed: world.value.snapshot.seed,
+      context: `medical:force-return:${world.value.snapshot.currentDate}:${parsed.data.playerId}`,
+    });
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new ForceMedicalReturn(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        relapseRoll: random.nextFloat(),
+        aggravationRoll: random.nextFloat(),
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-8 — alta: devolve o jogador ao elenco. */
+  "medical:discharge": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new DischargeFromMedical(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** Aposentadoria médica — terminal absoluto (INV-4). */
+  "medical:retire-player": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalRetirementPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new RetirePlayerMedically(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        confirmed: parsed.data.confirmed,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
   },
 
   /** Mentoria — vincula um mentor a um pupilo (M-MENTORING). */

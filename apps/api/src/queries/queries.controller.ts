@@ -1,4 +1,5 @@
 import type {
+  PrismaMedicalReadModel,
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
   GroupTrainingSessionsReadModel,
@@ -60,6 +61,7 @@ import {
   MENTORSHIP_REPOSITORY,
   CLUB_LINEUP_REPOSITORY,
   PLAYER_DEVELOPMENT_READ_MODEL,
+  MEDICAL_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
   GROUP_TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
@@ -126,6 +128,8 @@ export class QueriesController {
     private readonly clubLineupRepository: LineupRepository,
     @Inject(PLAYER_DEVELOPMENT_READ_MODEL)
     private readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel,
+    @Inject(MEDICAL_READ_MODEL)
+    private readonly medicalReadModel: PrismaMedicalReadModel,
     @Inject(TRAINING_SESSIONS_READ_MODEL)
     private readonly trainingSessionsReadModel: TrainingSessionsReadModel,
     @Inject(WORLD_SEASON_READ_MODEL)
@@ -335,6 +339,7 @@ export class QueriesController {
         mentorshipRepository: this.mentorshipRepository,
         clubLineupRepository: this.clubLineupRepository,
         playerDevelopmentReadModel: this.playerDevelopmentReadModel,
+        medicalReadModel: this.medicalReadModel,
         trainingSessionsReadModel: this.trainingSessionsReadModel,
         worldSeasonReadModel: this.worldSeasonReadModel,
         groupTrainingSessionsReadModel: this.groupTrainingSessionsReadModel,

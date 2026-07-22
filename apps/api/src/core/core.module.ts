@@ -24,6 +24,7 @@ import {
   PrismaIndividualTrainingPlanRepository,
   PrismaIndividualTrainingUnitOfWork,
   PrismaMedicalUnitOfWork,
+  PrismaMedicalReadModel,
   PrismaMentorshipRepository,
   PrismaMentorshipUnitOfWork,
   PrismaCollectiveTrainingUnitOfWork,
@@ -76,6 +77,7 @@ import {
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
   PLAYER_DEVELOPMENT_READ_MODEL,
+  MEDICAL_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   COHESION_TRAINING_UNIT_OF_WORK,
@@ -232,6 +234,12 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaPlayerDevelopmentReadModel =>
         new PrismaPlayerDevelopmentReadModel(client),
+    },
+    {
+      provide: MEDICAL_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMedicalReadModel =>
+        new PrismaMedicalReadModel(client),
     },
     {
       provide: TRAINING_SESSIONS_READ_MODEL,
@@ -542,6 +550,7 @@ import {
     TRAINING_ACCRUAL_BUFFER_WRITER,
     SEASON_ACCRUAL_UNIT_OF_WORK,
     PLAYER_DEVELOPMENT_READ_MODEL,
+    MEDICAL_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
     SEASON_AGING_UNIT_OF_WORK,

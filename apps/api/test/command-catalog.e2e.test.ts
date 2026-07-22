@@ -111,6 +111,14 @@ describe.skipIf(!hasDatabase)(
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // Departamento médico (M-MEDICAL / M-MEDICAL-CASE): a máquina MED-1..MED-9.
+      "medical:advance-rehab",
+      "medical:diagnose",
+      "medical:discharge",
+      "medical:force-return",
+      "medical:order-exam",
+      "medical:retire-player",
+      "medical:set-plan",
       // M-MENTORING: vincular/desvincular mentor (evolução acelerada).
       "mentoring:link-mentor",
       "mentoring:unlink-mentor",
@@ -167,15 +175,25 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(53);
+    expect(response.body.commandCount).toBe(60);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // M-COMPETITION aba Chaveamento: os confrontos de mata-mata da edição.
+      "competition-bracket",
+      // M-COMPETITION: cabeçalho + regulamento de UMA competição.
+      "competition-detail",
+      // M-COMPETITION aba Jogos: todos os jogos da edição, com escudo e placar.
+      "competition-matches",
       // O desfecho da temporada (C7-V6b): campeão, acesso e rebaixamento.
       "competition-outcome",
+      // M-COMPETITION abas Artilharia/Assistências, com a cobertura do motor.
+      "competition-stats",
+      // M-COMPETITION aba Tabela/Grupos: uma tabela na liga, N na fase de grupos.
+      "competition-table",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
       // A lista de competições do mundo para o admin gerir (C7, R-202).
@@ -205,6 +223,10 @@ describe.skipIf(!hasDatabase)(
       "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
+      // O departamento médico do clube (M-MEDICAL): casos abertos + indicadores.
+      "medical",
+      // O caso aberto de um jogador (M-MEDICAL-CASE) + opções de tratamento.
+      "medical-case",
       // O mentor atual de um pupilo (M-MENTORING).
       "mentorship",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.
