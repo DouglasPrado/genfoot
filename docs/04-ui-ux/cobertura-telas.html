@@ -403,7 +403,7 @@
 
     <p class="lede" style="margin-top:28px"><strong>Nenhuma tela está pronta.</strong> Verde exige o doc da tela cumprido por inteiro — todos os estados, todas as ações — exercitado no app rodando e confirmado. Nada passou nessa barra ainda. As 19 amarelas têm caminho real, mas não fecham.</p>
 
-    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-21</b> · commit <b>a409542</b> · 0 prontas / 114</div>
+    <div class="stamp"><span class="dot"></span> Atualizado em <b>2026-07-22</b> · commit <b>b4a4140</b> · 0 prontas / 114</div>
   </header>
 
   <section>
@@ -745,6 +745,10 @@
     <p class="sub">Esta página é viva: conforme telas entrarem, o mapa e a contagem mudam aqui e a URL continua a mesma.</p>
 
     <div class="log">
+      <div class="log-row">
+        <span class="log-date">2026-07-22</span>
+        <span class="log-text"><b>Plano COLETIVO volta a desenvolver na virada + aviso-resumo (<code>b4a4140</code>) — o dono viu que não evoluía.</b> Era consequência da R-221 (o crescimento saiu da virada para as sessões, deixando o plano coletivo inerte — só as sessões notificavam). O crescimento volta à virada, mas IMEDIATO (não bufferizado): <code>SettleDueCollectiveTraining</code> desenvolve cada jogador apto rumo ao FOCO da sua entrada (<code>focus-attributes</code> mapeia físico/técnico/tático/mental/defensivo/ofensivo/bola parada/individual→atributos; RECOVERY = descanso), espalhado nos mais fracos, com orçamento modesto escalado pela carga (poupando 0 · leve 1 · firme/pesado 2, tetado pela folga). Aditivo à sessão/plano individual. Emite <b>UM aviso-resumo por clube</b>. Extraí <code>spreadBudget</code> como fonte única. <b>Provado por HTTP</b>: foco TÉCNICO carga 80 → as 2 técnicas mais fracas do jovem +1 (heading 22→23, finishing 24→25), físicos parados; aviso "1 jogador evoluiu no treino coletivo". Gate com banco: <b>165 arq / 1436 testes</b>, zero pulado. Mapa foco→atributos e magnitude são VAL-001. <b>Nenhuma tela mudou de cor</b> — conserto de comportamento.</span>
+      </div>
       <div class="log-row">
         <span class="log-date">2026-07-21</span>
         <span class="log-text"><b>Plano individual passa a mirar ATÉ 5 HABILIDADES (<code>a409542</code>) — pedido do dono; segue 🟡.</b> O alvo ATRIBUTO deixa de mirar 1 (concentrado) e mira 1..5, com o ganho <b>DIVIDIDO</b> entre elas (÷N, arredonda p/ baixo) — a MESMA régua da sessão (<code>perAttributeGain</code>), e a seleção na tela virou <b>multi</b> (até 5, marca ★ na recomendada da posição, contador N/5, trava ao chegar em 5). <b>core</b> (target <code>attributeCode</code>→<code>attributeCodes[]</code>, projeção divide, set valida 1..5/sem repetição) → <b>persistência</b> (coluna vira <code>String[]</code>, migração que preserva) → <b>API</b> (payload array) → <b>tela</b>. <b>Provado por HTTP</b>: alvo [finishing, dribbling], budget 6 → cada +3 (÷2), pace parado; array round-trips. Gate com banco: <b>164 arq / 1432 testes</b>, zero pulado.</span>
