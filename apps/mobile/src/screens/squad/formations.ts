@@ -85,25 +85,45 @@ export const FORMATIONS: Record<FormationKey, readonly Slot[]> = {
 const GROUP_ORDER: Record<PositionGroup, number> = { GOL: 0, DEF: 1, MEI: 2, ATA: 3 };
 
 /**
- * Atribui 11 jogadores aos slots da formação, casando por grupo de posição
- * (guloso: cada slot pega o próximo jogador não usado do mesmo grupo; se faltar,
- * pega qualquer um). Retorna os ids alinhados aos slots de FORMATIONS[key].
+ * Atribui 11 jogadores aos slots da formação. Retorna os ids alinhados aos slots
+ * de FORMATIONS[key].
+ *
+ * Três passadas, nesta ordem: POSIÇÃO exata (o rótulo do jogador é o papel do
+ * slot), depois o GRUPO, depois qualquer um. A passada de posição importa de
+ * verdade porque o servidor pondera cada titular por `fillQuality`
+ * (`packages/core/src/tactics/formation.ts`): fora da posição natural o jogador
+ * rende 80% na mesma linha e menos fora dela. Casando só por grupo, um zagueiro
+ * caía na lateral e o time ficava MAIS FRACO escalado do que sem escalação —
+ * o que passou a doer quando a escalação virou autosave.
  */
-/** Só lê id/group/ovr — aceita qualquer objeto com esses três (não o SquadPlayer inteiro). */
-type AssignablePlayer = Pick<SquadPlayer, "id" | "group" | "ovr">;
+/** Lê id/group/ovr e, quando houver, o rótulo de posição ("ZAG", "LE"…). */
+type AssignablePlayer = Pick<SquadPlayer, "id" | "group" | "ovr"> &
+  Partial<Pick<SquadPlayer, "position">>;
 
 export function assignToFormation(players: readonly AssignablePlayer[], key: FormationKey): string[] {
   const slots = FORMATIONS[key];
   const pool = [...players].sort((a, b) => GROUP_ORDER[a.group] - GROUP_ORDER[b.group] || b.ovr - a.ovr);
   const used = new Set<string>();
-  const result: string[] = [];
-  for (const slot of slots) {
-    let pick = pool.find((p) => !used.has(p.id) && p.group === slot.group);
-    if (!pick) pick = pool.find((p) => !used.has(p.id));
+  const bySlot = new Array<string | undefined>(slots.length);
+
+  // 1ª passada: quem joga exatamente naquele papel, o melhor primeiro.
+  slots.forEach((slot, index) => {
+    const pick = pool.find((p) => !used.has(p.id) && p.position === slot.role);
     if (pick) {
       used.add(pick.id);
-      result.push(pick.id);
+      bySlot[index] = pick.id;
     }
-  }
-  return result;
+  });
+  // 2ª e 3ª: o mesmo setor e, em último caso, qualquer um — nunca deixa buraco.
+  slots.forEach((slot, index) => {
+    if (bySlot[index] !== undefined) return;
+    const pick =
+      pool.find((p) => !used.has(p.id) && p.group === slot.group) ??
+      pool.find((p) => !used.has(p.id));
+    if (pick) {
+      used.add(pick.id);
+      bySlot[index] = pick.id;
+    }
+  });
+  return bySlot.filter((id): id is string => id !== undefined);
 }

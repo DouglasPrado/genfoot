@@ -20,15 +20,35 @@ const P = PlayerPosition;
 
 export type FormationLine = "GK" | "DEF" | "MID" | "FWD";
 
+/**
+ * A ORDEM dos slots é da ESQUERDA para a DIREITA, como o campo é desenhado no
+ * cliente (`FORMATIONS` em `apps/mobile/src/screens/squad/formations.ts`) — e
+ * isso é contrato, não estética: o cliente manda os 11 titulares em ordem de
+ * slot, e o índice i cai no slot i desta lista.
+ *
+ * Enquanto ela começava pela DIREITA (RB antes de LB), o lateral-esquerdo
+ * escalado na ponta esquerda do campo caía no slot de lateral-DIREITO — mesma
+ * linha, `fillQuality` 0,8. Medido contra a API com um elenco inteiro na
+ * posição natural: 4-3-3 e 4-4-2 davam média 0,927 (4 dos 11 slots a 0,8)
+ * contra 1,000 do 4-2-1-3, que já nascia alinhado. Escolher 4-3-3 tirava ~7%
+ * da força do time por desencontro de ordem, não por decisão de jogo.
+ *
+ * Mexer nesta ordem exige mexer no campo do cliente junto.
+ */
 export const CANONICAL_FORMATIONS = {
-  "4-4-2": [P.GK, P.RB, P.CB, P.CB, P.LB, P.RM, P.CM, P.CM, P.LM, P.ST, P.ST],
-  "4-3-3": [P.GK, P.RB, P.CB, P.CB, P.LB, P.CDM, P.CM, P.CM, P.RW, P.ST, P.LW],
-  "4-2-3-1": [P.GK, P.RB, P.CB, P.CB, P.LB, P.CDM, P.CDM, P.RM, P.CAM, P.LM, P.ST],
-  // 3-5-2 com meias abertos (RM/LM) na linha de 5 — mantém 3 def / 5 meio / 2
-  // ata. A variante com alas (RWB/LWB) desce os dois para a defesa e é outra
+  "4-4-2": [P.GK, P.LB, P.CB, P.CB, P.RB, P.LM, P.CM, P.CM, P.RM, P.ST, P.ST],
+  "4-3-3": [P.GK, P.LB, P.CB, P.CB, P.RB, P.CDM, P.CM, P.CM, P.LW, P.ST, P.RW],
+  "4-2-3-1": [P.GK, P.LB, P.CB, P.CB, P.RB, P.CDM, P.CDM, P.LM, P.CAM, P.RM, P.ST],
+  // 4-2-1-3: dois volantes, um meia central e três na frente. É a formação
+  // PADRÃO do campo do elenco no mobile (`FORMATIONS` em squad/formations.ts);
+  // sem ela aqui, `tactics:set-lineup` recusava a escalação do jogador com
+  // "Formação desconhecida" — o time nunca chegava à partida.
+  "4-2-1-3": [P.GK, P.LB, P.CB, P.CB, P.RB, P.CDM, P.CDM, P.CAM, P.LW, P.ST, P.RW],
+  // 3-5-2 com meias abertos (LM/RM) na linha de 5 — mantém 3 def / 5 meio / 2
+  // ata. A variante com alas (LWB/RWB) desce os dois para a defesa e é outra
   // formação; entra depois se for preciso.
-  "3-5-2": [P.GK, P.CB, P.CB, P.CB, P.RM, P.CM, P.CM, P.CM, P.LM, P.ST, P.ST],
-  "5-3-2": [P.GK, P.RB, P.CB, P.CB, P.CB, P.LB, P.CM, P.CM, P.CM, P.ST, P.ST],
+  "3-5-2": [P.GK, P.CB, P.CB, P.CB, P.LM, P.CM, P.CM, P.CM, P.RM, P.ST, P.ST],
+  "5-3-2": [P.GK, P.LB, P.CB, P.CB, P.CB, P.RB, P.CM, P.CM, P.CM, P.ST, P.ST],
 } as const satisfies Record<string, readonly PlayerPosition[]>;
 
 export type FormationName = keyof typeof CANONICAL_FORMATIONS;

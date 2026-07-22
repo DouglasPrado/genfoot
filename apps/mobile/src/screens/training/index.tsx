@@ -29,6 +29,7 @@ import { ScreenStatePanel } from "@/components/screen-state-panel";
 import { useToast } from "@/components/toast";
 import { commandFeedback } from "@/lib/command-feedback";
 import {
+  positionRole,
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
@@ -260,6 +261,7 @@ export function Training() {
         readonly playerId: string;
         readonly slotPosition: string;
       }[];
+      readonly bench: readonly string[];
     } | null;
   }>(
     managedClub === null ? null : "lineup",
@@ -640,10 +642,14 @@ export function Training() {
         setFormationOpen(false);
         return;
       }
+      // `position` (o rótulo: "ZAG", "LE"…) vai junto de propósito: é o que
+      // permite a `assignToFormation` casar o slot pela posição natural, e não
+      // só pelo setor — fora da posição o servidor pondera o jogador para baixo.
       const assignable: SquadPlayer[] = (rosterQuery.data?.players ?? []).map(
         (p) =>
           ({
             id: p.playerId,
+            position: positionRole(p.primaryPosition),
             group: sectorOf(p.primaryPosition) as PositionGroup,
             ovr: p.overall,
           }) as SquadPlayer,
@@ -672,7 +678,9 @@ export function Training() {
           clubId: managedClub.id,
           formation: key,
           starters,
-          bench: [],
+          // Preserva o banco já escalado: `bench: []` apagava as reservas
+          // montadas na tela de elenco toda vez que o treino trocava o esquema.
+          bench: (lineup?.bench ?? []).filter((id) => !starters.includes(id)),
           expectedVersion: lineup?.version ?? null,
         },
         idempotencyKey,

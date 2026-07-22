@@ -2,7 +2,6 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Alert,
   findNodeHandle,
   ScrollView,
   View,
@@ -24,10 +23,7 @@ import {
   type ClubPortfolioProjection,
   type MobileRosterProjection,
 } from "@/lib/club-projection";
-import {
-  submitTrackedCommand,
-  type TrackedCommandResult,
-} from "@/lib/command-orchestrator";
+import { submitTrackedCommand } from "@/lib/command-orchestrator";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
 import { commandIdempotencyKey, onDay, onRevision } from "@/lib/idempotency";
@@ -37,7 +33,18 @@ import {
   readLineupDraft,
   writeLineupDraft,
 } from "./lineup-draft";
-import { desiredSlots, lineupDiffers, planLineupSync } from "./lineup-sync";
+import {
+  hydrateFromServerLineup,
+  nextLineupVersion,
+  reconcileLineupVersion,
+  selectionDiffers,
+  setLineupPayload,
+  shouldRetryAfterConflict,
+  type LineupSelection,
+  type ServerLineup,
+} from "./lineup-server";
+import { useToast } from "@/components/toast";
+import { commandFeedback } from "@/lib/command-feedback";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -53,7 +60,7 @@ import {
 import { Pitch } from "./pitch";
 import { ReserveCard } from "./reserve-card";
 import {
-  canSubstitute,
+  canSubstituteIntoSlot,
   fitRank,
   positionFit,
   type PositionFit,
@@ -66,11 +73,18 @@ import {
 import { positionGroupTint } from "@/components/position-badge";
 import { clubCrestData } from "@/screens/club/customization/visual-identity";
 
+/**
+ * Quanto o autosave espera a mão parar antes de gravar. Substituir três
+ * jogadores em sequência é UMA escalação, não três commands.
+ */
+const AUTOSAVE_DELAY_MS = 800;
+
 /** Tela de Elenco: campo tático (formação editável) + modal de substituição. */
 export function Squad() {
   const reducedMotion = useReducedMotion();
   const sheetRef = useRef<View>(null);
   const worldId = useRequiredWorldId();
+  const toast = useToast();
   const { client, session, status, contractVersion } = useSession();
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
@@ -112,6 +126,19 @@ export function Squad() {
     [rosterQuery.data],
   );
   const players = officialPlayers;
+  // A escalação OFICIAL (query `lineup`, R-220 Fase 1) — é ela, e não as
+  // memberships, que a partida lê para montar a força do time
+  // (`prisma-match-play-repository.ts:561`). Sem esta leitura, a tela não tinha
+  // como saber a formação gravada nem a versão para o `expectedVersion`.
+  const lineupQuery = useWorldQuery<{ lineup: ServerLineup | null }>(
+    managedClub === null ? null : "lineup",
+    managedClub === null ? undefined : { clubId: managedClub.id },
+  );
+  // "Não há escalação" e "não consegui ler" são coisas diferentes: só a leitura
+  // CONCLUÍDA autoriza tratar `null` como ausência.
+  const lineupReadable =
+    lineupQuery.state === "ready" || lineupQuery.state === "empty";
+  const serverLineup = lineupQuery.data?.lineup ?? null;
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
   const playerById = useCallback((id: string) => byId.get(id), [byId]);
 
@@ -158,14 +185,6 @@ export function Squad() {
     if (node !== null) AccessibilityInfo.setAccessibilityFocus(node);
   }, []);
 
-  const squad = useMemo(
-    () =>
-      clubQuery.data?.squads?.find(
-        (candidate) => candidate.clubId === managedClub?.id,
-      ) ?? null,
-    [clubQuery.data, managedClub?.id],
-  );
-
   // Monta a escalação quando o elenco chega — de forma ROBUSTA.
   //
   // O bug anterior: `onPitchIds` inicializava vazio (o elenco ainda não tinha
@@ -177,6 +196,14 @@ export function Squad() {
   // no campo, ou tem um id que não é jogador do elenco), remonta na hora dos
   // jogadores reais. Isso NÃO apaga edição válida — se os 11 já batem, sai cedo.
   const hydratedClubRef = useRef<string | null>(null);
+  // Estado do autosave (ver `persistLineup` abaixo): a versão que acreditamos
+  // ser a corrente e a última escalação que o servidor confirmou.
+  const versionRef = useRef<number | null>(null);
+  const persistedRef = useRef<LineupSelection | null>(null);
+  const savingRef = useRef(false);
+  const pendingRef = useRef<LineupSelection | null>(null);
+  /** A escalação que o servidor recusou — não se reenvia igual, só editada. */
+  const falhouRef = useRef<LineupSelection | null>(null);
   useEffect(() => {
     const clubId = managedClub?.id ?? null;
     if (clubId === null || players.length < 11) return;
@@ -213,12 +240,34 @@ export function Squad() {
       }
     }
 
-    // Depois, tenta o rascunho salvo (assíncrono) e sobrepõe SE ainda for válido
-    // para este elenco. Uma vez por clube. `players.every(...)` garante que um
-    // rascunho ANTERIOR à compra (sem o reforço) seja rejeitado — senão ele
-    // reesconderia o jogador recém-contratado.
+    // Depois, a escalação de verdade. A ordem de preferência é dura:
+    //   1. a ESCALAÇÃO OFICIAL do servidor — é ela que joga a partida;
+    //   2. o rascunho local, só se não houver escalação gravada;
+    //   3. o remonte padrão acima.
+    // Antes só existia o passo 2, e o rascunho é local: o time que o jogador
+    // via na tela não era o time que entrava em campo.
+    if (!lineupReadable) return; // ainda não sei o que está gravado — não chuto
     if (hydratedClubRef.current === clubId) return;
     hydratedClubRef.current = clubId;
+    // A versão de partida do autosave sai da LEITURA; daqui em diante ela é
+    // contada localmente a cada save aceito.
+    versionRef.current = serverLineup?.version ?? null;
+
+    const fromServer = hydrateFromServerLineup(serverLineup, ids);
+    if (fromServer !== null) {
+      setFormation(fromServer.formation);
+      setOnPitchIds([...fromServer.onPitchIds]);
+      setBenchIds([...fromServer.benchIds]);
+      // Isto JÁ está gravado — marcar como persistido é o que impede o autosave
+      // de devolver ao servidor exatamente o que acabou de ler.
+      persistedRef.current = fromServer;
+      return;
+    }
+
+    // Sem escalação gravada (ou inservível para este elenco): tenta o rascunho
+    // salvo e sobrepõe SE ainda for válido. `players.every(...)` garante que um
+    // rascunho ANTERIOR à compra (sem o reforço) seja rejeitado — senão ele
+    // reesconderia o jogador recém-contratado.
     void readLineupDraft(worldId, clubId).then((draft) => {
       if (draft === null) return;
       const draftIds = new Set([...draft.onPitchIds, ...draft.benchIds]);
@@ -232,7 +281,15 @@ export function Squad() {
         setBenchIds([...draft.benchIds]);
       }
     });
-  }, [managedClub?.id, players, worldId, onPitchIds, benchIds]);
+  }, [
+    managedClub?.id,
+    players,
+    worldId,
+    onPitchIds,
+    benchIds,
+    lineupReadable,
+    serverLineup,
+  ]);
 
   // Persiste o rascunho a cada edição (pós-hidratação).
   useEffect(() => {
@@ -246,17 +303,11 @@ export function Squad() {
     });
   }, [formation, onPitchIds, benchIds, managedClub?.id, worldId]);
 
-  const desired = useMemo(
-    () => desiredSlots(onPitchIds, benchIds),
-    [onPitchIds, benchIds],
+  const selection = useMemo<LineupSelection>(
+    () => ({ formation, onPitchIds, benchIds }),
+    [formation, onPitchIds, benchIds],
   );
-  const dirty =
-    squad !== null &&
-    onPitchIds.length === 11 &&
-    lineupDiffers(squad.memberships, desired);
-  const [syncTracking, setSyncTracking] =
-    useState<TrackedCommandResult | null>(null);
-  const syncing = syncTracking?.status === CommandTrackingStatus.SUBMITTING;
+  const [saving, setSaving] = useState(false);
   const [demotingId, setDemotingId] = useState<string | null>(null);
 
   /**
@@ -300,113 +351,167 @@ export function Squad() {
     [client, contractVersion, managedClub, worldId, clubQuery.asOf, rosterQuery],
   );
 
-  const saveLineup = useCallback(() => {
-    if (
-      squad === null ||
-      managedClub === null ||
-      client === null ||
-      contractVersion === null ||
-      !dirty
-    ) {
-      return;
-    }
-    const plan = planLineupSync(squad.memberships, desired);
-    Alert.alert(
-      "Salvar escalação?",
-      `${plan.length / 2} jogador(es) mudam de posição no elenco oficial.`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Salvar",
-          onPress: () => {
-            const occurredAt = clubQuery.asOf ?? "2026-01-01";
-            // baseKey só para o correlationId (rastro), não para idempotência: a
-            // chave de cada command carrega o CONTEÚDO do movimento (via
-            // onRevision abaixo), senão duas substituições diferentes na mesma
-            // versão colidiam e a segunda sumia — a classe-do-plano.
-            const baseKey = `lineup:${squad.id}:${squad.version}`;
-            setSyncTracking({
-              status: CommandTrackingStatus.SUBMITTING,
-              commandId: null,
-              resource: null,
-              correlationId: `mobile:${baseKey}`,
-              errorCode: null,
-            });
-            void (async () => {
-              let expectedVersion = squad.version;
-              for (const [index, command] of plan.entries()) {
-                const result = await submitTrackedCommand(client, {
-                  clientContractVersion: "v1",
-                  serverContractVersion: contractVersion,
-                  commandType: "club:command",
-                  worldId,
-                  expectedVersion,
-                  payload: {
-                    clubId: managedClub.id,
-                    actorId: session?.subject ?? "mobile",
-                    occurredAt,
-                    command: { ...command, squadId: squad.id },
-                  },
-                  idempotencyKey: commandIdempotencyKey({
-                    commandType: "club:command",
-                    target: squad.id,
-                    occasion: onRevision(
-                      squad.version,
-                      index,
-                      JSON.stringify(command),
-                    ),
-                  }),
-                  correlationId: `mobile:${baseKey}:${index}`,
-                });
-                if (
-                  result.status !== CommandTrackingStatus.ACCEPTED &&
-                  result.status !== CommandTrackingStatus.APPLIED
-                ) {
-                  setSyncTracking(result);
-                  clubQuery.refetch();
-                  return;
-                }
-                expectedVersion += 1;
-              }
-              await clearLineupDraft(worldId, managedClub.id);
-              setSyncTracking({
-                status: CommandTrackingStatus.APPLIED,
-                commandId: null,
-                resource: `squad:${squad.id}`,
-                correlationId: `mobile:${baseKey}`,
-                errorCode: null,
-              });
-              clubQuery.refetch();
-              rosterQuery.refetch();
-            })();
-          },
-        },
-      ],
+  /**
+   * AUTOSAVE da escalação.
+   *
+   * Não há mais botão "Salvar": mexeu no campo, grava. A confirmação é o toast
+   * — e ele só aparece quando o servidor ACEITOU, nunca por otimismo.
+   *
+   * O que sumiu daqui, e por quê: a sincronia das memberships do elenco
+   * (`club:command` com `squadId`/`expectedVersion`). Ela dependia de
+   * `clubQuery.data.squads`, campo que a query `club-detail` NÃO devolve — era
+   * código morto que, de quebra, era a guarda que impedia a escalação de ser
+   * salva. A escalação oficial (`ClubLineup`) é o que a partida lê para montar
+   * a força do time, e ela não precisa do agregado de elenco.
+   *
+   * `versionRef` guarda a versão que acreditamos ser a corrente. Ela avança
+   * SOZINHA a cada save aceito (`nextLineupVersion`) porque o autosave não pode
+   * esperar o refetch: duas edições seguidas reenviariam a mesma
+   * `expectedVersion` e a segunda morreria em AGGREGATE_VERSION_CONFLICT.
+   */
+  const persistLineup = useCallback(
+    async (sel: LineupSelection, attempt = 0): Promise<void> => {
+      if (managedClub === null || client === null || contractVersion === null) {
+        return;
+      }
+      // Um save por vez. O mais recente espera a vez em `pendingRef` — sem isso,
+      // arrastar três jogadores em sequência mandaria três commands com a mesma
+      // versão e dois voltariam em conflito.
+      if (savingRef.current) {
+        pendingRef.current = sel;
+        return;
+      }
+      savingRef.current = true;
+      setSaving(true);
+
+      const payload = setLineupPayload(managedClub.id, versionRef.current, sel);
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "tactics:set-lineup",
+        target: managedClub.id,
+        // A chave carrega o CONTEÚDO, não só a versão: voltar atrás para uma
+        // escalação já enviada é edição legítima e não pode virar no-op.
+        occasion: onRevision(
+          versionRef.current ?? 0,
+          payload.formation,
+          payload.starters.join(","),
+          payload.bench.join(","),
+        ),
+      });
+      const result = await submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "tactics:set-lineup",
+        worldId,
+        payload: { ...payload },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      });
+
+      const aceito =
+        result.status === CommandTrackingStatus.ACCEPTED ||
+        result.status === CommandTrackingStatus.APPLIED;
+
+      if (aceito) {
+        versionRef.current = nextLineupVersion(versionRef.current);
+        persistedRef.current = sel;
+        falhouRef.current = null;
+        await clearLineupDraft(worldId, managedClub.id);
+      } else if (shouldRetryAfterConflict(result.errorCode, attempt)) {
+        // Conflito de versão: o número que tínhamos envelheceu, a escalação na
+        // tela continua sendo a que o usuário quer. Relê a versão REAL e
+        // reenvia UMA vez, calado — `refetch()` não servia aqui porque ele só
+        // mexe no estado do React, e a versão do autosave vive num ref: o
+        // reenvio seguinte saía com o mesmo número velho e conflitava de novo,
+        // em laço, um toast de erro por edição.
+        try {
+          const fresh = await client.query<{ lineup: ServerLineup | null }>(
+            worldId,
+            "lineup",
+            { params: { clubId: managedClub.id } },
+          );
+          versionRef.current = fresh.data.lineup?.version ?? null;
+        } catch {
+          // Não deu para reler: cai no relato de erro abaixo, sem reenviar.
+          versionRef.current = null;
+        }
+        savingRef.current = false;
+        setSaving(false);
+        await persistLineup(sel, attempt + 1);
+        return;
+      } else {
+        // Erro de conteúdo (ou conflito que persistiu): não insiste na MESMA
+        // escalação — senão o autosave a reenviaria a cada 800 ms para sempre.
+        // Qualquer edição nova limpa esta trava e volta a tentar.
+        falhouRef.current = sel;
+        lineupQuery.refetch();
+      }
+
+      const fb = commandFeedback(result, "Escalação salva.");
+      if (fb !== null) toast.show(fb);
+
+      savingRef.current = false;
+      setSaving(false);
+
+      const proxima = pendingRef.current;
+      pendingRef.current = null;
+      if (
+        aceito &&
+        proxima !== null &&
+        selectionDiffers(persistedRef.current, proxima)
+      ) {
+        await persistLineup(proxima);
+      }
+    },
+    [client, contractVersion, managedClub, worldId, toast, lineupQuery],
+  );
+
+  // Toda releitura da escalação reconcilia a versão do autosave. Sem isto, uma
+  // mudança vinda de fora (a tela de treino troca o esquema, outro aparelho)
+  // deixava o ref velho para sempre — hidratação roda uma vez só por clube.
+  useEffect(() => {
+    if (savingRef.current) return; // save em voo manda; resposta atrasada não
+    versionRef.current = reconcileLineupVersion(
+      versionRef.current,
+      serverLineup?.version ?? null,
     );
-  }, [
-    client,
-    clubQuery,
-    contractVersion,
-    desired,
-    dirty,
-    managedClub,
-    rosterQuery,
-    session?.subject,
-    squad,
-    worldId,
-  ]);
+  }, [serverLineup]);
+
+  // O gatilho: qualquer edição válida do campo. `hydratedClubRef` garante que a
+  // montagem inicial (que vem do próprio servidor) não se salve de volta.
+  useEffect(() => {
+    const clubId = managedClub?.id ?? null;
+    if (clubId === null || hydratedClubRef.current !== clubId) return;
+    if (!lineupReadable || onPitchIds.length !== 11) return;
+    if (!selectionDiffers(persistedRef.current, selection)) return;
+    // Já recusada exatamente assim: reenviar repetiria a recusa em laço.
+    if (!selectionDiffers(falhouRef.current, selection)) return;
+
+    // Espera a mão parar: substituir três jogadores é UMA escalação, não três.
+    const timer = setTimeout(() => {
+      void persistLineup(selection);
+    }, AUTOSAVE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [selection, managedClub?.id, lineupReadable, onPitchIds.length, persistLineup]);
 
   const refresh = useCallback(() => {
     clubQuery.refetch();
     identityQuery.refetch();
     rosterQuery.refetch();
-  }, [clubQuery.refetch, identityQuery.refetch, rosterQuery.refetch]);
+    lineupQuery.refetch();
+  }, [
+    clubQuery.refetch,
+    identityQuery.refetch,
+    rosterQuery.refetch,
+    lineupQuery.refetch,
+  ]);
 
   const substitute = useCallback(
     (benchPlayerId: string) => {
       if (activeSlot === null) return;
-      // Trava temporária: só troca por reserva da mesma posição de origem.
-      if (!canSubstitute(byId.get(onPitchIds[activeSlot] ?? ""), byId.get(benchPlayerId))) {
+      // Quem decide é o SLOT do campo, não a posição de quem está nele: com um
+      // zagueiro escalado na lateral, o campo mostrava "LE" e o modal oferecia
+      // o leque do ZAG — outra formação na hora de trocar.
+      if (!canSubstituteIntoSlot(slots[activeSlot]?.role, byId.get(benchPlayerId))) {
         return;
       }
       const outgoing = onPitchIds[activeSlot];
@@ -420,35 +525,38 @@ export function Squad() {
       );
       setActiveSlot(null);
     },
-    [activeSlot, onPitchIds, byId],
+    [activeSlot, onPitchIds, byId, slots],
   );
 
   const outgoing =
     activeSlot !== null ? byId.get(onPitchIds[activeSlot] ?? "") : undefined;
   const outgoingRole =
     activeSlot !== null ? slots[activeSlot]?.role : undefined;
-  // Todas as reservas, com o encaixe na posição do titular (natural/adaptável/
-  // bloqueado) — ordenadas para os ELEGÍVEIS aparecerem primeiro (natural antes
-  // de adaptável, bloqueado por último). Ordem estável dentro de cada faixa.
+  // Todas as reservas, com o encaixe no SLOT (natural/adaptável/bloqueado) —
+  // ordenadas para os ELEGÍVEIS aparecerem primeiro (natural antes de
+  // adaptável, bloqueado por último). Ordem estável dentro de cada faixa.
   const benchOptions = useMemo(() => {
     const opts = benchIds
       .map((id) => byId.get(id))
       .filter((p): p is SquadPlayer => Boolean(p))
       .map((p, index) => {
-        const fit: PositionFit = outgoing
-          ? positionFit(outgoing.position, p.position)
-          : "none";
+        const fit: PositionFit =
+          outgoingRole === undefined
+            ? "none"
+            : positionFit(outgoingRole, p.position);
         return { player: p, fit, eligible: fit !== "none", index };
       });
     return opts
       .sort((a, b) => fitRank(a.fit) - fitRank(b.fit) || a.index - b.index)
       .map(({ player, fit, eligible }) => ({ player, fit, eligible }));
-  }, [outgoing, benchIds, byId]);
+  }, [outgoingRole, benchIds, byId]);
   const eligibleCount = benchOptions.filter((o) => o.eligible).length;
 
   const detail = detailId === null ? undefined : byId.get(detailId);
   const detailFit: PositionFit =
-    detail && outgoing ? positionFit(outgoing.position, detail.position) : "none";
+    detail && outgoingRole !== undefined
+      ? positionFit(outgoingRole, detail.position)
+      : "none";
 
   const queryState =
     clubQuery.state === "loading" ||
@@ -595,30 +703,12 @@ export function Squad() {
           </Text>
         </View>
 
-        {dirty || syncTracking?.status === CommandTrackingStatus.REJECTED ? (
-          <View style={styles.saveBar}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.saveTitle}>
-                {dirty ? "ESCALAÇÃO NÃO SALVA" : "FALHA AO SALVAR"}
-              </Text>
-              <Text style={styles.saveNote}>
-                {syncTracking?.status === CommandTrackingStatus.REJECTED
-                  ? `Rejeitado: ${syncTracking.errorCode ?? "erro de domínio"}. Recarregue e tente de novo.`
-                  : "O rascunho está só neste aparelho até você salvar."}
-              </Text>
-            </View>
-            {syncing ? (
-              <ActivityIndicator color={color.primary} />
-            ) : dirty ? (
-              <Pressable
-                style={styles.saveButton}
-                onPress={saveLineup}
-                accessibilityRole="button"
-                accessibilityLabel="Salvar escalação oficial"
-              >
-                <Text style={styles.saveButtonText}>SALVAR</Text>
-              </Pressable>
-            ) : null}
+        {/* Sem botão: a escalação grava sozinha. Este bloco só existe enquanto
+            o command está em voo — o veredito vem no toast, do servidor. */}
+        {saving ? (
+          <View style={styles.saveBar} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={color.primary} />
+            <Text style={styles.saveNote}>Salvando escalação…</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -641,12 +731,14 @@ export function Squad() {
                 <Text style={styles.sheetSub}>
                   Sai <Text style={styles.sheetOut}>{outgoing.name}</Text>
                   {outgoingRole ? ` (${outgoingRole})` : ""}
+                  {outgoingRole !== undefined && outgoing.position !== outgoingRole
+                    ? ` · natural ${outgoing.position}`
+                    : ""}
                 </Text>
               ) : null}
-              {outgoing ? (
+              {outgoingRole !== undefined ? (
                 <Text style={styles.sheetRule}>
-                  {outgoing.position} e posições que se adaptam · toque para ver o
-                  card
+                  {outgoingRole} e posições que se adaptam · toque para ver o card
                 </Text>
               ) : null}
             </View>
@@ -678,7 +770,7 @@ export function Squad() {
                   accessibilityLabel={
                     eligible
                       ? `Ver card de ${p.name}${fit === "adaptable" ? " (adapta)" : ""}`
-                      : `Ver card de ${p.name} — ${p.position} não cobre ${outgoing?.position ?? ""}`
+                      : `Ver card de ${p.name} — ${p.position} não cobre ${outgoingRole ?? ""}`
                   }
                   style={[styles.benchRow, eligible ? null : styles.benchBlocked]}
                 >
@@ -747,10 +839,10 @@ export function Squad() {
                   />
                   <Text style={styles.detailFitText}>
                     {detailFit === "natural"
-                      ? `Posição natural de ${outgoing.position}.`
+                      ? `Posição natural de ${outgoingRole ?? ""}.`
                       : detailFit === "adaptable"
-                        ? `Adapta de ${detail.position} para ${outgoing.position}.`
-                        : `${detail.position} não cobre ${outgoing.position}.`}
+                        ? `Adapta de ${detail.position} para ${outgoingRole ?? ""}.`
+                        : `${detail.position} não cobre ${outgoingRole ?? ""}.`}
                   </Text>
                 </View>
               ) : null}
