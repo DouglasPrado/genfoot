@@ -1,6 +1,7 @@
 import {
   buildBracket,
   buildGroupTables,
+  buildGroupTablesWithMovement,
   buildStandings,
   resolveSeasonOutcome,
   type ClubBadgeView,
@@ -52,37 +53,26 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
     const edition = competition.seasons[0];
     if (edition === undefined) return null;
 
-    const matches = await this.client.match.findMany({
-      where: { competitionSeasonId: edition.id },
-      select: {
-        homeClubId: true,
-        awayClubId: true,
-        homeGoals: true,
-        awayGoals: true,
-        runtimeStatus: true,
-        resultStatus: true,
-      },
-    });
-
+    const matches = await this.editionMatches(edition.id);
     // Só partidas de fato TERMINADAS entram na tabela — o 0×0 de uma agendada
     // não é empate.
-    const finished = matches.filter(
-      (m) =>
-        (m.runtimeStatus === "FINISHED" || m.runtimeStatus === "PROCESSED") &&
-        m.resultStatus === "NORMAL",
-    );
+    const finished = matches.filter(isPlayed);
 
     const clubIds = edition.clubs.map((c) => c.clubId);
     const names = await this.clubNames(gameWorldId, clubIds);
-    const table = buildStandings(
-      clubIds,
+    // A Home mostra a MESMA variação de posição da aba Tabela: uma conta só,
+    // num lugar só, senão as duas telas divergiriam sobre quem subiu.
+    const [group] = buildGroupTablesWithMovement(
+      clubIds.map((clubId) => ({ clubId, group: null })),
       finished.map((m) => ({
+        round: m.roundNumber,
         homeClubId: m.homeClubId,
         awayClubId: m.awayClubId,
         homeGoals: m.homeGoals,
         awayGoals: m.awayGoals,
       })),
     );
+    const table = group?.table ?? [];
 
     return {
       competitionId: competition.id,
@@ -464,7 +454,10 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
     const { competition, edition } = found;
 
     const matches = await this.editionMatches(edition.id);
+    // A rodada vai junto: a variação de posição precisa saber onde cada jogo
+    // caiu para reconstruir a tabela da rodada anterior.
     const finished = matches.filter(isPlayed).map((m) => ({
+      round: m.roundNumber,
       homeClubId: m.homeClubId,
       awayClubId: m.awayClubId,
       homeGoals: m.homeGoals,
@@ -475,7 +468,7 @@ export class PrismaCompetitionReadModel implements CompetitionReadModel {
       gameWorldId,
       edition.clubs.map((c) => c.clubId),
     );
-    const groups = buildGroupTables(
+    const groups = buildGroupTablesWithMovement(
       edition.clubs.map((c) => ({ clubId: c.clubId, group: c.groupName })),
       finished,
     );

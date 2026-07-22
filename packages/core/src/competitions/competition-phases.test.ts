@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildBracket,
   buildGroupTables,
+  buildGroupTablesWithMovement,
   knockoutRoundName,
 } from "./competition-phases.js";
 
@@ -152,5 +153,81 @@ describe("buildBracket", () => {
 
   it("mundo sem mata-mata devolve chaveamento vazio", () => {
     expect(buildBracket([])).toEqual([]);
+  });
+});
+
+describe("buildGroupTablesWithMovement", () => {
+  const clubs = [
+    { clubId: "a", group: null },
+    { clubId: "b", group: null },
+    { clubId: "c", group: null },
+  ];
+
+  it("sem rodada anterior, ninguém subiu nem caiu — é null, não 'manteve'", () => {
+    // Só a rodada 1 jogada: não existe classificação anterior para comparar, e
+    // dizer "manteve" afirmaria uma posição que nunca existiu.
+    const tables = buildGroupTablesWithMovement(clubs, [
+      { round: 1, homeClubId: "a", awayClubId: "b", homeGoals: 2, awayGoals: 0 },
+    ]);
+    for (const row of tables[0]!.table) {
+      expect(row.movement).toBeNull();
+      expect(row.previousRank).toBeNull();
+    }
+  });
+
+  it("quem passou o outro aparece como SUBIU, e o outro como CAIU", () => {
+    const tables = buildGroupTablesWithMovement(clubs, [
+      // Rodada 1: b lidera.
+      { round: 1, homeClubId: "b", awayClubId: "c", homeGoals: 3, awayGoals: 0 },
+      // Rodada 2: a vence por muito e passa b no saldo.
+      { round: 2, homeClubId: "a", awayClubId: "c", homeGoals: 5, awayGoals: 0 },
+      { round: 2, homeClubId: "b", awayClubId: "a", homeGoals: 0, awayGoals: 0 },
+    ]);
+    const byClub = new Map(tables[0]!.table.map((r) => [r.clubId, r]));
+    expect(byClub.get("a")?.movement).toBe("up");
+    expect(byClub.get("b")?.movement).toBe("down");
+  });
+
+  it("quem não mexeu de posição fica em 'same'", () => {
+    const tables = buildGroupTablesWithMovement(clubs, [
+      { round: 1, homeClubId: "a", awayClubId: "b", homeGoals: 1, awayGoals: 0 },
+      { round: 2, homeClubId: "a", awayClubId: "c", homeGoals: 1, awayGoals: 0 },
+    ]);
+    const byClub = new Map(tables[0]!.table.map((r) => [r.clubId, r]));
+    expect(byClub.get("a")?.movement).toBe("same");
+    expect(byClub.get("a")?.previousRank).toBe(1);
+  });
+
+  it("a comparação é DENTRO do grupo, não na competição inteira", () => {
+    const grupos = [
+      { clubId: "a1", group: "A" },
+      { clubId: "a2", group: "A" },
+      { clubId: "b1", group: "B" },
+      { clubId: "b2", group: "B" },
+    ];
+    const tables = buildGroupTablesWithMovement(grupos, [
+      { round: 1, homeClubId: "a1", awayClubId: "a2", homeGoals: 0, awayGoals: 1 },
+      { round: 1, homeClubId: "b1", awayClubId: "b2", homeGoals: 1, awayGoals: 0 },
+      { round: 2, homeClubId: "a1", awayClubId: "a2", homeGoals: 3, awayGoals: 0 },
+    ]);
+    const grupoA = new Map(tables[0]!.table.map((r) => [r.clubId, r]));
+    expect(grupoA.get("a1")?.movement).toBe("up");
+    // O grupo B não jogou a rodada 2: ninguém se mexeu lá.
+    const grupoB = new Map(tables[1]!.table.map((r) => [r.clubId, r]));
+    expect(grupoB.get("b1")?.movement).toBe("same");
+  });
+
+  it("jogo sem rodada conta para a tabela, mas não define a rodada corrente", () => {
+    const tables = buildGroupTablesWithMovement(clubs, [
+      { round: null, homeClubId: "a", awayClubId: "b", homeGoals: 1, awayGoals: 0 },
+    ]);
+    expect(tables[0]!.table.every((r) => r.movement === null)).toBe(true);
+    expect(tables[0]!.table[0]!.clubId).toBe("a");
+  });
+
+  it("sem jogo nenhum, a tabela existe e ninguém tem movimento", () => {
+    const tables = buildGroupTablesWithMovement(clubs, []);
+    expect(tables[0]!.table).toHaveLength(3);
+    expect(tables[0]!.table.every((r) => r.movement === null)).toBe(true);
   });
 });

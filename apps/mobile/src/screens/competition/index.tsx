@@ -21,6 +21,7 @@ import {
   formatLabel,
   groupMatchesByRound,
   lifecycleLabel,
+  movementBadge,
   statAvailability,
   tableZone,
   type ClubBadgeSource,
@@ -51,6 +52,8 @@ interface StandingRowSource {
   readonly goalsAgainst: number;
   readonly goalDifference: number;
   readonly points: number;
+  readonly previousRank: number | null;
+  readonly movement: "up" | "down" | "same" | null;
 }
 
 interface TableProjection {
@@ -383,6 +386,7 @@ function TableTab({
                   ]}
                 />
                 <Text style={styles.cellRank}>{index + 1}</Text>
+                <MovementMark row={row} rank={index + 1} />
                 <View style={styles.cellClubBox}>
                   <Badge club={row} size={26} />
                   <Text
@@ -421,6 +425,36 @@ function TableTab({
         </Card>
       ))}
     </>
+  );
+}
+
+/**
+ * A variação de posição desde a rodada anterior.
+ *
+ * Nada desenhado = não há rodada anterior com que comparar. Traço = manteve.
+ * São coisas diferentes, e um traço nos dois casos diria que a posição se
+ * sustentou quando ela nem existia antes.
+ */
+function MovementMark({
+  row,
+  rank,
+}: {
+  row: StandingRowSource;
+  rank: number;
+}) {
+  const badge = movementBadge(row.movement, rank, row.previousRank);
+  if (badge.glyph === null) return <View style={styles.movementGap} />;
+  return (
+    <Text
+      accessibilityLabel={badge.accessibilityLabel}
+      style={[
+        styles.movement,
+        badge.tone === "up" && styles.movementUp,
+        badge.tone === "down" && styles.movementDown,
+      ]}
+    >
+      {badge.glyph}
+    </Text>
   );
 }
 
@@ -863,6 +897,16 @@ const styles = StyleSheet.create({
   zonePromotion: { backgroundColor: color.success },
   zoneRelegation: { backgroundColor: color.danger },
   cellRank: { width: 20, color: color.textMuted, fontSize: fontSize.xs },
+  movement: {
+    width: 14,
+    textAlign: "center",
+    fontSize: 9,
+    color: color.textFaint,
+  },
+  movementUp: { color: color.success },
+  movementDown: { color: color.danger },
+  /** Reserva a coluna quando não há movimento, para as linhas não dançarem. */
+  movementGap: { width: 14 },
   cellClub: { flex: 1 },
   cellClubBox: {
     flex: 1,

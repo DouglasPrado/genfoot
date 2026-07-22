@@ -5,6 +5,7 @@ import {
   formatLabel,
   groupMatchesByRound,
   lifecycleLabel,
+  movementBadge,
   statAvailability,
   tableZone,
   type CompetitionDetailSource,
@@ -222,5 +223,47 @@ describe("rótulos", () => {
     expect(lifecycleLabel("FINISHED")).toBe("Encerrada");
     expect(lifecycleLabel("SCHEDULED")).toBe("A começar");
     expect(lifecycleLabel("DRAFT")).toBe("Em preparação");
+  });
+});
+
+describe("movementBadge", () => {
+  it("sem rodada anterior não desenha nada — nem traço", () => {
+    const badge = movementBadge(null, 1, null);
+    expect(badge.glyph).toBeNull();
+    expect(badge.tone).toBe("none");
+    expect(badge.accessibilityLabel).toContain("sem rodada anterior");
+  });
+
+  it("manter posição é traço, e é DIFERENTE de não ter comparação", () => {
+    const manteve = movementBadge("same", 3, 3);
+    expect(manteve.glyph).toBe("—");
+    expect(manteve.tone).toBe("flat");
+    expect(movementBadge(null, 3, null).glyph).not.toBe(manteve.glyph);
+  });
+
+  it("subir é seta para cima e diz quantas posições", () => {
+    const badge = movementBadge("up", 2, 5);
+    expect(badge.glyph).toBe("▲");
+    expect(badge.tone).toBe("up");
+    expect(badge.delta).toBe(3);
+    expect(badge.accessibilityLabel).toBe("subiu 3 posições");
+  });
+
+  it("cair é seta para baixo", () => {
+    const badge = movementBadge("down", 7, 4);
+    expect(badge.glyph).toBe("▼");
+    expect(badge.tone).toBe("down");
+    expect(badge.delta).toBe(3);
+  });
+
+  it("uma posição fica no singular", () => {
+    expect(movementBadge("up", 1, 2).accessibilityLabel).toBe("subiu 1 posição");
+  });
+
+  it("movimento sem posição anterior conhecida ainda desenha a seta", () => {
+    const badge = movementBadge("up", 4, undefined);
+    expect(badge.glyph).toBe("▲");
+    expect(badge.delta).toBeNull();
+    expect(badge.accessibilityLabel).toBe("subiu de posição");
   });
 });

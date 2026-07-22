@@ -11,10 +11,28 @@ import type { InjuryEpisodeRepository } from "./injury-episode-types.js";
 import type { PlayerAvailabilityWriter } from "./medical-use-cases.js";
 import type { TrainingLoadReader } from "./settle-training-injuries.js";
 
+/**
+ * Contexto clínico de um jogador, para abrir caso MANUALMENTE sobre quem já
+ * está marcado como indisponível mas nunca teve episódio registrado.
+ */
+export interface PlayerMedicalContextReader {
+  forPlayer(
+    gameWorldId: string,
+    playerId: string,
+    worldDate: string,
+  ): Promise<{
+    readonly clubId: string;
+    readonly fatigue: number;
+    readonly age: number;
+    readonly injuredRegionHistory: readonly string[];
+  } | null>;
+}
+
 export interface MedicalRepositories {
   readonly episodes: InjuryEpisodeRepository;
   readonly loads: TrainingLoadReader;
   readonly availability: PlayerAvailabilityWriter;
+  readonly context: PlayerMedicalContextReader;
 }
 
 export interface MedicalUnitOfWork {

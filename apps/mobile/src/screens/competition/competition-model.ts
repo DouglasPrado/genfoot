@@ -217,3 +217,60 @@ const LIFECYCLE_LABELS: Record<string, string> = {
 export function lifecycleLabel(lifecycle: string): string {
   return LIFECYCLE_LABELS[lifecycle] ?? lifecycle;
 }
+
+export type RankMovementSource = "up" | "down" | "same" | null | undefined;
+
+export interface MovementBadge {
+  /** O que se desenha: seta, traço, ou nada. */
+  readonly glyph: "▲" | "▼" | "—" | null;
+  readonly tone: "up" | "down" | "flat" | "none";
+  /** Quantas posições andou; `null` quando não há com que comparar. */
+  readonly delta: number | null;
+  readonly accessibilityLabel: string;
+}
+
+/**
+ * Como a variação de posição se apresenta na linha da tabela.
+ *
+ * A distinção que importa: `null` de movimento é "não há rodada anterior", e
+ * não "manteve". Desenhar um traço nos dois casos diria ao jogador que a
+ * posição se sustentou quando ela nem existia antes.
+ */
+export function movementBadge(
+  movement: RankMovementSource,
+  rank: number,
+  previousRank: number | null | undefined,
+): MovementBadge {
+  if (movement === null || movement === undefined) {
+    return {
+      glyph: null,
+      tone: "none",
+      delta: null,
+      accessibilityLabel: "sem rodada anterior para comparar",
+    };
+  }
+  const delta =
+    previousRank === null || previousRank === undefined
+      ? null
+      : Math.abs(previousRank - rank);
+  if (movement === "same") {
+    return {
+      glyph: "—",
+      tone: "flat",
+      delta: 0,
+      accessibilityLabel: "manteve a posição",
+    };
+  }
+  const up = movement === "up";
+  return {
+    glyph: up ? "▲" : "▼",
+    tone: up ? "up" : "down",
+    delta,
+    accessibilityLabel:
+      delta === null
+        ? up
+          ? "subiu de posição"
+          : "caiu de posição"
+        : `${up ? "subiu" : "caiu"} ${delta} ${delta === 1 ? "posição" : "posições"}`,
+  };
+}

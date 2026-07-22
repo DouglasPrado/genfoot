@@ -92,6 +92,8 @@ import {
   DischargeFromMedical,
   RetirePlayerMedically,
   SeededRandom,
+  rollInjuryNature,
+  InjuryCause,
   type MentorshipRepository,
   type MedicalUnitOfWork,
   type MedicalRepositories,
@@ -1350,6 +1352,64 @@ const handlers: Record<string, CommandHandler> = {
   // Cada command roda numa transação só com o episódio e a disponibilidade do
   // jogador, para não existir instante com caso aberto e jogador escalável.
   // ---------------------------------------------------------------------
+
+  /**
+   * MED-1 manual — registra o caso de quem o elenco JÁ trata como lesionado
+   * mas nunca teve episódio (mundo anterior a esta vertical, ou restrição sem
+   * caso). Sem isto a seção "sem caso registrado" da `M-MEDICAL` é um beco sem
+   * saída: mostra o problema e não deixa agir.
+   *
+   * Tipo e região saem do `SeededRandom` do MUNDO, não do cliente: a verdade
+   * clínica já existe (o jogador está machucado), o que falta é a comissão
+   * descobri-la pelos exames — é a assimetria de informação do §16.
+   */
+  "medical:open-case": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await medicalUnitOfWork.run(
+      async (repos: MedicalRepositories) => {
+        const context = await repos.context.forPlayer(
+          world.value.worldId,
+          parsed.data.playerId,
+          world.value.snapshot.currentDate,
+        );
+        if (context === null) {
+          return fail(
+            new DomainError(
+              "PLAYER_NOT_IN_SQUAD",
+              "Jogador não pertence a nenhum elenco ativo do mundo.",
+              { playerId: parsed.data.playerId },
+            ),
+          );
+        }
+        const random = new SeededRandom({
+          worldSeed: world.value.snapshot.seed,
+          context: `medical:open-case:${world.value.snapshot.currentDate}:${parsed.data.playerId}`,
+        });
+        const nature = rollInjuryNature(random, {
+          fatigue: context.fatigue,
+          age: context.age,
+          contact: false,
+          injuredRegionHistory: context.injuredRegionHistory,
+        });
+        return new OpenInjuryEpisode(repos.episodes).execute({
+          gameWorldId: world.value.worldId,
+          clubId: context.clubId,
+          playerId: parsed.data.playerId,
+          worldSeed: world.value.snapshot.seed,
+          occurredOn: world.value.snapshot.currentDate,
+          injuryType: nature.injuryType,
+          cause: InjuryCause.WEAR,
+          region: nature.region,
+        });
+      },
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
 
   /** MED-2 — solicita exames. */
   "medical:order-exam": async ({ worlds, medicalUnitOfWork, envelope }) => {

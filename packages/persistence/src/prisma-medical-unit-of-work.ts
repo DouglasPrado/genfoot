@@ -115,6 +115,48 @@ export class PrismaTrainingLoadReader implements TrainingLoadReader {
 }
 
 /**
+ * O contexto clínico de UM jogador — para abrir caso manualmente sobre quem o
+ * elenco já trata como lesionado. Mesma fonte do settle da virada.
+ */
+export class PrismaPlayerMedicalContext {
+  public constructor(private readonly client: Prisma.TransactionClient) {}
+
+  public async forPlayer(
+    gameWorldId: string,
+    playerId: string,
+    worldDate: string,
+  ): Promise<{
+    readonly clubId: string;
+    readonly fatigue: number;
+    readonly age: number;
+    readonly injuredRegionHistory: readonly string[];
+  } | null> {
+    const membership = await this.client.squadMembership.findFirst({
+      where: { isActive: true, playerId, player: { gameWorldId } },
+      include: {
+        squad: { select: { clubId: true } },
+        player: {
+          select: {
+            fatigue: true,
+            person: { select: { birthDate: true } },
+            injuries: { select: { region: true }, where: { gameWorldId } },
+          },
+        },
+      },
+    });
+    if (membership === null) return null;
+    return {
+      clubId: membership.squad.clubId,
+      fatigue: membership.player.fatigue,
+      age: ageOn(membership.player.person.birthDate, worldDate),
+      injuredRegionHistory: [
+        ...new Set(membership.player.injuries.map((injury) => injury.region)),
+      ],
+    };
+  }
+}
+
+/**
  * O estado oficial do jogador (P4). O episódio médico PEDE a mudança; quem
  * escreve `availability` é isto — e é o que a escalação e o treino leem.
  */
@@ -165,6 +207,7 @@ export class PrismaMedicalUnitOfWork implements MedicalUnitOfWork {
           episodes: new PrismaInjuryEpisodeRepository(tx),
           loads: new PrismaTrainingLoadReader(tx),
           availability: new PrismaPlayerAvailabilityWriter(tx),
+          context: new PrismaPlayerMedicalContext(tx),
         }),
       { timeout: 120_000, maxWait: 10_000 },
     );

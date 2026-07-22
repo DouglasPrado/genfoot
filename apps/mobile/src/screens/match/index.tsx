@@ -256,6 +256,62 @@ export function Match() {
           </View>
         </View>
 
+        {/* A "faixa de estado" do protótipo, traduzida para o pós-jogo: sem
+            AGORA para medir, o que resta é COMPARAÇÃO. Cada barra entrega o
+            veredito antes de o número ser lido. */}
+        {detail.finished ? (
+          <Card>
+            <SectionHeader title="COMO O JOGO FOI" />
+            {detail.homeShots === null || detail.awayShots === null ? (
+              <Text style={styles.empty}>
+                Esta partida foi jogada antes de o mundo passar a guardar posse
+                e finalizações. Os números dela não existem — só o placar.
+              </Text>
+            ) : (
+              <>
+                {detail.homePossession !== null ? (
+                  <StatSplit
+                    label="Posse de bola"
+                    home={detail.homePossession}
+                    away={100 - detail.homePossession}
+                    homeColor={homeColor}
+                    awayColor={awayColor}
+                    format={(v) => `${v}%`}
+                  />
+                ) : null}
+                <StatSplit
+                  label="Finalizações"
+                  home={detail.homeShots}
+                  away={detail.awayShots}
+                  homeColor={homeColor}
+                  awayColor={awayColor}
+                />
+                {detail.homeShotsOnTarget !== null &&
+                detail.awayShotsOnTarget !== null ? (
+                  <StatSplit
+                    label="No alvo"
+                    home={detail.homeShotsOnTarget}
+                    away={detail.awayShotsOnTarget}
+                    homeColor={homeColor}
+                    awayColor={awayColor}
+                  />
+                ) : null}
+                {detail.homeExpectedGoals !== null &&
+                detail.awayExpectedGoals !== null ? (
+                  <StatSplit
+                    label="xG · gols esperados"
+                    home={detail.homeExpectedGoals}
+                    away={detail.awayExpectedGoals}
+                    homeColor={homeColor}
+                    awayColor={awayColor}
+                    format={(v) => v.toFixed(2)}
+                  />
+                ) : null}
+              </>
+            )}
+          </Card>
+        ) : null}
+
         {!detail.finished ? (
           <Card>
             <SectionHeader title="AINDA NÃO ROLOU" />
@@ -280,39 +336,65 @@ export function Match() {
             ) : (
               halves.map((half) => (
                 <View key={half.half}>
-                  <Text style={styles.halfLabel}>
-                    {half.half === 1 ? "1º TEMPO" : "2º TEMPO"}
-                  </Text>
+                  <View style={styles.halfRow}>
+                    <Text style={styles.halfLabel}>
+                      {half.half === 1 ? "1º TEMPO" : "2º TEMPO"}
+                    </Text>
+                    <View style={styles.halfRule} />
+                  </View>
                   {half.events.map((event) => {
                     const score = scoreAfterEvent(
                       detail.events,
                       event.sequence,
                       detail.homeClubId,
                     );
+                    const kind = markKindOf(event.type);
+                    const club =
+                      event.side === "home"
+                        ? detail.home
+                        : event.side === "away"
+                          ? detail.away
+                          : null;
                     return (
                       <View key={event.sequence} style={styles.eventRow}>
-                        <Text style={styles.minute}>{event.minute}'</Text>
-                        <View
-                          style={[
-                            styles.sideMark,
-                            event.side === "home" && styles.sideMarkHome,
-                            event.side === "away" && styles.sideMarkAway,
-                          ]}
-                        />
+                        <Text style={styles.minute}>{event.minute}&apos;</Text>
+                        {/* A espinha: a linha vertical que atravessa a lista e
+                            faz dela uma linha do tempo, não uma pilha. */}
+                        <View style={styles.spine}>
+                          <View style={styles.spineLine} />
+                          <FeedMark kind={kind} />
+                        </View>
                         <View style={styles.eventText}>
-                          <Text style={styles.eventLabel}>{event.label}</Text>
+                          <Text
+                            style={[
+                              styles.eventLabel,
+                              kind === "goal" && styles.eventLabelGoal,
+                            ]}
+                          >
+                            {event.label}
+                          </Text>
                           <Text style={styles.eventWho} numberOfLines={1}>
                             {event.playerName ?? event.description}
-                            {event.side === null
+                            {club === null
                               ? ""
-                              : event.side === "home"
-                                ? ` · ${detail.home.shortCode || detail.home.clubName}`
-                                : ` · ${detail.away.shortCode || detail.away.clubName}`}
+                              : ` · ${club.shortCode || club.clubName}`}
                           </Text>
                         </View>
-                        <Text style={styles.runningScore}>
-                          {score.home}–{score.away}
-                        </Text>
+                        {kind === "goal" ? (
+                          <Text
+                            style={[
+                              styles.runningScore,
+                              {
+                                borderColor:
+                                  event.side === "home" ? homeColor : awayColor,
+                              },
+                            ]}
+                          >
+                            {score.home}–{score.away}
+                          </Text>
+                        ) : (
+                          <View style={styles.runningScoreGap} />
+                        )}
                       </View>
                     );
                   })}
@@ -322,75 +404,31 @@ export function Match() {
           </Card>
         )}
 
-        {/* Estatísticas de time: o que o kernel produz. Partida jogada ANTES
-            da migration não tem os números — e aí a tela diz isso, em vez de
-            mostrar zero, que se leria como "não finalizaram uma vez". */}
-        {detail.finished ? (
-          <Card>
-            <SectionHeader title="NÚMEROS DO JOGO" />
-            {detail.homeShots === null || detail.awayShots === null ? (
-              <Text style={styles.empty}>
-                Esta partida foi jogada antes de o mundo passar a guardar posse
-                e finalizações. Os números dela não existem — só o placar.
-              </Text>
-            ) : (
-              <>
-                <StatLine
-                  label="Finalizações"
-                  home={detail.homeShots}
-                  away={detail.awayShots}
-                />
-                {detail.homePossession !== null ? (
-                  <StatLine
-                    label="Posse de bola"
-                    home={`${detail.homePossession}%`}
-                    away={`${100 - detail.homePossession}%`}
-                  />
-                ) : null}
-                {detail.homeShotsOnTarget !== null &&
-                detail.awayShotsOnTarget !== null ? (
-                  <StatLine
-                    label="No alvo"
-                    home={detail.homeShotsOnTarget}
-                    away={detail.awayShotsOnTarget}
-                  />
-                ) : null}
-                {detail.homeExpectedGoals !== null &&
-                detail.awayExpectedGoals !== null ? (
-                  <StatLine
-                    label="xG (gols esperados)"
-                    home={detail.homeExpectedGoals.toFixed(2)}
-                    away={detail.awayExpectedGoals.toFixed(2)}
-                  />
-                ) : null}
-                <StatLine
-                  label="Gols"
-                  home={detail.homeGoals ?? 0}
-                  away={detail.awayGoals ?? 0}
-                />
-              </>
-            )}
-          </Card>
-        ) : null}
-
         {/* As notas (doc 05 §16). O primeiro é o melhor em campo e o último o
             pior — a ordem já vem do servidor. */}
         {detail.finished && detail.ratings.length > 0 ? (
           <Card>
-            <SectionHeader title="NOTAS" />
+            <SectionHeader
+              title="NOTAS"
+              trailing={<Text style={styles.count}>melhor em campo no topo</Text>}
+            />
             {detail.ratings.map((row, index) => (
-              <View key={row.playerId} style={styles.ratingRow}>
+              <View
+                key={row.playerId}
+                style={[styles.ratingRow, index === 0 && styles.ratingRowBest]}
+              >
                 <View
                   style={[
-                    styles.sideMark,
-                    row.clubId === detail.homeClubId && styles.sideMarkHome,
-                    row.clubId === detail.awayClubId && styles.sideMarkAway,
+                    styles.clubRule,
+                    {
+                      backgroundColor:
+                        row.clubId === detail.awayClubId ? awayColor : homeColor,
+                    },
                   ]}
                 />
                 <View style={styles.eventText}>
                   <Text style={styles.eventLabel} numberOfLines={1}>
                     {row.playerName}
-                    {index === 0 ? "  ★" : ""}
                   </Text>
                   <Text style={styles.eventWho} numberOfLines={1}>
                     {row.position}
@@ -434,25 +472,6 @@ export function Match() {
         ) : null}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-/** Uma linha de estatística: casa · rótulo · visitante, como num placar. */
-function StatLine({
-  label,
-  home,
-  away,
-}: {
-  label: string;
-  home: string | number;
-  away: string | number;
-}) {
-  return (
-    <View style={styles.statLine}>
-      <Text style={styles.statValue}>{home}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{away}</Text>
-    </View>
   );
 }
 
@@ -548,74 +567,77 @@ const styles = StyleSheet.create({
   },
   kickoff: { color: color.primary, fontSize: fontSize.xs },
 
-  halfLabel: {
-    color: color.primary,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.bold as "700",
-    marginTop: space.md,
-    marginBottom: space.xs,
-  },
-  eventRow: {
+  halfRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
-    paddingVertical: space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.border,
+    marginTop: space.md,
+    marginBottom: space.xs,
   },
+  halfLabel: {
+    color: color.primary,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.black as "800",
+    fontStyle: "italic",
+    letterSpacing: 0.5,
+  },
+  halfRule: { flex: 1, height: 1, backgroundColor: color.border },
+  eventRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   minute: {
-    width: 34,
+    width: 32,
+    textAlign: "right",
     color: color.textMuted,
     fontSize: fontSize.xs,
     fontWeight: fontWeight.bold as "700",
   },
-  sideMark: {
-    width: 3,
-    height: 22,
-    borderRadius: 2,
+  /**
+   * A espinha da linha do tempo: a marca do lance fica por cima de uma linha
+   * contínua, e é ela que transforma a pilha de linhas em cronologia.
+   */
+  spine: { width: 30, alignItems: "center", justifyContent: "center" },
+  spineLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 1,
     backgroundColor: color.border,
   },
-  sideMarkHome: { backgroundColor: color.primary },
-  sideMarkAway: { backgroundColor: color.info },
-  eventText: { flex: 1, gap: 2 },
+  eventText: { flex: 1, gap: 2, paddingVertical: space.sm },
   eventLabel: { color: color.text, fontSize: fontSize.sm },
+  eventLabelGoal: {
+    color: color.primary,
+    fontWeight: fontWeight.bold as "700",
+  },
   eventWho: { color: color.textMuted, fontSize: fontSize.xs },
   runningScore: {
-    minWidth: 44,
+    minWidth: 48,
     textAlign: "center",
     color: color.text,
     fontSize: fontSize.sm,
     fontWeight: fontWeight.bold as "700",
-    backgroundColor: color.background,
+    borderWidth: 1,
     borderRadius: radius.sm,
     paddingVertical: 2,
   },
+  /** Reserva a coluna do placar para as linhas sem gol não desalinharem. */
+  runningScoreGap: { minWidth: 48 },
 
-  statLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: space.sm,
-    paddingVertical: space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.border,
-  },
-  statValue: {
-    minWidth: 44,
-    textAlign: "center",
-    color: color.text,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold as "700",
-  },
-  statLabel: { flex: 1, textAlign: "center", color: color.textMuted, fontSize: fontSize.xs },
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
-    paddingVertical: space.sm,
+    paddingRight: space.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: color.border,
   },
+  /** O melhor em campo ganha fundo, não um enfeite solto ao lado do nome. */
+  ratingRowBest: {
+    backgroundColor: color.surfaceRaised,
+    borderRadius: radius.sm,
+    borderTopWidth: 0,
+  },
+  /** A cor do clube marca de que lado o jogador é, sem repetir o nome do time. */
+  clubRule: { width: 3, height: 30, borderRadius: 2 },
   ratingValue: {
     minWidth: 44,
     textAlign: "center",

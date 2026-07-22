@@ -236,3 +236,97 @@ function resolveTie(tie: MutableTie): BracketTie {
     undecidedReason: null,
   };
 }
+
+/**
+ * O movimento de um clube de uma rodada para a outra.
+ *
+ * `null` NÃO é "manteve": é "não há rodada anterior com que comparar" — antes da
+ * segunda rodada, dizer que alguém manteve a posição afirmaria uma classificação
+ * que nunca existiu.
+ */
+export type RankMovement = "up" | "down" | "same";
+
+export interface StandingRowWithMovement extends StandingRow {
+  /** A posição na rodada ANTERIOR; `null` quando não havia tabela ainda. */
+  readonly previousRank: number | null;
+  readonly movement: RankMovement | null;
+}
+
+export interface GroupTableWithMovement {
+  readonly group: string | null;
+  readonly table: readonly StandingRowWithMovement[];
+}
+
+/** Uma partida terminada, com a rodada em que ela caiu. */
+export interface RoundedMatchInput extends FinishedMatchInput {
+  /** `null` num jogo fora de rodada (mata-mata avulso, amistoso). */
+  readonly round: number | null;
+}
+
+/**
+ * As tabelas por grupo, com a variação de posição desde a rodada anterior.
+ *
+ * A tabela é projeção dos jogos (R-178) — então a "tabela da rodada anterior" é
+ * a MESMA conta sem a última rodada. Não é preciso guardar histórico: ele se
+ * reconstrói, e reconstruir é mais confiável do que um instantâneo que pode
+ * ficar dessincronizado do resultado oficial.
+ *
+ * A rodada corrente é a maior rodada com jogo terminado — global à competição,
+ * não por grupo: os grupos jogam a mesma rodada, e um grupo que ainda não jogou
+ * simplesmente não se mexe.
+ */
+export function buildGroupTablesWithMovement(
+  clubs: readonly CompetitionClubGroup[],
+  matches: readonly RoundedMatchInput[],
+): readonly GroupTableWithMovement[] {
+  const rounds = matches
+    .map((m) => m.round)
+    .filter((r): r is number => r !== null);
+  const currentRound = rounds.length > 0 ? Math.max(...rounds) : null;
+
+  const current = buildGroupTables(clubs, matches);
+
+  // Sem rodada corrente, ou estando na primeira, não existe tabela anterior.
+  // Comparar com "todos zerados" produziria movimento a partir da ordem de
+  // desempate — que não é classificação, é alfabeto.
+  const hasPrevious =
+    currentRound !== null &&
+    matches.some((m) => m.round !== null && m.round < currentRound);
+
+  if (!hasPrevious) {
+    return current.map((group) => ({
+      group: group.group,
+      table: group.table.map((row) => ({
+        ...row,
+        previousRank: null,
+        movement: null,
+      })),
+    }));
+  }
+
+  const before = buildGroupTables(
+    clubs,
+    matches.filter((m) => m.round !== null && m.round < currentRound),
+  );
+  const previousRankOf = new Map<string, number>();
+  for (const group of before) {
+    group.table.forEach((row, index) => {
+      previousRankOf.set(row.clubId, index + 1);
+    });
+  }
+
+  return current.map((group) => ({
+    group: group.group,
+    table: group.table.map((row, index) => {
+      const rank = index + 1;
+      const previousRank = previousRankOf.get(row.clubId) ?? null;
+      if (previousRank === null) {
+        return { ...row, previousRank: null, movement: null };
+      }
+      // Número MENOR é posição melhor: cair de 5º para 3º é subir.
+      const movement: RankMovement =
+        previousRank === rank ? "same" : previousRank > rank ? "up" : "down";
+      return { ...row, previousRank, movement };
+    }),
+  }));
+}

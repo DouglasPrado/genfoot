@@ -1,7 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+
+import { CommandTrackingStatus } from "@grinta/core";
 
 import { Card } from "@/components/card";
 import { Icon } from "@/components/icon";
@@ -11,9 +13,16 @@ import {
   selectManagedClub,
   type ClubPortfolioProjection,
 } from "@/lib/club-projection";
+import { useToast } from "@/components/toast";
+import { commandFeedback } from "@/lib/command-feedback";
+import {
+  submitTrackedCommand,
+  type TrackedCommandResult,
+} from "@/lib/command-orchestrator";
+import { commandIdempotencyKey } from "@/lib/idempotency";
 import { deriveScreenState } from "@/lib/screen-state";
 import { useSession } from "@/lib/session";
-import { useWorldQuery } from "@/lib/world";
+import { useRequiredWorldId, useWorldQuery } from "@/lib/world";
 import {
   deriveOnboardingStep,
   type MobileIdentityProjection,
@@ -43,7 +52,10 @@ import { color, fontSize, fontWeight, radius, space } from "@/theme";
  * vazia é o estado legítimo "elenco saudável", não erro.
  */
 export function Medical() {
-  const { session, status } = useSession();
+  const { session, status, client, contractVersion } = useSession();
+  const worldId = useRequiredWorldId();
+  const toast = useToast();
+  const [opening, setOpening] = useState<string | null>(null);
   const clubQuery = useWorldQuery<ClubPortfolioProjection>("club-detail");
   const identityQuery =
     useWorldQuery<MobileIdentityProjection>("identity-detail");
@@ -68,6 +80,43 @@ export function Medical() {
     clubQuery.refetch();
     medicalQuery.refetch();
   }, [clubQuery.refetch, medicalQuery.refetch]);
+
+  /**
+   * Registra o caso de quem o elenco já trata como lesionado. Sem isto a lista
+   * mostra o problema e não deixa agir — o usuário vê o jogador e não tem o que
+   * fazer com ele.
+   */
+  const openCase = useCallback(
+    (playerId: string) => {
+      if (client === null || contractVersion === null) return;
+      setOpening(playerId);
+      const idempotencyKey = commandIdempotencyKey({
+        commandType: "medical:open-case",
+        target: playerId,
+        occasion: "abrir-caso",
+      });
+      void submitTrackedCommand(client, {
+        clientContractVersion: "v1",
+        serverContractVersion: contractVersion,
+        commandType: "medical:open-case",
+        worldId,
+        payload: { playerId },
+        idempotencyKey,
+        correlationId: `mobile:${idempotencyKey}`,
+      }).then((result: TrackedCommandResult) => {
+        setOpening(null);
+        const feedback = commandFeedback(result, "Caso médico aberto.");
+        if (feedback !== null) toast.show(feedback);
+        if (
+          result.status === CommandTrackingStatus.ACCEPTED ||
+          result.status === CommandTrackingStatus.APPLIED
+        ) {
+          refresh();
+        }
+      });
+    },
+    [client, contractVersion, refresh, toast, worldId],
+  );
 
   const department = medicalQuery.data ?? null;
   const cases = sortCases(department?.cases ?? []);
@@ -131,7 +180,12 @@ export function Medical() {
                 anterior ao departamento médico.
               </Text>
               {restrictions.map((item) => (
-                <RestrictionRow key={item.playerId} item={item} />
+                <RestrictionRow
+                  key={item.playerId}
+                  item={item}
+                  busy={opening === item.playerId}
+                  onOpenCase={() => openCase(item.playerId)}
+                />
               ))}
             </Card>
           )}
@@ -160,7 +214,15 @@ export function Medical() {
   );
 }
 
-function RestrictionRow({ item }: { readonly item: MedicalRestriction }) {
+function RestrictionRow({
+  item,
+  busy,
+  onOpenCase,
+}: {
+  readonly item: MedicalRestriction;
+  readonly busy: boolean;
+  readonly onOpenCase: () => void;
+}) {
   return (
     <View style={styles.row}>
       <View style={styles.info}>
@@ -174,6 +236,18 @@ function RestrictionRow({ item }: { readonly item: MedicalRestriction }) {
           {restrictionLabel(item)}
         </Text>
       </View>
+      <Pressable
+        disabled={busy}
+        onPress={onOpenCase}
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir caso médico de ${item.playerName}`}
+        accessibilityState={{ disabled: busy }}
+        style={[styles.openCase, busy ? styles.openCaseBusy : null]}
+      >
+        <Text style={styles.openCaseText}>
+          {busy ? "Abrindo…" : "Abrir caso"}
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -297,4 +371,16 @@ const styles = StyleSheet.create({
     fontWeight: fontWeight.bold as "700",
   },
   relapse: { color: color.danger, fontSize: fontSize.xs },
+  openCase: {
+    backgroundColor: color.primary,
+    borderRadius: radius.sm,
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+  },
+  openCaseBusy: { opacity: 0.6 },
+  openCaseText: {
+    color: color.primaryContrast,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold as "700",
+  },
 });

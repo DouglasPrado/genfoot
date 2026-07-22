@@ -1,6 +1,9 @@
 import type { GameWorldId } from "@grinta/shared";
 
-import type { TieUndecidedReason } from "./competition-phases.js";
+import type {
+  RankMovement,
+  TieUndecidedReason,
+} from "./competition-phases.js";
 import type { ClubOutcome } from "./season-outcome.js";
 import type { StandingRow } from "./standings.js";
 
@@ -29,6 +32,13 @@ export interface StandingViewRow extends StandingRow {
   readonly primaryColor?: string | null;
   readonly secondaryColor?: string | null;
   readonly crestTemplateId?: string | null;
+  /**
+   * A posição na rodada anterior e o movimento desde ela. `null` NÃO é
+   * "manteve" — é "não há rodada anterior com que comparar", e a tela precisa
+   * distinguir os dois: antes da 2ª rodada ninguém subiu nem caiu.
+   */
+  readonly previousRank?: number | null;
+  readonly movement?: RankMovement | null;
 }
 
 /**

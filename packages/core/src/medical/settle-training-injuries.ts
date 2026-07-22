@@ -16,7 +16,11 @@ import type { DomainError } from "@grinta/shared";
 
 import { SeededRandom } from "../foundation/seeded-random.js";
 
-import { InjuryCause, type InjuryEpisodeSnapshot } from "./injury-episode-types.js";
+import {
+  InjuryCause,
+  type InjuryEpisodeSnapshot,
+  type InjuryType,
+} from "./injury-episode-types.js";
 import { injuryProbability, rollInjuryType } from "./injury-risk.js";
 import type { OpenInjuryEpisode } from "./medical-use-cases.js";
 
@@ -49,6 +53,41 @@ export const INJURY_REGIONS = [
   "lombar",
   "ombro",
 ] as const;
+
+/**
+ * Sorteia tipo e região de uma lesão a partir de um gerador do mundo.
+ *
+ * Compartilhado pelo gatilho da virada e pela abertura MANUAL de caso: nos dois
+ * a verdade clínica já existe no mundo — o que muda é quem a descobre. Consome
+ * dois números do gerador (tipo, região), nesta ordem.
+ */
+export function rollInjuryNature(
+  random: SeededRandom,
+  context: {
+    readonly fatigue: number;
+    readonly age: number;
+    readonly contact: boolean;
+    readonly injuredRegionHistory: readonly string[];
+  },
+): { readonly injuryType: InjuryType; readonly region: string } {
+  const injuryType = rollInjuryType(
+    {
+      fatigue: context.fatigue,
+      contact: context.contact,
+      recurrentHistory: context.injuredRegionHistory.length > 0,
+      age: context.age,
+    },
+    random.nextFloat(),
+  );
+  // Recorrente reincide onde já doeu; o resto sorteia região nova.
+  const region =
+    injuryType === "RECURRENT" && context.injuredRegionHistory.length > 0
+      ? (context.injuredRegionHistory[
+          random.nextInt(0, context.injuredRegionHistory.length)
+        ] as string)
+      : (INJURY_REGIONS[random.nextInt(0, INJURY_REGIONS.length)] as string);
+  return { injuryType, region };
+}
 
 export interface TrainingLoadEntry {
   readonly playerId: string;
@@ -141,22 +180,12 @@ export class SettleTrainingInjuries {
 
       if (random.nextFloat() >= trainingInjuryProbability(entry)) continue;
 
-      const injuryType = rollInjuryType(
-        {
-          fatigue: entry.fatigue,
-          contact: false, // treino não é duelo de partida
-          recurrentHistory: entry.injuredRegionHistory.length > 0,
-          age: entry.age,
-        },
-        random.nextFloat(),
-      );
-      // Recorrente reincide onde já doeu; o resto sorteia região nova.
-      const region =
-        injuryType === "RECURRENT" && entry.injuredRegionHistory.length > 0
-          ? (entry.injuredRegionHistory[
-              random.nextInt(0, entry.injuredRegionHistory.length)
-            ] as string)
-          : (INJURY_REGIONS[random.nextInt(0, INJURY_REGIONS.length)] as string);
+      const { injuryType, region } = rollInjuryNature(random, {
+        fatigue: entry.fatigue,
+        age: entry.age,
+        contact: false, // treino não é duelo de partida
+        injuredRegionHistory: entry.injuredRegionHistory,
+      });
 
       const result = await this.open.execute({
         gameWorldId: input.gameWorldId,
