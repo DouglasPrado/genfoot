@@ -18,6 +18,7 @@ import type {
   GenesisUnitOfWork,
   IdentityUnitOfWork,
   MatchPlayRepository,
+  LiveMatchRepository,
   PresenceRepository,
   WorldClockRepository,
   SeasonFinanceUnitOfWork,
@@ -46,6 +47,7 @@ import type {
   AiTrainingUnitOfWork,
   IndividualTrainingPlanRepository,
   IndividualTrainingUnitOfWork,
+  MedicalUnitOfWork,
   MentorshipRepository,
   MentorshipUnitOfWork,
   CollectiveTrainingUnitOfWork,
@@ -66,6 +68,7 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  LIVE_MATCH_REPOSITORY,
   PRESENCE_REPOSITORY,
   WORLD_CLOCK_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
@@ -93,6 +96,7 @@ import {
   AI_TRAINING_UNIT_OF_WORK,
   INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MEDICAL_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
   COLLECTIVE_TRAINING_UNIT_OF_WORK,
@@ -129,6 +133,8 @@ export class CommandsController {
     private readonly genesisUnitOfWork: GenesisUnitOfWork,
     @Inject(MATCH_PLAY_REPOSITORY)
     private readonly matchPlay: MatchPlayRepository,
+    @Inject(LIVE_MATCH_REPOSITORY)
+    private readonly liveMatch: LiveMatchRepository,
     @Inject(PRESENCE_REPOSITORY)
     private readonly presence: PresenceRepository,
     @Inject(WORLD_CLOCK_REPOSITORY)
@@ -183,6 +189,8 @@ export class CommandsController {
     private readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository,
     @Inject(INDIVIDUAL_TRAINING_UNIT_OF_WORK)
     private readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork,
+    @Inject(MEDICAL_UNIT_OF_WORK)
+    private readonly medicalUnitOfWork: MedicalUnitOfWork,
     @Inject(MENTORSHIP_REPOSITORY)
     private readonly mentorshipRepository: MentorshipRepository,
     @Inject(MENTORSHIP_UNIT_OF_WORK)
@@ -332,6 +340,7 @@ export class CommandsController {
         clubUnitOfWork: this.clubUnitOfWork,
         genesisUnitOfWork: this.genesisUnitOfWork,
         matchPlay: this.matchPlay,
+        liveMatch: this.liveMatch,
         presence: this.presence,
         worldClock: this.worldClock,
         transferUnitOfWork: this.transferUnitOfWork,
@@ -359,6 +368,7 @@ export class CommandsController {
         aiTrainingUnitOfWork: this.aiTrainingUnitOfWork,
         individualTrainingPlanRepository: this.individualTrainingPlanRepository,
         individualTrainingUnitOfWork: this.individualTrainingUnitOfWork,
+        medicalUnitOfWork: this.medicalUnitOfWork,
         mentorshipRepository: this.mentorshipRepository,
         mentorshipUnitOfWork: this.mentorshipUnitOfWork,
         collectiveTrainingUnitOfWork: this.collectiveTrainingUnitOfWork,

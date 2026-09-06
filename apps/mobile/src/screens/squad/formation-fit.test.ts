@@ -18,8 +18,13 @@ describe("formationFit — encaixe do jogador na formação (core-backed)", () =
   });
 
   it("formação que o core não cataloga → unknown (não julga)", () => {
-    // 4-2-1-3 existe no mobile mas não no CANONICAL_FORMATIONS do core.
-    expect(formationFit("ST", "4-2-1-3")).toBe("unknown");
+    expect(formationFit("ST", "6-0-4")).toBe("unknown");
+  });
+
+  it("o 4-2-1-3 (padrão do campo) é catalogado pelo core", () => {
+    // Ele já foi `unknown` aqui, e era o bug: a mesma lacuna fazia
+    // `tactics:set-lineup` recusar a escalação padrão do jogador.
+    expect(formationFit("ST", "4-2-1-3")).toBe("natural");
   });
 
   it("posição inválida → unknown (cliente não inventa)", () => {

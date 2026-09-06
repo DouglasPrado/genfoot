@@ -18,6 +18,7 @@ import type {
   LineupRepository,
 } from "@grinta/core";
 import type {
+  PrismaMedicalReadModel,
   PlayerDevelopmentReadModel,
   TrainingSessionsReadModel,
   GroupTrainingSessionsReadModel,
@@ -60,6 +61,8 @@ export interface QueryContext {
   readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
   readonly mentorshipRepository: MentorshipRepository;
   readonly playerDevelopmentReadModel: PlayerDevelopmentReadModel;
+  /** Departamento médico — a lista de casos e o caso aberto (doc 23 §43). */
+  readonly medicalReadModel: PrismaMedicalReadModel;
   readonly trainingSessionsReadModel: TrainingSessionsReadModel;
   /** A temporada corrente — deixa `seasonId` opcional nas queries de treino. */
   readonly worldSeasonReadModel: WorldSeasonReadModel;
@@ -81,6 +84,29 @@ export type QueryHandler = (
   params: Record<string, unknown>,
 ) => Promise<Result<unknown, DomainError>>;
 
+/**
+ * As queries de M-COMPETITION são todas recortadas por `competitionId` — o
+ * mesmo pedido de parâmetro repetido cinco vezes vira este atalho. Sem o
+ * parâmetro é erro de contrato (`QUERY_PARAM_REQUIRED`), não lista vazia.
+ */
+async function requireCompetitionId<T>(
+  params: Record<string, unknown>,
+  read: (competitionId: string) => Promise<T>,
+): Promise<Result<T, DomainError>> {
+  const competitionId =
+    typeof params.competitionId === "string" ? params.competitionId : null;
+  if (competitionId === null) {
+    return fail(
+      new DomainError(
+        "QUERY_PARAM_REQUIRED",
+        "a query exige o parâmetro competitionId.",
+        { param: "competitionId" },
+      ),
+    );
+  }
+  return succeed(await read(competitionId));
+}
+
 const handlers: Record<string, QueryHandler> = {
   club: async ({ clubReadModel }, worldId) =>
     succeed(await clubReadModel.summary(worldId)),
@@ -94,10 +120,46 @@ const handlers: Record<string, QueryHandler> = {
     succeed(await ledgerReadModel.summary(worldId)),
   competitions: async ({ competitionReadModel }, worldId) =>
     succeed(await competitionReadModel.leagueStandings(worldId)),
-  "competitions-list": async ({ competitionReadModel }, worldId) =>
-    succeed({ competitions: await competitionReadModel.listCompetitions(worldId) }),
-  "competition-outcome": async ({ competitionReadModel }, worldId) =>
-    succeed(await competitionReadModel.competitionOutcome(worldId)),
+  // A lista de M-COMPETITIONS. `clubId` é OPCIONAL: com ele cada linha diz se o
+  // clube participa e em que posição está; sem ele (admin), a lista crua.
+  "competitions-list": async ({ competitionReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    return succeed({
+      competitions: await competitionReadModel.listCompetitions(worldId, clubId),
+    });
+  },
+  "competition-outcome": async ({ competitionReadModel }, worldId, params) => {
+    const competitionId =
+      typeof params.competitionId === "string" ? params.competitionId : null;
+    return succeed(
+      await competitionReadModel.competitionOutcome(worldId, competitionId),
+    );
+  },
+  /** M-COMPETITION — cabeçalho e regulamento de UMA competição. */
+  "competition-detail": async ({ competitionReadModel }, worldId, params) =>
+    requireCompetitionId(params, (competitionId) =>
+      competitionReadModel.competitionDetail(worldId, competitionId),
+    ),
+  /** M-COMPETITION aba Tabela/Grupos. */
+  "competition-table": async ({ competitionReadModel }, worldId, params) =>
+    requireCompetitionId(params, (competitionId) =>
+      competitionReadModel.competitionTable(worldId, competitionId),
+    ),
+  /** M-COMPETITION aba Chaveamento. `rounds` vazio = competição sem mata-mata. */
+  "competition-bracket": async ({ competitionReadModel }, worldId, params) =>
+    requireCompetitionId(params, (competitionId) =>
+      competitionReadModel.competitionBracket(worldId, competitionId),
+    ),
+  /** M-COMPETITION aba Rodadas/Jogos — todos os jogos da edição. */
+  "competition-matches": async ({ competitionReadModel }, worldId, params) =>
+    requireCompetitionId(params, (competitionId) =>
+      competitionReadModel.competitionMatches(worldId, competitionId),
+    ),
+  /** M-COMPETITION abas Artilharia/Assistências, com a cobertura do motor. */
+  "competition-stats": async ({ competitionReadModel }, worldId, params) =>
+    requireCompetitionId(params, (competitionId) =>
+      competitionReadModel.competitionStats(worldId, competitionId),
+    ),
   "top-scorers": async ({ competitionReadModel }, worldId) =>
     succeed({ scorers: await competitionReadModel.topScorers(worldId) }),
   matches: async ({ matchesReadModel }, worldId, params) => {
@@ -158,6 +220,45 @@ const handlers: Record<string, QueryHandler> = {
     );
     return succeed({ plan });
   },
+  /**
+   * Departamento médico do clube (`M-MEDICAL`).
+   *
+   * Lista vazia é o estado LEGÍTIMO "elenco saudável" — não erro. A tela
+   * precisa do total do elenco para dizer quantos estão sãos, e do nível da
+   * comissão médica (null = clube sem médico contratado).
+   */
+  "medical": async ({ medicalReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "medical exige o parâmetro clubId.",
+          { params: ["clubId"] },
+        ),
+      );
+    }
+    return succeed(await medicalReadModel.department(worldId, clubId));
+  },
+
+  /**
+   * O caso aberto de um jogador (`M-MEDICAL-CASE`), com as opções de
+   * tratamento recomendadas. `case: null` = jogador sem episódio aberto.
+   */
+  "medical-case": async ({ medicalReadModel }, worldId, params) => {
+    const playerId = typeof params.playerId === "string" ? params.playerId : null;
+    if (playerId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "medical-case exige o parâmetro playerId.",
+          { params: ["playerId"] },
+        ),
+      );
+    }
+    return succeed(await medicalReadModel.case(worldId, playerId));
+  },
+
   /** Plano INDIVIDUAL de um jogador (M-TRAINING-INDIV). `null` = jogador sem plano. */
   "individual-training-plan": async (
     { individualTrainingPlanRepository },
@@ -279,6 +380,20 @@ const handlers: Record<string, QueryHandler> = {
   },
   "youth-intake": async ({ youthIntakeReadModel }, worldId) =>
     succeed({ candidates: await youthIntakeReadModel.candidates(worldId) }),
+  /** A ficha disciplinar do elenco de um clube (M-CLUB-VIEW). */
+  "club-discipline": async ({ matchesReadModel }, worldId, params) => {
+    const clubId = typeof params.clubId === "string" ? params.clubId : null;
+    if (clubId === null) {
+      return fail(
+        new DomainError(
+          "QUERY_PARAM_REQUIRED",
+          "club-discipline exige o parametro clubId.",
+          { param: "clubId" },
+        ),
+      );
+    }
+    return succeed(await matchesReadModel.clubDiscipline(worldId, clubId));
+  },
   "match-detail": async ({ matchesReadModel }, worldId, params) => {
     const matchId = typeof params.matchId === "string" ? params.matchId : null;
     if (matchId === null) {

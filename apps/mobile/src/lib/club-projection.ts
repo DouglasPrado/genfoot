@@ -153,6 +153,16 @@ const positionPresentation: Readonly<
 };
 
 /**
+ * O rótulo curto da posição ("ZAG", "LE", "VOL"…) — o mesmo texto que os slots
+ * de `FORMATIONS` usam como `role`. É o que deixa `assignToFormation` casar o
+ * jogador com o slot pela posição natural. Posição desconhecida devolve o
+ * próprio código, que não casa com slot nenhum (cai no setor).
+ */
+export function positionRole(primaryPosition: string): string {
+  return positionPresentation[primaryPosition]?.label ?? primaryPosition;
+}
+
+/**
  * O elenco tal como a query `roster` o devolve (RosterView do core, R-190).
  *
  * Substitui `PlayerRosterProjection` + `portfolio.squads`: a query nova já vem

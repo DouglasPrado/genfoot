@@ -1563,24 +1563,83 @@ model PlayerContract {
   @@index([clubId])
 }
 
+/// Episódio médico (C4 · medicina). Não é um registro de lesão inerte: carrega
+/// a MÁQUINA MED-1..MED-9 (`docs/02-tecnico/14-maquinas-de-estado.md §6`) — o
+/// `state` diz onde o episódio está e `rehabStage` (1–7) o estágio dentro da
+/// reabilitação. Um episódio ABERTO por jogador; o episódio atravessa a virada
+/// de temporada sem reiniciar.
 model PlayerInjury {
-  id                           String         @id @default(uuid(7)) @db.Uuid
-  gameWorldId                  String         @db.Uuid
-  playerId                     String         @db.Uuid
+  id                           String              @id @default(uuid(7)) @db.Uuid
+  gameWorldId                  String              @db.Uuid
+  playerId                     String              @db.Uuid
+  clubId                       String?             @db.Uuid // clube responsável pelo tratamento (empréstimo trata à parte)
   severity                     InjurySeverity
   name                         String
   description                  String?
   occurredAt                   DateTime
   expectedReturnAt             DateTime?
   recoveredAt                  DateTime?
-  causedByMatchId              String?        @db.Uuid
-  causedByTrainingPlanId       String?        @db.Uuid
+  causedByMatchId              String?             @db.Uuid
+  causedByTrainingPlanId       String?             @db.Uuid
   medicalDepartmentLevelAtTime Int?
-  version                      Int            @default(1) // concorrência otimista (agregado C4 · medicina)
+  // --- máquina médica (MED-1..MED-9) ---
+  state                        MedicalEpisodeState @default(EVALUATION)
+  rehabStage                   Int? // 1–7, apenas quando state = REHAB
+  injuryType                   InjuryTypeCode      @default(LIGHT) // matriz de tipo R-21
+  cause                        InjuryCauseCode     @default(WEAR)
+  region                       String              @default("indefinida") // alimenta o `recorrente ×3` de R-21
+  // --- diagnóstico (MED-3/MED-9); nulo enquanto não fechou ---
+  diagnosisMinimumDays         Int?
+  diagnosisMaximumDays         Int?
+  returnRiskScore              Int?
+  diagnosisRevisions           Int                 @default(0)
+  // --- tratamento (MED-4) ---
+  treatmentOption              TreatmentOptionCode?
+  treatmentStartedAt           DateTime?
+  relapseCount                 Int                 @default(0)
+  version                      Int                 @default(1) // concorrência otimista (agregado C4 · medicina)
 
   player Player @relation(fields: [gameWorldId, playerId], references: [gameWorldId, id]) // C-05: FK composta world-scope, onDelete: Cascade)
 
   @@index([gameWorldId, playerId])
+  @@index([gameWorldId, clubId, state])
+}
+
+/// Estados da máquina médica (§6.1). `REHAB` carrega o estágio 1–7 em
+/// `rehabStage`; `DISCHARGE` e `MEDICAL_RETIREMENT` são terminais.
+enum MedicalEpisodeState {
+  EVALUATION
+  EXAMS
+  DIAGNOSIS
+  REHAB
+  COMPETITIVE_RETURN
+  DISCHARGE
+  MEDICAL_RETIREMENT
+}
+
+/// Tipos da matriz de lesão de R-21 (F13).
+enum InjuryTypeCode {
+  LIGHT
+  MODERATE
+  SERIOUS
+  MUSCULAR
+  IMPACT
+  RECURRENT
+}
+
+/// De onde veio a lesão — MED-1 aceita partida, treino ou desgaste.
+enum InjuryCauseCode {
+  MATCH
+  TRAINING
+  WEAR
+}
+
+/// Opções de tratamento (§16). Magnitudes são calibração VAL-MED-001.
+enum TreatmentOptionCode {
+  CONSERVATIVE
+  STANDARD
+  INTENSIVE
+  SURGERY
 }
 
 // -----------------------------------------------------------------------------
@@ -2106,6 +2165,12 @@ model Match {
   awayGoals           Int                @default(0)
   homeExpectedGoals   Decimal?           @db.Decimal(8, 4) // xG: não-monetário
   awayExpectedGoals   Decimal?           @db.Decimal(8, 4)
+  // Estatísticas de time que o kernel JÁ produz e o banco descartava: sem
+  // coluna, `M-POSTMATCH` não tinha como mostrar posse e finalizações, e o dado
+  // morria no `SimulatedMatchResult`. `null` = partida ainda não jogada.
+  homeShots           Int?
+  awayShots           Int?
+  homePossession      Int? // 0..100; o do visitante é 100 − este
   simulationSeed      String? // replay determinístico
   simulatedOffline    Boolean            @default(false) // + MatchControlSource
   version             Int                @default(1)

@@ -23,6 +23,8 @@ import {
   PrismaAiTrainingUnitOfWork,
   PrismaIndividualTrainingPlanRepository,
   PrismaIndividualTrainingUnitOfWork,
+  PrismaMedicalUnitOfWork,
+  PrismaMedicalReadModel,
   PrismaMentorshipRepository,
   PrismaMentorshipUnitOfWork,
   PrismaCollectiveTrainingUnitOfWork,
@@ -42,6 +44,7 @@ import {
   PrismaClubUnitOfWork,
   PrismaGenesisUnitOfWork,
   PrismaMatchPlayRepository,
+  PrismaLiveMatchRepository,
   PrismaPresenceRepository,
   PrismaWorldClockRepository,
   PrismaTransferUnitOfWork,
@@ -75,6 +78,7 @@ import {
   TRAINING_ACCRUAL_BUFFER_WRITER,
   SEASON_ACCRUAL_UNIT_OF_WORK,
   PLAYER_DEVELOPMENT_READ_MODEL,
+  MEDICAL_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
   COHESION_TRAINING_UNIT_OF_WORK,
@@ -85,6 +89,7 @@ import {
   AI_TRAINING_UNIT_OF_WORK,
   INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
   INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+  MEDICAL_UNIT_OF_WORK,
   MENTORSHIP_REPOSITORY,
   MENTORSHIP_UNIT_OF_WORK,
   COLLECTIVE_TRAINING_UNIT_OF_WORK,
@@ -104,6 +109,7 @@ import {
   CLUB_UNIT_OF_WORK,
   GENESIS_UNIT_OF_WORK,
   MATCH_PLAY_REPOSITORY,
+  LIVE_MATCH_REPOSITORY,
   PRESENCE_REPOSITORY,
   WORLD_CLOCK_REPOSITORY,
   TRANSFER_UNIT_OF_WORK,
@@ -232,6 +238,12 @@ import {
         new PrismaPlayerDevelopmentReadModel(client),
     },
     {
+      provide: MEDICAL_READ_MODEL,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMedicalReadModel =>
+        new PrismaMedicalReadModel(client),
+    },
+    {
       provide: TRAINING_SESSIONS_READ_MODEL,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaTrainingSessionsReadModel =>
@@ -322,6 +334,12 @@ import {
         new PrismaIndividualTrainingUnitOfWork(client),
     },
     {
+      provide: MEDICAL_UNIT_OF_WORK,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaMedicalUnitOfWork =>
+        new PrismaMedicalUnitOfWork(client),
+    },
+    {
       provide: MENTORSHIP_REPOSITORY,
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaMentorshipRepository =>
@@ -404,6 +422,12 @@ import {
       inject: [PRISMA_CLIENT],
       useFactory: (client: PrismaClient): PrismaMatchPlayRepository =>
         new PrismaMatchPlayRepository(client),
+    },
+    {
+      provide: LIVE_MATCH_REPOSITORY,
+      inject: [PRISMA_CLIENT],
+      useFactory: (client: PrismaClient): PrismaLiveMatchRepository =>
+        new PrismaLiveMatchRepository(client),
     },
     {
       provide: PRESENCE_REPOSITORY,
@@ -519,6 +543,7 @@ import {
     CLUB_UNIT_OF_WORK,
     GENESIS_UNIT_OF_WORK,
     MATCH_PLAY_REPOSITORY,
+    LIVE_MATCH_REPOSITORY,
     PRESENCE_REPOSITORY,
     WORLD_CLOCK_REPOSITORY,
     TRANSFER_UNIT_OF_WORK,
@@ -534,6 +559,7 @@ import {
     TRAINING_ACCRUAL_BUFFER_WRITER,
     SEASON_ACCRUAL_UNIT_OF_WORK,
     PLAYER_DEVELOPMENT_READ_MODEL,
+    MEDICAL_READ_MODEL,
   TRAINING_SESSIONS_READ_MODEL,
   WORLD_SEASON_READ_MODEL,
     SEASON_AGING_UNIT_OF_WORK,
@@ -549,6 +575,7 @@ import {
     AI_TRAINING_UNIT_OF_WORK,
     INDIVIDUAL_TRAINING_PLAN_REPOSITORY,
     INDIVIDUAL_TRAINING_UNIT_OF_WORK,
+    MEDICAL_UNIT_OF_WORK,
     MENTORSHIP_REPOSITORY,
     MENTORSHIP_UNIT_OF_WORK,
     COLLECTIVE_TRAINING_UNIT_OF_WORK,

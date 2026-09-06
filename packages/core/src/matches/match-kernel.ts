@@ -13,6 +13,16 @@ export interface MatchKernelOutput {
   readonly homeShots: number;
   readonly awayShots: number;
   readonly homePossession: number;
+  /**
+   * xG — a soma das PROBABILIDADES de gol das finalizações que o time criou.
+   *
+   * Não é estimativa nem enfeite: `conversion()` é literalmente a chance contra
+   * a qual cada chute foi sorteado, então somá-las é a definição de expected
+   * goals. Não consome sorteio nenhum — é contabilidade do que já aconteceu,
+   * então acrescentá-lo não muda placar de partida alguma.
+   */
+  readonly homeExpectedGoals: number;
+  readonly awayExpectedGoals: number;
   readonly resultHash: string;
   readonly statsHash: string;
 }
@@ -35,6 +45,9 @@ export interface MatchKernelProgress {
   readonly awayGoals: number;
   readonly homeShots: number;
   readonly awayShots: number;
+  /** Ver `MatchKernelOutput.homeExpectedGoals`. */
+  readonly homeExpectedGoals: number;
+  readonly awayExpectedGoals: number;
   readonly rngCursor: number;
 }
 
@@ -62,6 +75,8 @@ export function simulateUpTo(
   let awayGoals = 0;
   let homeShots = 0;
   let awayShots = 0;
+  let homeExpectedGoals = 0;
+  let awayExpectedGoals = 0;
   let rngCursor = 0;
   let homeMod = 0;
   let awayMod = 0;
@@ -83,17 +98,29 @@ export function simulateUpTo(
     rngCursor += 1;
     if (attacker < homeAdjusted) {
       homeShots += 1;
+      const chance = conversion(homeAdjusted, away);
+      homeExpectedGoals += chance / 100;
       const roll = rng.nextInt(0, 100);
       rngCursor += 1;
-      if (roll < conversion(homeAdjusted, away)) homeGoals += 1;
+      if (roll < chance) homeGoals += 1;
     } else {
       awayShots += 1;
+      const chance = conversion(away, homeAdjusted);
+      awayExpectedGoals += chance / 100;
       const roll = rng.nextInt(0, 100);
       rngCursor += 1;
-      if (roll < conversion(away, homeAdjusted)) awayGoals += 1;
+      if (roll < chance) awayGoals += 1;
     }
   }
-  return { homeGoals, awayGoals, homeShots, awayShots, rngCursor };
+  return {
+    homeGoals,
+    awayGoals,
+    homeShots,
+    awayShots,
+    homeExpectedGoals,
+    awayExpectedGoals,
+    rngCursor,
+  };
 }
 
 /**
@@ -137,6 +164,12 @@ export function simulateMatch(
     homeShots: progress.homeShots,
     awayShots: progress.awayShots,
     homePossession,
+    // Arredondado a 2 casas: o xG é para leitura humana ("1,84"), e a coluna do
+    // banco é Decimal(8,4). O `statsHash` NÃO o inclui de propósito — ele é
+    // derivado das finalizações que já estão lá, e mudar o hash invalidaria os
+    // manifestos de replay já gravados.
+    homeExpectedGoals: Math.round(progress.homeExpectedGoals * 100) / 100,
+    awayExpectedGoals: Math.round(progress.awayExpectedGoals * 100) / 100,
     resultHash,
     statsHash,
   };

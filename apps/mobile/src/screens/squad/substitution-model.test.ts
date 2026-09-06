@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SquadPlayer } from "./squad-data";
+import { FORMATIONS } from "./formations";
 import {
   canSubstitute,
+  canSubstituteIntoSlot,
   compareStat,
   fitRank,
   positionFit,
@@ -33,6 +35,12 @@ const gol = player({ id: "gol-a", position: "GOL", group: "GOL" });
 const vol = player({ id: "vol-a", position: "VOL", group: "MEI" });
 const le = player({ id: "le-a", position: "LE", group: "DEF" });
 const ata = player({ id: "ata-a", position: "ATA", group: "ATA" });
+const pte = player({ id: "pte-a", position: "PTE", group: "ATA" });
+
+/** Todo papel que o campo tático desenha, em qualquer formação. */
+const PITCH_ROLES = [
+  ...new Set(Object.values(FORMATIONS).flatMap((slots) => slots.map((s) => s.role))),
+];
 
 const ALL_POSITIONS = [
   "GOL",
@@ -67,9 +75,15 @@ describe("positionFit — grafo de adaptação", () => {
   });
 
   it("o grafo é simétrico: se A adapta em B, B adapta em A", () => {
-    for (const from of ALL_POSITIONS) {
-      for (const to of ALL_POSITIONS) {
-        expect(positionFit(from, to)).toBe(positionFit(to, from));
+    // Inclui os papéis que só existem como slot (ME/MD/ALA) — a assimetria ali
+    // seria invisível olhando só as posições de jogador.
+    const nos = [...new Set([...ALL_POSITIONS, ...PITCH_ROLES])];
+    for (const from of nos) {
+      for (const to of nos) {
+        expect(
+          positionFit(from, to),
+          `assimetria entre ${from} e ${to}`,
+        ).toBe(positionFit(to, from));
       }
     }
   });
@@ -101,6 +115,43 @@ describe("canSubstitute", () => {
   it("um lateral se adapta a zagueiro (vizinho), mas não a atacante", () => {
     expect(canSubstitute(zag, le)).toBe(true);
     expect(canSubstitute(gol, ata)).toBe(false);
+  });
+});
+
+describe("canSubstituteIntoSlot — quem entra é decidido pelo SLOT do campo", () => {
+  it("o slot manda, não a posição de quem está nele", () => {
+    // Um ZAG escalado no slot LE: o campo mostra LE, então o leque é o do LE.
+    // PTE é vizinho de LE (entra) e NÃO é vizinho de ZAG — antes era barrado,
+    // e o jogador via uma formação no campo e outra na hora de substituir.
+    expect(canSubstituteIntoSlot("LE", pte)).toBe(true);
+    expect(canSubstitute(zag, pte)).toBe(false);
+  });
+
+  it("o slot também BARRA quem a posição do ocupante deixaria passar", () => {
+    // GOL é vizinho de ZAG, mas não do slot LE.
+    expect(canSubstituteIntoSlot("LE", gol)).toBe(false);
+    expect(canSubstitute(zag, gol)).toBe(true);
+  });
+
+  it("mesma posição do slot entra sempre", () => {
+    expect(canSubstituteIntoSlot("ZAG", zag)).toBe(true);
+    expect(canSubstituteIntoSlot("GOL", gol)).toBe(true);
+  });
+
+  it("sem slot ou sem reserva, ninguém entra", () => {
+    expect(canSubstituteIntoSlot(undefined, zag)).toBe(false);
+    expect(canSubstituteIntoSlot("ZAG", undefined)).toBe(false);
+  });
+
+  it("todo papel desenhado no campo é um nó conhecido do grafo", () => {
+    // Se o campo desenhar um papel que o grafo não conhece, o modal fica vazio
+    // e a substituição morre em silêncio.
+    for (const role of PITCH_ROLES) {
+      expect(
+        ALL_POSITIONS.some((pos) => positionFit(role, pos) !== "none"),
+        `papel ${role} não casa com posição nenhuma`,
+      ).toBe(true);
+    }
   });
 });
 

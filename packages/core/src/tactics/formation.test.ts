@@ -31,6 +31,8 @@ describe("formações canônicas", () => {
     expect(isKnownFormation("4-2-3-1")).toBe(true);
     expect(isKnownFormation("3-5-2")).toBe(true);
     expect(isKnownFormation("5-3-2")).toBe(true);
+    // O padrão do campo do mobile — sem ela, a escalação do jogador era recusada.
+    expect(isKnownFormation("4-2-1-3")).toBe(true);
   });
 
   it("rejeita formação desconhecida", () => {
@@ -46,6 +48,7 @@ describe("formações canônicas", () => {
       "4-2-3-1": [4, 5, 1], // 2+3 no meio = 5 na linha do meio
       "3-5-2": [3, 5, 2],
       "5-3-2": [5, 3, 2],
+      "4-2-1-3": [4, 3, 3], // 2+1 no meio = 3 na linha do meio
     };
     for (const name of Object.keys(expected) as FormationName[]) {
       const slots = formationSlots(name)!;
@@ -53,6 +56,40 @@ describe("formações canônicas", () => {
       const mid = slots.filter((p) => positionLine(p) === "MID").length;
       const fwd = slots.filter((p) => positionLine(p) === "FWD").length;
       expect([def, mid, fwd]).toEqual(expected[name]);
+    }
+  });
+});
+
+describe("ordem dos slots — esquerda→direita, como o cliente desenha", () => {
+  // O cliente manda os titulares em ordem de slot; se esta lista começar pela
+  // direita, o lateral-esquerdo cai no slot direito e perde 20% por fillQuality.
+  const ESQUERDA = new Set<PlayerPosition>([
+    PlayerPosition.LB,
+    PlayerPosition.LM,
+    PlayerPosition.LW,
+  ]);
+  const DIREITA = new Set<PlayerPosition>([
+    PlayerPosition.RB,
+    PlayerPosition.RM,
+    PlayerPosition.RW,
+  ]);
+
+  it("em cada linha, o lado esquerdo vem antes do direito", () => {
+    for (const name of Object.keys(CANONICAL_FORMATIONS) as FormationName[]) {
+      const slots = formationSlots(name)!;
+      const esq = slots.findIndex((p) => ESQUERDA.has(p));
+      const dir = slots.findIndex((p) => DIREITA.has(p));
+      if (esq === -1 || dir === -1) continue; // formação sem lados definidos
+      expect(
+        esq,
+        `${name}: esquerda (${esq}) deveria vir antes da direita (${dir})`,
+      ).toBeLessThan(dir);
+    }
+  });
+
+  it("o goleiro é sempre o slot 0 — o campo desenha o gol primeiro", () => {
+    for (const name of Object.keys(CANONICAL_FORMATIONS) as FormationName[]) {
+      expect(formationSlots(name)![0]).toBe(PlayerPosition.GK);
     }
   });
 });

@@ -11,7 +11,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
-import { hasDatabase, skipReason } from "./postgres.guard.js";
+import {
+  hasDatabase,
+  resetWorldFixtures,
+  skipReason,
+} from "./postgres.guard.js";
 
 describe.skipIf(!hasDatabase)(
   `API query catalog (e2e)${hasDatabase ? "" : ` — PULADO: ${skipReason}`}`,
@@ -31,6 +35,9 @@ describe.skipIf(!hasDatabase)(
   }
 
   beforeAll(async () => {
+    // Banco limpo ANTES de criar o mundo: estes e2e usam idempotencyKey fixa,
+    // e um registro sobrevivente aponta para um mundo truncado (404 em tudo).
+    await resetWorldFixtures();
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apiq-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     // Porta de desenvolvimento: sem ela, /auth/session exige prova do provedor.

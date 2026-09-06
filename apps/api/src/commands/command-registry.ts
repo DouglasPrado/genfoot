@@ -57,6 +57,8 @@ import {
   type MatchPlayRepository,
   type PresenceRepository,
   type WorldClockRepository,
+  LiveMatch,
+  type LiveMatchRepository,
   type CompetitionReadModel,
   type TrainingPlanRepository,
   type TrainingContextReader,
@@ -82,7 +84,21 @@ import {
   type IndividualTrainingTarget,
   SetIndividualTrainingPlan,
   SettleDueIndividualTrainingPlans,
+  SettleTrainingInjuries,
+  OpenInjuryEpisode,
+  OrderMedicalExam,
+  DiagnoseInjury,
+  SetMedicalPlan,
+  AdvanceRehabStage,
+  ForceMedicalReturn,
+  DischargeFromMedical,
+  RetirePlayerMedically,
+  SeededRandom,
+  rollInjuryNature,
+  InjuryCause,
   type MentorshipRepository,
+  type MedicalUnitOfWork,
+  type MedicalRepositories,
   type MentorshipUnitOfWork,
   LinkMentor,
   UnlinkMentor,
@@ -164,6 +180,8 @@ export interface CommandContext {
   readonly genesisUnitOfWork: GenesisUnitOfWork;
   /** C5 — joga a próxima rodada da liga (simulação determinística). */
   readonly matchPlay: MatchPlayRepository;
+  /** C5-V2: a partida ao vivo — apito, ordens do técnico, apito final. */
+  readonly liveMatch: LiveMatchRepository;
   /** X-001 — a presença do usuário no mundo (heartbeat). */
   readonly presence: PresenceRepository;
   /** MUNDO-V1 — o relógio do mundo (config de tempo por dia lógico). */
@@ -192,6 +210,8 @@ export interface CommandContext {
   readonly aiTrainingUnitOfWork: AiTrainingUnitOfWork;
   readonly individualTrainingPlanRepository: IndividualTrainingPlanRepository;
   readonly individualTrainingUnitOfWork: IndividualTrainingUnitOfWork;
+  /** Departamento médico: settle da virada (gatilho MED-1 por carga). */
+  readonly medicalUnitOfWork: MedicalUnitOfWork;
   readonly mentorshipRepository: MentorshipRepository;
   readonly mentorshipUnitOfWork: MentorshipUnitOfWork;
   readonly collectiveTrainingUnitOfWork: CollectiveTrainingUnitOfWork;
@@ -283,6 +303,21 @@ const applyClubIdentityPayload = z.object({
 const promoteYouthPayload = z.object({
   clubId: z.string().uuid(),
   playerId: z.string().uuid(),
+});
+
+/**
+ * As ordens do técnico durante a partida (doc 05 §11).
+ *
+ * O `delta` é a intenção traduzida em ajuste de força — atacar empurra, recuar
+ * segura. O domínio o limita (`COACH_DELTA_LIMIT`); aqui só se valida a forma.
+ */
+const matchIdPayload = z.object({ matchId: z.string().uuid() });
+
+const coachCommandPayload = z.object({
+  matchId: z.string().uuid(),
+  side: z.enum(["HOME", "AWAY"]),
+  delta: z.number().int(),
+  commandType: z.string().min(1).max(64),
 });
 
 const signPlayerPayload = z.object({
@@ -592,6 +627,38 @@ const individualTrainingPlanPayload = z.object({
   expectedVersion: z.number().int().nullable(),
 });
 
+/**
+ * Payloads do departamento médico. `playerId` identifica o caso: um episódio
+ * aberto por jogador, então não é preciso mandar o `injuryId` — mandá-lo abriria
+ * a porta para comandar um episódio já encerrado.
+ */
+const medicalPlayerPayload = z.object({
+  playerId: z.string().uuid(),
+});
+
+const medicalDiagnosisPayload = z.object({
+  playerId: z.string().uuid(),
+  severity: z.enum(["MINOR", "LIGHT", "MODERATE", "SERIOUS", "CRITICAL"]),
+  returnRiskScore: z.number().int().min(0).max(100),
+});
+
+const medicalPlanPayload = z.object({
+  playerId: z.string().uuid(),
+  option: z.enum(["CONSERVATIVE", "STANDARD", "INTENSIVE", "SURGERY"]),
+});
+
+const medicalForceReturnPayload = z.object({
+  playerId: z.string().uuid(),
+  /** O usuário assume o risco explicitamente (HighRiskConfirm da tela). */
+  acceptRisk: z.literal(true),
+});
+
+const medicalRetirementPayload = z.object({
+  playerId: z.string().uuid(),
+  /** Rito de confirmação: terminal absoluto, sem desfazer (§17). */
+  confirmed: z.literal(true),
+});
+
 const linkMentorPayload = z.object({
   clubId: z.string().uuid(),
   menteeId: z.string().uuid(),
@@ -765,6 +832,35 @@ async function runAiTraining(
     });
   } catch (err) {
     console.warn(`[ai-training] falha no treino dos clubes de IA: ${String(err)}`);
+  }
+}
+
+/**
+ * Settle do DEPARTAMENTO MÉDICO na virada: sorteia lesão por carga (F13/R-21)
+ * e abre o episódio em EVALUATION. É o gatilho MED-1 — sem ele a máquina
+ * médica existe mas nada a inicia. Best-effort: uma falha não derruba a virada.
+ */
+async function settleTrainingInjuries(
+  deps: Pick<CommandContext, "medicalUnitOfWork">,
+  world: {
+    readonly worldId: string;
+    readonly seed: string;
+    readonly currentDate: string;
+  },
+): Promise<void> {
+  try {
+    await deps.medicalUnitOfWork.run(async (repos: MedicalRepositories) =>
+      new SettleTrainingInjuries(
+        repos.loads,
+        new OpenInjuryEpisode(repos.episodes),
+      ).execute({
+        gameWorldId: world.worldId,
+        worldSeed: world.seed,
+        worldDate: world.currentDate,
+      }),
+    );
+  } catch (err) {
+    console.warn(`[medical] falha no settle de lesões: ${String(err)}`);
   }
 }
 
@@ -1036,6 +1132,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    medicalUnitOfWork,
     mentorshipUnitOfWork,
     collectiveTrainingUnitOfWork,
     playerRepository,
@@ -1129,6 +1226,11 @@ const handlers: Record<string, CommandHandler> = {
         rulesetVersion: advanced.value.world.rulesetVersion,
       },
     );
+    // Departamento médico: a carga do dia pode lesionar (F13/R-21).
+    await settleTrainingInjuries(
+      { medicalUnitOfWork },
+      { worldId, seed: worldSeed, currentDate: worldDate },
+    );
     await settleMentorships(
       { mentorshipUnitOfWork },
       {
@@ -1169,6 +1271,87 @@ const handlers: Record<string, CommandHandler> = {
    * A compra de verdade (C6/R-192). Dinheiro, contrato e elenco num só commit —
    * ou os três, ou nenhum. A taxa é validada na faixa da R-26 dentro do domínio.
    */
+  /**
+   * Apita o início (C5-V2). Congela o manifesto e põe a partida a correr — a
+   * partir daqui o minuto é derivado do relógio do mundo, não de uma coluna.
+   */
+  "match:start": async ({ worlds, liveMatch, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = matchIdPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const current = await liveMatch.findLive(
+      world.value.worldId,
+      parsed.data.matchId,
+    );
+    if (current === null) {
+      return fail(
+        new DomainError("MATCH_NOT_FOUND", "Partida não encontrada neste mundo.", {
+          matchId: parsed.data.matchId,
+        }),
+      );
+    }
+    const started = LiveMatch.fromSnapshot(current).start();
+    if (!started.ok) return started;
+    await liveMatch.startMatch(world.value.worldId, parsed.data.matchId);
+    return succeed({ resource: `match:${parsed.data.matchId}` });
+  },
+
+  /**
+   * A ordem do técnico. O agregado decide se ela cabe (partida em andamento,
+   * delta na faixa, chave não repetida) e em que posição do log ela entra; o
+   * repositório só a grava, e recusa se alguém tomou a posição primeiro.
+   */
+  "match:submit-command": async ({ worlds, liveMatch, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = coachCommandPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const current = await liveMatch.findLive(
+      world.value.worldId,
+      parsed.data.matchId,
+    );
+    if (current === null) {
+      return fail(
+        new DomainError("MATCH_NOT_FOUND", "Partida não encontrada neste mundo.", {
+          matchId: parsed.data.matchId,
+        }),
+      );
+    }
+    const decided = LiveMatch.fromSnapshot(current).submitCoachCommand({
+      side: parsed.data.side,
+      delta: parsed.data.delta,
+      actor: envelope.idempotencyKey,
+      commandType: parsed.data.commandType,
+      idempotencyKey: envelope.idempotencyKey,
+    });
+    if (!decided.ok) return decided;
+
+    const entry = decided.value.commandLog.at(-1);
+    // Sem entrada nova = a chave já tinha sido aplicada. O domínio tratou como
+    // idempotente, e repetir a gravação seria desfazer essa garantia.
+    if (entry === undefined || entry.idempotencyKey !== envelope.idempotencyKey) {
+      return succeed({ resource: `match:${parsed.data.matchId}` });
+    }
+    const written = await liveMatch.appendCommand(
+      world.value.worldId,
+      parsed.data.matchId,
+      entry,
+    );
+    if (!written) {
+      return fail(
+        new DomainError(
+          "MATCH_COMMAND_WINDOW_CLOSED",
+          "Outra ordem ocupou esta posição do log; tente de novo.",
+          { matchId: parsed.data.matchId, sequence: entry.matchSequence },
+        ),
+      );
+    }
+    return succeed({ resource: `match:${parsed.data.matchId}` });
+  },
+
   "market:sign-player": async ({ worlds, transferUnitOfWork, envelope }) => {
     const world = await loadWorld(worlds, envelope.worldId);
     if (!world.ok) return world;
@@ -1262,6 +1445,202 @@ const handlers: Record<string, CommandHandler> = {
     return succeed({
       resource: `individual-training-plan:${result.value.plan.id}`,
     });
+  },
+
+  // ---------------------------------------------------------------------
+  // Departamento médico (M-MEDICAL / M-MEDICAL-CASE) — máquina MED-1..MED-9.
+  // Cada command roda numa transação só com o episódio e a disponibilidade do
+  // jogador, para não existir instante com caso aberto e jogador escalável.
+  // ---------------------------------------------------------------------
+
+  /**
+   * MED-1 manual — registra o caso de quem o elenco JÁ trata como lesionado
+   * mas nunca teve episódio (mundo anterior a esta vertical, ou restrição sem
+   * caso). Sem isto a seção "sem caso registrado" da `M-MEDICAL` é um beco sem
+   * saída: mostra o problema e não deixa agir.
+   *
+   * Tipo e região saem do `SeededRandom` do MUNDO, não do cliente: a verdade
+   * clínica já existe (o jogador está machucado), o que falta é a comissão
+   * descobri-la pelos exames — é a assimetria de informação do §16.
+   */
+  "medical:open-case": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+
+    const result = await medicalUnitOfWork.run(
+      async (repos: MedicalRepositories) => {
+        const context = await repos.context.forPlayer(
+          world.value.worldId,
+          parsed.data.playerId,
+          world.value.snapshot.currentDate,
+        );
+        if (context === null) {
+          return fail(
+            new DomainError(
+              "PLAYER_NOT_IN_SQUAD",
+              "Jogador não pertence a nenhum elenco ativo do mundo.",
+              { playerId: parsed.data.playerId },
+            ),
+          );
+        }
+        const random = new SeededRandom({
+          worldSeed: world.value.snapshot.seed,
+          context: `medical:open-case:${world.value.snapshot.currentDate}:${parsed.data.playerId}`,
+        });
+        const nature = rollInjuryNature(random, {
+          fatigue: context.fatigue,
+          age: context.age,
+          contact: false,
+          injuredRegionHistory: context.injuredRegionHistory,
+        });
+        return new OpenInjuryEpisode(repos.episodes).execute({
+          gameWorldId: world.value.worldId,
+          clubId: context.clubId,
+          playerId: parsed.data.playerId,
+          worldSeed: world.value.snapshot.seed,
+          occurredOn: world.value.snapshot.currentDate,
+          injuryType: nature.injuryType,
+          cause: InjuryCause.WEAR,
+          region: nature.region,
+        });
+      },
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-2 — solicita exames. */
+  "medical:order-exam": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new OrderMedicalExam(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-3/MED-9 — fecha o diagnóstico (ou o revisa, se já havia um). */
+  "medical:diagnose": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalDiagnosisPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new DiagnoseInjury(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        severity: parsed.data.severity,
+        returnRiskScore: parsed.data.returnRiskScore,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-4 — `SetMedicalPlan` do doc 23: escolhe o tratamento e inicia a reabilitação. */
+  "medical:set-plan": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlanPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new SetMedicalPlan(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        option: parsed.data.option,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-5/6/7 — avança um estágio; de S7 vira liberação competitiva. */
+  "medical:advance-rehab": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new AdvanceRehabStage(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /**
+   * Retorno antecipado. O sorteio da recaída sai do `SeededRandom` do MUNDO —
+   * o servidor é a autoridade, e o mesmo mundo no mesmo dia dá o mesmo desfecho.
+   */
+  "medical:force-return": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalForceReturnPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const random = new SeededRandom({
+      worldSeed: world.value.snapshot.seed,
+      context: `medical:force-return:${world.value.snapshot.currentDate}:${parsed.data.playerId}`,
+    });
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new ForceMedicalReturn(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        relapseRoll: random.nextFloat(),
+        aggravationRoll: random.nextFloat(),
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** MED-8 — alta: devolve o jogador ao elenco. */
+  "medical:discharge": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalPlayerPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new DischargeFromMedical(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
+  },
+
+  /** Aposentadoria médica — terminal absoluto (INV-4). */
+  "medical:retire-player": async ({ worlds, medicalUnitOfWork, envelope }) => {
+    const world = await loadWorld(worlds, envelope.worldId);
+    if (!world.ok) return world;
+    const parsed = medicalRetirementPayload.safeParse(envelope.payload);
+    if (!parsed.success) return fail(invalidPayload(parsed.error));
+    const result = await medicalUnitOfWork.run((repos: MedicalRepositories) =>
+      new RetirePlayerMedically(repos.episodes, repos.availability).execute({
+        gameWorldId: world.value.worldId,
+        playerId: parsed.data.playerId,
+        occurredOn: world.value.snapshot.currentDate,
+        confirmed: parsed.data.confirmed,
+      }),
+    );
+    if (!result.ok) return result;
+    return succeed({ resource: `injury:${result.value.episode.id}` });
   },
 
   /** Mentoria — vincula um mentor a um pupilo (M-MENTORING). */
@@ -2000,6 +2379,7 @@ const handlers: Record<string, CommandHandler> = {
     pushTokenRepository,
     aiTrainingUnitOfWork,
     individualTrainingUnitOfWork,
+    medicalUnitOfWork,
     mentorshipUnitOfWork,
     collectiveTrainingUnitOfWork,
     playerRepository,
@@ -2070,6 +2450,15 @@ const handlers: Record<string, CommandHandler> = {
           seed: after.value.snapshot.seed,
           currentDate: after.value.snapshot.currentDate,
           rulesetVersion: after.value.snapshot.rulesetVersion,
+        },
+      );
+      // Departamento médico: a carga do dia pode lesionar (F13/R-21).
+      await settleTrainingInjuries(
+        { medicalUnitOfWork },
+        {
+          worldId: after.value.worldId,
+          seed: after.value.snapshot.seed,
+          currentDate: after.value.snapshot.currentDate,
         },
       );
       // Mentoria: evolução acelerada dos pupilos.

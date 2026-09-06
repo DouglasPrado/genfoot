@@ -12,7 +12,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { registeredCommandTypes } from "../src/commands/command-registry.js";
 import { API_PREFIX } from "../src/main.js";
 import { AppModule } from "../src/app.module.js";
-import { hasDatabase, skipReason } from "./postgres.guard.js";
+import {
+  hasDatabase,
+  resetWorldFixtures,
+  skipReason,
+} from "./postgres.guard.js";
 
 const VALID_STATUSES = new Set(["ACCEPTED", "ALREADY_APPLIED", "REJECTED"]);
 
@@ -24,6 +28,9 @@ describe.skipIf(!hasDatabase)(
   let worldId = "";
 
   beforeAll(async () => {
+    // Banco limpo ANTES de criar o mundo: estes e2e usam idempotencyKey fixa,
+    // e um registro sobrevivente aponta para um mundo truncado (404 em tudo).
+    await resetWorldFixtures();
     dataDirectory = await mkdtemp(join(tmpdir(), "grinta-apicat-"));
     process.env.GRINTA_API_DATA_DIR = dataDirectory;
     process.env.GRINTA_API_ALLOW_ANONYMOUS = "1";
@@ -111,6 +118,18 @@ describe.skipIf(!hasDatabase)(
       "market:release-player",
       "market:sell-player",
       "market:sign-player",
+      // C5-V2: a partida ao vivo — apito inicial e as ordens do técnico (§11).
+      "match:start",
+      "match:submit-command",
+      // Departamento médico (M-MEDICAL / M-MEDICAL-CASE): a máquina MED-1..MED-9.
+      "medical:advance-rehab",
+      "medical:diagnose",
+      "medical:discharge",
+      "medical:force-return",
+      "medical:open-case",
+      "medical:order-exam",
+      "medical:retire-player",
+      "medical:set-plan",
       // M-MENTORING: vincular/desvincular mentor (evolução acelerada).
       "mentoring:link-mentor",
       "mentoring:unlink-mentor",
@@ -167,15 +186,27 @@ describe.skipIf(!hasDatabase)(
       "/api/v1/commands/catalog",
     );
     expect(response.status).toBe(200);
-    expect(response.body.commandCount).toBe(53);
+    expect(response.body.commandCount).toBe(63);
     expect(response.body.commands).toContain("world:genesis");
     expect(response.body.commands).toContain("world:pause");
     expect(response.body.commands).toContain("identity:reserve-club");
     expect([...response.body.queries].sort()).toEqual([
       "club",
       "club-detail",
+      // A ficha disciplinar do elenco de um clube (M-CLUB-VIEW): cartões somados.
+      "club-discipline",
+      // M-COMPETITION aba Chaveamento: os confrontos de mata-mata da edição.
+      "competition-bracket",
+      // M-COMPETITION: cabeçalho + regulamento de UMA competição.
+      "competition-detail",
+      // M-COMPETITION aba Jogos: todos os jogos da edição, com escudo e placar.
+      "competition-matches",
       // O desfecho da temporada (C7-V6b): campeão, acesso e rebaixamento.
       "competition-outcome",
+      // M-COMPETITION abas Artilharia/Assistências, com a cobertura do motor.
+      "competition-stats",
+      // M-COMPETITION aba Tabela/Grupos: uma tabela na liga, N na fase de grupos.
+      "competition-table",
       // A tabela da liga (C7): derivada dos jogos terminados.
       "competitions",
       // A lista de competições do mundo para o admin gerir (C7, R-202).
@@ -205,6 +236,10 @@ describe.skipIf(!hasDatabase)(
       "match-detail",
       // O calendário e os resultados (M-05, lista).
       "matches",
+      // O departamento médico do clube (M-MEDICAL): casos abertos + indicadores.
+      "medical",
+      // O caso aberto de um jogador (M-MEDICAL-CASE) + opções de tratamento.
+      "medical-case",
       // O mentor atual de um pupilo (M-MENTORING).
       "mentorship",
       // A imprensa (C11, M-25): manchetes dos fatos reais do mundo.

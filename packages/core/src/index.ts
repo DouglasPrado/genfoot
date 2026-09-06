@@ -115,6 +115,7 @@ export * from "./competitions/competition.js";
 export * from "./competitions/competition-schedule.js";
 export * from "./competitions/author-competition.js";
 export * from "./competitions/standings.js";
+export * from "./competitions/competition-phases.js";
 export * from "./competitions/season-outcome.js";
 export * from "./competitions/promotion-relegation.js";
 export * from "./competitions/season-rollover.js";
@@ -138,6 +139,11 @@ export * from "./youth/promote-youth.js";
 export * from "./youth/demote-to-youth.js";
 export * from "./matches/match-simulation.js";
 export * from "./matches/goal-attribution.js";
+export * from "./matches/match-incidents.js";
+export * from "./matches/player-ratings.js";
+export * from "./matches/live-match.js";
+export * from "./matches/live-match-clock.js";
+export * from "./matches/live-match-repository.js";
 export * from "./matches/match-play-repository.js";
 export * from "./matches/play-next-round.js";
 export * from "./matches/matches-read-model.js";
@@ -158,6 +164,14 @@ export * from "./automation/run-autopilot.js";
 export * from "./automation/ai-club-training.js";
 export * from "./presence/presence-model.js";
 export * from "./presence/presence-repository.js";
+
+// Medicina — máquina do episódio (MED-1..MED-9) e F13/R-21.
+export * from "./medical/injury-episode-types.js";
+export * from "./medical/injury-episode.js";
+export * from "./medical/injury-risk.js";
+export * from "./medical/medical-use-cases.js";
+export * from "./medical/settle-training-injuries.js";
+export * from "./medical/medical-unit-of-work.js";
 
 // Treino — a fórmula de evolução do §6 (R-212).
 export * from "./training/development-gain.js";
